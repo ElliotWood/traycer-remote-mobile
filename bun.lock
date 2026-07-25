@@ -189,6 +189,25 @@
         "vitest": "catalog:",
       },
     },
+    "clients/mobile": {
+      "name": "@traycer-clients/mobile",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tanstack/react-query": "catalog:",
+        "@traycer-clients/shared": "workspace:*",
+        "@traycer/protocol": "workspace:*",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+        "uuid": "catalog:",
+      },
+      "devDependencies": {
+        "@types/react": "catalog:",
+        "@types/react-dom": "catalog:",
+        "@vitejs/plugin-react": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+      },
+    },
     "clients/shared": {
       "name": "@traycer-clients/shared",
       "dependencies": {
@@ -1332,6 +1351,8 @@
     "@traycer-clients/desktop": ["@traycer-clients/desktop@workspace:clients/desktop"],
 
     "@traycer-clients/gui-app": ["@traycer-clients/gui-app@workspace:clients/gui-app"],
+
+    "@traycer-clients/mobile": ["@traycer-clients/mobile@workspace:clients/mobile"],
 
     "@traycer-clients/shared": ["@traycer-clients/shared@workspace:clients/shared"],
 

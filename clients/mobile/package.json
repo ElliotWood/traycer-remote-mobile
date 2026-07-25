@@ -1,0 +1,28 @@
+{
+  "name": "@traycer-clients/mobile",
+  "license": "MIT",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "compile": "tsc -b",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@traycer/protocol": "workspace:*",
+    "@traycer-clients/shared": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "uuid": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}
