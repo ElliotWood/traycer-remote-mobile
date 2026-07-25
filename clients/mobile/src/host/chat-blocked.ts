@@ -52,3 +52,44 @@ export function blockedFromSnapshot(
   }
   return items;
 }
+
+/**
+ * Folds a live server frame into the current blocked list: a snapshot replaces
+ * it wholesale; approval/interview request/resolve frames add or remove a single
+ * item. Any other frame leaves the list unchanged (same reference, so React
+ * skips a re-render). Pure — unit-tested.
+ */
+export function applyServerFrame(
+  prev: readonly BlockedItem[],
+  frame: ChatSubscribeServerFrame,
+): readonly BlockedItem[] {
+  switch (frame.kind) {
+    case "snapshot":
+      return blockedFromSnapshot(frame.snapshot);
+    case "approvalRequested":
+      return [
+        ...prev,
+        {
+          kind: "approval",
+          id: frame.approval.approvalId,
+          title: frame.approval.description,
+        },
+      ];
+    case "approvalResolved":
+      return prev.filter(
+        (item) => !(item.kind === "approval" && item.id === frame.approvalId),
+      );
+    case "interviewRequested":
+      return [
+        ...prev,
+        { kind: "interview", id: frame.blockId, title: "Awaiting your input" },
+      ];
+    case "interviewAnswered":
+    case "interviewErrored":
+      return prev.filter(
+        (item) => !(item.kind === "interview" && item.id === frame.blockId),
+      );
+    default:
+      return prev;
+  }
+}

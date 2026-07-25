@@ -1,6 +1,13 @@
-import type { ChatSnapshot } from "@traycer/protocol/host/agent/gui/subscribe";
+import type {
+  ChatSnapshot,
+  ChatSubscribeServerFrame,
+} from "@traycer/protocol/host/agent/gui/subscribe";
 import { expect, test } from "vitest";
-import { blockedFromSnapshot } from "@/host/chat-blocked";
+import {
+  applyServerFrame,
+  blockedFromSnapshot,
+  type BlockedItem,
+} from "@/host/chat-blocked";
 
 type PendingSlices = Pick<
   ChatSnapshot,
@@ -36,4 +43,56 @@ test("blockedFromSnapshot returns nothing when idle", () => {
     pendingInterviews: [],
   };
   expect(blockedFromSnapshot(snapshot)).toEqual([]);
+});
+
+test("applyServerFrame adds an approval on approvalRequested", () => {
+  const frame: ChatSubscribeServerFrame = {
+    kind: "approvalRequested",
+    hasBinaryPayload: false,
+    epicId: "e1",
+    chatId: "c1",
+    approval: {
+      approvalId: "a1",
+      toolName: "bash",
+      description: "Run it?",
+      input: null,
+      requestedAt: 0,
+      kind: "tool",
+      planId: null,
+      actions: [],
+    },
+  };
+  expect(applyServerFrame([], frame)).toEqual([
+    { kind: "approval", id: "a1", title: "Run it?" },
+  ]);
+});
+
+test("applyServerFrame removes an approval on approvalResolved", () => {
+  const prev: BlockedItem[] = [
+    { kind: "approval", id: "a1", title: "Run it?" },
+    { kind: "interview", id: "b1", title: "Awaiting your input" },
+  ];
+  const frame: ChatSubscribeServerFrame = {
+    kind: "approvalResolved",
+    hasBinaryPayload: false,
+    epicId: "e1",
+    chatId: "c1",
+    approvalId: "a1",
+    decision: { approved: true },
+    resolvedAt: 0,
+  };
+  expect(applyServerFrame(prev, frame)).toEqual([
+    { kind: "interview", id: "b1", title: "Awaiting your input" },
+  ]);
+});
+
+test("applyServerFrame leaves the list unchanged (same ref) for other frames", () => {
+  const prev: readonly BlockedItem[] = [
+    { kind: "approval", id: "a1", title: "Run it?" },
+  ];
+  const frame: ChatSubscribeServerFrame = {
+    kind: "pong",
+    hasBinaryPayload: false,
+  };
+  expect(applyServerFrame(prev, frame)).toBe(prev);
 });

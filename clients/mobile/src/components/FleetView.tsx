@@ -26,7 +26,8 @@ export function FleetView(): ReactElement {
         <ul>
           {state.items.map((item) => (
             <li key={`${item.kind}:${item.id}`}>
-              <strong>{item.title}</strong> — {item.status}
+              <strong>{item.title}</strong> — {item.status}{" "}
+              <code>{item.id}</code>
             </li>
           ))}
         </ul>
