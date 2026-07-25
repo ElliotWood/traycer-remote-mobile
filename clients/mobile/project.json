@@ -1,0 +1,15 @@
+{
+  "name": "traycer-clients-mobile",
+  "implicitDependencies": ["@traycer-clients/shared", "@traycer/protocol"],
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*"]
+  },
+  "targets": {
+    "build": {
+      "inputs": ["{projectRoot}/**/*", "sharedGlobals"]
+    },
+    "compile": {
+      "inputs": ["{projectRoot}/**/*", "sharedGlobals"]
+    }
+  }
+}
