@@ -35,14 +35,9 @@ import { CreateArtifactView } from "./create-artifact-view";
 import { ArtifactBodyView } from "./artifact-body-view";
 import { NotificationPermissionButton } from "./notification-permission-button";
 import { AgentsSection } from "./epic-tree/agents-section";
-import {
-  ArtifactsSection,
-  DEFAULT_ARTIFACT_FILTER,
-  type ArtifactFilter,
-} from "./epic-tree/artifacts-section";
-import { ArtifactFilterPanel } from "./epic-tree/artifact-filter-panel";
+import { ArtifactsSection } from "./epic-tree/artifacts-section";
 import { ConnectionPill } from "./epic-tree/connection-pill";
-import { Button, SectionHeading, screen, theme, type } from "./design-tokens";
+import { Button, SectionHeading, screen } from "./design-tokens";
 
 interface EpicViewProps {
   readonly epicId: string;
@@ -109,8 +104,6 @@ export function EpicView({
   }, [epicId, artifacts]);
 
   const [drill, setDrill] = useState<Drill>(null);
-  const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>(DEFAULT_ARTIFACT_FILTER);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT_MODE);
 
   // The artifact body drill marks itself seen the moment it opens (mirrors
@@ -169,31 +162,31 @@ export function EpicView({
         ← Back
       </Button>
 
-      <header style={{ margin: "16px 0 12px" }}>
+      <header style={{ margin: "12px 0 10px" }}>
         <SectionHeading>{epicTitle ?? "Epic"}</SectionHeading>
         <ConnectionPill state={connection} />
       </header>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      {/* Compact toolbar: New-agent is the primary (teal-filled) CTA, the rest are tight secondary/ghost chips packed close together. */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         {hostClient !== null && (
-          <Button variant="secondary" onClick={() => setDrill({ kind: "author", parentId: null })}>
+          <Button variant="primary" onClick={() => setDrill({ kind: "author", parentId: null })}>
             + New agent
           </Button>
         )}
         {hostClient !== null && (
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => setDrill({ kind: "create-artifact", parentId: null })}
           >
-            + New artifact
+            + Artifact
           </Button>
         )}
         <Button variant="ghost" onClick={() => setSortMode(nextSortMode(sortMode))}>
-          Sort: {describeSortMode(sortMode)}
+          {describeSortMode(sortMode)}
         </Button>
+        <NotificationPermissionButton compact />
       </div>
-
-      <NotificationPermissionButton />
 
       <AgentsSection
         epicId={epicId}
@@ -205,39 +198,14 @@ export function EpicView({
         onAddChild={(parentId) => setDrill({ kind: "author", parentId })}
       />
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 4px" }}>
-        <button
-          type="button"
-          onClick={() => setShowFilterPanel((v) => !v)}
-          style={{
-            ...type.bodyXs,
-            border: "none",
-            background: "transparent",
-            color: showFilterPanel || hasActiveFilter(artifactFilter) ? theme.primary : theme.mutedText,
-            cursor: "pointer",
-            padding: "6px 4px",
-          }}
-        >
-          Filter
-        </button>
-      </div>
-      {showFilterPanel && (
-        <ArtifactFilterPanel filter={artifactFilter} onChange={setArtifactFilter} />
-      )}
-
       <ArtifactsSection
         epicId={epicId}
         artifacts={artifacts}
         connectionLive={connectionLive}
-        filter={artifactFilter}
         sortMode={sortMode}
         onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
         onAddChild={(parentId) => setDrill({ kind: "create-artifact", parentId })}
       />
     </main>
   );
-}
-
-function hasActiveFilter(filter: ArtifactFilter): boolean {
-  return filter.statuses.size > 0 || filter.kinds.size > 0 || filter.read !== "all";
 }

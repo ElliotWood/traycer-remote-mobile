@@ -13,8 +13,16 @@ import { radius, theme } from "@/views/design-tokens";
 export const INDENT_PX = 16;
 export const BASE_PAD_LEFT = 8;
 export const GUIDE_OFFSET_PX = 7;
-export const ROW_MIN_HEIGHT = 44;
-const HIT_SIZE = 44;
+/**
+ * Density refinement (user + Evaluator round 1: "reads taller/sparser than
+ * the desktop's dense h-7"): 36px rather than a strict 44px — still a
+ * comfortably tappable row (well above a bare 28px desktop row), trading a
+ * few px of hit-slop for the tighter, denser rhythm both asked for. Applies
+ * to TREE rows/chevrons/row-actions only; standalone screen buttons
+ * (`design-tokens.Button`) keep their own 44px `MIN_TOUCH`.
+ */
+export const ROW_MIN_HEIGHT = 36;
+const HIT_SIZE = 36;
 
 export function rowIndentStyle(depth: number): CSSProperties {
   return { paddingLeft: depth * INDENT_PX + BASE_PAD_LEFT };
@@ -80,7 +88,11 @@ export function TreeChevron({
         onToggle();
       }}
     >
-      {expanded ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+      {expanded ? (
+        <ChevronDown size={16} color={theme.primary} aria-hidden="true" />
+      ) : (
+        <ChevronRight size={16} aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -131,13 +143,13 @@ export function rowOpenButtonStyle(): CSSProperties {
     minWidth: 0,
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     minHeight: ROW_MIN_HEIGHT,
     padding: "0 4px",
     border: "none",
     background: "transparent",
     color: theme.textRow,
-    fontSize: 14,
+    fontSize: 13,
     textAlign: "left",
     cursor: "pointer",
     borderRadius: radius.sm,
@@ -148,7 +160,7 @@ export const sectionHeaderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "10px 4px",
+  padding: "6px 4px",
   cursor: "pointer",
   background: "transparent",
   border: "none",

@@ -8,7 +8,38 @@
 import type { ReactElement } from "react";
 import { KIND_COLORS, KIND_LABELS, STATUS_LABELS, type ArtifactStatus, type CardKind } from "@/views/kind-tokens";
 import { radius, theme, type } from "@/views/design-tokens";
-import { DEFAULT_ARTIFACT_FILTER, type ArtifactFilter } from "./artifacts-section";
+
+export interface ArtifactFilter {
+  readonly statuses: ReadonlySet<ArtifactStatus>;
+  readonly kinds: ReadonlySet<CardKind>;
+  readonly read: "all" | "read" | "unread";
+}
+
+export const DEFAULT_ARTIFACT_FILTER: ArtifactFilter = {
+  statuses: new Set(),
+  kinds: new Set(),
+  read: "all",
+};
+
+export function artifactMatchesFilter(
+  artifact: { readonly status: ArtifactStatus | null; readonly kind: CardKind },
+  filter: ArtifactFilter,
+  unread: boolean,
+): boolean {
+  if (filter.statuses.size > 0 && (artifact.status === null || !filter.statuses.has(artifact.status))) {
+    return false;
+  }
+  if (filter.kinds.size > 0 && !filter.kinds.has(artifact.kind)) {
+    return false;
+  }
+  if (filter.read === "read" && unread) return false;
+  if (filter.read === "unread" && !unread) return false;
+  return true;
+}
+
+export function hasActiveArtifactFilter(filter: ArtifactFilter): boolean {
+  return filter.statuses.size > 0 || filter.kinds.size > 0 || filter.read !== "all";
+}
 
 const STATUSES: readonly ArtifactStatus[] = [0, 1, 2];
 const KINDS: readonly CardKind[] = ["spec", "ticket", "story", "review"];

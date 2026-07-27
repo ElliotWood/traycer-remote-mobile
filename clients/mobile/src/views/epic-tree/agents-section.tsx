@@ -25,7 +25,7 @@ import { getLastSeenAt, isUnread } from "@/host/read-tracking-store";
 import { resortTree, type SortMode } from "@/host/tree-sort";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useRenameChat, useDeleteChat } from "@/host/use-node-mutations";
-import { LADDER_TIER_LABELS, LadderIcon } from "@/views/kind-tokens";
+import { LADDER_TIER_LABELS, LadderIcon, hexToRgba } from "@/views/kind-tokens";
 import { theme, type } from "@/views/design-tokens";
 import {
   GuideRails,
@@ -108,10 +108,14 @@ export function AgentsSection({
   const canMutate = hostClient !== null && connectionLive;
 
   return (
-    <section style={{ marginBottom: 8 }}>
+    <section style={{ marginBottom: 2 }}>
       <button type="button" style={sectionHeaderStyle} onClick={() => setCollapsed((c) => !c)}>
         <span style={sectionLabelStyle}>Agents</span>
-        {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+        {collapsed ? (
+          <ChevronRight size={14} color={theme.primary} aria-hidden="true" />
+        ) : (
+          <ChevronDown size={14} color={theme.primary} aria-hidden="true" />
+        )}
       </button>
 
       {!collapsed && (
@@ -222,11 +226,15 @@ function ChatNode({
         <button
           type="button"
           data-testid={`chat-row-${id}`}
-          style={{ ...rowOpenButtonStyle(), ...rowIndentStyle(0) }}
+          style={{
+            ...rowOpenButtonStyle(),
+            ...rowIndentStyle(0),
+            background: hexToRgba(theme.primary, 0.06),
+          }}
           onClick={() => onOpen(id)}
         >
           <span role="status" title={LADDER_TIER_LABELS[selfTier]} aria-label={LADDER_TIER_LABELS[selfTier]}>
-            <LadderIcon tier={selfTier} size={16} />
+            <LadderIcon tier={selfTier} size={15} />
           </span>
           <span
             style={{

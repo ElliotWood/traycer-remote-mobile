@@ -5,7 +5,7 @@
  * `epic-sidebar-artifact-tree.tsx` + `ArtifactUnreadMarker`.
  */
 import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, ListFilter } from "lucide-react";
 import {
   buildArtifactTree,
   type ArtifactTree,
@@ -22,10 +22,8 @@ import {
   StatusDot,
   displayArtifactTitle,
   hexToRgba,
-  type ArtifactStatus,
-  type CardKind,
 } from "@/views/kind-tokens";
-import { theme, type } from "@/views/design-tokens";
+import { radius, theme, type } from "@/views/design-tokens";
 import {
   GuideRails,
   RowActionsButton,
@@ -36,40 +34,18 @@ import {
   sectionLabelStyle,
 } from "./tree-primitives";
 import { NodeActionSheet, RenamePrompt } from "./node-action-sheet";
-
-export interface ArtifactFilter {
-  readonly statuses: ReadonlySet<ArtifactStatus>;
-  readonly kinds: ReadonlySet<CardKind>;
-  readonly read: "all" | "read" | "unread";
-}
-
-export const DEFAULT_ARTIFACT_FILTER: ArtifactFilter = {
-  statuses: new Set(),
-  kinds: new Set(),
-  read: "all",
-};
-
-function matchesFilter(
-  artifact: EpicArtifactEntry,
-  filter: ArtifactFilter,
-  unread: boolean,
-): boolean {
-  if (filter.statuses.size > 0 && (artifact.status === null || !filter.statuses.has(artifact.status))) {
-    return false;
-  }
-  if (filter.kinds.size > 0 && !filter.kinds.has(artifact.kind)) {
-    return false;
-  }
-  if (filter.read === "read" && unread) return false;
-  if (filter.read === "unread" && !unread) return false;
-  return true;
-}
+import {
+  ArtifactFilterPanel,
+  DEFAULT_ARTIFACT_FILTER,
+  artifactMatchesFilter,
+  hasActiveArtifactFilter,
+  type ArtifactFilter,
+} from "./artifact-filter-panel";
 
 export interface ArtifactsSectionProps {
   readonly epicId: string;
   readonly artifacts: readonly EpicArtifactEntry[];
   readonly connectionLive: boolean;
-  readonly filter: ArtifactFilter;
   readonly sortMode: SortMode;
   readonly onOpenArtifact: (artifactId: string) => void;
   readonly onAddChild: (parentArtifactId: string | null) => void;
@@ -79,7 +55,6 @@ export function ArtifactsSection({
   epicId,
   artifacts,
   connectionLive,
-  filter,
   sortMode,
   onOpenArtifact,
   onAddChild,
@@ -88,6 +63,8 @@ export function ArtifactsSection({
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [actionsForId, setActionsForId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<ArtifactFilter>(DEFAULT_ARTIFACT_FILTER);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const hostClient = useHostClientOrNull();
 
   const fullTree = useMemo(
@@ -100,13 +77,12 @@ export function ArtifactsSection({
     return out;
   }, [artifacts, epicId]);
 
-  const hasActiveFilter =
-    filter.statuses.size > 0 || filter.kinds.size > 0 || filter.read !== "all";
+  const hasActiveFilter = hasActiveArtifactFilter(filter);
   const visibleIds = useMemo(() => {
     if (!hasActiveFilter) return null;
     const set = new Set<string>();
     for (const a of artifacts) {
-      if (matchesFilter(a, filter, unreadById[a.id] ?? false)) set.add(a.id);
+      if (artifactMatchesFilter(a, filter, unreadById[a.id] ?? false)) set.add(a.id);
     }
     return set;
   }, [artifacts, filter, hasActiveFilter, unreadById]);
@@ -129,13 +105,45 @@ export function ArtifactsSection({
   const roots = visibleIds === null ? fullTree.roots : fullTree.roots.filter((id) => visibleIds.has(id));
 
   return (
-    <section style={{ marginBottom: 8 }}>
-      <button type="button" style={sectionHeaderStyle} onClick={() => setCollapsed((c) => !c)}>
-        <span style={sectionLabelStyle}>
-          Artifacts{hasActiveFilter ? " · filtered" : ""}
-        </span>
-        {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-      </button>
+    <section style={{ marginBottom: 4 }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <button
+          type="button"
+          style={{ ...sectionHeaderStyle, flex: 1 }}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <span style={sectionLabelStyle}>
+            Artifacts{hasActiveFilter ? " · filtered" : ""}
+          </span>
+          {collapsed ? (
+            <ChevronRight size={14} color={theme.primary} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={14} color={theme.primary} aria-hidden="true" />
+          )}
+        </button>
+        <button
+          type="button"
+          aria-label="Filter artifacts"
+          onClick={() => setShowFilterPanel((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 36,
+            height: 36,
+            flexShrink: 0,
+            border: "none",
+            borderRadius: radius.md,
+            background: showFilterPanel || hasActiveFilter ? `${theme.primary}22` : "transparent",
+            color: showFilterPanel || hasActiveFilter ? theme.primary : theme.mutedText,
+            cursor: "pointer",
+          }}
+        >
+          <ListFilter size={15} aria-hidden="true" />
+        </button>
+      </div>
+
+      {showFilterPanel && <ArtifactFilterPanel filter={filter} onChange={setFilter} />}
 
       {!collapsed && (
         <>
@@ -258,7 +266,7 @@ function ArtifactNode({
           onClick={() => onOpen(id)}
         >
           <UnreadMarker variant={markerVariant} />
-          <Icon size={16} color={color} aria-hidden="true" />
+          <Icon size={15} color={color} aria-hidden="true" />
           <span
             style={{
               flex: 1,
