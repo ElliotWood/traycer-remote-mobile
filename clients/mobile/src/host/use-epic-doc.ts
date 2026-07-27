@@ -415,6 +415,17 @@ export function useEpicDoc(
   // Dedupes the projection write against a burst of live frames (S1) — only
   // re-serializes/writes when the projected shape actually changed.
   const lastWrittenProjectionRef = useRef<string | null>(null);
+  // Perf fix: every Y.Doc update/snapshot re-derives BOTH `chats` AND
+  // `artifacts` from the whole doc, even when the delta only touched one of
+  // them (or neither, e.g. an artifact-room frame that doesn't change the
+  // tree at all) — calling `setChats`/`setArtifacts` with a NEW array every
+  // time forces the Agents/Artifacts sections to re-render on every frame
+  // regardless of whether their own slice actually changed. These track the
+  // last-applied serialization per collection so `refresh()` can skip the
+  // `setState` (and the array-identity churn that comes with it) when a
+  // frame didn't actually change that half of the tree.
+  const lastChatsRef = useRef<string | null>(null);
+  const lastArtifactsRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (streamConnection === null) {
@@ -427,6 +438,11 @@ export function useEpicDoc(
     }
 
     setDocLoaded(false);
+    // Fresh mount (new epicId/connection) — the compare-refs must not carry
+    // over a previous epic's serialization, or a coincidental content match
+    // could wrongly skip this epic's first live `setChats`/`setArtifacts`.
+    lastChatsRef.current = null;
+    lastArtifactsRef.current = null;
     const doc = new Y.Doc();
     const registry = new ArtifactRoomRegistry();
     setArtifactRooms(registry);
@@ -440,8 +456,19 @@ export function useEpicDoc(
       if (disposed) return;
       const nextChats = readChatsFromEpicDoc(doc);
       const nextArtifacts = readArtifactsFromEpicDoc(doc);
-      setChats(nextChats);
-      setArtifacts(nextArtifacts);
+      const chatsSerialized = JSON.stringify(nextChats);
+      const artifactsSerialized = JSON.stringify(nextArtifacts);
+      // Only the collection that actually changed gets a new array identity
+      // — a delta touching just the artifacts tree never re-renders the
+      // Agents section, and vice versa.
+      if (chatsSerialized !== lastChatsRef.current) {
+        lastChatsRef.current = chatsSerialized;
+        setChats(nextChats);
+      }
+      if (artifactsSerialized !== lastArtifactsRef.current) {
+        lastArtifactsRef.current = artifactsSerialized;
+        setArtifacts(nextArtifacts);
+      }
       const serialized = serializeEpicProjection(nextChats, nextArtifacts);
       if (serialized !== lastWrittenProjectionRef.current) {
         lastWrittenProjectionRef.current = serialized;

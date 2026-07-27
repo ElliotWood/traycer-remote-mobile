@@ -15,7 +15,7 @@
  * are deferred per the accepted P2 contract (no file-search/command-list
  * RPC, no STT infra).
  */
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { ArrowUp, Code, FileCheck, Layers, LockKeyholeOpen, ShieldCheck, Square, type LucideIcon } from "lucide-react";
 import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persistence/epic/foundation";
 import type { AgentMode } from "@traycer/protocol/common/schemas";
@@ -39,8 +39,17 @@ const DEFAULT_HARNESS = "claude" as const;
 export interface ComposerProps {
   readonly epicId: string;
   readonly client: MobileHostClient | null;
-  readonly draftText: string;
-  readonly onDraftTextChange: (text: string) => void;
+  /**
+   * Perf fix: the composer owns its OWN draft text internally now (below) —
+   * every keystroke used to live in `ChatView`'s state, re-rendering the
+   * whole chat screen (transcript included) on every character. These two
+   * props are the ONLY way a parent can still push text in from outside
+   * (the "edit a queued item" flow): bump `prefillNonce` alongside a new
+   * `prefillText` and the effect below adopts it. A stable `prefillNonce`
+   * across renders means "nothing to adopt" — typing never touches these.
+   */
+  readonly prefillText: string | null;
+  readonly prefillNonce: number;
   readonly chatSettings: ChatRunSettings | null;
   readonly canStop: boolean;
   readonly stopping: boolean;
@@ -54,8 +63,8 @@ export interface ComposerProps {
 export function Composer({
   epicId,
   client,
-  draftText,
-  onDraftTextChange,
+  prefillText,
+  prefillNonce,
   chatSettings,
   canStop,
   stopping,
@@ -65,6 +74,7 @@ export function Composer({
   onSend,
   onStop,
 }: ComposerProps): ReactElement {
+  const [draftText, setDraftText] = useState("");
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
     chatSettings?.permissionMode ?? "full_access",
   );
@@ -72,6 +82,14 @@ export function Composer({
   const [modelSlug, setModelSlug] = useState<string | null>(chatSettings?.model ?? null);
   const { models } = useHarnessModels(client, epicId, DEFAULT_HARNESS);
   const resolvedModel = modelSlug ?? models[0]?.id ?? null;
+
+  // Only fires when the PARENT explicitly bumps the nonce (queue-edit) — a
+  // stable nonce across re-renders (typing, transcript updates, anything
+  // else) never re-triggers this, so it can't fight the user's own typing.
+  useEffect(() => {
+    if (prefillNonce > 0 && prefillText !== null) setDraftText(prefillText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillNonce]);
 
   const readOnly = accessRole === "viewer";
   const canType = !readOnly;
@@ -88,6 +106,7 @@ export function Composer({
       agentMode,
       profileId: null,
     });
+    setDraftText("");
   };
 
   return (
@@ -106,7 +125,7 @@ export function Composer({
       ) : (
         <textarea
           value={draftText}
-          onChange={(e) => onDraftTextChange(e.target.value)}
+          onChange={(e) => setDraftText(e.target.value)}
           placeholder="Message this agent…"
           rows={2}
           disabled={!connectionLive}

@@ -6,6 +6,7 @@
  */
 import type { ReactElement } from "react";
 import type { RenderableBlock } from "./transcript-model";
+import { ErrorBoundary } from "../error-boundary";
 import { colors } from "../ui";
 import { TextBlock } from "./blocks/text-block";
 import { ReasoningBlock } from "./blocks/reasoning-block";
@@ -32,7 +33,11 @@ export function BlockList({ nodes, epicId, chatId }: BlockListProps): ReactEleme
   return (
     <>
       {nodes.map((node) => (
-        <BlockNode key={node.block.blockId} node={node} epicId={epicId} chatId={chatId} />
+        // One malformed/throwing block must never take out the whole
+        // transcript — a compact fallback replaces just this card.
+        <ErrorBoundary key={node.block.blockId} label="this block" compact>
+          <BlockNode node={node} epicId={epicId} chatId={chatId} />
+        </ErrorBoundary>
       ))}
     </>
   );

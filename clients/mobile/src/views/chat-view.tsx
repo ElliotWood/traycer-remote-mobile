@@ -148,16 +148,21 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
   };
 
   // ---- Composer draft ----
-  const [draftText, setDraftText] = useState("");
+  // Perf fix: the draft text used to live HERE, so every keystroke re-rendered
+  // this whole component — including the transcript below it (hundreds of
+  // block cards on a long chat). The Composer now owns its own draft state
+  // internally; this component only ever needs to PUSH text into it for the
+  // rare "edit a queued item" action, via a prefill token the Composer's own
+  // effect picks up (see composer.tsx's `prefillText`/`prefillNonce`).
+  const [prefill, setPrefill] = useState<{ readonly text: string; readonly nonce: number } | null>(null);
 
   const handleSend = (text: string, settings: Parameters<typeof chat.sendMessage>[0]["settings"]): void => {
     chat.sendMessage({ text, settings });
-    setDraftText("");
   };
 
   const handleEditQueueItem = (item: ChatQueuedItem, text: string): void => {
     chat.dispatchAction((base) => ({ ...base, kind: "queueCancel", queueItemId: item.queueItemId }));
-    setDraftText(text);
+    setPrefill((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }));
   };
 
   const [undoAllPending, setUndoAllPending] = useState(false);
@@ -259,8 +264,8 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
         <Composer
           epicId={epicId}
           client={hostClient}
-          draftText={draftText}
-          onDraftTextChange={setDraftText}
+          prefillText={prefill?.text ?? null}
+          prefillNonce={prefill?.nonce ?? 0}
           chatSettings={chat.chatSettings}
           canStop={isRunning}
           stopping={chat.runStatus === "stopping"}

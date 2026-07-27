@@ -4,7 +4,7 @@
  * (solid self / translucent descendant) — mirrors desktop's
  * `epic-sidebar-artifact-tree.tsx` + `ArtifactUnreadMarker`.
  */
-import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import { memo, useCallback, useMemo, useState, type CSSProperties, type ReactElement } from "react";
 import { ChevronDown, ChevronRight, ListFilter } from "lucide-react";
 import {
   buildArtifactTree,
@@ -91,13 +91,14 @@ export function ArtifactsSection({
     return set;
   }, [artifacts, filter, hasActiveFilter, unreadById]);
 
-  const toggleExpanded = (id: string): void => {
+  // Perf: stable identity so `React.memo`'d `ArtifactNode` rows bail out.
+  const toggleExpanded = useCallback((id: string): void => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
+  }, []);
 
   const actionsArtifact = actionsForId === null ? null : fullTree.byId[actionsForId];
   const renamingArtifact = renamingId === null ? null : fullTree.byId[renamingId];
@@ -222,7 +223,8 @@ function UnreadMarker({ variant }: { readonly variant: "self" | "descendant" | n
   return <span aria-hidden="true" style={style} />;
 }
 
-function ArtifactNode({
+/** Perf: memoized (default shallow prop compare) — see `ChatNodeImpl`'s equivalent docblock in `agents-section.tsx` for why this bails out on unrelated re-renders. */
+function ArtifactNodeImpl({
   id,
   depth,
   tree,
@@ -316,3 +318,5 @@ function ArtifactNode({
     </li>
   );
 }
+
+const ArtifactNode = memo(ArtifactNodeImpl);

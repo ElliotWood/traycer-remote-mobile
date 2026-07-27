@@ -24,6 +24,7 @@ import { EpicView } from "@/views/epic-view";
 import { ChatView } from "@/views/chat-view";
 import { CommentsPanel } from "@/views/comments/comments-panel";
 import { parseCommentsHarnessParams } from "@/views/comments/comments-harness-params";
+import { ErrorBoundary } from "@/views/error-boundary";
 
 interface AppShellProps {
   readonly client: MobileHostClient;
@@ -89,33 +90,39 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
   switch (route.name) {
     case "fleet":
       return (
-        <FleetView
-          client={client}
-          onSignOut={onSignOut}
-          onOpenEpic={(epicId, epicTitle) =>
-            dispatch({ type: "open-epic", epicId, epicTitle })
-          }
-        />
+        <ErrorBoundary label="the fleet" key={route.name}>
+          <FleetView
+            client={client}
+            onSignOut={onSignOut}
+            onOpenEpic={(epicId, epicTitle) =>
+              dispatch({ type: "open-epic", epicId, epicTitle })
+            }
+          />
+        </ErrorBoundary>
       );
     case "epic":
       return (
-        <EpicView
-          epicId={route.epicId}
-          epicTitle={route.epicTitle}
-          onOpenChat={(chatId, chatTitle) =>
-            dispatch({ type: "open-chat", epicId: route.epicId, chatId, chatTitle })
-          }
-          onBack={() => dispatch({ type: "back" })}
-        />
+        <ErrorBoundary label="this epic" key={`${route.name}:${route.epicId}`}>
+          <EpicView
+            epicId={route.epicId}
+            epicTitle={route.epicTitle}
+            onOpenChat={(chatId, chatTitle) =>
+              dispatch({ type: "open-chat", epicId: route.epicId, chatId, chatTitle })
+            }
+            onBack={() => dispatch({ type: "back" })}
+          />
+        </ErrorBoundary>
       );
     case "chat":
       return (
-        <ChatView
-          epicId={route.epicId}
-          chatId={route.chatId}
-          initialTitle={route.chatTitle}
-          onBack={() => dispatch({ type: "back" })}
-        />
+        <ErrorBoundary label="this chat" key={`${route.name}:${route.chatId}`}>
+          <ChatView
+            epicId={route.epicId}
+            chatId={route.chatId}
+            initialTitle={route.chatTitle}
+            onBack={() => dispatch({ type: "back" })}
+          />
+        </ErrorBoundary>
       );
   }
 }

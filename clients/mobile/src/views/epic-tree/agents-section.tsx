@@ -5,7 +5,7 @@
  * Terminal-agents are OUT this round (see the P1 contract — `tuiAgents` are
  * never projected into the epic doc mobile reads).
  */
-import { useMemo, useState, type ReactElement } from "react";
+import { memo, useCallback, useMemo, useState, type ReactElement } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   buildChatTree,
@@ -91,13 +91,16 @@ export function AgentsSection({
     return out;
   }, [chats, badges, epicId]);
 
-  const toggleExpanded = (id: string): void => {
+  // Perf: stable identity across re-renders (state setters are already
+  // stable — the closure body itself doesn't capture anything that changes)
+  // so `React.memo`'d `ChatNode` rows can actually bail out on it.
+  const toggleExpanded = useCallback((id: string): void => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
+  }, []);
 
   const actionsChat = actionsForChatId === null ? null : tree.byId[actionsForChatId];
   const renamingChat = renamingChatId === null ? null : tree.byId[renamingChatId];
@@ -193,7 +196,15 @@ const DEFAULT_BADGE: ChatBadgeState = {
   lastErrorAt: null,
 };
 
-function ChatNode({
+/**
+ * Perf: memoized (default shallow prop compare). `tree`/`tierById` are
+ * themselves memoized upstream (`useMemo` keyed on `[chats, ...]`, and
+ * `use-epic-doc.ts` now only hands `chats` a new array identity when its
+ * CONTENT actually changed) — so a re-render of `AgentsSection` triggered by
+ * something unrelated (e.g. a sibling section, a connection-pill update)
+ * leaves these props referentially identical and every row bails out here.
+ */
+function ChatNodeImpl({
   id,
   depth,
   tree,
@@ -287,6 +298,8 @@ function ChatNode({
     </li>
   );
 }
+
+const ChatNode = memo(ChatNodeImpl);
 
 /** The rollup only ever carries the six urgency kinds — mapped back to a displayable tier for the muted glyph. */
 function descendantKindToTier(kind: ReturnType<typeof computeChatDescendantRollup>["kind"]): LadderTier {

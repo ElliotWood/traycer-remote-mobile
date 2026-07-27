@@ -37,6 +37,7 @@ import { NotificationPermissionButton } from "./notification-permission-button";
 import { AgentsSection } from "./epic-tree/agents-section";
 import { ArtifactsSection } from "./epic-tree/artifacts-section";
 import { ConnectionPill } from "./epic-tree/connection-pill";
+import { ErrorBoundary } from "./error-boundary";
 import { Button, SectionHeading, screen } from "./design-tokens";
 
 interface EpicViewProps {
@@ -147,14 +148,16 @@ export function EpicView({
     const artifact = artifacts.find((a) => a.id === drill.artifactId);
     if (artifact !== undefined) {
       return (
-        <ArtifactBodyView
-          epicId={epicId}
-          artifact={artifact}
-          artifacts={artifacts}
-          artifactRooms={artifactRooms}
-          onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
-          onBack={() => setDrill(null)}
-        />
+        <ErrorBoundary label="this artifact" key={artifact.id}>
+          <ArtifactBodyView
+            epicId={epicId}
+            artifact={artifact}
+            artifacts={artifacts}
+            artifactRooms={artifactRooms}
+            onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
+            onBack={() => setDrill(null)}
+          />
+        </ErrorBoundary>
       );
     }
   }

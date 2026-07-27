@@ -3,8 +3,19 @@
  * (persisted `chat.messages`, user bubbles + assistant block trees) followed
  * by the accumulator's live overlay (`liveBlocks`), through the SAME
  * renderers regardless of source.
+ *
+ * Perf fix: `React.memo` here (default shallow prop compare) plus on
+ * `AssistantTurn`/`UserMessageBubble` below means a re-render of `ChatView`
+ * that leaves `messages`/`liveBlocks` referentially unchanged (now the
+ * common case — `use-chat.ts` memoizes both) skips this whole subtree
+ * entirely; when a NEW message genuinely arrives, only the new/changed
+ * message re-renders — every prior message object is preserved by
+ * reference (the reducer only ever appends, never recreates old entries),
+ * so its per-message `React.memo` bails out for everything but the delta.
+ * On a long chat (hundreds of blocks) this is the difference between one
+ * new card mounting and the whole transcript re-rendering.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
 import type { Message } from "@traycer/protocol/persistence/epic/messages";
 import { BlockList } from "./block-list";
@@ -18,7 +29,7 @@ export interface TranscriptViewProps {
   readonly chatId: string;
 }
 
-export function TranscriptView({
+function TranscriptViewImpl({
   messages,
   liveBlocks,
   epicId,
@@ -49,6 +60,8 @@ export function TranscriptView({
   );
 }
 
+export const TranscriptView = memo(TranscriptViewImpl);
+
 /**
  * Renders one assistant turn's blocks in their original relative order,
  * interleaving `steer` blocks as user bubbles at their original position
@@ -56,7 +69,7 @@ export function TranscriptView({
  * (computed once over the WHOLE turn, not fragmented per contiguous run, so
  * a suppression pair separated by an interleaved steer still dedupes).
  */
-function AssistantTurn({
+function AssistantTurnImpl({
   blocks,
   epicId,
   chatId,
@@ -91,3 +104,6 @@ function AssistantTurn({
     </>
   );
 }
+
+/** Perf fix: memoized for the same reason as `UserMessageBubble` — an unrelated new message shouldn't re-render every prior assistant turn. */
+const AssistantTurn = memo(AssistantTurnImpl);

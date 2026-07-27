@@ -18,7 +18,7 @@
  * Lifecycle mirrors `useEpicDoc`: one session per (connection, epicId, chatId),
  * torn down in the same effect cleanup — a socket can never outlive the view.
  */
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_ACCOUNT_CONTEXT } from "@traycer/protocol/common/schemas";
 import type { ChatStreamClient } from "@traycer-clients/shared/host-transport/chat-stream-client";
@@ -824,6 +824,25 @@ export function useChat(
     [state.replies],
   );
 
+  // Perf fix: these were plain expressions below, recomputed to a BRAND NEW
+  // array/identity on every render of this hook — including renders caused
+  // by state slices that have nothing to do with the transcript (queue,
+  // turnInProgress, connection). A consumer that memoizes on these values
+  // (`React.memo`, `useMemo`) could never bail out. `state.messages`/
+  // `state.trailingMessages`/`state.liveTurn` only change reference when the
+  // REDUCER actually touches them (every other case spreads `...state`,
+  // preserving the same array/object references) — memoizing on those, not
+  // on `state` itself, keeps `transcriptMessages`/`liveTurnBlocks` stable
+  // across unrelated dispatches.
+  const transcriptMessages = useMemo(
+    () => [...state.messages, ...state.trailingMessages],
+    [state.messages, state.trailingMessages],
+  );
+  const liveTurnBlocksMemo = useMemo(
+    () => computeLiveTurnBlocks(state.liveTurn),
+    [state.liveTurn],
+  );
+
   return {
     connection,
     runStatus: state.runStatus,
@@ -835,8 +854,8 @@ export function useChat(
     resolveInterview,
     replyStatusFor,
     sendReply,
-    transcriptMessages: [...state.messages, ...state.trailingMessages],
-    liveTurnBlocks: computeLiveTurnBlocks(state.liveTurn),
+    transcriptMessages,
+    liveTurnBlocks: liveTurnBlocksMemo,
     hasSnapshot: state.hasSnapshot,
     queue: state.queue,
     backgroundItems: state.backgroundItems,

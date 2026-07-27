@@ -7,7 +7,7 @@
  * through this SAME component with a "steered" badge — it is never a block
  * card (matches desktop's `BLOCK_HANDLERS.steer => null`).
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { JsonContent } from "@traycer/protocol/common/registry";
 import type { UserMessageSender } from "@traycer/protocol/persistence/epic/senders";
 import { userContentToMarkdown, userSenderProvenance } from "@/host/user-content";
@@ -20,7 +20,7 @@ export interface UserMessageBubbleProps {
   readonly steered?: boolean;
 }
 
-export function UserMessageBubble({
+function UserMessageBubbleImpl({
   content,
   sender,
   steered = false,
@@ -63,3 +63,6 @@ export function UserMessageBubble({
     </div>
   );
 }
+
+/** Perf fix: memoized so an unrelated transcript update (a new message appended elsewhere) doesn't re-render every prior bubble — see `transcript-view.tsx`'s docblock. */
+export const UserMessageBubble = memo(UserMessageBubbleImpl);

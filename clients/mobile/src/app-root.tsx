@@ -33,6 +33,7 @@ import { HostClientProvider } from "@/host/host-client-context";
 import { HostStreamConnection } from "@/host/stream-connection";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { App } from "@/App";
+import { ErrorBoundary } from "@/views/error-boundary";
 import { VersionPromptBanner } from "@/views/version-prompt-banner";
 
 const QUERY_CACHE_STORAGE_KEY = "traycer-remote:query-cache";
@@ -125,7 +126,10 @@ export function AppRoot(): ReactElement {
     <RestoreGate>
       <HostClientProvider client={connection?.hostClient ?? null}>
         <StreamConnectionProvider connection={streamConnection}>
-          <App auth={auth} />
+          {/* Last resort: catches anything the per-screen boundaries (app-shell.tsx) miss (e.g. the sign-in gate itself). */}
+          <ErrorBoundary label="Traycer Remote">
+            <App auth={auth} />
+          </ErrorBoundary>
         </StreamConnectionProvider>
       </HostClientProvider>
     </RestoreGate>
