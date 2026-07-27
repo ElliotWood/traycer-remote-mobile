@@ -12,7 +12,14 @@
  * navigation. All streams (the epic stream + every per-chat badge stream) are
  * torn down by the hooks' effect cleanups when the user backs out.
  */
-import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useEpicDoc, type EpicChatEntry } from "@/host/use-epic-doc";
@@ -22,8 +29,11 @@ import {
   type ChatBadgeState,
 } from "@/host/use-chat-badges";
 import type { StreamConnectionState } from "@/host/stream-connection";
+import { useSettledConnectionState } from "@/host/use-settled-connection-state";
+import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
 import { AuthorView } from "./author-view";
 import { ArtifactTreeView } from "./artifact-tree-view";
+import { NotificationPermissionButton } from "./notification-permission-button";
 import { colors, row, screen, secondaryButton } from "./ui";
 
 interface EpicViewProps {
@@ -39,7 +49,13 @@ export function EpicView({
 }: EpicViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
-  const { chats, artifacts, artifactRooms, connection } = useEpicDoc(streamConnection, epicId);
+  const { chats, artifacts, artifactRooms, connection: rawConnection } = useEpicDoc(
+    streamConnection,
+    epicId,
+  );
+  // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
+  // liveness-recovery on focus/visibility/online) never visibly flickers.
+  const connection = useSettledConnectionState(rawConnection);
   // The badge streams follow the exact chat-id set the doc reports.
   const chatIds = useMemo(() => chats.map((c) => c.chatId), [chats]);
   const badges = useChatBadges(streamConnection, epicId, chatIds);
@@ -47,6 +63,20 @@ export function EpicView({
   // Blocked chats to the top; otherwise keep the doc's order. A stable sort
   // preserves relative order within each group.
   const ordered = useMemo(() => sortByBlocked(chats, badges), [chats, badges]);
+
+  // S5 (C): fire a foreground alert on a real false→true blocked transition —
+  // never on a chat that's already blocked the moment it's first observed
+  // (see `detectBlockedTransitions`'s doc comment). Fed the RAW badge map,
+  // never one padded with `DEFAULT_CHAT_BADGE` filler.
+  const prevBadgesRef = useRef<Readonly<Record<string, ChatBadgeState>>>({});
+  useEffect(() => {
+    const transitioned = detectBlockedTransitions(prevBadgesRef.current, badges);
+    for (const chatId of transitioned) {
+      const chat = chats.find((c) => c.chatId === chatId);
+      void notifyBlocked({ epicId, chatId, chatTitle: chat?.title ?? "" });
+    }
+    prevBadgesRef.current = badges;
+  }, [badges, chats, epicId]);
 
   const [authoring, setAuthoring] = useState(false);
   // Sprint 3: artifact browse is a local drill-in (like `authoring`), not a
@@ -122,6 +152,8 @@ export function EpicView({
       >
         Artifacts
       </button>
+
+      <NotificationPermissionButton />
 
       <ChatList ordered={ordered} badges={badges} onOpenChat={onOpenChat} />
     </main>

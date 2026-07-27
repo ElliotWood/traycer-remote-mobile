@@ -156,6 +156,17 @@ export interface EpicListResult {
   readonly isRefetching: boolean;
 }
 
+/**
+ * Sprint 5 (S5 A2/A3): the fleet is no longer manual-refresh-only. `refetchInterval`
+ * is the "gentle poll" (20s — TanStack pauses it automatically while the tab is
+ * hidden/unfocused via `refetchIntervalInBackground: false`, so it never busy-loops
+ * in the background). `refetchOnWindowFocus`/`refetchOnReconnect` are already
+ * TanStack v5 defaults; set explicitly so a future global `QueryClient` default
+ * change can't silently regress them. The manual Refresh button stays — this is
+ * additive, not a replacement.
+ */
+const FLEET_REFETCH_INTERVAL_MS = 20_000;
+
 export function useEpicList(client: EpicListClient): EpicListResult {
   const query = useInfiniteQuery<
     ListTasksResponse,
@@ -168,6 +179,10 @@ export function useEpicList(client: EpicListClient): EpicListResult {
     queryFn: ({ pageParam }) => fetchEpicListPage(client, pageParam),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => epicListNextCursor(lastPage),
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: FLEET_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
   });
 
   const epics = useMemo<readonly FleetEpic[]>(

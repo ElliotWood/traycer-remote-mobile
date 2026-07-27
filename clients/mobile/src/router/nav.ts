@@ -19,7 +19,14 @@ export type Route =
 export type NavAction =
   | { readonly type: "open-epic"; readonly epicId: string }
   | { readonly type: "open-chat"; readonly epicId: string; readonly chatId: string }
-  | { readonly type: "back" };
+  | { readonly type: "back" }
+  /**
+   * S5 (C, P1): a notification click always lands on a clean [fleet, epic,
+   * chat] stack, rather than pushing onto whatever stack the user happened to
+   * be on — pushing `open-epic`+`open-chat` unconditionally could duplicate an
+   * epic frame if the user was already inside that same epic/chat.
+   */
+  | { readonly type: "goto-chat"; readonly epicId: string; readonly chatId: string };
 
 /** The stack always holds at least the Fleet root, so `currentRoute` is total. */
 export type NavStack = readonly [Route, ...Route[]];
@@ -45,5 +52,11 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
       return stack.length > 1
         ? (stack.slice(0, -1) as unknown as NavStack)
         : stack;
+    case "goto-chat":
+      return [
+        { name: "fleet" },
+        { name: "epic", epicId: action.epicId },
+        { name: "chat", epicId: action.epicId, chatId: action.chatId },
+      ];
   }
 }

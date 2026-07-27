@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 // Standalone Vite app for the phone client. `@traycer/protocol` and
 // `@traycer-clients/shared` resolve as workspace packages (their exports point
@@ -8,7 +9,54 @@ import { defineConfig } from "vite";
 // VITE_HOST_WS_URL (local ws://127.0.0.1:<port>/rpc now; a tailnet wss:// URL in
 // D4 — the client code is identical either way).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // S5 (B): installable PWA + "new version" prompt. `injectManifest` (not
+    // `generateSW`) because `src/sw.ts` needs to own the `notificationclick`
+    // handler (§C) — a `generateSW`-produced opaque SW couldn't host it, so
+    // precaching and the click handler share that one custom file instead.
+    // `registerType: "prompt"` — a new SW installs and waits for the page's
+    // banner to ask it to activate (`useRegisterSW` in `src/App.tsx`), it
+    // never self-activates. `devOptions` stays disabled: the SW does not
+    // register under `bun run dev` — PWA/version-prompt/notification behavior
+    // is only real under `vite build` + `vite preview` (contract, F2).
+    VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      registerType: "prompt",
+      injectRegister: false,
+      devOptions: { enabled: false },
+      manifest: {
+        name: "Traycer Remote",
+        short_name: "Traycer Remote",
+        description: "Read chats, browse artifacts, and reply from your phone.",
+        start_url: "/",
+        display: "standalone",
+        background_color: "#111111",
+        theme_color: "#111111",
+        icons: [
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+        ],
+      },
+      injectManifest: {
+        // M3: precache the app shell ONLY — index.html, the main JS entry,
+        // the generated manifest, and the icons. Left unbounded, Workbox's
+        // default glob would sweep in every lazy mermaid/katex/cytoscape
+        // diagram chunk (Sprint 1 deliberately kept off the initial route),
+        // pulling several MB over the network on SW install regardless of
+        // whether the user ever opens a diagram. Those chunks stay
+        // runtime-fetch-on-demand — never precached, never intercepted.
+        globPatterns: [
+          "index.html",
+          "assets/index-*.js",
+          "manifest.webmanifest",
+          "icons/*.png",
+        ],
+      },
+    }),
+  ],
   envPrefix: ["VITE_"],
   resolve: {
     // Workspace aliases. `@traycer/protocol` and `@traycer-clients/shared`

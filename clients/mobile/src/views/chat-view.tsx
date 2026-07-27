@@ -18,7 +18,13 @@
  * `accepted` ack lets the streamed resolve-delta drop the item (agent unblocks);
  * a `rejected` ack shows an inline error against the still-true pending state.
  */
-import { useState, type CSSProperties, type ReactElement } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import {
   approvalKey,
@@ -38,6 +44,13 @@ import type {
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
 import type { StreamConnectionState } from "@/host/stream-connection";
 import { TranscriptView } from "./chat/transcript-view";
+import { useSettledConnectionState } from "@/host/use-settled-connection-state";
+import {
+  detectBlockedTransitions,
+  notifyBlocked,
+  type BlockedState,
+} from "@/host/notifications";
+import { NotificationPermissionButton } from "./notification-permission-button";
 import { colors, screen, secondaryButton } from "./ui";
 
 interface ChatViewProps {
@@ -49,11 +62,30 @@ interface ChatViewProps {
 export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const chat = useChat(streamConnection, epicId, chatId);
+  // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
+  // liveness-recovery on focus/visibility/online) never visibly flickers.
+  const displayConnection = useSettledConnectionState(chat.connection);
 
   const hasPending =
     chat.pendingInterviews.length > 0 ||
     chat.pendingApprovals.length > 0 ||
     chat.pendingFileEditApprovals.length > 0;
+
+  // S5 (C, F1 fix): feed the SAME map-shaped detector EpicView uses — a
+  // single-entry map that's `{}` until `hasSnapshot`, so an already-blocked
+  // chat's first snapshot after open/switch never fires (chatId absent from
+  // the previous map ⇒ no fire, the identical rule EpicView relies on).
+  const prevRef = useRef<Readonly<Record<string, BlockedState>>>({});
+  useEffect(() => {
+    const next: Record<string, BlockedState> = chat.hasSnapshot
+      ? { [chatId]: { blocked: hasPending } }
+      : {};
+    const transitioned = detectBlockedTransitions(prevRef.current, next);
+    if (transitioned.length > 0) {
+      void notifyBlocked({ epicId, chatId, chatTitle: chat.title });
+    }
+    prevRef.current = next;
+  }, [chat.hasSnapshot, hasPending, chat.title, epicId, chatId]);
 
   return (
     <main style={screen}>
@@ -70,7 +102,7 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
           {chat.title || "Untitled chat"}
         </h1>
         <RunStatusLine runStatus={chat.runStatus} blocked={hasPending} />
-        <ConnectionIndicator state={chat.connection} />
+        <ConnectionIndicator state={displayConnection} />
       </header>
 
       {chat.recentActivity !== "" && (
@@ -85,6 +117,8 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
           {chat.recentActivity}
         </p>
       )}
+
+      <NotificationPermissionButton />
 
       {hasPending ? (
         <PendingSection chat={chat} />
