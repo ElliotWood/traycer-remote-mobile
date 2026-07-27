@@ -23,6 +23,7 @@ import {
 } from "@/host/use-chat-badges";
 import type { StreamConnectionState } from "@/host/stream-connection";
 import { AuthorView } from "./author-view";
+import { ArtifactTreeView } from "./artifact-tree-view";
 import { colors, row, screen, secondaryButton } from "./ui";
 
 interface EpicViewProps {
@@ -38,7 +39,7 @@ export function EpicView({
 }: EpicViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
-  const { chats, connection } = useEpicDoc(streamConnection, epicId);
+  const { chats, artifacts, artifactRooms, connection } = useEpicDoc(streamConnection, epicId);
   // The badge streams follow the exact chat-id set the doc reports.
   const chatIds = useMemo(() => chats.map((c) => c.chatId), [chats]);
   const badges = useChatBadges(streamConnection, epicId, chatIds);
@@ -48,6 +49,10 @@ export function EpicView({
   const ordered = useMemo(() => sortByBlocked(chats, badges), [chats, badges]);
 
   const [authoring, setAuthoring] = useState(false);
+  // Sprint 3: artifact browse is a local drill-in (like `authoring`), not a
+  // `nav.ts` route — `ArtifactTreeView` owns its own further drill-in into a
+  // body render.
+  const [browsingArtifacts, setBrowsingArtifacts] = useState(false);
 
   // The author flow needs a bound host client to dispatch `epic.createChat`;
   // when one is present (always so under the signed-in shell) the "+ New agent
@@ -59,6 +64,17 @@ export function EpicView({
         client={hostClient}
         onCreated={onOpenChat}
         onCancel={() => setAuthoring(false)}
+      />
+    );
+  }
+
+  if (browsingArtifacts) {
+    return (
+      <ArtifactTreeView
+        artifacts={artifacts}
+        artifactRooms={artifactRooms}
+        connection={connection}
+        onBack={() => setBrowsingArtifacts(false)}
       />
     );
   }
@@ -97,6 +113,14 @@ export function EpicView({
           + New agent here
         </button>
       )}
+
+      <button
+        type="button"
+        style={{ ...secondaryButton, marginBottom: 12 }}
+        onClick={() => setBrowsingArtifacts(true)}
+      >
+        Artifacts
+      </button>
 
       <ChatList ordered={ordered} badges={badges} onOpenChat={onOpenChat} />
     </main>

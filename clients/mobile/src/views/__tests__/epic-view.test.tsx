@@ -166,4 +166,47 @@ describe("EpicView", () => {
       expect(session.close).toHaveBeenCalledTimes(1);
     }
   });
+
+  it("regresses eval-round-1 finding 1: opening Artifacts does NOT open a second epic.subscribe, and the tree is populated instantly from the already-live session", async () => {
+    const fake = createFakeStreamConnection();
+    renderEpicView(fake);
+
+    act(() => {
+      fake.epicSessions[0].callbacks.onSnapshot(EPIC_META, epicUpdateWithArtifacts([
+        { id: "spec-1", kind: "spec", title: "Design doc" },
+      ]));
+      fake.epicSessions[0].connection.applyStatus("open", null);
+    });
+    await screen.findByText("Live");
+    expect(fake.epicSessions).toHaveLength(1);
+
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Artifacts" }));
+
+    // The tree renders from the SAME session's already-fetched artifacts
+    // immediately -- no "Reconnecting..." flash, no second handshake.
+    expect(await screen.findByText("Design doc")).toBeTruthy();
+    expect(screen.queryByText("Reconnecting…")).toBeNull();
+    // Exactly one epic.subscribe for the whole epic-view lifetime, including
+    // after drilling into Artifacts.
+    expect(fake.epicSessions).toHaveLength(1);
+  });
 });
+
+function epicUpdateWithArtifacts(
+  artifacts: readonly { readonly id: string; readonly kind: string; readonly title: string }[],
+): Uint8Array {
+  const doc = new Y.Doc();
+  const map = new Y.Map<unknown>();
+  doc.getMap("epic").set("artifacts", map);
+  for (const a of artifacts) {
+    const entry = new Y.Map<unknown>();
+    map.set(a.id, entry);
+    entry.set("kind", a.kind);
+    entry.set("title", a.title);
+    entry.set("parentId", null);
+    entry.set("artifactRoomId", `room-${a.id}`);
+    entry.set("createdAt", 0);
+    entry.set("updatedAt", 0);
+  }
+  return Y.encodeStateAsUpdate(doc);
+}
