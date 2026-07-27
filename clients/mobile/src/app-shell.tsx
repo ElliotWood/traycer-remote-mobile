@@ -25,6 +25,7 @@ import { ChatView } from "@/views/chat-view";
 import { CommentsPanel } from "@/views/comments/comments-panel";
 import { parseCommentsHarnessParams } from "@/views/comments/comments-harness-params";
 import { ErrorBoundary } from "@/views/error-boundary";
+import { CurrentEpicProvider } from "@/host/current-epic-context";
 
 interface AppShellProps {
   readonly client: MobileHostClient;
@@ -87,22 +88,29 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
     return <CommentsPanel {...harnessParams} />;
   }
 
-  switch (route.name) {
-    case "fleet":
-      return (
-        <ErrorBoundary label="the fleet" key={route.name}>
-          <FleetView
-            client={client}
-            onSignOut={onSignOut}
-            onOpenEpic={(epicId, epicTitle) =>
-              dispatch({ type: "open-epic", epicId, epicTitle })
-            }
-          />
-        </ErrorBoundary>
-      );
-    case "epic":
-      return (
-        <ErrorBoundary label="this epic" key={`${route.name}:${route.epicId}`}>
+  if (route.name === "fleet") {
+    return (
+      <ErrorBoundary label="the fleet" key={route.name}>
+        <FleetView
+          client={client}
+          onSignOut={onSignOut}
+          onOpenEpic={(epicId, epicTitle) =>
+            dispatch({ type: "open-epic", epicId, epicTitle })
+          }
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  // "epic" and "chat" both carry `epicId` and share ONE `epic.subscribe`
+  // session for the whole epic↔chat transition — `CurrentEpicProvider` is
+  // keyed by epicId (not by route.name), so switching between the tree and
+  // a chat within the SAME epic never tears the session down or re-decodes
+  // the snapshot (see `current-epic-context.tsx`'s docblock).
+  return (
+    <CurrentEpicProvider epicId={route.epicId} key={route.epicId}>
+      {route.name === "epic" ? (
+        <ErrorBoundary label="this epic" key={`epic:${route.epicId}`}>
           <EpicView
             epicId={route.epicId}
             epicTitle={route.epicTitle}
@@ -112,10 +120,8 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
             onBack={() => dispatch({ type: "back" })}
           />
         </ErrorBoundary>
-      );
-    case "chat":
-      return (
-        <ErrorBoundary label="this chat" key={`${route.name}:${route.chatId}`}>
+      ) : (
+        <ErrorBoundary label="this chat" key={`chat:${route.chatId}`}>
           <ChatView
             epicId={route.epicId}
             chatId={route.chatId}
@@ -123,6 +129,7 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
             onBack={() => dispatch({ type: "back" })}
           />
         </ErrorBoundary>
-      );
-  }
+      )}
+    </CurrentEpicProvider>
+  );
 }

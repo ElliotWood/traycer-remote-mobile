@@ -5,9 +5,12 @@
  * with ONE tree screen, segmented into an Agents section (nested chats, the
  * live-state ladder) and an Artifacts section (nested spec/ticket/story/
  * review, status dots, unread bars) — mirroring desktop's VS Code-style
- * sidebar tree. Both sections read straight off the SAME `useEpicDoc`
- * session this view already opens (no second `epic.subscribe` — the
- * eval-round-1 regression this file already guards against).
+ * sidebar tree. Both sections read off `useCurrentEpicDoc()` — the ONE
+ * `epic.subscribe` session `app-shell.tsx`'s `CurrentEpicProvider` opens for
+ * the whole epic↔chat nav transition, not a session this view opens itself
+ * (an earlier `ArtifactTreeView` opened a second one alongside this view's,
+ * producing a multi-second "Reconnecting…/empty" flash — see
+ * `current-epic-context.tsx`'s docblock for the full history).
  *
  * Chat/artifact opening is unchanged from pre-P1: `onOpenChat` drills into
  * the S2 transcript exactly as before; artifact opening now renders
@@ -24,7 +27,7 @@ import {
 } from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
-import { useEpicDoc } from "@/host/use-epic-doc";
+import { useCurrentEpicDoc } from "@/host/current-epic-context";
 import { useChatBadges, type ChatBadgeState } from "@/host/use-chat-badges";
 import { useSettledConnectionState } from "@/host/use-settled-connection-state";
 import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
@@ -64,10 +67,7 @@ export function EpicView({
 }: EpicViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
-  const { chats, artifacts, artifactRooms, docLoaded, connection: rawConnection } = useEpicDoc(
-    streamConnection,
-    epicId,
-  );
+  const { chats, artifacts, artifactRooms, docLoaded, connection: rawConnection } = useCurrentEpicDoc();
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
   const connection = useSettledConnectionState(rawConnection);

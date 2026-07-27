@@ -15,6 +15,7 @@ import type { SnapshotMetaEpic } from "@traycer/protocol/host/epic/snapshot-meta
 import type { ChatSubscribeServerFrame } from "@traycer/protocol/host/agent/gui/subscribe";
 import { EpicView } from "@/views/epic-view";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
+import { CurrentEpicProvider } from "@/host/current-epic-context";
 import {
   createFakeStreamConnection,
   type FakeChatSession,
@@ -89,7 +90,9 @@ function renderEpicView(
 ): { readonly unmount: () => void } {
   const result = render(
     <StreamConnectionProvider connection={fake.connection}>
-      <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={onOpenChat} onBack={() => {}} />
+      <CurrentEpicProvider epicId="e1">
+        <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={onOpenChat} onBack={() => {}} />
+      </CurrentEpicProvider>
     </StreamConnectionProvider>,
   );
   return { unmount: result.unmount };

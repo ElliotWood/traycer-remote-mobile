@@ -13,6 +13,7 @@ import type { SnapshotMetaEpic } from "@traycer/protocol/host/epic/snapshot-meta
 import { ChatView } from "@/views/chat-view";
 import { EpicView } from "@/views/epic-view";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
+import { CurrentEpicProvider } from "@/host/current-epic-context";
 import {
   createFakeStreamConnection,
   type FakeChatSession,
@@ -127,7 +128,9 @@ describe("EpicView — blocked-transition notification (F1)", () => {
     const fake = createFakeStreamConnection();
     render(
       <StreamConnectionProvider connection={fake.connection}>
-        <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={() => {}} onBack={() => {}} />
+        <CurrentEpicProvider epicId="e1">
+          <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={() => {}} onBack={() => {}} />
+        </CurrentEpicProvider>
       </StreamConnectionProvider>,
     );
 
