@@ -29,6 +29,7 @@ function snapshotFrame(approvals: readonly unknown[]): SnapshotFrame {
     snapshot: {
       runStatus: "running",
       chat: { title: "Fix bug", messages: [] },
+      access: { role: "owner", ownerUserId: "u1" },
       pendingApprovals: approvals,
       pendingFileEditApprovals: [],
       pendingInterviews: [],

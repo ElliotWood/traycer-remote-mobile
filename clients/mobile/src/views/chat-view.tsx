@@ -51,6 +51,7 @@ import {
   type BlockedState,
 } from "@/host/notifications";
 import { NotificationPermissionButton } from "./notification-permission-button";
+import { markSeen } from "@/host/read-tracking-store";
 import { colors, screen, secondaryButton } from "./ui";
 
 interface ChatViewProps {
@@ -65,6 +66,13 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
   const displayConnection = useSettledConnectionState(chat.connection);
+
+  // P1 (Epic tree unread markers): the moment this chat is actually opened,
+  // it reads as seen — clears any `done-unread`/`failed` ladder tier the
+  // Agents-tree row was showing for it. See `read-tracking-store.ts`.
+  useEffect(() => {
+    markSeen(epicId, chatId);
+  }, [epicId, chatId]);
 
   const hasPending =
     chat.pendingInterviews.length > 0 ||

@@ -9,9 +9,11 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import {
   buildArtifactTree,
+  buildChatTree,
   readArtifactsFromEpicDoc,
   readChatsFromEpicDoc,
   type EpicArtifactEntry,
+  type EpicChatEntry,
 } from "../use-epic-doc";
 
 /** Builds a chat entry Y.Map, attaching it to `chats[chatId]` before populating. */
@@ -37,20 +39,30 @@ function docWithChats(
   return doc;
 }
 
-function byId(entries: readonly { chatId: string; title: string }[]) {
+function byId(entries: readonly EpicChatEntry[]) {
   return [...entries].sort((a, b) => a.chatId.localeCompare(b.chatId));
 }
 
+function chatEntry(overrides: Partial<EpicChatEntry> & { readonly chatId: string }): EpicChatEntry {
+  return {
+    title: "",
+    parentId: null,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides,
+  };
+}
+
 describe("readChatsFromEpicDoc", () => {
-  it("lists every chat as { chatId (= map key), title }", () => {
+  it("lists every chat with its full projected shape", () => {
     const doc = docWithChats((chats) => {
-      addChat(chats, "c1", { title: "Auth refactor", createdAt: 1 });
-      addChat(chats, "c2", { title: "Fix flaky test", createdAt: 2 });
+      addChat(chats, "c1", { title: "Auth refactor", createdAt: 1, updatedAt: 5 });
+      addChat(chats, "c2", { title: "Fix flaky test", createdAt: 2, updatedAt: 6, parentId: "c1" });
     });
 
     expect(byId(readChatsFromEpicDoc(doc))).toEqual([
-      { chatId: "c1", title: "Auth refactor" },
-      { chatId: "c2", title: "Fix flaky test" },
+      chatEntry({ chatId: "c1", title: "Auth refactor", createdAt: 1, updatedAt: 5 }),
+      chatEntry({ chatId: "c2", title: "Fix flaky test", createdAt: 2, updatedAt: 6, parentId: "c1" }),
     ]);
   });
 
@@ -61,9 +73,17 @@ describe("readChatsFromEpicDoc", () => {
     });
 
     expect(byId(readChatsFromEpicDoc(doc))).toEqual([
-      { chatId: "c1", title: "" },
-      { chatId: "c2", title: "" },
+      chatEntry({ chatId: "c1", createdAt: 1 }),
+      chatEntry({ chatId: "c2" }),
     ]);
+  });
+
+  it("falls back parentId to null when absent/malformed", () => {
+    const doc = docWithChats((chats) => {
+      addChat(chats, "c1", { title: "S", parentId: 42 });
+    });
+    const [c1] = readChatsFromEpicDoc(doc);
+    expect(c1.parentId).toBeNull();
   });
 
   it("skips a malformed entry that is not a nested Y.Map", () => {
@@ -72,7 +92,7 @@ describe("readChatsFromEpicDoc", () => {
       chats.set("bad", "not-a-map"); // stray primitive
     });
 
-    expect(readChatsFromEpicDoc(doc)).toEqual([{ chatId: "good", title: "ok" }]);
+    expect(readChatsFromEpicDoc(doc)).toEqual([chatEntry({ chatId: "good", title: "ok" })]);
   });
 
   it("returns [] when the epic doc has no chats map", () => {
@@ -97,9 +117,30 @@ describe("readChatsFromEpicDoc", () => {
     Y.applyUpdate(replica, update);
 
     expect(byId(readChatsFromEpicDoc(replica))).toEqual([
-      { chatId: "c1", title: "Alpha" },
-      { chatId: "c2", title: "Beta" },
+      chatEntry({ chatId: "c1", title: "Alpha" }),
+      chatEntry({ chatId: "c2", title: "Beta" }),
     ]);
+  });
+});
+
+describe("buildChatTree", () => {
+  it("nests children under their parentId, ordered by updatedAt DESC / id ASC", () => {
+    const tree = buildChatTree([
+      chatEntry({ chatId: "root", updatedAt: 1 }),
+      chatEntry({ chatId: "child-b", parentId: "root", updatedAt: 2 }),
+      chatEntry({ chatId: "child-a", parentId: "root", updatedAt: 2 }),
+    ]);
+    expect(tree.roots).toEqual(["root"]);
+    expect(tree.childrenByParent.root).toEqual(["child-a", "child-b"]);
+    expect(tree.byId["child-a"]?.parentId).toBe("root");
+  });
+
+  it("promotes a chat with an unknown parentId to root (orphan promotion)", () => {
+    const tree = buildChatTree([
+      chatEntry({ chatId: "orphan", parentId: "does-not-exist", updatedAt: 1 }),
+    ]);
+    expect(tree.roots).toEqual(["orphan"]);
+    expect(tree.childrenByParent["does-not-exist"]).toBeUndefined();
   });
 });
 

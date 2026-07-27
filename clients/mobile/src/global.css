@@ -20,3 +20,22 @@ body {
     "Segoe UI",
     sans-serif;
 }
+
+/**
+ * P1 — the Agents-tree "running" ladder tier's spinner (mobile equivalent of
+ * desktop's `AgentSpinningDots`). A CSS keyframe rather than an inline style
+ * because `CSSProperties` can't express `@keyframes` — this is the one
+ * global rule the ladder icon needs, everything else about it stays inline.
+ */
+@keyframes traycer-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.traycer-spinner {
+  animation: traycer-spin 0.9s linear infinite;
+}

@@ -18,6 +18,8 @@ import { colors, primaryButton, screen, secondaryButton } from "./ui";
 interface AuthorViewProps {
   readonly epicId: string;
   readonly client: MobileHostClient;
+  /** P1: nests the new chat under this parent (Agents-row "+" action). `null`/omitted for a top-level chat. */
+  readonly parentId?: string | null;
   /** Called with the minted chatId once the host accepts the create (→ T6). */
   readonly onCreated: (chatId: string) => void;
   readonly onCancel: () => void;
@@ -26,11 +28,12 @@ interface AuthorViewProps {
 export function AuthorView({
   epicId,
   client,
+  parentId = null,
   onCreated,
   onCancel,
 }: AuthorViewProps): ReactElement {
   const [instruction, setInstruction] = useState("");
-  const { phase, error, submit } = useCreateChat({ client, epicId, onCreated });
+  const { phase, error, submit } = useCreateChat({ client, epicId, parentId, onCreated });
 
   const submitting = phase === "submitting";
   const canSubmit = instruction.trim().length > 0 && !submitting;

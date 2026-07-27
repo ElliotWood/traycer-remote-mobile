@@ -25,11 +25,16 @@ function snapshot(opts: {
   readonly approvals?: readonly string[];
   readonly fileEditApprovals?: readonly string[];
   readonly interviews?: readonly string[];
+  readonly accessRole?: "owner" | "viewer";
+  readonly backgroundItemCount?: number;
+  readonly activeTurnStatus?: string;
+  readonly activeTurnUpdatedAt?: number;
 }): Frame<"snapshot"> {
   return {
     kind: "snapshot",
     snapshot: {
       runStatus: opts.runStatus,
+      access: { role: opts.accessRole ?? "owner", ownerUserId: "u1" },
       pendingApprovals: (opts.approvals ?? []).map((approvalId) => ({
         approvalId,
       })),
@@ -37,9 +42,34 @@ function snapshot(opts: {
         (approvalId) => ({ approvalId }),
       ),
       pendingInterviews: (opts.interviews ?? []).map((blockId) => ({ blockId })),
+      backgroundItems: Array.from({ length: opts.backgroundItemCount ?? 0 }, (_, i) => ({
+        id: `bg${i}`,
+      })),
+      activeTurn:
+        opts.activeTurnStatus === undefined
+          ? null
+          : { status: opts.activeTurnStatus, updatedAt: opts.activeTurnUpdatedAt ?? 0 },
     },
   } as unknown as Frame<"snapshot">;
 }
+
+const turnStateChanged = (opts: {
+  readonly runStatus: "idle" | "running" | "stopping";
+  readonly backgroundItemCount?: number;
+  readonly activeTurnStatus?: string;
+  readonly activeTurnUpdatedAt?: number;
+}): Frame<"turnStateChanged"> =>
+  ({
+    kind: "turnStateChanged",
+    runStatus: opts.runStatus,
+    backgroundItems: Array.from({ length: opts.backgroundItemCount ?? 0 }, (_, i) => ({
+      id: `bg${i}`,
+    })),
+    activeTurn:
+      opts.activeTurnStatus === undefined
+        ? null
+        : { status: opts.activeTurnStatus, updatedAt: opts.activeTurnUpdatedAt ?? 0 },
+  }) as unknown as Frame<"turnStateChanged">;
 
 const fileEditRequested = (approvalId: string): Frame<"fileEditApprovalRequested"> =>
   ({ kind: "fileEditApprovalRequested", approval: { approvalId } }) as unknown as Frame<"fileEditApprovalRequested">;
@@ -55,6 +85,11 @@ const approvalResolved = (approvalId: string): Frame<"approvalResolved"> =>
 function mountBadge(): {
   readonly blocked: () => boolean | undefined;
   readonly runStatus: () => string | undefined;
+  readonly pendingInterview: () => boolean | undefined;
+  readonly pendingApproval: () => boolean | undefined;
+  readonly background: () => boolean | undefined;
+  readonly accessRole: () => string | undefined;
+  readonly lastErrorAt: () => number | null | undefined;
   readonly drive: <K extends ChatSubscribeServerFrame["kind"]>(
     kind: K,
     frame: Frame<K>,
@@ -68,6 +103,11 @@ function mountBadge(): {
   return {
     blocked: () => result.current["c1"]?.blocked,
     runStatus: () => result.current["c1"]?.runStatus,
+    pendingInterview: () => result.current["c1"]?.pendingInterview,
+    pendingApproval: () => result.current["c1"]?.pendingApproval,
+    background: () => result.current["c1"]?.background,
+    accessRole: () => result.current["c1"]?.accessRole,
+    lastErrorAt: () => result.current["c1"]?.lastErrorAt,
     drive: (kind, frame) => {
       act(() => {
         // Dispatch to the matching handler; the callback surface is typed per
@@ -76,6 +116,9 @@ function mountBadge(): {
         switch (kind) {
           case "snapshot":
             cb.onSnapshot(frame as Frame<"snapshot">);
+            break;
+          case "turnStateChanged":
+            cb.onTurnStateChanged(frame as Frame<"turnStateChanged">);
             break;
           case "fileEditApprovalRequested":
             cb.onFileEditApprovalRequested(frame as Frame<"fileEditApprovalRequested">);
@@ -142,5 +185,84 @@ describe("useChatBadges — blocking predicate", () => {
     // A fresh snapshot with no pendings re-seeds the sets from scratch.
     b.drive("snapshot", snapshot({ runStatus: "idle" }));
     expect(b.blocked()).toBe(false);
+  });
+});
+
+describe("useChatBadges — P1 ladder fields", () => {
+  it("splits pendingInterview from pendingApproval so the ladder can rank them separately", () => {
+    const b = mountBadge();
+    b.drive("snapshot", snapshot({ runStatus: "idle", interviews: ["i1"] }));
+    expect(b.pendingInterview()).toBe(true);
+    expect(b.pendingApproval()).toBe(false);
+    expect(b.blocked()).toBe(true);
+
+    b.drive("snapshot", snapshot({ runStatus: "idle", approvals: ["a1"] }));
+    expect(b.pendingInterview()).toBe(false);
+    expect(b.pendingApproval()).toBe(true);
+  });
+
+  it("reads accessRole from the snapshot", () => {
+    const b = mountBadge();
+    b.drive("snapshot", snapshot({ runStatus: "idle", accessRole: "viewer" }));
+    expect(b.accessRole()).toBe("viewer");
+  });
+
+  it("defaults accessRole to owner before any snapshot arrives", () => {
+    const b = mountBadge();
+    expect(b.accessRole()).toBeUndefined(); // never-reported chat: caller falls back to DEFAULT_CHAT_BADGE
+  });
+
+  it("background is true only when background items exist AND the chat itself is not running", () => {
+    const b = mountBadge();
+    b.drive("snapshot", snapshot({ runStatus: "idle", backgroundItemCount: 1 }));
+    expect(b.background()).toBe(true);
+
+    b.drive("snapshot", snapshot({ runStatus: "running", backgroundItemCount: 1 }));
+    expect(b.background()).toBe(false);
+
+    b.drive("snapshot", snapshot({ runStatus: "idle", backgroundItemCount: 0 }));
+    expect(b.background()).toBe(false);
+  });
+
+  it("background updates live off a turnStateChanged delta", () => {
+    const b = mountBadge();
+    b.drive("snapshot", snapshot({ runStatus: "running" }));
+    expect(b.background()).toBe(false);
+
+    b.drive("turnStateChanged", turnStateChanged({ runStatus: "idle", backgroundItemCount: 2 }));
+    expect(b.background()).toBe(true);
+  });
+
+  it("captures lastErrorAt from an errored activeTurn in the snapshot", () => {
+    const b = mountBadge();
+    b.drive(
+      "snapshot",
+      snapshot({ runStatus: "idle", activeTurnStatus: "errored", activeTurnUpdatedAt: 5000 }),
+    );
+    expect(b.lastErrorAt()).toBe(5000);
+  });
+
+  it("captures lastErrorAt from an errored activeTurn in a turnStateChanged delta", () => {
+    const b = mountBadge();
+    b.drive("snapshot", snapshot({ runStatus: "running" }));
+    expect(b.lastErrorAt()).toBeNull();
+
+    b.drive(
+      "turnStateChanged",
+      turnStateChanged({ runStatus: "idle", activeTurnStatus: "errored", activeTurnUpdatedAt: 7000 }),
+    );
+    expect(b.lastErrorAt()).toBe(7000);
+  });
+
+  it("does not clear a captured lastErrorAt on a later non-errored transition (latches until the session resets)", () => {
+    const b = mountBadge();
+    b.drive(
+      "turnStateChanged",
+      turnStateChanged({ runStatus: "idle", activeTurnStatus: "errored", activeTurnUpdatedAt: 1000 }),
+    );
+    expect(b.lastErrorAt()).toBe(1000);
+
+    b.drive("turnStateChanged", turnStateChanged({ runStatus: "running" }));
+    expect(b.lastErrorAt()).toBe(1000);
   });
 });

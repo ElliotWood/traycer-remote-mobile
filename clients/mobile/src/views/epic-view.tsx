@@ -1,46 +1,48 @@
 /**
- * Epic detail view (T5, Flow 3): the chat list for one epic with live badges.
+ * Epic detail view (T5, P1 desktop-fidelity rebuild).
  *
- * Streams the epic's Y.Doc (`useEpicDoc`) to enumerate its chats, and opens a
- * bounded `chat.subscribe` per chat (`useChatBadges`) to show whether each is
- * running or BLOCKED (waiting on the user — a pending approval or interview).
- * Blocked chats sort to the top and are visually distinct, so a glance answers
- * "what needs me?". The epic stream's connection state (live / reconnecting /
- * disconnected) is shown so the list never implies freshness it can't back.
+ * P1 replaces the old flat chat list + separate "Artifacts" drill-in screen
+ * with ONE tree screen, segmented into an Agents section (nested chats, the
+ * live-state ladder) and an Artifacts section (nested spec/ticket/story/
+ * review, status dots, unread bars) — mirroring desktop's VS Code-style
+ * sidebar tree. Both sections read straight off the SAME `useEpicDoc`
+ * session this view already opens (no second `epic.subscribe` — the
+ * eval-round-1 regression this file already guards against).
  *
- * Tapping a chat drills into the chat detail (T6); this view only wires the
- * navigation. All streams (the epic stream + every per-chat badge stream) are
- * torn down by the hooks' effect cleanups when the user backs out.
- *
- * Sprint 6 (round 1): restyled on the ported desktop design tokens
- * (`design-tokens.ts`) — real card rows, teal-green primary/running badges,
- * and the header shows the epic's TITLE (threaded from Fleet via `nav.ts`),
- * not the raw id.
+ * Chat/artifact opening is unchanged from pre-P1: `onOpenChat` drills into
+ * the S2 transcript exactly as before; artifact opening now renders
+ * `ArtifactBodyView` INLINE (reparented from the old standalone
+ * `ArtifactTreeView` screen) rather than via a separate drill screen, but
+ * the component itself — and its S3 body / S4 comments — is untouched.
  */
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
 } from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
-import { useEpicDoc, type EpicChatEntry } from "@/host/use-epic-doc";
-import {
-  DEFAULT_CHAT_BADGE,
-  useChatBadges,
-  type ChatBadgeState,
-} from "@/host/use-chat-badges";
-import type { StreamConnectionState } from "@/host/stream-connection";
+import { useEpicDoc } from "@/host/use-epic-doc";
+import { useChatBadges, type ChatBadgeState } from "@/host/use-chat-badges";
 import { useSettledConnectionState } from "@/host/use-settled-connection-state";
 import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
+import { markSeen, seedUnseen } from "@/host/read-tracking-store";
+import { DEFAULT_SORT_MODE, describeSortMode, nextSortMode, type SortMode } from "@/host/tree-sort";
 import { AuthorView } from "./author-view";
-import { ArtifactTreeView } from "./artifact-tree-view";
+import { CreateArtifactView } from "./create-artifact-view";
+import { ArtifactBodyView } from "./artifact-body-view";
 import { NotificationPermissionButton } from "./notification-permission-button";
-import { KIND_COLORS, KIND_ICONS } from "./kind-tokens";
-import { Button, Card, SectionHeading, radius, screen, theme, type } from "./design-tokens";
+import { AgentsSection } from "./epic-tree/agents-section";
+import {
+  ArtifactsSection,
+  DEFAULT_ARTIFACT_FILTER,
+  type ArtifactFilter,
+} from "./epic-tree/artifacts-section";
+import { ArtifactFilterPanel } from "./epic-tree/artifact-filter-panel";
+import { ConnectionPill } from "./epic-tree/connection-pill";
+import { Button, SectionHeading, screen, theme, type } from "./design-tokens";
 
 interface EpicViewProps {
   readonly epicId: string;
@@ -49,6 +51,13 @@ interface EpicViewProps {
   readonly onOpenChat: (chatId: string) => void;
   readonly onBack: () => void;
 }
+
+/** Which full-screen drill-in (if any) currently covers the tree. */
+type Drill =
+  | { readonly kind: "author"; readonly parentId: string | null }
+  | { readonly kind: "create-artifact"; readonly parentId: string | null }
+  | { readonly kind: "artifact-body"; readonly artifactId: string }
+  | null;
 
 export function EpicView({
   epicId,
@@ -65,13 +74,11 @@ export function EpicView({
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
   const connection = useSettledConnectionState(rawConnection);
+  const connectionLive = connection === "live";
+
   // The badge streams follow the exact chat-id set the doc reports.
   const chatIds = useMemo(() => chats.map((c) => c.chatId), [chats]);
   const badges = useChatBadges(streamConnection, epicId, chatIds);
-
-  // Blocked chats to the top; otherwise keep the doc's order. A stable sort
-  // preserves relative order within each group.
-  const ordered = useMemo(() => sortByBlocked(chats, badges), [chats, badges]);
 
   // S5 (C): fire a foreground alert on a real false→true blocked transition —
   // never on a chat that's already blocked the moment it's first observed
@@ -87,36 +94,73 @@ export function EpicView({
     prevBadgesRef.current = badges;
   }, [badges, chats, epicId]);
 
-  const [authoring, setAuthoring] = useState(false);
-  // Sprint 3: artifact browse is a local drill-in (like `authoring`), not a
-  // `nav.ts` route — `ArtifactTreeView` owns its own further drill-in into a
-  // body render.
-  const [browsingArtifacts, setBrowsingArtifacts] = useState(false);
+  // P1 tighten #1: seed every never-seen node to ITS OWN updatedAt so the
+  // tree never opens with everything reading as unread — only activity
+  // AFTER this point should ever flip a marker.
+  useEffect(() => {
+    const updatedAtById: Record<string, number> = {};
+    for (const c of chats) updatedAtById[c.chatId] = c.updatedAt;
+    seedUnseen(epicId, updatedAtById);
+  }, [epicId, chats]);
+  useEffect(() => {
+    const updatedAtById: Record<string, number> = {};
+    for (const a of artifacts) updatedAtById[a.id] = a.updatedAt;
+    seedUnseen(epicId, updatedAtById);
+  }, [epicId, artifacts]);
 
-  // The author flow needs a bound host client to dispatch `epic.createChat`;
-  // when one is present (always so under the signed-in shell) the "+ New agent
-  // here" entry point drills into it (T7).
-  if (authoring && hostClient !== null) {
+  const [drill, setDrill] = useState<Drill>(null);
+  const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>(DEFAULT_ARTIFACT_FILTER);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT_MODE);
+
+  // The artifact body drill marks itself seen the moment it opens (mirrors
+  // ChatView doing the same for chats — see `read-tracking-store.ts`).
+  useEffect(() => {
+    if (drill?.kind === "artifact-body") {
+      markSeen(epicId, drill.artifactId);
+    }
+  }, [epicId, drill]);
+
+  if (drill?.kind === "author" && hostClient !== null) {
     return (
       <AuthorView
         epicId={epicId}
         client={hostClient}
+        parentId={drill.parentId}
         onCreated={onOpenChat}
-        onCancel={() => setAuthoring(false)}
+        onCancel={() => setDrill(null)}
       />
     );
   }
 
-  if (browsingArtifacts) {
+  if (drill?.kind === "create-artifact" && hostClient !== null) {
     return (
-      <ArtifactTreeView
+      <CreateArtifactView
         epicId={epicId}
-        artifacts={artifacts}
-        artifactRooms={artifactRooms}
-        connection={connection}
-        onBack={() => setBrowsingArtifacts(false)}
+        parentId={drill.parentId}
+        client={hostClient}
+        onCreated={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
+        onCancel={() => setDrill(null)}
       />
     );
+  }
+
+  // A stale `drill.artifactId` (its artifact left the tree — deleted
+  // elsewhere) falls through to the tree view below rather than calling
+  // `setDrill` during render — mirrors the pre-P1 `ArtifactTreeView`'s same
+  // stale-id handling.
+  if (drill?.kind === "artifact-body") {
+    const artifact = artifacts.find((a) => a.id === drill.artifactId);
+    if (artifact !== undefined) {
+      return (
+        <ArtifactBodyView
+          epicId={epicId}
+          artifact={artifact}
+          artifactRooms={artifactRooms}
+          onBack={() => setDrill(null)}
+        />
+      );
+    }
   }
 
   return (
@@ -127,173 +171,73 @@ export function EpicView({
 
       <header style={{ margin: "16px 0 12px" }}>
         <SectionHeading>{epicTitle ?? "Epic"}</SectionHeading>
-        <ConnectionIndicator state={connection} />
+        <ConnectionPill state={connection} />
       </header>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         {hostClient !== null && (
-          <Button variant="secondary" onClick={() => setAuthoring(true)}>
-            + New agent here
+          <Button variant="secondary" onClick={() => setDrill({ kind: "author", parentId: null })}>
+            + New agent
           </Button>
         )}
-        <Button variant="secondary" onClick={() => setBrowsingArtifacts(true)}>
-          Artifacts
+        {hostClient !== null && (
+          <Button
+            variant="secondary"
+            onClick={() => setDrill({ kind: "create-artifact", parentId: null })}
+          >
+            + New artifact
+          </Button>
+        )}
+        <Button variant="ghost" onClick={() => setSortMode(nextSortMode(sortMode))}>
+          Sort: {describeSortMode(sortMode)}
         </Button>
       </div>
 
       <NotificationPermissionButton />
 
-      <ChatList ordered={ordered} badges={badges} onOpenChat={onOpenChat} />
+      <AgentsSection
+        epicId={epicId}
+        chats={chats}
+        badges={badges}
+        connectionLive={connectionLive}
+        sortMode={sortMode}
+        onOpenChat={onOpenChat}
+        onAddChild={(parentId) => setDrill({ kind: "author", parentId })}
+      />
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 4px" }}>
+        <button
+          type="button"
+          onClick={() => setShowFilterPanel((v) => !v)}
+          style={{
+            ...type.bodyXs,
+            border: "none",
+            background: "transparent",
+            color: showFilterPanel || hasActiveFilter(artifactFilter) ? theme.primary : theme.mutedText,
+            cursor: "pointer",
+            padding: "6px 4px",
+          }}
+        >
+          Filter
+        </button>
+      </div>
+      {showFilterPanel && (
+        <ArtifactFilterPanel filter={artifactFilter} onChange={setArtifactFilter} />
+      )}
+
+      <ArtifactsSection
+        epicId={epicId}
+        artifacts={artifacts}
+        connectionLive={connectionLive}
+        filter={artifactFilter}
+        sortMode={sortMode}
+        onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
+        onAddChild={(parentId) => setDrill({ kind: "create-artifact", parentId })}
+      />
     </main>
   );
 }
 
-function ChatList({
-  ordered,
-  badges,
-  onOpenChat,
-}: {
-  readonly ordered: readonly EpicChatEntry[];
-  readonly badges: Readonly<Record<string, ChatBadgeState>>;
-  readonly onOpenChat: (chatId: string) => void;
-}): ReactElement {
-  if (ordered.length === 0) {
-    return (
-      <p style={{ ...type.body, color: theme.mutedText }}>
-        No chats in this epic yet. Start one from the Traycer desktop app.
-      </p>
-    );
-  }
-  return (
-    <div>
-      {ordered.map((chat) => (
-        <ChatRow
-          key={chat.chatId}
-          chat={chat}
-          badge={badges[chat.chatId] ?? DEFAULT_CHAT_BADGE}
-          onOpen={() => onOpenChat(chat.chatId)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ChatRow({
-  chat,
-  badge,
-  onOpen,
-}: {
-  readonly chat: EpicChatEntry;
-  readonly badge: ChatBadgeState;
-  readonly onOpen: () => void;
-}): ReactElement {
-  const ChatIcon = KIND_ICONS.chat;
-  return (
-    <Card onClick={onOpen} accentColor={badge.blocked ? theme.danger : undefined}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 32,
-            height: 32,
-            flexShrink: 0,
-            borderRadius: radius.md,
-            background: "rgba(56, 189, 248, 0.1)",
-            border: "1px solid rgba(56, 189, 248, 0.25)",
-          }}
-        >
-          <ChatIcon size={16} color={KIND_COLORS.chat} aria-hidden="true" />
-        </span>
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-          }}
-        >
-          <span style={{ ...type.titleSm, color: theme.textRow }}>
-            {chat.title || "Untitled chat"}
-          </span>
-          <ChatBadge badge={badge} />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/**
- * The single most important signal per row. Blocked outranks running: a chat
- * waiting on the user needs attention even if a turn is also mid-flight. Idle
- * chats show no badge (nothing to triage).
- */
-function ChatBadge({ badge }: { readonly badge: ChatBadgeState }): ReactElement | null {
-  if (badge.blocked) {
-    return (
-      <span role="status" style={badgeStyle(theme.danger, theme.dangerSurface)}>
-        Blocked
-      </span>
-    );
-  }
-  if (badge.runStatus === "running" || badge.runStatus === "stopping") {
-    return (
-      <span role="status" style={badgeStyle(theme.primary, "transparent")}>
-        {badge.runStatus === "stopping" ? "Stopping" : "Running"}
-      </span>
-    );
-  }
-  return null;
-}
-
-function ConnectionIndicator({
-  state,
-}: {
-  readonly state: StreamConnectionState;
-}): ReactElement {
-  const { label, color } = CONNECTION_LABEL[state];
-  return (
-    <p role="status" style={{ ...type.bodySm, color, margin: "4px 0 0" }}>
-      {label}
-    </p>
-  );
-}
-
-const CONNECTION_LABEL: Record<
-  StreamConnectionState,
-  { readonly label: string; readonly color: string }
-> = {
-  live: { label: "Live", color: theme.primary },
-  reconnecting: { label: "Reconnecting…", color: theme.mutedText },
-  disconnected: { label: "Disconnected", color: theme.danger },
-};
-
-function badgeStyle(fg: string, bg: string): CSSProperties {
-  return {
-    fontSize: 12,
-    fontWeight: 600,
-    color: fg,
-    background: bg,
-    border: `1px solid ${fg}`,
-    borderRadius: 999,
-    padding: "2px 8px",
-    whiteSpace: "nowrap",
-  };
-}
-
-/**
- * Stable partition: blocked chats first (in doc order), then the rest (in doc
- * order). `Array.prototype.sort` is stable in every supported engine, so equal
- * keys keep their input order.
- */
-function sortByBlocked(
-  chats: readonly EpicChatEntry[],
-  badges: Readonly<Record<string, ChatBadgeState>>,
-): readonly EpicChatEntry[] {
-  const rank = (chat: EpicChatEntry): number =>
-    (badges[chat.chatId] ?? DEFAULT_CHAT_BADGE).blocked ? 0 : 1;
-  return [...chats].sort((a, b) => rank(a) - rank(b));
+function hasActiveFilter(filter: ArtifactFilter): boolean {
+  return filter.statuses.size > 0 || filter.kinds.size > 0 || filter.read !== "all";
 }

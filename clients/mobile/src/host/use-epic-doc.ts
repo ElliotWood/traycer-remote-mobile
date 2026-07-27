@@ -43,10 +43,18 @@ import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
 import { startLivenessRecovery } from "./liveness-recovery";
 
-/** One chat enumerated from the epic doc — the minimum a row + badge needs. */
+/**
+ * One chat enumerated from the epic doc — the minimum a row + badge needs.
+ * `parentId`/`createdAt`/`updatedAt` (P1) mirror `chatSchema`
+ * (persistence/epic/chat.ts:44) and feed the Agents tree's nesting + default
+ * sort, exactly as `EpicArtifactEntry`'s equivalents already do below.
+ */
 export interface EpicChatEntry {
   readonly chatId: string;
   readonly title: string;
+  readonly parentId: string | null;
+  readonly createdAt: number;
+  readonly updatedAt: number;
 }
 
 /**
@@ -69,9 +77,13 @@ export function readChatsFromEpicDoc(doc: Y.Doc): readonly EpicChatEntry[] {
       continue;
     }
     const rawTitle = entry.get("title");
+    const rawParentId = entry.get("parentId");
     out.push({
       chatId,
       title: typeof rawTitle === "string" ? rawTitle : "",
+      parentId: typeof rawParentId === "string" ? rawParentId : null,
+      createdAt: readMaybeNumber(entry.get("createdAt"), 0),
+      updatedAt: readMaybeNumber(entry.get("updatedAt"), 0),
     });
   }
   return out;
@@ -143,32 +155,52 @@ export interface ArtifactTree {
   readonly byId: Readonly<Record<string, EpicArtifactEntry>>;
 }
 
+export interface ChatTree {
+  readonly roots: readonly string[];
+  readonly childrenByParent: Readonly<Record<string, readonly string[]>>;
+  readonly byId: Readonly<Record<string, EpicChatEntry>>;
+}
+
+interface ParentedNode {
+  readonly parentId: string | null;
+  readonly updatedAt: number;
+}
+
 /**
  * Sibling comparator mirroring desktop's `DEFAULT_SORT_MODE` (`updatedAt`
- * DESC, `id` ASC tie-break) — `epic-sort.ts`'s `makeNodeComparator`, scoped
+ * DESC, id ASC tie-break) — `epic-sort.ts`'s `makeNodeComparator`, scoped
  * down to the two fields this tree needs rather than porting the full
- * multi-field module.
+ * multi-field module. Shared by the chat and artifact trees (P1) since both
+ * nest by `parentId` under the identical desktop default-sort rule.
  */
-function compareArtifactNodes(a: EpicArtifactEntry, b: EpicArtifactEntry): number {
+function compareParentedNodes(aId: string, a: ParentedNode, bId: string, b: ParentedNode): number {
   if (a.updatedAt !== b.updatedAt) return b.updatedAt - a.updatedAt;
-  if (a.id < b.id) return -1;
-  if (a.id > b.id) return 1;
+  if (aId < bId) return -1;
+  if (aId > bId) return 1;
   return 0;
 }
 
 /**
- * Nests artifacts by `parentId`. A `parentId` that points at an id not
- * present in `entries` (deleted parent, stale reference) promotes the child
- * to root rather than dropping it — mirrors `resolveEffectiveParent`'s
- * "unknown id -> null (orphan promotion)" rule, scoped to artifacts only
- * (no chat/agent cross-family case exists in this map).
+ * Nests entries by `parentId`. A `parentId` that points at an id not present
+ * in `entries` (deleted parent, stale reference) promotes the child to root
+ * rather than dropping it — mirrors `resolveEffectiveParent`'s "unknown id ->
+ * null (orphan promotion)" rule. Generic over chats and artifacts (P1) — both
+ * families nest by `parentId` within their own map, never across families;
+ * `keyOf` supplies each family's identity field (`id` vs `chatId`).
  */
-export function buildArtifactTree(entries: readonly EpicArtifactEntry[]): ArtifactTree {
-  const byId: Record<string, EpicArtifactEntry> = {};
-  for (const entry of entries) byId[entry.id] = entry;
+function buildParentedTree<T extends ParentedNode>(
+  entries: readonly T[],
+  keyOf: (entry: T) => string,
+): {
+  readonly roots: readonly string[];
+  readonly childrenByParent: Readonly<Record<string, readonly string[]>>;
+  readonly byId: Readonly<Record<string, T>>;
+} {
+  const byId: Record<string, T> = {};
+  for (const entry of entries) byId[keyOf(entry)] = entry;
 
-  const rootsUnsorted: EpicArtifactEntry[] = [];
-  const childrenUnsorted: Record<string, EpicArtifactEntry[]> = {};
+  const rootsUnsorted: T[] = [];
+  const childrenUnsorted: Record<string, T[]> = {};
   for (const entry of entries) {
     const effectiveParentId =
       entry.parentId !== null && Object.hasOwn(byId, entry.parentId) ? entry.parentId : null;
@@ -179,16 +211,24 @@ export function buildArtifactTree(entries: readonly EpicArtifactEntry[]): Artifa
     (childrenUnsorted[effectiveParentId] ??= []).push(entry);
   }
 
+  const sortIds = (nodes: readonly T[]): readonly string[] =>
+    [...nodes].sort((a, b) => compareParentedNodes(keyOf(a), a, keyOf(b), b)).map(keyOf);
+
   const childrenByParent: Record<string, readonly string[]> = {};
   for (const [parentId, children] of Object.entries(childrenUnsorted)) {
-    childrenByParent[parentId] = [...children].sort(compareArtifactNodes).map((c) => c.id);
+    childrenByParent[parentId] = sortIds(children);
   }
 
-  return {
-    roots: [...rootsUnsorted].sort(compareArtifactNodes).map((r) => r.id),
-    childrenByParent,
-    byId,
-  };
+  return { roots: sortIds(rootsUnsorted), childrenByParent, byId };
+}
+
+export function buildArtifactTree(entries: readonly EpicArtifactEntry[]): ArtifactTree {
+  return buildParentedTree(entries, (e) => e.id);
+}
+
+/** Chat-tree equivalent of {@link buildArtifactTree}, keyed by `chatId`. */
+export function buildChatTree(entries: readonly EpicChatEntry[]): ChatTree {
+  return buildParentedTree(entries, (e) => e.chatId);
 }
 
 export interface UseEpicDocResult {

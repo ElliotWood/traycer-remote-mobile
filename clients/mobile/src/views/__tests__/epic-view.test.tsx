@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 /**
- * Render test for the epic detail view (T5).
+ * Render test for the Epic tree view (T5, P1 desktop-fidelity rebuild).
  *
  * Drives the FAKE stream layer (no socket): feed a decoded epic doc-update that
- * enumerates two chats, then per-chat snapshots — one blocked, one running.
- * Asserts the chats render, the blocked chat sorts to the top with its badge,
- * the epic connection state surfaces, and every stream (epic + both chats) is
- * closed on unmount.
+ * enumerates chats/artifacts, then per-chat snapshots. Asserts the Agents +
+ * Artifacts sections both render from the SAME epic session (no second
+ * `epic.subscribe`), the connection pill shows desktop's 3-state copy, and
+ * every stream (epic + every per-chat badge) is closed on unmount.
  */
 import { describe, expect, it } from "vitest";
 import userEvent from "@testing-library/user-event";
@@ -39,6 +39,25 @@ function epicUpdateWithChats(
   return Y.encodeStateAsUpdate(doc);
 }
 
+function epicUpdateWithArtifacts(
+  artifacts: readonly { readonly id: string; readonly kind: string; readonly title: string }[],
+): Uint8Array {
+  const doc = new Y.Doc();
+  const map = new Y.Map<unknown>();
+  doc.getMap("epic").set("artifacts", map);
+  for (const a of artifacts) {
+    const entry = new Y.Map<unknown>();
+    map.set(a.id, entry);
+    entry.set("kind", a.kind);
+    entry.set("title", a.title);
+    entry.set("parentId", null);
+    entry.set("artifactRoomId", `room-${a.id}`);
+    entry.set("createdAt", 0);
+    entry.set("updatedAt", 0);
+  }
+  return Y.encodeStateAsUpdate(doc);
+}
+
 type SnapshotFrame = Extract<ChatSubscribeServerFrame, { readonly kind: "snapshot" }>;
 
 function chatSnapshot(opts: {
@@ -50,6 +69,7 @@ function chatSnapshot(opts: {
     kind: "snapshot",
     snapshot: {
       runStatus: opts.runStatus,
+      access: { role: "owner", ownerUserId: "u1" },
       pendingApprovals: (opts.approvals ?? []).map((approvalId) => ({
         approvalId,
       })),
@@ -86,8 +106,8 @@ function chatSessionFor(
   return session;
 }
 
-describe("EpicView", () => {
-  it("renders chats, sorts the blocked one to the top with a badge, and shows connection state", async () => {
+describe("EpicView — Agents section (P1)", () => {
+  it("renders chats with a live-state icon, blocked outranking running in the accessible label", async () => {
     const fake = createFakeStreamConnection();
     renderEpicView(fake);
 
@@ -103,9 +123,9 @@ describe("EpicView", () => {
       fake.epicSessions[0].connection.applyStatus("open", null);
     });
 
-    expect(await screen.findByText("Running chat")).toBeTruthy();
-    expect(screen.getByText("Blocked chat")).toBeTruthy();
-    expect(screen.getByText("Live")).toBeTruthy();
+    expect(await screen.findByTestId("chat-row-c1")).toBeTruthy();
+    expect(screen.getByTestId("chat-row-c2")).toBeTruthy();
+    expect(screen.getByText("All changes synced")).toBeTruthy();
 
     // 2) Per-chat badge streams report: c2 is blocked (pending approval), c1 running.
     act(() => {
@@ -117,13 +137,10 @@ describe("EpicView", () => {
       );
     });
 
-    // Blocked sorts to the top: the first row is the blocked chat with its badge.
-    const rows = await screen.findAllByRole("button", { name: /chat/i });
-    const chatRows = rows.filter((r) => /Running chat|Blocked chat/.test(r.textContent ?? ""));
-    expect(within(chatRows[0]).getByText("Blocked chat")).toBeTruthy();
-    expect(within(chatRows[0]).getByText("Blocked")).toBeTruthy();
-    expect(within(chatRows[1]).getByText("Running chat")).toBeTruthy();
-    expect(within(chatRows[1]).getByText("Running")).toBeTruthy();
+    const runningRow = screen.getByTestId("chat-row-c1");
+    const blockedRow = screen.getByTestId("chat-row-c2");
+    expect(within(runningRow).getByLabelText("Running")).toBeTruthy();
+    expect(within(blockedRow).getByLabelText("Waiting for your approval")).toBeTruthy();
   });
 
   it("navigates to the tapped chat", async () => {
@@ -138,7 +155,7 @@ describe("EpicView", () => {
       );
     });
 
-    await userEvent.setup().click(await screen.findByRole("button", { name: /Only chat/ }));
+    await userEvent.setup().click(await screen.findByTestId("chat-row-c1"));
     expect(opened).toEqual(["c1"]);
   });
 
@@ -156,7 +173,7 @@ describe("EpicView", () => {
       );
     });
     // Both per-chat streams must have opened before we can assert their teardown.
-    await screen.findByText("Alpha");
+    await screen.findByTestId("chat-row-c1");
     expect(fake.chatSessions).toHaveLength(2);
 
     unmount();
@@ -166,47 +183,42 @@ describe("EpicView", () => {
       expect(session.close).toHaveBeenCalledTimes(1);
     }
   });
+});
 
-  it("regresses eval-round-1 finding 1: opening Artifacts does NOT open a second epic.subscribe, and the tree is populated instantly from the already-live session", async () => {
+describe("EpicView — Artifacts section (P1)", () => {
+  it("renders inline from the SAME epic session — no second epic.subscribe", async () => {
     const fake = createFakeStreamConnection();
     renderEpicView(fake);
 
     act(() => {
-      fake.epicSessions[0].callbacks.onSnapshot(EPIC_META, epicUpdateWithArtifacts([
-        { id: "spec-1", kind: "spec", title: "Design doc" },
-      ]));
+      fake.epicSessions[0].callbacks.onSnapshot(
+        EPIC_META,
+        epicUpdateWithArtifacts([{ id: "spec-1", kind: "spec", title: "Design doc" }]),
+      );
       fake.epicSessions[0].connection.applyStatus("open", null);
     });
-    await screen.findByText("Live");
-    expect(fake.epicSessions).toHaveLength(1);
 
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Artifacts" }));
-
-    // The tree renders from the SAME session's already-fetched artifacts
-    // immediately -- no "Reconnecting..." flash, no second handshake.
-    expect(await screen.findByText("Design doc")).toBeTruthy();
-    expect(screen.queryByText("Reconnecting…")).toBeNull();
-    // Exactly one epic.subscribe for the whole epic-view lifetime, including
-    // after drilling into Artifacts.
+    await screen.findByText("All changes synced");
+    // The Artifacts section renders directly alongside Agents — no drill-in
+    // screen, no second handshake.
+    expect(await screen.findByTestId("artifact-row-spec-1")).toBeTruthy();
+    expect(screen.getByText("Design doc")).toBeTruthy();
     expect(fake.epicSessions).toHaveLength(1);
   });
-});
 
-function epicUpdateWithArtifacts(
-  artifacts: readonly { readonly id: string; readonly kind: string; readonly title: string }[],
-): Uint8Array {
-  const doc = new Y.Doc();
-  const map = new Y.Map<unknown>();
-  doc.getMap("epic").set("artifacts", map);
-  for (const a of artifacts) {
-    const entry = new Y.Map<unknown>();
-    map.set(a.id, entry);
-    entry.set("kind", a.kind);
-    entry.set("title", a.title);
-    entry.set("parentId", null);
-    entry.set("artifactRoomId", `room-${a.id}`);
-    entry.set("createdAt", 0);
-    entry.set("updatedAt", 0);
-  }
-  return Y.encodeStateAsUpdate(doc);
-}
+  it("opens the artifact body inline on tap", async () => {
+    const fake = createFakeStreamConnection();
+    renderEpicView(fake);
+
+    act(() => {
+      fake.epicSessions[0].callbacks.onSnapshot(
+        EPIC_META,
+        epicUpdateWithArtifacts([{ id: "spec-1", kind: "spec", title: "Design doc" }]),
+      );
+    });
+
+    await userEvent.setup().click(await screen.findByTestId("artifact-row-spec-1"));
+    // ArtifactBodyView renders its own back control + the artifact's icon tile.
+    expect(await screen.findByText("Design doc")).toBeTruthy();
+  });
+});

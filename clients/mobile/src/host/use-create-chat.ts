@@ -94,6 +94,8 @@ export interface BuildCreateChatRequestArgs {
   readonly userId: string;
   readonly model: string;
   readonly instruction: string;
+  /** P1: the Agents-row "+" add-child action passes the parent chat's id; the root "+ New agent here" flow omits it (defaults to a top-level chat). */
+  readonly parentId?: string | null;
 }
 
 /**
@@ -123,7 +125,7 @@ export function buildCreateChatRequest(
   };
   return {
     epicId: args.epicId,
-    parentId: null,
+    parentId: args.parentId ?? null,
     hostId: MOBILE_HOST_ID,
     title: deriveChatTitle(args.instruction),
     chatId: args.chatId,
@@ -143,6 +145,8 @@ export interface UseCreateChatResult {
 export interface UseCreateChatArgs {
   readonly client: MobileHostClient;
   readonly epicId: string;
+  /** P1: nests the new chat under this parent (Agents-row "+" action). Omitted/`null` for a top-level chat. */
+  readonly parentId?: string | null;
   /** Called with the minted `chatId` once the host accepts the create. */
   readonly onCreated: (chatId: string) => void;
 }
@@ -150,6 +154,7 @@ export interface UseCreateChatArgs {
 export function useCreateChat({
   client,
   epicId,
+  parentId = null,
   onCreated,
 }: UseCreateChatArgs): UseCreateChatResult {
   const [phase, setPhase] = useState<CreateChatPhase>("idle");
@@ -197,6 +202,7 @@ export function useCreateChat({
             userId,
             model,
             instruction: text,
+            parentId,
           });
 
           const response = await client.request("epic.createChat", request);
@@ -214,7 +220,7 @@ export function useCreateChat({
         }
       })();
     },
-    [client, epicId, onCreated, phase],
+    [client, epicId, parentId, onCreated, phase],
   );
 
   return { phase, error, submit };

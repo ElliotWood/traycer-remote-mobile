@@ -13,12 +13,21 @@ import {
   BookOpen,
   ClipboardCheck,
   FileText,
+  LoaderCircle,
+  MessageCircleQuestionMark,
   MessageSquare,
+  MessageSquareCheck,
+  MessageSquareDot,
+  MessageSquareLock,
+  MessageSquareWarning,
+  MessageSquareX,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
+import type { LadderTier } from "@/host/agent-ladder";
 import { colors } from "./ui";
+import { theme } from "./design-tokens";
 
 /** Backend artifact kinds that get the full kind-card treatment. */
 export type CardKind = "spec" | "ticket" | "story" | "review";
@@ -226,3 +235,79 @@ export function displayArtifactTitle(title: string, kind: CardKind): string {
 }
 
 export { isCardKind };
+
+/**
+ * P1 — the Agents-section live-state ladder icon set. Static glyphs per
+ * `notification-indicator-tones.ts` (failure/interview/approval/done) plus
+ * mobile's own background/read-only tiles; `running`/`idle` have no entry
+ * here — running renders a spinner, idle renders the plain `KIND_ICONS.chat`
+ * glyph, exactly like desktop's `defaultIcon` fallback.
+ */
+export const LADDER_ICONS: Readonly<
+  Record<Exclude<LadderTier, "running" | "idle">, LucideIcon>
+> = {
+  failed: MessageSquareX,
+  "needs-interview": MessageCircleQuestionMark,
+  "needs-approval": MessageSquareWarning,
+  background: MessageSquareDot,
+  "done-unread": MessageSquareCheck,
+  "read-only": MessageSquareLock,
+};
+
+/** Tone color per ladder tier, sourced from the Sprint 6 `design-tokens` theme (not `./ui`) since P1 is the desktop-fidelity rebuild. */
+export const LADDER_TONE_COLORS: Readonly<Record<LadderTier, string>> = {
+  failed: theme.danger,
+  "needs-interview": theme.warning,
+  "needs-approval": theme.warning,
+  running: theme.primary,
+  background: theme.mutedText,
+  "done-unread": theme.success,
+  "read-only": theme.mutedText,
+  idle: KIND_COLORS.chat,
+};
+
+export const LADDER_TIER_LABELS: Readonly<Record<LadderTier, string>> = {
+  failed: "Needs attention",
+  "needs-interview": "Waiting for your response",
+  "needs-approval": "Waiting for your approval",
+  running: "Running",
+  background: "Running in background",
+  "done-unread": "Task completed",
+  "read-only": "Read-only",
+  idle: "Idle",
+};
+
+export interface LadderIconProps {
+  readonly tier: LadderTier;
+  /** Muted (opacity-60) collapsed-parent rollup variant — mirrors `NestedChatStatusIcon`. */
+  readonly muted?: boolean;
+  readonly size?: number;
+}
+
+/**
+ * The Agents-row live-state glyph: a static tone icon for failed/interview/
+ * approval/background/done-unread/read-only, a CSS spinner for `running`,
+ * and the plain chat glyph for `idle` — mirrors `NotificationIndicatorIcon`'s
+ * precedence-resolved single-icon-slot rendering.
+ */
+export function LadderIcon({ tier, muted = false, size = 16 }: LadderIconProps): ReactElement {
+  const color = LADDER_TONE_COLORS[tier];
+  const opacity = muted ? 0.6 : 1;
+
+  if (tier === "running") {
+    return (
+      <LoaderCircle
+        className="traycer-spinner"
+        size={size}
+        color={color}
+        aria-hidden="true"
+        style={{ opacity }}
+      />
+    );
+  }
+  if (tier === "idle") {
+    return <MessageSquare size={size} color={color} aria-hidden="true" style={{ opacity }} />;
+  }
+  const Icon = LADDER_ICONS[tier];
+  return <Icon size={size} color={color} aria-hidden="true" style={{ opacity }} />;
+}
