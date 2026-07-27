@@ -12,13 +12,16 @@
  * bypass), so the Evaluator can drive comments live in a real browser without
  * Sprint 3's artifact tree existing in this worktree.
  */
-import { useEffect, useMemo, useReducer, type ReactElement } from "react";
+import { useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
 import {
   currentRoute,
   INITIAL_NAV_STACK,
   navReducer,
 } from "@/router/nav";
 import type { MobileHostClient } from "@/host/host-client-context";
+import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
+import { useHostNotifications } from "@/host/use-host-notifications";
+import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import { FleetView } from "@/views/fleet-view";
 import { EpicView } from "@/views/epic-view";
 import { ChatView } from "@/views/chat-view";
@@ -26,9 +29,15 @@ import { CommentsPanel } from "@/views/comments/comments-panel";
 import { parseCommentsHarnessParams } from "@/views/comments/comments-harness-params";
 import { ErrorBoundary } from "@/views/error-boundary";
 import { CurrentEpicProvider } from "@/host/current-epic-context";
+import { TopAppBar } from "@/views/toolbar/top-app-bar";
+import { AccountSheet } from "@/views/toolbar/account-sheet";
+import { UsageSheet } from "@/views/toolbar/usage-sheet";
+import { NotificationsScreen } from "@/views/toolbar/notifications-screen";
+import { SettingsScreen } from "@/views/toolbar/settings-screen";
 
 interface AppShellProps {
   readonly client: MobileHostClient;
+  readonly user: AuthenticatedUser | null;
   readonly onSignOut: () => void;
 }
 
@@ -49,9 +58,13 @@ function isOpenChatMessage(data: unknown): data is OpenChatMessage {
   );
 }
 
-export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
+export function AppShell({ client, user, onSignOut }: AppShellProps): ReactElement {
   const [stack, dispatch] = useReducer(navReducer, INITIAL_NAV_STACK);
   const route = currentRoute(stack);
+  const streamConnection = useStreamConnectionOrNull();
+  const { summary: notificationsSummary } = useHostNotifications(streamConnection);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
 
   // S5 (C, P1): a blocked-chat notification's click posts a message to an
   // existing client (see `src/sw.ts`'s `notificationclick`); this is the one
@@ -88,48 +101,95 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
     return <CommentsPanel {...harnessParams} />;
   }
 
-  if (route.name === "fleet") {
-    return (
-      <ErrorBoundary label="the fleet" key={route.name}>
-        <FleetView
-          client={client}
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
+      <TopAppBar
+        user={user}
+        notificationsSummary={notificationsSummary}
+        onOpenUsage={() => setUsageOpen(true)}
+        onOpenNotifications={() => dispatch({ type: "open-notifications" })}
+        onOpenAccount={() => setAccountOpen(true)}
+      />
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>{renderRoute()}</div>
+      {accountOpen && (
+        <AccountSheet
+          user={user}
+          onClose={() => setAccountOpen(false)}
+          onOpenSettings={() => {
+            setAccountOpen(false);
+            dispatch({ type: "open-settings" });
+          }}
           onSignOut={onSignOut}
-          onOpenEpic={(epicId, epicTitle) =>
-            dispatch({ type: "open-epic", epicId, epicTitle })
-          }
         />
-      </ErrorBoundary>
+      )}
+      {usageOpen && <UsageSheet onClose={() => setUsageOpen(false)} />}
+    </div>
+  );
+
+  function renderRoute(): ReactElement {
+    if (route.name === "fleet") {
+      return (
+        <ErrorBoundary label="the fleet" key={route.name}>
+          <FleetView
+            client={client}
+            onSignOut={onSignOut}
+            onOpenEpic={(epicId, epicTitle) =>
+              dispatch({ type: "open-epic", epicId, epicTitle })
+            }
+          />
+        </ErrorBoundary>
+      );
+    }
+
+    if (route.name === "notifications") {
+      return (
+        <ErrorBoundary label="notifications" key={route.name}>
+          <NotificationsScreen
+            onBack={() => dispatch({ type: "back" })}
+            onOpenChat={(epicId, chatId) => dispatch({ type: "goto-chat", epicId, chatId })}
+            onOpenEpic={(epicId) => dispatch({ type: "open-epic", epicId, epicTitle: "" })}
+          />
+        </ErrorBoundary>
+      );
+    }
+
+    if (route.name === "settings") {
+      return (
+        <ErrorBoundary label="settings" key={route.name}>
+          <SettingsScreen onBack={() => dispatch({ type: "back" })} onSignOut={onSignOut} />
+        </ErrorBoundary>
+      );
+    }
+
+    // "epic" and "chat" both carry `epicId` and share ONE `epic.subscribe`
+    // session for the whole epic↔chat transition — `CurrentEpicProvider` is
+    // keyed by epicId (not by route.name), so switching between the tree and
+    // a chat within the SAME epic never tears the session down or re-decodes
+    // the snapshot (see `current-epic-context.tsx`'s docblock).
+    return (
+      <CurrentEpicProvider epicId={route.epicId} key={route.epicId}>
+        {route.name === "epic" ? (
+          <ErrorBoundary label="this epic" key={`epic:${route.epicId}`}>
+            <EpicView
+              epicId={route.epicId}
+              epicTitle={route.epicTitle}
+              onOpenChat={(chatId, chatTitle) =>
+                dispatch({ type: "open-chat", epicId: route.epicId, chatId, chatTitle })
+              }
+              onBack={() => dispatch({ type: "back" })}
+            />
+          </ErrorBoundary>
+        ) : (
+          <ErrorBoundary label="this chat" key={`chat:${route.chatId}`}>
+            <ChatView
+              epicId={route.epicId}
+              chatId={route.chatId}
+              initialTitle={route.chatTitle}
+              onBack={() => dispatch({ type: "back" })}
+            />
+          </ErrorBoundary>
+        )}
+      </CurrentEpicProvider>
     );
   }
-
-  // "epic" and "chat" both carry `epicId` and share ONE `epic.subscribe`
-  // session for the whole epic↔chat transition — `CurrentEpicProvider` is
-  // keyed by epicId (not by route.name), so switching between the tree and
-  // a chat within the SAME epic never tears the session down or re-decodes
-  // the snapshot (see `current-epic-context.tsx`'s docblock).
-  return (
-    <CurrentEpicProvider epicId={route.epicId} key={route.epicId}>
-      {route.name === "epic" ? (
-        <ErrorBoundary label="this epic" key={`epic:${route.epicId}`}>
-          <EpicView
-            epicId={route.epicId}
-            epicTitle={route.epicTitle}
-            onOpenChat={(chatId, chatTitle) =>
-              dispatch({ type: "open-chat", epicId: route.epicId, chatId, chatTitle })
-            }
-            onBack={() => dispatch({ type: "back" })}
-          />
-        </ErrorBoundary>
-      ) : (
-        <ErrorBoundary label="this chat" key={`chat:${route.chatId}`}>
-          <ChatView
-            epicId={route.epicId}
-            chatId={route.chatId}
-            initialTitle={route.chatTitle}
-            onBack={() => dispatch({ type: "back" })}
-          />
-        </ErrorBoundary>
-      )}
-    </CurrentEpicProvider>
-  );
 }

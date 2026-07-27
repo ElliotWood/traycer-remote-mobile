@@ -43,7 +43,11 @@ export function App({ auth }: { readonly auth: MobileAuthService }): ReactElemen
       return client === null ? (
         <HostConfigPrompt />
       ) : (
-        <AppShell client={client} onSignOut={() => auth.signOut()} />
+        <AppShell
+          client={client}
+          user={status.kind === "signed-in" ? status.user : null}
+          onSignOut={() => auth.signOut()}
+        />
       );
   }
 }

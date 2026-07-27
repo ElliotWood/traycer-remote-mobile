@@ -22,7 +22,12 @@ export type Route =
   // that opened it) so ChatView shows real text instantly instead of
   // "Untitled chat" until chat.subscribe's snapshot lands. `null` when
   // reached a way that doesn't know it (e.g. `goto-chat` from a notification).
-  | { readonly name: "chat"; readonly epicId: string; readonly chatId: string; readonly chatTitle: string | null };
+  | { readonly name: "chat"; readonly epicId: string; readonly chatId: string; readonly chatTitle: string | null }
+  // App-toolbar screens: reachable from the bell/avatar on any screen, pushed
+  // onto the SAME stack (so "back" returns to wherever the user was) rather
+  // than living outside the drilldown.
+  | { readonly name: "notifications" }
+  | { readonly name: "settings" };
 
 export type NavAction =
   | { readonly type: "open-epic"; readonly epicId: string; readonly epicTitle: string }
@@ -34,7 +39,9 @@ export type NavAction =
    * be on — pushing `open-epic`+`open-chat` unconditionally could duplicate an
    * epic frame if the user was already inside that same epic/chat.
    */
-  | { readonly type: "goto-chat"; readonly epicId: string; readonly chatId: string };
+  | { readonly type: "goto-chat"; readonly epicId: string; readonly chatId: string }
+  | { readonly type: "open-notifications" }
+  | { readonly type: "open-settings" };
 
 /** The stack always holds at least the Fleet root, so `currentRoute` is total. */
 export type NavStack = readonly [Route, ...Route[]];
@@ -69,5 +76,9 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
         { name: "epic", epicId: action.epicId, epicTitle: null },
         { name: "chat", epicId: action.epicId, chatId: action.chatId, chatTitle: null },
       ];
+    case "open-notifications":
+      return [...stack, { name: "notifications" }];
+    case "open-settings":
+      return [...stack, { name: "settings" }];
   }
 }
