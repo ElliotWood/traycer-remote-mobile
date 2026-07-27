@@ -47,13 +47,13 @@ const codeBlockStyle: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
   border: `1px solid ${colors.border}`,
-  background: "#1a1a1a",
+  background: "var(--muted)",
 };
 
 const inlineCodeStyle: CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, monospace",
   fontSize: 13,
-  background: "#1a1a1a",
+  background: "var(--muted)",
   borderRadius: 4,
   padding: "1px 5px",
 };
@@ -155,6 +155,7 @@ export function MobileMarkdown({ children }: MobileMarkdownProps): ReactElement 
   return (
     <div
       data-testid="mobile-markdown"
+      className="prose dark:prose-invert md-prose prose-sm max-w-none"
       style={{
         color: colors.text,
         fontSize: 15,

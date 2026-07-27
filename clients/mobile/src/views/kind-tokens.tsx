@@ -166,7 +166,17 @@ export function KindCard({ kind, status, title, children }: KindCardProps): Reac
     padding: 12,
     marginBottom: 8,
     borderRadius: 8,
-    border: `1px solid ${colors.border}`,
+    // Split into longhands (not the `border` shorthand): a shorthand whose
+    // color is a CSS custom property (`colors.border` → `var(--border)`
+    // post Tailwind-pivot) is a single "invalid or unresolved" declaration
+    // in browsers that don't support live var() substitution in jsdom's
+    // cssstyle — the whole shorthand (including the WIDTH) would silently
+    // fail to apply in the test's `getComputedStyle` check. Longhands keep
+    // `borderWidth`/`borderStyle` independently verifiable even where
+    // `borderColor` itself can't be resolved outside a real browser.
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     borderLeft: `3px solid ${color}`,
     background: hexToRgba(color, 0.08),
   };

@@ -5,21 +5,32 @@
  * a dark, single-column phone layout defined here rather than pulling in a CSS
  * framework. Inline `CSSProperties` keeps each view self-contained and avoids a
  * global stylesheet build step.
+ *
+ * Tailwind-foundation pivot: `colors.*` now reference the SAME live CSS custom
+ * properties `design-tokens.tsx`'s `theme.*` does (`global.css`'s
+ * `.dark[data-theme="traycer-green"]` block), rather than the pre-pivot
+ * hand-picked hex (`#111`/`#4a9eff` shell blue/etc.) — every one of this
+ * module's ~20 content-screen call sites (chat blocks, artifact body,
+ * comments, markdown/mermaid/wireframe, sign-in) picks up the real desktop
+ * palette with zero changes at the call site. Field NAMES are unchanged on
+ * purpose (`bg`/`text`/`muted`/`accent`/...) so this is a pure repoint, not a
+ * rename.
  */
 import type { CSSProperties } from "react";
 
 export const colors = {
-  bg: "#111",
-  text: "#eee",
-  muted: "#888",
-  border: "#333",
-  accent: "#4a9eff",
-  danger: "#e5484d",
-  dangerBg: "#2a1414",
+  bg: "var(--background)",
+  text: "var(--foreground)",
+  muted: "var(--muted-foreground)",
+  border: "var(--border)",
+  accent: "var(--primary)",
+  danger: "var(--destructive)",
+  dangerBg: "color-mix(in oklch, var(--destructive) 12%, transparent)",
 } as const;
 
 export const screen: CSSProperties = {
-  fontFamily: "system-ui, sans-serif",
+  fontFamily:
+    "'Figtree Variable', Figtree, ui-sans-serif, system-ui, -apple-system, sans-serif",
   maxWidth: 480,
   margin: "0 auto",
   minHeight: "100vh",
@@ -36,7 +47,7 @@ export const primaryButton: CSSProperties = {
   border: 0,
   borderRadius: 8,
   background: colors.accent,
-  color: "#fff",
+  color: "var(--primary-foreground)",
   cursor: "pointer",
 };
 

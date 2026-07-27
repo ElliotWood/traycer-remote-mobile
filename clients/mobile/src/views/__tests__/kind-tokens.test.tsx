@@ -61,7 +61,12 @@ describe("KindCard — border + tint + icon tile", () => {
     // Surface tint: an rgba wash of the kind color, not a flat/generic gray.
     expect(style).toContain(hexToRgba(KIND_COLORS[kind], 0.08));
     // Colored left border (3px), distinct from the outer 1px border on the
-    // other three sides.
+    // other three sides. The outer border's WIDTH is asserted via
+    // `getComputedStyle` (kind-tokens.tsx sets it as a separate `borderWidth`
+    // longhand rather than the `border` shorthand specifically so this keeps
+    // working even though `borderColor` resolves to `var(--border)` — a CSS
+    // custom property jsdom's cssstyle can't substitute outside a real
+    // browser with `global.css` loaded).
     const computed = getComputedStyle(card);
     expect(computed.borderLeftWidth).toBe("3px");
     expect(computed.borderLeftColor).toBe(hexToRgbCss(KIND_COLORS[kind]));
