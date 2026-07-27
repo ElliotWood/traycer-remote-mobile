@@ -441,16 +441,24 @@ function ApprovalCard({
   readonly onDecide: (approved: boolean) => void;
 }): ReactElement {
   return (
-    <article style={card}>
-      <div style={cardLabel}>
-        {approval.kind === "plan" ? "Plan approval" : "Tool approval"}
-        {" · "}
-        <span style={{ color: theme.text }}>{approval.toolName}</span>
-      </div>
-      <p style={cardDescription}>{approval.description}</p>
-      <ApproveRejectRow status={status} onDecide={onDecide} />
-      <ReplyStatusLine status={status} />
-    </article>
+    <PendingCardShell
+      body={
+        <>
+          <div style={cardLabel}>
+            {approval.kind === "plan" ? "Plan approval" : "Tool approval"}
+            {" · "}
+            <span style={{ color: theme.text }}>{approval.toolName}</span>
+          </div>
+          <p style={{ ...cardDescription, margin: 0 }}>{approval.description}</p>
+        </>
+      }
+      footer={
+        <>
+          <ApproveRejectRow status={status} onDecide={onDecide} />
+          <ReplyStatusLine status={status} />
+        </>
+      }
+    />
   );
 }
 
@@ -464,23 +472,57 @@ function FileEditApprovalCard({
   readonly onDecide: (approved: boolean) => void;
 }): ReactElement {
   return (
-    <article style={card}>
-      <div style={cardLabel}>
-        File edit · <span style={{ color: theme.text }}>{approval.operation}</span>
-      </div>
-      <p style={cardDescription}>{approval.description}</p>
-      <ul style={{ margin: "0 0 12px", paddingLeft: 18 }}>
-        {approval.paths.map((path) => (
-          <li
-            key={path}
-            style={{ color: theme.text, fontSize: 13, wordBreak: "break-all" }}
-          >
-            {path}
-          </li>
-        ))}
-      </ul>
-      <ApproveRejectRow status={status} onDecide={onDecide} />
-      <ReplyStatusLine status={status} />
+    <PendingCardShell
+      body={
+        <>
+          <div style={cardLabel}>
+            File edit · <span style={{ color: theme.text }}>{approval.operation}</span>
+          </div>
+          <p style={cardDescription}>{approval.description}</p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {approval.paths.map((path) => (
+              <li
+                key={path}
+                style={{ color: theme.text, fontSize: 13, wordBreak: "break-all" }}
+              >
+                {path}
+              </li>
+            ))}
+          </ul>
+        </>
+      }
+      footer={
+        <>
+          <ApproveRejectRow status={status} onDecide={onDecide} />
+          <ReplyStatusLine status={status} />
+        </>
+      }
+    />
+  );
+}
+
+/**
+ * Shared shell for every "waiting on you" card (interview/approval/
+ * file-edit-approval): a bounded-height flex column with an internally
+ * SCROLLABLE body and a pinned, always-visible footer for the action row.
+ * Fixes a real bug — a long interview question / many options / a long
+ * file-edit path list could push Submit/Approve/Reject below the fold with
+ * no way to reach it, since the outer `<footer>` this renders inside
+ * doesn't scroll and the flex layout just let the card overflow off-screen.
+ * `dvh` (not `vh`) so the mobile URL bar / on-screen keyboard resizing the
+ * visual viewport doesn't strand the cap at the wrong height.
+ */
+function PendingCardShell({
+  body,
+  footer,
+}: {
+  readonly body: ReactElement;
+  readonly footer: ReactElement;
+}): ReactElement {
+  return (
+    <article style={pendingCardShellStyle}>
+      <div style={pendingCardBodyStyle}>{body}</div>
+      <div style={pendingCardFooterStyle}>{footer}</div>
     </article>
   );
 }
@@ -598,70 +640,78 @@ function InterviewForm({
   const canSubmit = !busy && answers.every((a) => a.values.length > 0);
 
   return (
-    <article style={card}>
-      <div style={cardLabel}>Interview</div>
-      {block.title !== null && <p style={cardDescription}>{block.title}</p>}
-      {block.questions.map((question, qi) => (
-        <fieldset
-          key={question.questionId ?? qi}
-          style={{ border: 0, margin: 0, padding: "0 0 12px" }}
-        >
-          {question.header !== null && (
-            <div style={{ color: theme.mutedText, fontSize: 12 }}>{question.header}</div>
-          )}
-          <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>
-            {question.question}
-          </legend>
-          {question.options.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {question.options.map((option) => {
-                const selected = drafts[qi].selected.includes(option.label);
-                return (
-                  <button
-                    key={option.label}
-                    type="button"
-                    disabled={busy}
-                    aria-pressed={selected}
-                    style={optionButton(selected, busy)}
-                    onClick={() =>
-                      toggleOption(qi, option.label, question.multiSelect)
-                    }
-                  >
-                    <span style={{ fontWeight: 600 }}>{option.label}</span>
-                    {option.description !== null && (
-                      <span
-                        style={{ display: "block", color: theme.mutedText, fontSize: 12 }}
+    <PendingCardShell
+      body={
+        <>
+          <div style={cardLabel}>Interview</div>
+          {block.title !== null && <p style={cardDescription}>{block.title}</p>}
+          {block.questions.map((question, qi) => (
+            <fieldset
+              key={question.questionId ?? qi}
+              style={{ border: 0, margin: 0, padding: "0 0 12px" }}
+            >
+              {question.header !== null && (
+                <div style={{ color: theme.mutedText, fontSize: 12 }}>{question.header}</div>
+              )}
+              <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>
+                {question.question}
+              </legend>
+              {question.options.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {question.options.map((option) => {
+                    const selected = drafts[qi].selected.includes(option.label);
+                    return (
+                      <button
+                        key={option.label}
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={selected}
+                        style={optionButton(selected, busy)}
+                        onClick={() =>
+                          toggleOption(qi, option.label, question.multiSelect)
+                        }
                       >
-                        {option.description}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <input
-              type="text"
-              disabled={busy}
-              value={drafts[qi].text}
-              placeholder="Type your answer"
-              aria-label={question.question}
-              style={textInput}
-              onChange={(e) => setText(qi, e.target.value)}
-            />
-          )}
-        </fieldset>
-      ))}
-      <button
-        type="button"
-        disabled={!canSubmit}
-        style={decisionButton(theme.primary, !canSubmit)}
-        onClick={() => onSubmit(answers)}
-      >
-        Submit answer
-      </button>
-      <ReplyStatusLine status={status} />
-    </article>
+                        <span style={{ fontWeight: 600 }}>{option.label}</span>
+                        {option.description !== null && (
+                          <span
+                            style={{ display: "block", color: theme.mutedText, fontSize: 12 }}
+                          >
+                            {option.description}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  disabled={busy}
+                  value={drafts[qi].text}
+                  placeholder="Type your answer"
+                  aria-label={question.question}
+                  style={textInput}
+                  onChange={(e) => setText(qi, e.target.value)}
+                />
+              )}
+            </fieldset>
+          ))}
+        </>
+      }
+      footer={
+        <>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            style={decisionButton(theme.primary, !canSubmit)}
+            onClick={() => onSubmit(answers)}
+          >
+            Submit answer
+          </button>
+          <ReplyStatusLine status={status} />
+        </>
+      }
+    />
   );
 }
 
@@ -696,6 +746,38 @@ const card: CSSProperties = {
   borderRadius: radius.lg,
   padding: 12,
   marginBottom: 12,
+};
+
+/**
+ * `PendingCardShell`'s outer article: bounded height (`dvh`, not `vh` — see
+ * the shell's own docblock) so a long interview/approval never exceeds a
+ * fraction of the viewport, `overflow: hidden` so the rounded corners clip
+ * the scrollable body cleanly instead of the body's own scrollbar poking
+ * out past them.
+ */
+const pendingCardShellStyle: CSSProperties = {
+  ...card,
+  display: "flex",
+  flexDirection: "column",
+  maxHeight: "50dvh",
+  padding: 0,
+  overflow: "hidden",
+};
+
+/** The classic flex-child-won't-shrink trap needs `minHeight: 0` here, or this never actually scrolls — it just grows past the parent's `maxHeight`. */
+const pendingCardBodyStyle: CSSProperties = {
+  flex: "1 1 auto",
+  minHeight: 0,
+  overflowY: "auto",
+  padding: 12,
+};
+
+/** Pinned footer — outside the scrollable body, so Approve/Reject/Submit stay reachable regardless of how much the body content scrolls. */
+const pendingCardFooterStyle: CSSProperties = {
+  flexShrink: 0,
+  padding: 12,
+  borderTop: `1px solid ${theme.borderHairline}`,
+  background: theme.surface,
 };
 
 const cardLabel: CSSProperties = {
