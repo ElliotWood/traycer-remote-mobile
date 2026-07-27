@@ -8,21 +8,35 @@
     "dev": "vite",
     "build": "vite build",
     "compile": "tsc -b",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@traycer/protocol": "workspace:*",
     "@traycer-clients/shared": "workspace:*",
     "@tanstack/react-query": "catalog:",
+    "lucide-react": "catalog:",
+    "mermaid": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "uuid": "catalog:"
+    "react-markdown": "catalog:",
+    "rehype-raw": "catalog:",
+    "rehype-sanitize": "catalog:",
+    "remark-gfm": "catalog:",
+    "unified": "catalog:",
+    "uuid": "catalog:",
+    "yjs": "catalog:"
   },
   "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }
