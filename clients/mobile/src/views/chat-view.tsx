@@ -160,8 +160,12 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
   // effect picks up (see composer.tsx's `prefillText`/`prefillNonce`).
   const [prefill, setPrefill] = useState<{ readonly text: string; readonly nonce: number } | null>(null);
 
-  const handleSend = (text: string, settings: Parameters<typeof chat.sendMessage>[0]["settings"]): void => {
-    chat.sendMessage({ text, settings });
+  const handleSend = (
+    text: string,
+    settings: Parameters<typeof chat.sendMessage>[0]["settings"],
+    attachments: Parameters<typeof chat.sendMessage>[0]["attachments"],
+  ): void => {
+    chat.sendMessage({ text, settings, attachments });
   };
 
   const handleEditQueueItem = (item: ChatQueuedItem, text: string): void => {
