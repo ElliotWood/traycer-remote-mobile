@@ -26,6 +26,10 @@ import {
 } from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
+import { useCurrentEpicDocOrNull } from "@/host/current-epic-context";
+import { buildChatTree } from "@/host/use-epic-doc";
+import { collectDescendantIds } from "@/host/agent-ladder";
+import { isDescendantRunning, useDescendantAgents } from "@/host/use-descendant-agents";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   approvalKey,
@@ -188,6 +192,43 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
     [chat.transcriptMessages, chat.liveTurnBlocks],
   );
 
+  // Active agents: self (already free from `useChat`) + running descendants,
+  // resolved from the SAME shared epic-doc session `CurrentEpicProvider`
+  // opens (app-shell.tsx) — never a second epic.subscribe. `null` when this
+  // chat wasn't reached through the normal epic->chat nav (e.g. a
+  // notification deep-link, or a bare render in a test) — the panel then
+  // just never appears, same "absent = not reachable" convention already
+  // used for `backgroundItems`.
+  const epicDoc = useCurrentEpicDocOrNull();
+  const descendantChatIds = useMemo(() => {
+    if (epicDoc === null) return [];
+    const tree = buildChatTree(epicDoc.chats);
+    return collectDescendantIds(chatId, tree.childrenByParent);
+  }, [epicDoc, chatId]);
+  const descendantAgents = useDescendantAgents(streamConnection, epicId, descendantChatIds);
+  const chatTitleById = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const c of epicDoc?.chats ?? []) out[c.chatId] = c.title;
+    return out;
+  }, [epicDoc]);
+  const activeAgentRows = useMemo(() => {
+    const rows: { readonly chatId: string; readonly title: string; readonly isSelf: boolean }[] = [];
+    if (isRunning) rows.push({ chatId, title: chat.title || initialTitle || "Untitled chat", isSelf: true });
+    for (const descendantId of descendantChatIds) {
+      if (isDescendantRunning(descendantAgents.states[descendantId])) {
+        rows.push({ chatId: descendantId, title: chatTitleById[descendantId] ?? "", isSelf: false });
+      }
+    }
+    return rows;
+  }, [isRunning, chatId, chat.title, initialTitle, descendantChatIds, descendantAgents.states, chatTitleById]);
+  const handleStopAgent = (targetChatId: string, isSelf: boolean): void => {
+    if (isSelf) chat.stopTurn();
+    else descendantAgents.stop(targetChatId);
+  };
+  const handleStopAllAgents = (): void => {
+    for (const row of activeAgentRows) handleStopAgent(row.chatId, row.isSelf);
+  };
+
   return (
     <div style={chatLayoutStyle}>
       <header style={headerStyle}>
@@ -244,6 +285,9 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
         {hasPending && <PendingSection chat={chat} />}
         <LowerDock
           todoSnapshot={todoSnapshot}
+          activeAgentRows={activeAgentRows}
+          onStopAgent={handleStopAgent}
+          onStopAllAgents={handleStopAllAgents}
           queue={chat.queue}
           backgroundItems={chat.backgroundItems}
           accumulatedFileChanges={chat.accumulatedFileChanges}

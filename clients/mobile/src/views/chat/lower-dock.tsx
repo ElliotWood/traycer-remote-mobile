@@ -1,7 +1,8 @@
 /**
  * P2/P2.1 — orchestrates the lower-dock panels above the composer: todo,
- * queue, background items, accumulated changes. Each panel returns `null`
- * when empty, so the dock takes zero space when there's nothing to show.
+ * active agents, queue, background items, accumulated changes. Each panel
+ * returns `null` when empty, so the dock takes zero space when there's
+ * nothing to show.
  *
  * UX fix (user feedback): the FULL dock used to render open by default and
  * could push the composer/transcript out of view. Collapsed by default now
@@ -9,19 +10,16 @@
  * background count) directly above the composer; tap to expand into the
  * full panels. The transcript + composer stay reachable regardless.
  *
- * Active-agents summary is DEFERRED, flagged not hollow: desktop sources it
- * from the epic-wide `useEpicActiveAgentIds` (the in-process canvas store's
- * aggregate over ALL descendant chats, unioning Yjs presence-awareness
- * across every host — confirmed via a dedicated research pass, not a guess).
- * `ChatView` only has this ONE chat's own stream, not the epic tree or
- * cross-host awareness. Building a faithful descendant-aware panel would
- * mean threading the epic tree AND a new awareness subsystem into ChatView
- * — a real architecture change, out of scope for this pass; the Todo panel
- * below is the piece of the same ask that WAS reachable from a single
- * chat's own stream (confirmed via the same research pass).
+ * Active-agents: self + running descendant chats, resolved by `ChatView`
+ * from the shared epic-doc session (`current-epic-context.tsx`) plus a
+ * small number of bounded per-descendant `chat.subscribe` sessions
+ * (`use-descendant-agents.ts`) — NOT desktop's epic-wide cross-host
+ * awareness store, which really is unreachable from a chat screen. See
+ * that hook's docblock for why this gets the same user-visible result a
+ * smaller way.
  */
 import { useMemo, useState, type ReactElement } from "react";
-import { CheckSquare, ChevronDown, ChevronUp, FileDiff, ListOrdered, Radio } from "lucide-react";
+import { Bot, CheckSquare, ChevronDown, ChevronUp, FileDiff, ListOrdered, Radio } from "lucide-react";
 import type {
   BackgroundItem,
   ChatAccumulatedFileChange,
@@ -31,12 +29,16 @@ import type {
 import type { PinnedTodoSnapshot } from "@/host/chat-projection";
 import { radius, theme, type } from "@/views/design-tokens";
 import { AccumulatedChangesPanel } from "./accumulated-changes-panel";
+import { ActiveAgentsPanel, type ActiveAgentRow } from "./active-agents-panel";
 import { BackgroundItemsPanel } from "./background-items-panel";
 import { PinnedTodoPanel } from "./pinned-todo-panel";
 import { QueuePanel } from "./queue-panel";
 
 export interface LowerDockProps {
   readonly todoSnapshot: PinnedTodoSnapshot | null;
+  readonly activeAgentRows: readonly ActiveAgentRow[];
+  readonly onStopAgent: (chatId: string, isSelf: boolean) => void;
+  readonly onStopAllAgents: () => void;
   readonly queue: ChatQueueState;
   readonly backgroundItems: readonly BackgroundItem[] | undefined;
   readonly accumulatedFileChanges: readonly ChatAccumulatedFileChange[];
@@ -64,6 +66,9 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
         label: `${props.todoSnapshot.doneCount}/${props.todoSnapshot.totalCount} done`,
       });
     }
+    if (props.activeAgentRows.length > 0) {
+      out.push({ key: "agents", icon: Bot, label: `${props.activeAgentRows.length} active` });
+    }
     if (props.queue.items.length > 0) {
       out.push({ key: "queue", icon: ListOrdered, label: `${props.queue.items.length} queued` });
     }
@@ -78,7 +83,13 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
       });
     }
     return out;
-  }, [props.todoSnapshot, props.queue.items.length, props.backgroundItems, props.accumulatedFileChanges.length]);
+  }, [
+    props.todoSnapshot,
+    props.activeAgentRows.length,
+    props.queue.items.length,
+    props.backgroundItems,
+    props.accumulatedFileChanges.length,
+  ]);
 
   if (chips.length === 0) return null;
 
@@ -117,6 +128,12 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
       {expanded && (
         <div style={{ border: `1px solid ${theme.borderHairline}`, borderTop: "none", borderRadius: `0 0 ${radius.lg}px ${radius.lg}px`, padding: 6 }}>
           {props.todoSnapshot !== null && <PinnedTodoPanel snapshot={props.todoSnapshot} />}
+          <ActiveAgentsPanel
+            rows={props.activeAgentRows}
+            canMutate={props.canMutate}
+            onStop={props.onStopAgent}
+            onStopAll={props.onStopAllAgents}
+          />
           <QueuePanel
             queue={props.queue}
             canMutate={props.canMutate}
