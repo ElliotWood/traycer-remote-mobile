@@ -196,6 +196,7 @@
         "@tanstack/react-query": "catalog:",
         "@traycer-clients/shared": "workspace:*",
         "@traycer/protocol": "workspace:*",
+        "diff": "catalog:",
         "lucide-react": "catalog:",
         "mermaid": "catalog:",
         "react": "catalog:",

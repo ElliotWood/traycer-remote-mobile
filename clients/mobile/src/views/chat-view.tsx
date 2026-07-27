@@ -37,6 +37,7 @@ import type {
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
 import type { StreamConnectionState } from "@/host/stream-connection";
+import { TranscriptView } from "./chat/transcript-view";
 import { colors, screen, secondaryButton } from "./ui";
 
 interface ChatViewProps {
@@ -92,6 +93,13 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
           Nothing is waiting on you in this chat right now.
         </p>
       )}
+
+      <TranscriptView
+        messages={chat.transcriptMessages}
+        liveBlocks={chat.liveTurnBlocks}
+        epicId={epicId}
+        chatId={chatId}
+      />
     </main>
   );
 }

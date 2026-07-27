@@ -30,7 +30,11 @@ import type {
   ChatSnapshot,
   ChatSubscribeClientFrame,
 } from "@traycer/protocol/host/agent/gui/subscribe";
-import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
+import type { RuntimeEvent } from "@traycer/protocol/host/agent/gui/agent-runtime";
+import type {
+  ContentBlock,
+  InterviewAnswer,
+} from "@traycer/protocol/persistence/epic/content-blocks";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
 import {
@@ -39,6 +43,12 @@ import {
   type ChatMessage,
   type InterviewBlock,
 } from "./chat-projection";
+import {
+  EMPTY_LIVE_TURN,
+  foldRuntimeEvent,
+  liveTurnBlocks as computeLiveTurnBlocks,
+  type LiveTurnState,
+} from "./chat-live-turn";
 
 /**
  * Live reply status for one pending item, keyed by its stable pending key. The
@@ -84,6 +94,10 @@ export interface UseChatResult {
   /** Live reply status for a pending key (see the `*Key` helpers), or undefined. */
   readonly replyStatusFor: (key: string) => ReplyStatus | undefined;
   readonly sendReply: (arg: SendReplyArg) => void;
+  /** Snapshot messages + any user rows accepted since (Sprint 2 transcript). */
+  readonly transcriptMessages: readonly ChatMessage[];
+  /** The current in-progress turn's blocks, folded live from `blockDelta` (Sprint 2). */
+  readonly liveTurnBlocks: readonly ContentBlock[];
 }
 
 // Stable pending keys. Tool- and file-edit approvalIds share a namespace on the
@@ -96,6 +110,12 @@ interface ChatState {
   readonly runStatus: ChatRunStatus;
   readonly title: string;
   readonly messages: readonly ChatMessage[];
+  // User rows accepted (`onMessageAccepted`) SINCE the last snapshot — the
+  // snapshot itself is always authoritative; this + `liveTurn` reset to empty
+  // on every fresh snapshot so nothing from a stale overlay can survive
+  // alongside the now-persisted content (no-duplication guarantee).
+  readonly trailingMessages: readonly ChatMessage[];
+  readonly liveTurn: LiveTurnState;
   readonly pendingApprovals: readonly ChatApprovalState[];
   readonly pendingFileEditApprovals: readonly ChatFileEditApprovalState[];
   readonly pendingInterviews: readonly ChatPendingInterviewState[];
@@ -108,6 +128,8 @@ const INITIAL_STATE: ChatState = {
   runStatus: "idle",
   title: "",
   messages: [],
+  trailingMessages: [],
+  liveTurn: EMPTY_LIVE_TURN,
   pendingApprovals: [],
   pendingFileEditApprovals: [],
   pendingInterviews: [],
@@ -142,7 +164,9 @@ type ChatEvent =
       readonly clientActionId: string;
       readonly status: "accepted" | "rejected";
       readonly reason: string | null;
-    };
+    }
+  | { readonly type: "messageAccepted"; readonly message: ChatMessage }
+  | { readonly type: "blockDelta"; readonly event: RuntimeEvent };
 
 /** Drops a keyed entry from a record without mutating the input. */
 function without<V>(
@@ -182,6 +206,12 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         runStatus: snap.runStatus,
         title: snap.chat.title,
         messages: snap.chat.messages,
+        // The snapshot is always fully authoritative — both overlays reset
+        // to empty BEFORE its content becomes the render source, so nothing
+        // from a stale live turn can survive alongside it (no-duplication
+        // guarantee; see `use-chat.test.ts`'s snapshot-transition test).
+        trailingMessages: [],
+        liveTurn: EMPTY_LIVE_TURN,
         pendingApprovals: snap.pendingApprovals,
         pendingFileEditApprovals: snap.pendingFileEditApprovals,
         pendingInterviews: snap.pendingInterviews,
@@ -191,6 +221,19 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
     }
     case "turnState":
       return { ...state, runStatus: event.runStatus };
+    case "messageAccepted": {
+      const alreadyKnown =
+        state.messages.some((m) => m.messageId === event.message.messageId) ||
+        state.trailingMessages.some((m) => m.messageId === event.message.messageId);
+      if (alreadyKnown) return state;
+      return {
+        ...state,
+        trailingMessages: [...state.trailingMessages, event.message],
+        liveTurn: EMPTY_LIVE_TURN,
+      };
+    }
+    case "blockDelta":
+      return { ...state, liveTurn: foldRuntimeEvent(state.liveTurn, event.event) };
     case "approvalRequested": {
       if (
         state.pendingApprovals.some(
@@ -286,10 +329,10 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
 }
 
 /**
- * Builds the chat-stream callbacks that fold frames into the reducer. Only the
- * run/blocked/reply-bearing frames drive state; the rest (block deltas, restore
- * progress, queue, worktree, etc.) are intentionally inert for the phone's
- * reply surface, exactly as T5's badge reducer ignores them.
+ * Builds the chat-stream callbacks that fold frames into the reducer. The
+ * run/blocked/reply-bearing frames drive the T6 reply surface; `messageAccepted`
+ * and `blockDelta` (Sprint 2) drive the transcript. The rest (restore
+ * progress, queue, worktree, etc.) remain intentionally inert.
  */
 function makeChatCallbacks(dispatch: (event: ChatEvent) => void): ChatStreamCallbacks {
   return {
@@ -321,10 +364,13 @@ function makeChatCallbacks(dispatch: (event: ChatEvent) => void): ChatStreamCall
         status: frame.status,
         reason: frame.reason,
       }),
-    // Frames the reply surface does not consume.
-    onMessageAccepted: () => {},
+    onMessageAccepted: (frame) => dispatch({ type: "messageAccepted", message: frame.message }),
+    onBlockDelta: (frame) => dispatch({ type: "blockDelta", event: frame.event }),
+    // Frames neither the reply surface nor the transcript consume.
     onQueueChanged: () => {},
-    onBlockDelta: () => {},
+    // A DIFFERENT durable timeline log (turn/queue/approval state
+    // transitions), not content-block deltas — see `chat-live-turn.ts`'s
+    // docblock. Not consumed by the transcript.
     onEventAppended: () => {},
     onRestoreStarted: () => {},
     onRestoreProgress: () => {},
@@ -451,5 +497,7 @@ export function useChat(
     resolveInterview,
     replyStatusFor,
     sendReply,
+    transcriptMessages: [...state.messages, ...state.trailingMessages],
+    liveTurnBlocks: computeLiveTurnBlocks(state.liveTurn),
   };
 }

@@ -68,15 +68,26 @@ const fileEditApproval = (approvalId: string): unknown => ({
   requestedAt: 0,
 });
 
-/** An assistant message carrying an interview block resolvable by `blockId`. */
+/**
+ * An assistant message carrying an interview block resolvable by `blockId`.
+ * Fields beyond blockId/title/questions are the schema's real shape (Sprint 2's
+ * TranscriptView also renders this same message's blocks, so the fixture must
+ * satisfy `InterviewBlock` fully, not just what T6's reply flow reads).
+ */
 const interviewMessages = (blockId: string): readonly unknown[] => [
   {
     role: "assistant",
+    messageId: "a1",
     blocks: [
       {
         type: "interview",
         blockId,
+        status: "streaming",
+        timestamp: 0,
+        parentBlockId: null,
+        toolName: null,
         title: "A quick decision",
+        description: null,
         questions: [
           {
             questionId: "q1",
@@ -89,6 +100,9 @@ const interviewMessages = (blockId: string): readonly unknown[] => [
             multiSelect: false,
           },
         ],
+        answers: [],
+        error: null,
+        metadata: null,
       },
     ],
   },

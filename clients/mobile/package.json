@@ -15,6 +15,7 @@
     "@traycer/protocol": "workspace:*",
     "@traycer-clients/shared": "workspace:*",
     "@tanstack/react-query": "catalog:",
+    "diff": "catalog:",
     "lucide-react": "catalog:",
     "mermaid": "catalog:",
     "react": "catalog:",
