@@ -16,6 +16,8 @@
     "@traycer-clients/shared": "workspace:*",
     "@fontsource-variable/figtree": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "@tanstack/react-query-persist-client": "5.101.4",
+    "@tanstack/query-sync-storage-persister": "5.101.4",
     "@tiptap/core": "catalog:",
     "@tiptap/extension-link": "catalog:",
     "@tiptap/extension-table": "catalog:",
@@ -36,6 +38,7 @@
     "remark-gfm": "catalog:",
     "unified": "catalog:",
     "uuid": "catalog:",
+    "y-indexeddb": "^9.0.12",
     "yjs": "catalog:"
   },
   "devDependencies": {
@@ -45,6 +48,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "fake-indexeddb": "^6.2.2",
     "jsdom": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

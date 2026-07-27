@@ -35,6 +35,7 @@ import type {
   ContentBlock,
   InterviewAnswer,
 } from "@traycer/protocol/persistence/epic/content-blocks";
+import { CACHE_SCHEMA_VERSION } from "./cache-config";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
 import { startLivenessRecovery } from "./liveness-recovery";
@@ -152,8 +153,115 @@ const INITIAL_STATE: ChatState = {
   hasSnapshot: false,
 };
 
+/**
+ * P0 caching, layer C: the persisted slice of `ChatState`. Deliberately NOT
+ * the whole state — `trailingMessages`/`liveTurn`/`replies`/`ackIndex` are
+ * session-only (resurrecting a stale "submitting" reply or a partial live
+ * turn across a reload would be a correctness bug, not a feature). `messages`
+ * here is the RENDERED transcript (`state.messages` + `state.trailingMessages`
+ * combined, exactly what `transcriptMessages` exposes today) so a cached
+ * reload shows the same thing the user last saw, capped to the most recent
+ * `CHAT_CACHE_MAX_MESSAGES` — this is a last-known PREVIEW; the next real
+ * snapshot is always fully authoritative and replaces it wholesale.
+ */
+interface ChatCacheSlice {
+  readonly title: string;
+  readonly messages: readonly ChatMessage[];
+  readonly runStatus: ChatRunStatus;
+  readonly pendingApprovals: readonly ChatApprovalState[];
+  readonly pendingFileEditApprovals: readonly ChatFileEditApprovalState[];
+  readonly pendingInterviews: readonly ChatPendingInterviewState[];
+}
+
+const CHAT_CACHE_MAX_MESSAGES = 50;
+
+export function chatCacheStorageKey(epicId: string, chatId: string): string {
+  return `chat-cache:v${CACHE_SCHEMA_VERSION}:${epicId}:${chatId}`;
+}
+
+/** Pure serialize, kept separate from storage I/O for testability. */
+export function serializeChatCache(state: ChatState): string {
+  const allMessages = [...state.messages, ...state.trailingMessages];
+  const slice: ChatCacheSlice = {
+    title: state.title,
+    messages: allMessages.slice(Math.max(0, allMessages.length - CHAT_CACHE_MAX_MESSAGES)),
+    runStatus: state.runStatus,
+    pendingApprovals: state.pendingApprovals,
+    pendingFileEditApprovals: state.pendingFileEditApprovals,
+    pendingInterviews: state.pendingInterviews,
+  };
+  return JSON.stringify(slice);
+}
+
+function parseChatCache(raw: string): ChatCacheSlice | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof (parsed as { title?: unknown }).title !== "string" ||
+      !Array.isArray((parsed as { messages?: unknown }).messages) ||
+      !Array.isArray((parsed as { pendingApprovals?: unknown }).pendingApprovals) ||
+      !Array.isArray((parsed as { pendingFileEditApprovals?: unknown }).pendingFileEditApprovals) ||
+      !Array.isArray((parsed as { pendingInterviews?: unknown }).pendingInterviews)
+    ) {
+      return null;
+    }
+    return parsed as ChatCacheSlice;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Synchronous localStorage read, used both as `useReducer`'s lazy 3rd-arg
+ * initializer (covers the mount case with zero gap — `localStorage.getItem`
+ * is synchronous, unlike TanStack's `await`-based restore or IndexedDB) and
+ * from the effect's "reset" dispatch (see `useChat` — that dispatch fires on
+ * EVERY effect run, including the first, so it must seed from cache too or
+ * it would blank the lazy-initialized state a moment after mount).
+ */
+export function readCachedChatState(epicId: string, chatId: string): ChatCacheSlice | null {
+  if (typeof window === "undefined" || !("localStorage" in window)) return null;
+  try {
+    const raw = window.localStorage.getItem(chatCacheStorageKey(epicId, chatId));
+    return raw === null ? null : parseChatCache(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedChatState(epicId: string, chatId: string, serialized: string): void {
+  if (typeof window === "undefined" || !("localStorage" in window)) return;
+  try {
+    window.localStorage.setItem(chatCacheStorageKey(epicId, chatId), serialized);
+  } catch {
+    // Quota exceeded / private-mode write rejection — degrade to "no cache
+    // written this time", never throw.
+  }
+}
+
+/**
+ * `hasSnapshot` stays `false` for a cache-seeded state — it is cached, not
+ * live-confirmed, and `notifications.ts`'s blocked-transition gate relies on
+ * that distinction to avoid firing a spurious notification on a state it has
+ * never actually observed live.
+ */
+function seedFromCache(cached: ChatCacheSlice | null): ChatState {
+  if (cached === null) return INITIAL_STATE;
+  return {
+    ...INITIAL_STATE,
+    title: cached.title,
+    messages: cached.messages,
+    runStatus: cached.runStatus,
+    pendingApprovals: cached.pendingApprovals,
+    pendingFileEditApprovals: cached.pendingFileEditApprovals,
+    pendingInterviews: cached.pendingInterviews,
+  };
+}
+
 type ChatEvent =
-  | { readonly type: "reset" }
+  | { readonly type: "reset"; readonly cached: ChatCacheSlice | null }
   | { readonly type: "snapshot"; readonly snapshot: ChatSnapshot }
   | { readonly type: "turnState"; readonly runStatus: ChatRunStatus }
   | { readonly type: "approvalRequested"; readonly approval: ChatApprovalState }
@@ -197,7 +305,7 @@ function without<V>(
 function chatReducer(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
     case "reset":
-      return INITIAL_STATE;
+      return seedFromCache(event.cached);
     case "snapshot": {
       const snap = event.snapshot;
       // Snapshot is authoritative for pending items. Keep only reply entries
@@ -410,19 +518,36 @@ export function useChat(
   epicId: string,
   chatId: string,
 ): UseChatResult {
-  const [state, dispatch] = useReducer(chatReducer, INITIAL_STATE);
+  // P0 caching: the lazy 3rd-arg initializer reads localStorage
+  // SYNCHRONOUSLY on first render (unlike TanStack's `await`-based restore
+  // or IndexedDB), so a warm mount's very first paint already shows the
+  // last-known transcript. Safe as a lazy initializer (not re-read on every
+  // render) because every chat open is a fresh mount of this hook
+  // (`app-shell.tsx`'s route switch never transitions chat→chat in place).
+  const [state, dispatch] = useReducer(
+    chatReducer,
+    { epicId, chatId },
+    ({ epicId: initialEpicId, chatId: initialChatId }) =>
+      seedFromCache(readCachedChatState(initialEpicId, initialChatId)),
+  );
   const [connection, setConnection] =
     useState<StreamConnectionState>("reconnecting");
   const streamRef = useRef<ChatStreamClient | null>(null);
+  // Dedupes the cache write against a burst of live frames (S1) — only
+  // re-serializes/writes when the persisted slice actually changed.
+  const lastWrittenChatCacheRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (streamConnection === null) {
       setConnection("disconnected");
       return;
     }
-    // Reset to the idle baseline whenever the target chat changes so a previous
-    // chat's pending items can never bleed into the new one.
-    dispatch({ type: "reset" });
+    // Reset to the cache-seeded baseline (never a hard blank — this line
+    // runs on EVERY effect invocation, including the very first, so it must
+    // preserve what the lazy initializer above just seeded) whenever the
+    // target chat changes, so a previous chat's pending items can never
+    // bleed into the new one.
+    dispatch({ type: "reset", cached: readCachedChatState(epicId, chatId) });
 
     const handle = streamConnection.openChat({
       epicId,
@@ -452,6 +577,18 @@ export function useChat(
       streamRef.current = null;
     };
   }, [streamConnection, epicId, chatId]);
+
+  // P0 caching write-through: only once `hasSnapshot` is true — i.e. only
+  // ever persist live-confirmed data, never overwrite a good cache with the
+  // still-loading/cache-seeded state a reconnect window can otherwise leave
+  // `state` in.
+  useEffect(() => {
+    if (!state.hasSnapshot) return;
+    const serialized = serializeChatCache(state);
+    if (serialized === lastWrittenChatCacheRef.current) return;
+    lastWrittenChatCacheRef.current = serialized;
+    writeCachedChatState(epicId, chatId, serialized);
+  }, [state, epicId, chatId]);
 
   const sendReply = useCallback(
     (arg: SendReplyArg): void => {

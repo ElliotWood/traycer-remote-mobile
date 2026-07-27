@@ -10,8 +10,9 @@
  * state, not the underlying `Y.Doc` replicas the registry keeps for the
  * whole session.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { artifactBodyFragmentName } from "@traycer/protocol/persistence/epic/artifacts";
+import { CACHE_SCHEMA_VERSION } from "./cache-config";
 import type { ArtifactRoomRegistry } from "./artifact-room-registry";
 
 export type ArtifactBodyState =
@@ -23,12 +24,68 @@ export type ArtifactBodyState =
 
 const LOADING: ArtifactBodyState = { kind: "loading" };
 
+/**
+ * P0 caching, layer D: the last successfully-serialized markdown, keyed by
+ * (artifactRoomId, artifactId). The registry's `Y.Doc` replicas are NOT
+ * separately persisted (no `y-indexeddb` here) — this string cache already
+ * updates in lockstep with every successful serialize below, so a second
+ * persistence mechanism for the raw doc would only add lifecycle complexity
+ * (interacting with `ArtifactRoomRegistry.applyState`'s doc-replacement
+ * branch) for zero marginal coverage.
+ */
+function artifactBodyStorageKey(artifactRoomId: string, artifactId: string): string {
+  return `artifact-body:v${CACHE_SCHEMA_VERSION}:${artifactRoomId}:${artifactId}`;
+}
+
+/**
+ * Synchronous localStorage read, used both as `useState`'s lazy initializer
+ * (zero-gap on mount) and from the effect's id-change reset (that line runs
+ * on every effect invocation, including the first, so it must seed from
+ * cache too or it would blank the lazy-initialized state a moment after
+ * mount). Corrupt JSON / no `window` degrade to "no cache", never throw.
+ */
+export function readCachedArtifactBody(
+  artifactRoomId: string,
+  artifactId: string,
+): ArtifactBodyState | null {
+  if (typeof window === "undefined" || !("localStorage" in window)) return null;
+  try {
+    const raw = window.localStorage.getItem(artifactBodyStorageKey(artifactRoomId, artifactId));
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || typeof (parsed as { markdown?: unknown }).markdown !== "string") {
+      return null;
+    }
+    return { kind: "ready", markdown: (parsed as { markdown: string }).markdown };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedArtifactBody(artifactRoomId: string, artifactId: string, markdown: string): void {
+  if (typeof window === "undefined" || !("localStorage" in window)) return;
+  try {
+    window.localStorage.setItem(
+      artifactBodyStorageKey(artifactRoomId, artifactId),
+      JSON.stringify({ markdown }),
+    );
+  } catch {
+    // Quota exceeded / private-mode write rejection — degrade to "no cache
+    // written this time", never throw.
+  }
+}
+
 export function useArtifactBody(
   registry: ArtifactRoomRegistry | null,
   artifactRoomId: string,
   artifactId: string,
 ): ArtifactBodyState {
-  const [state, setState] = useState<ArtifactBodyState>(LOADING);
+  const [state, setState] = useState<ArtifactBodyState>(
+    () => readCachedArtifactBody(artifactRoomId, artifactId) ?? LOADING,
+  );
+  // Dedupes the cache write against a burst of Yjs frames (S1) — only
+  // re-writes when the serialized markdown actually changed.
+  const lastWrittenMarkdownRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (registry === null) {
@@ -37,13 +94,30 @@ export function useArtifactBody(
     }
 
     let disposed = false;
-    setState(LOADING);
+    const seed = readCachedArtifactBody(artifactRoomId, artifactId);
+    setState(seed ?? LOADING);
+    lastWrittenMarkdownRef.current = seed?.kind === "ready" ? seed.markdown : null;
 
     const recompute = (): void => {
       if (disposed) return;
       const roomState = registry.getState(artifactRoomId);
       if (roomState !== "ready") {
-        setState(roomState === "retrying" ? { kind: "retrying" } : { kind: "unavailable" });
+        const placeholder: ArtifactBodyState =
+          roomState === "retrying" ? { kind: "retrying" } : { kind: "unavailable" };
+        // R4: `getState()` defaults an unreported room to "unavailable"
+        // indistinguishably from a real host report. `hasReported` tells them
+        // apart — while the host has never determined this room's state at
+        // all (dead/slow host, or just hasn't gotten to it yet), don't
+        // downgrade an already-`ready` cached render. The MOMENT the host has
+        // reported anything real (`hasReported` true — whether that happened
+        // before this mount or arrives live via `registry.subscribe` below),
+        // honor it unconditionally, including a genuine downgrade (the
+        // artifact really was deleted, the room really dropped).
+        if (!registry.hasReported(artifactRoomId)) {
+          setState((prev) => (prev.kind === "ready" ? prev : placeholder));
+        } else {
+          setState(placeholder);
+        }
         return;
       }
       const doc = registry.getDoc(artifactRoomId);
@@ -60,6 +134,10 @@ export function useArtifactBody(
           const fragment = doc.getXmlFragment(artifactBodyFragmentName(artifactId));
           const markdown = serializeArtifactBody(fragment);
           setState({ kind: "ready", markdown });
+          if (markdown !== lastWrittenMarkdownRef.current) {
+            lastWrittenMarkdownRef.current = markdown;
+            writeCachedArtifactBody(artifactRoomId, artifactId, markdown);
+          }
         })
         .catch((err: unknown) => {
           if (disposed) return;

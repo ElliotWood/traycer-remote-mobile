@@ -34,11 +34,13 @@
  * out of this file entirely — `useArtifactBody` does that, lazily, only for
  * the artifact currently open.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
+import { IndexeddbPersistence } from "y-indexeddb";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { CardKind, ArtifactStatus } from "@/views/kind-tokens";
 import { ArtifactRoomRegistry } from "./artifact-room-registry";
+import { CACHE_SCHEMA_VERSION } from "./cache-config";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
 import { startLivenessRecovery } from "./liveness-recovery";
@@ -231,6 +233,85 @@ export function buildChatTree(entries: readonly EpicChatEntry[]): ChatTree {
   return buildParentedTree(entries, (e) => e.chatId);
 }
 
+/**
+ * P0 caching, layer B: the epic tree's `Y.Doc` is the authoritative CRDT
+ * store, persisted via `y-indexeddb`. IndexedDB has no synchronous
+ * main-thread read API, so that store alone still leaves `chats`/`artifacts`
+ * empty on the very first render — this doc name plus the projection cache
+ * below are the two halves of the fix (see `useEpicDoc`'s effect).
+ */
+export function epicTreeDocName(epicId: string): string {
+  return `epic-tree:v${CACHE_SCHEMA_VERSION}:${epicId}`;
+}
+
+function epicProjectionStorageKey(epicId: string): string {
+  return `epic-proj:v${CACHE_SCHEMA_VERSION}:${epicId}`;
+}
+
+interface EpicProjection {
+  readonly chats: readonly EpicChatEntry[];
+  readonly artifacts: readonly EpicArtifactEntry[];
+}
+
+/** Pure serialize/parse pair, kept separate from storage I/O for testability. */
+export function serializeEpicProjection(
+  chats: readonly EpicChatEntry[],
+  artifacts: readonly EpicArtifactEntry[],
+): string {
+  return JSON.stringify({ chats, artifacts });
+}
+
+function parseEpicProjection(raw: string): EpicProjection | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !Array.isArray((parsed as { chats?: unknown }).chats) ||
+      !Array.isArray((parsed as { artifacts?: unknown }).artifacts)
+    ) {
+      return null;
+    }
+    return parsed as EpicProjection;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Synchronous localStorage read for the epic-tree seed. Used as `useState`'s
+ * lazy initializer (never inside an effect) so a warm reload's render #1
+ * already holds last-known rows — no gap for `y-indexeddb`'s async IndexedDB
+ * open to fill. Corrupt JSON / wrong schema version / no `window` all
+ * degrade to "no cache", never throw.
+ */
+export function readCachedEpicProjection(epicId: string): EpicProjection | null {
+  if (typeof window === "undefined" || !("localStorage" in window)) return null;
+  try {
+    const raw = window.localStorage.getItem(epicProjectionStorageKey(epicId));
+    return raw === null ? null : parseEpicProjection(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes the projected (small JSON) tree, NOT the Yjs binary, so the next
+ * cold mount has something to seed from synchronously. Only ever called from
+ * a LIVE `epic.subscribe` frame (see `refresh` in `useEpicDoc`) — an
+ * IndexedDB-sync-triggered read must never become the next seed (R2: a
+ * transiently-empty local IDB read is not authoritative).
+ */
+export function writeCachedEpicProjection(epicId: string, serialized: string): void {
+  if (typeof window === "undefined" || !("localStorage" in window)) return;
+  try {
+    window.localStorage.setItem(epicProjectionStorageKey(epicId), serialized);
+  } catch {
+    // Quota exceeded / private-mode write rejection — degrade to "no cache
+    // written this time", never throw.
+  }
+}
+
 export interface UseEpicDocResult {
   readonly chats: readonly EpicChatEntry[];
   readonly artifacts: readonly EpicArtifactEntry[];
@@ -305,11 +386,25 @@ export function useEpicDoc(
   streamConnection: HostStreamConnection | null,
   epicId: string,
 ): UseEpicDocResult {
-  const [chats, setChats] = useState<readonly EpicChatEntry[]>([]);
-  const [artifacts, setArtifacts] = useState<readonly EpicArtifactEntry[]>([]);
+  // P0 caching: seeded synchronously from the last live-confirmed projection
+  // (see `readCachedEpicProjection`) so a warm mount's FIRST render already
+  // shows last-known rows — `agents-section.tsx`/`artifacts-section.tsx`'s
+  // existing `tree.roots.length === 0` empty-state gate never sees an
+  // artificially-empty array. Safe as a lazy initializer (not re-read on
+  // every render) because every epic open is a fresh mount of this hook
+  // (`app-shell.tsx`'s route switch never transitions epic→epic in place).
+  const [chats, setChats] = useState<readonly EpicChatEntry[]>(
+    () => readCachedEpicProjection(epicId)?.chats ?? [],
+  );
+  const [artifacts, setArtifacts] = useState<readonly EpicArtifactEntry[]>(
+    () => readCachedEpicProjection(epicId)?.artifacts ?? [],
+  );
   const [connection, setConnection] =
     useState<StreamConnectionState>("reconnecting");
   const [artifactRooms, setArtifactRooms] = useState<ArtifactRoomRegistry | null>(null);
+  // Dedupes the projection write against a burst of live frames (S1) — only
+  // re-serializes/writes when the projected shape actually changed.
+  const lastWrittenProjectionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (streamConnection === null) {
@@ -324,16 +419,65 @@ export function useEpicDoc(
     const registry = new ArtifactRoomRegistry();
     setArtifactRooms(registry);
     let disposed = false;
+
+    // Live-frame refresh (`onSnapshot`/`onUpdate`): the ONLY authoritative
+    // source. A genuinely empty result here is a real confirmed-empty epic,
+    // free to blank the view — and the only path allowed to update the
+    // projection seed for the next cold mount (R2).
     const refresh = (): void => {
       if (disposed) return;
-      setChats(readChatsFromEpicDoc(doc));
-      setArtifacts(readArtifactsFromEpicDoc(doc));
+      const nextChats = readChatsFromEpicDoc(doc);
+      const nextArtifacts = readArtifactsFromEpicDoc(doc);
+      setChats(nextChats);
+      setArtifacts(nextArtifacts);
+      const serialized = serializeEpicProjection(nextChats, nextArtifacts);
+      if (serialized !== lastWrittenProjectionRef.current) {
+        lastWrittenProjectionRef.current = serialized;
+        writeCachedEpicProjection(epicId, serialized);
+      }
     };
 
     const handle = streamConnection.openEpic({
       epicId,
       callbacks: makeEpicDocCallbacks(doc, registry, refresh),
     });
+
+    // R2: `y-indexeddb` is the authoritative CRDT store, layered UNDER the
+    // synchronous projection seed above (which only ever covers render #1).
+    // IndexedDB's own load is inherently async, and — unlike a live frame —
+    // an empty local IDB read is NOT authoritative: the doc for this epic may
+    // simply be missing/evicted from IndexedDB while the localStorage seed is
+    // still good. So this path may enrich or correct the current view, but
+    // may never regress a populated view back to empty; only `refresh()`
+    // above (a real host frame) may do that. Never writes the projection seed
+    // itself — only live-confirmed data becomes the next seed.
+    //
+    // The constructor itself (not just `whenSynced`) can throw synchronously
+    // when `indexedDB` is unavailable (private-mode Safari, storage disabled,
+    // a test environment with no IndexedDB polyfill) — guarded the same way
+    // as the async rejection below: degrade to "no y-indexeddb layer this
+    // session", never crash the epic view.
+    let idb: IndexeddbPersistence | null = null;
+    try {
+      idb = new IndexeddbPersistence(epicTreeDocName(epicId), doc);
+    } catch {
+      idb = null;
+    }
+    idb?.whenSynced
+      .then(() => {
+        if (disposed) return;
+        const nextChats = readChatsFromEpicDoc(doc);
+        const nextArtifacts = readArtifactsFromEpicDoc(doc);
+        setChats((prev) => (nextChats.length === 0 && prev.length > 0 ? prev : nextChats));
+        setArtifacts((prev) =>
+          nextArtifacts.length === 0 && prev.length > 0 ? prev : nextArtifacts,
+        );
+      })
+      .catch(() => {
+        // IndexedDB unavailable/blocked (private mode, storage disabled) —
+        // the doc simply stays whatever the localStorage seed + live stream
+        // give it; no different than never having a y-indexeddb layer.
+      });
 
     let currentState = handle.connection.getState();
     setConnection(currentState);
@@ -355,6 +499,11 @@ export function useEpicDoc(
       stopLivenessRecovery();
       unsubscribe();
       handle.stream.close();
+      // y-indexeddb's own README teardown order: its provider unsubscribes
+      // the doc's `update` listener as part of `destroy()`, so it must go
+      // before `doc.destroy()` — otherwise a late in-flight update could try
+      // to persist against an already-destroyed doc.
+      void idb?.destroy();
       doc.destroy();
       registry.destroy();
     };

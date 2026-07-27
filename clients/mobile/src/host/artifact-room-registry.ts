@@ -77,6 +77,20 @@ export class ArtifactRoomRegistry {
     return this.rooms.get(artifactRoomId)?.state ?? "unavailable";
   }
 
+  /**
+   * P0 caching: whether the host has EVER sent an explicit `artifactRoomState`
+   * frame for this room this session — distinct from `getState()`, which
+   * collapses "never reported" and a real "unavailable" report to the same
+   * value. `useArtifactBody`'s cache-seed guard needs that distinction: "the
+   * host hasn't told us anything yet" must not downgrade an already-cached
+   * render, but "the host already told us this room isn't ready" must be
+   * honored even on the first check after mount.
+   */
+  hasReported(artifactRoomId: string): boolean {
+    const entry = this.rooms.get(artifactRoomId);
+    return entry !== undefined && entry.state !== null;
+  }
+
   getDoc(artifactRoomId: string): Y.Doc | null {
     return this.rooms.get(artifactRoomId)?.doc ?? null;
   }
