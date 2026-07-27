@@ -199,7 +199,11 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
 
       <div ref={scrollRef} onScroll={handleScroll} style={scrollAreaStyle}>
         <NotificationPermissionButton compact />
-        {!chat.hasSnapshot ? (
+        {chat.transcriptMessages.length === 0 && chat.liveTurnBlocks.length === 0 && !chat.hasSnapshot ? (
+          // Cache-seeded content (mobile-v3-cache) paints instantly even
+          // before hasSnapshot flips true — the skeleton only ever covers a
+          // genuinely blank window (no cache, no live snapshot yet), never a
+          // cache-seeded transcript that's already there to show.
           <TranscriptSkeleton />
         ) : (
           <TranscriptView

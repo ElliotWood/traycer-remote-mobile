@@ -15,16 +15,60 @@
  * teardown (which the browser reclaims), and disposing in an effect cleanup
  * would wrongly tear the connection down under StrictMode's simulated remount.
  */
-import { useEffect, useRef, useState, type ReactElement } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import {
+  defaultShouldDehydrateQuery,
+  QueryClient,
+  QueryClientProvider,
+  useIsRestoring,
+  type DehydrateOptions,
+} from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AUTHN_BASE_URL } from "@/config";
 import { MobileAuthService } from "@/host/auth-service";
+import { CACHE_MAX_AGE_MS, CACHE_SCHEMA_VERSION } from "@/host/cache-config";
 import { createHostConnection } from "@/host/connection";
 import { HostClientProvider } from "@/host/host-client-context";
 import { HostStreamConnection } from "@/host/stream-connection";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { App } from "@/App";
 import { VersionPromptBanner } from "@/views/version-prompt-banner";
+
+const QUERY_CACHE_STORAGE_KEY = "traycer-remote:query-cache";
+
+/**
+ * Only these two unary queries are part of the empty-on-load bug (P0) — the
+ * fleet list and comment threads. `snapshots.readSnapshotDiff` /
+ * `workspace.readFile` / `agent.gui.getPlan` are lazy, on-expand, potentially
+ * large payloads with no "instant paint" requirement; persisting them would
+ * only bloat localStorage.
+ */
+const PERSISTED_QUERY_NAMES: ReadonlySet<string> = new Set([
+  "epic.listTasks",
+  "epic.listCommentThreads",
+]);
+
+export const shouldDehydrateQuery: DehydrateOptions["shouldDehydrateQuery"] = (query) =>
+  defaultShouldDehydrateQuery(query) &&
+  query.queryKey[0] === "mobile" &&
+  typeof query.queryKey[1] === "string" &&
+  PERSISTED_QUERY_NAMES.has(query.queryKey[1]);
+
+/**
+ * Restoring a persisted `QueryClient` is always at least one microtask past
+ * first commit (`persistQueryClient`'s restore is `await`-based even when the
+ * underlying `localStorage` read is synchronous), so without this gate the
+ * Fleet would render its `isPending` "Loading your epics…" copy for exactly
+ * one frame before flipping to the warm data — a real, if brief, flash. This
+ * withholds the signed-in app (not the auth-independent `VersionPromptBanner`)
+ * until restore settles; restoring `null` for that one tick is invisible
+ * (nothing has painted yet), unlike a loading string would be.
+ */
+function RestoreGate({ children }: { readonly children: ReactNode }): ReactElement | null {
+  const isRestoring = useIsRestoring();
+  return isRestoring ? null : <>{children}</>;
+}
 
 export function AppRoot(): ReactElement {
   const [auth] = useState(
@@ -41,7 +85,26 @@ export function AppRoot(): ReactElement {
         clientId: "desktop",
       }),
   );
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          // Must be >= the persister's `maxAge` below — otherwise a query
+          // just restored from localStorage is already past its own gcTime
+          // window (computed from the ORIGINAL, pre-restore `dataUpdatedAt`)
+          // and can be garbage-collected before any component observes it.
+          queries: { gcTime: CACHE_MAX_AGE_MS },
+        },
+      }),
+  );
+  const [persister] = useState(() =>
+    typeof window === "undefined" || !("localStorage" in window)
+      ? null
+      : createSyncStoragePersister({
+          storage: window.localStorage,
+          key: QUERY_CACHE_STORAGE_KEY,
+        }),
+  );
   const [connection] = useState(() => createHostConnection(auth));
   // T5 stands up the streaming stack (T3) the unary wiring never reached: one
   // `HostStreamConnection` for the session's `epic.subscribe` / `chat.subscribe`
@@ -58,16 +121,41 @@ export function AppRoot(): ReactElement {
     void auth.start();
   }, [auth]);
 
-  return (
-    <QueryClientProvider client={queryClient}>
+  const shell = (
+    <RestoreGate>
       <HostClientProvider client={connection?.hostClient ?? null}>
         <StreamConnectionProvider connection={streamConnection}>
           <App auth={auth} />
         </StreamConnectionProvider>
       </HostClientProvider>
-      {/* Auth-independent: installability/update prompt applies from the
-          sign-in screen onward, not just once signed in. */}
+    </RestoreGate>
+  );
+
+  // `persister` is null when localStorage is unavailable (SSR, private-mode
+  // edge cases) — fall back to a plain, unpersisted QueryClientProvider
+  // rather than crashing. `useIsRestoring()` inside `RestoreGate` defaults to
+  // `false` with no `IsRestoringProvider` ancestor, so the gate is a no-op
+  // either way.
+  return persister === null ? (
+    <QueryClientProvider client={queryClient}>
+      {shell}
       <VersionPromptBanner />
     </QueryClientProvider>
+  ) : (
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        maxAge: CACHE_MAX_AGE_MS,
+        buster: CACHE_SCHEMA_VERSION,
+        dehydrateOptions: { shouldDehydrateQuery },
+      }}
+    >
+      {shell}
+      {/* Auth-independent: installability/update prompt applies from the
+          sign-in screen onward, not just once signed in — and it must never
+          sit behind the restore gate either. */}
+      <VersionPromptBanner />
+    </PersistQueryClientProvider>
   );
 }

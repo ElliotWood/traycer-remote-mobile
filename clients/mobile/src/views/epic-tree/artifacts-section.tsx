@@ -151,13 +151,17 @@ export function ArtifactsSection({
 
       {!collapsed && (
         <>
-          {!docLoaded ? (
+          {roots.length > 0 ? null : !docLoaded ? (
+            // See AgentsSection's identical gate: a non-empty tree (cache-seeded
+            // or live) always wins regardless of docLoaded, so cached rows paint
+            // instantly; "no artifacts" is only ever claimed once confirmed live.
             <TreeRowSkeleton />
-          ) : roots.length === 0 ? (
+          ) : (
             <p style={{ ...type.bodySm, color: theme.mutedText, padding: "0 8px" }}>
               {hasActiveFilter ? "No artifacts match this filter." : "No artifacts in this epic yet."}
             </p>
-          ) : (
+          )}
+          {roots.length > 0 && (
             <ul role="tree" aria-label="Artifacts" style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {roots.map((id) => (
                 <ArtifactNode

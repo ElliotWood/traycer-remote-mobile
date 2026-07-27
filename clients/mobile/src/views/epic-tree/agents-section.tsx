@@ -124,13 +124,19 @@ export function AgentsSection({
 
       {!collapsed && (
         <>
-          {!docLoaded ? (
+          {tree.roots.length > 0 ? null : !docLoaded ? (
+            // Nothing to show yet: could be a genuinely empty epic (needs
+            // docLoaded to say so for sure) or just the cache-seed/live
+            // decode window — never claim "no chats" until docLoaded is
+            // true. A non-empty tree (cache-seeded or live) always wins,
+            // regardless of docLoaded, so cached rows paint instantly.
             <TreeRowSkeleton />
-          ) : tree.roots.length === 0 ? (
+          ) : (
             <p style={{ ...type.bodySm, color: theme.mutedText, padding: "0 8px" }}>
               No chats in this epic yet. Start one from the Traycer desktop app.
             </p>
-          ) : (
+          )}
+          {tree.roots.length > 0 && (
             <ul role="tree" aria-label="Agents" style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {tree.roots.map((id) => (
                 <ChatNode

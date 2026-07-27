@@ -103,4 +103,49 @@ describe("ArtifactRoomRegistry", () => {
     // behavior that matters here.
     expect(doc1).not.toBeNull();
   });
+
+  // P0 caching: `hasReported` is what lets `useArtifactBody`'s cache-seed
+  // guard (R4) tell "the host hasn't told us anything about this room yet"
+  // (safe to keep showing a cached render) apart from "the host already
+  // reported this room isn't ready" (must be honored) — `getState()` alone
+  // collapses both to the same "unavailable" value.
+  describe("hasReported", () => {
+    it("is false for a room the registry has never heard about at all", () => {
+      const registry = new ArtifactRoomRegistry();
+      expect(registry.hasReported("never-seen")).toBe(false);
+    });
+
+    it("is false for a room whose ONLY frame so far is a snapshot/update — no explicit state frame yet", () => {
+      const registry = new ArtifactRoomRegistry();
+      const bytes = snapshotBytesFor((doc) => {
+        doc.getXmlFragment("artifact-body:a1").insert(0, [new Y.XmlText("content")]);
+      });
+      registry.applySnapshot("room-1", bytes);
+      // The entry now exists in the map (content arrived), but no
+      // `artifactRoomState` frame has ever reported this room's state.
+      expect(registry.hasReported("room-1")).toBe(false);
+    });
+
+    it("is true once applyState has been called for the room, regardless of which state", () => {
+      const registry = new ArtifactRoomRegistry();
+      registry.applyState("room-1", "ready");
+      expect(registry.hasReported("room-1")).toBe(true);
+
+      registry.applyState("room-2", "unavailable");
+      expect(registry.hasReported("room-2")).toBe(true);
+
+      registry.applyState("room-3", "retrying");
+      expect(registry.hasReported("room-3")).toBe(true);
+    });
+
+    it("stays true after destroy() clears the map — a fresh registry starts over at false", () => {
+      const registry = new ArtifactRoomRegistry();
+      registry.applyState("room-1", "ready");
+      registry.destroy();
+      // The room no longer exists in the (cleared) map at all, so it reads
+      // as "never reported" again — matches getState()'s own reset-on-destroy
+      // behavior above.
+      expect(registry.hasReported("room-1")).toBe(false);
+    });
+  });
 });
