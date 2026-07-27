@@ -28,6 +28,7 @@ import {
   GuideRails,
   RowActionsButton,
   TreeChevron,
+  TreeRowSkeleton,
   rowOpenButtonStyle,
   rowShellStyle,
   sectionHeaderStyle,
@@ -46,6 +47,8 @@ export interface ArtifactsSectionProps {
   readonly epicId: string;
   readonly artifacts: readonly EpicArtifactEntry[];
   readonly connectionLive: boolean;
+  /** `false` while the epic snapshot is still decoding — renders a skeleton instead of a premature "no artifacts" empty-state. */
+  readonly docLoaded: boolean;
   readonly sortMode: SortMode;
   readonly onOpenArtifact: (artifactId: string) => void;
   readonly onAddChild: (parentArtifactId: string | null) => void;
@@ -55,6 +58,7 @@ export function ArtifactsSection({
   epicId,
   artifacts,
   connectionLive,
+  docLoaded,
   sortMode,
   onOpenArtifact,
   onAddChild,
@@ -147,7 +151,9 @@ export function ArtifactsSection({
 
       {!collapsed && (
         <>
-          {roots.length === 0 ? (
+          {!docLoaded ? (
+            <TreeRowSkeleton />
+          ) : roots.length === 0 ? (
             <p style={{ ...type.bodySm, color: theme.mutedText, padding: "0 8px" }}>
               {hasActiveFilter ? "No artifacts match this filter." : "No artifacts in this epic yet."}
             </p>

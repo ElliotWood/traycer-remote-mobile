@@ -63,7 +63,7 @@ export function EpicView({
 }: EpicViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
-  const { chats, artifacts, artifactRooms, connection: rawConnection } = useEpicDoc(
+  const { chats, artifacts, artifactRooms, docLoaded, connection: rawConnection } = useEpicDoc(
     streamConnection,
     epicId,
   );
@@ -194,6 +194,7 @@ export function EpicView({
         chats={chats}
         badges={badges}
         connectionLive={connectionLive}
+        docLoaded={docLoaded}
         sortMode={sortMode}
         onOpenChat={onOpenChat}
         onAddChild={(parentId) => setDrill({ kind: "author", parentId })}
@@ -203,6 +204,7 @@ export function EpicView({
         epicId={epicId}
         artifacts={artifacts}
         connectionLive={connectionLive}
+        docLoaded={docLoaded}
         sortMode={sortMode}
         onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
         onAddChild={(parentId) => setDrill({ kind: "create-artifact", parentId })}

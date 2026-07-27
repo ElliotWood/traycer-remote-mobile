@@ -26,6 +26,7 @@ import {
 } from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   approvalKey,
   fileEditKey,
@@ -198,12 +199,16 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
 
       <div ref={scrollRef} onScroll={handleScroll} style={scrollAreaStyle}>
         <NotificationPermissionButton compact />
-        <TranscriptView
-          messages={chat.transcriptMessages}
-          liveBlocks={chat.liveTurnBlocks}
-          epicId={epicId}
-          chatId={chatId}
-        />
+        {!chat.hasSnapshot ? (
+          <TranscriptSkeleton />
+        ) : (
+          <TranscriptView
+            messages={chat.transcriptMessages}
+            liveBlocks={chat.liveTurnBlocks}
+            epicId={epicId}
+            chatId={chatId}
+          />
+        )}
         {isRunning && (
           <RunIndicator
             seed={chat.activeTurn?.turnId ?? chatId}
@@ -293,6 +298,19 @@ const scrollAreaStyle: CSSProperties = {
   position: "relative",
   padding: "8px 16px",
 };
+
+/** Bubble-shaped loading placeholder shown until `chat.subscribe`'s first snapshot decodes — an empty transcript area reads as "load finished, nothing here" otherwise. */
+function TranscriptSkeleton(): ReactElement {
+  return (
+    <div aria-hidden="true" style={{ display: "flex", flexDirection: "column", gap: 12, padding: "4px 0" }}>
+      <div style={{ alignSelf: "flex-end", width: "60%" }}>
+        <Skeleton className="h-9 w-full rounded-2xl" />
+      </div>
+      <Skeleton className="h-4 w-1/3 rounded" />
+      <Skeleton className="h-20 w-full rounded-xl" />
+    </div>
+  );
+}
 
 const footerStyle: CSSProperties = {
   flexShrink: 0,

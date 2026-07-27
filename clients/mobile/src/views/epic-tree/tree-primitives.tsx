@@ -8,6 +8,7 @@
  */
 import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import type { CSSProperties, ReactElement } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { radius, theme } from "@/views/design-tokens";
 
 export const INDENT_PX = 16;
@@ -175,3 +176,21 @@ export const sectionLabelStyle: CSSProperties = {
   textTransform: "uppercase",
   color: theme.mutedText,
 };
+
+/**
+ * Row-shaped loading placeholder for the Agents/Artifacts sections — shown
+ * while the epic snapshot is still decoding, so a slow-to-arrive Y.Doc reads
+ * as "content incoming" rather than a (possibly wrong) empty-state.
+ */
+export function TreeRowSkeleton(): ReactElement {
+  return (
+    <div aria-hidden="true" style={{ padding: "2px 4px" }}>
+      {[0, 1, 2].map((i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: ROW_MIN_HEIGHT }}>
+          <Skeleton className="size-4 shrink-0 rounded-sm" />
+          <Skeleton className="h-3.5 rounded" style={{ width: `${60 - i * 12}%` }} />
+        </div>
+      ))}
+    </div>
+  );
+}

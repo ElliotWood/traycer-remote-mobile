@@ -237,6 +237,13 @@ export interface UseEpicDocResult {
   readonly connection: StreamConnectionState;
   /** `null` when disconnected (no host / no session open). */
   readonly artifactRooms: ArtifactRoomRegistry | null;
+  /**
+   * UX fix: `false` until the epic's first `epic.subscribe` snapshot has
+   * decoded into the Y.Doc — lets callers show a loading skeleton instead of
+   * misreading "haven't heard from the host yet" as "genuinely empty".
+   * `true` immediately when there's no connection at all (nothing pending).
+   */
+  readonly docLoaded: boolean;
 }
 
 /**
@@ -253,11 +260,13 @@ function makeEpicDocCallbacks(
   doc: Y.Doc,
   artifactRooms: ArtifactRoomRegistry,
   onDocChanged: () => void,
+  onSnapshotArrived: () => void,
 ): EpicStreamCallbacks {
   return {
     onSnapshot: (_meta, snapshotBytes) => {
       Y.applyUpdate(doc, snapshotBytes);
       onDocChanged();
+      onSnapshotArrived();
     },
     onUpdate: (updateBytes) => {
       Y.applyUpdate(doc, updateBytes);
@@ -310,6 +319,7 @@ export function useEpicDoc(
   const [connection, setConnection] =
     useState<StreamConnectionState>("reconnecting");
   const [artifactRooms, setArtifactRooms] = useState<ArtifactRoomRegistry | null>(null);
+  const [docLoaded, setDocLoaded] = useState(false);
 
   useEffect(() => {
     if (streamConnection === null) {
@@ -317,9 +327,11 @@ export function useEpicDoc(
       setArtifacts([]);
       setArtifactRooms(null);
       setConnection("disconnected");
+      setDocLoaded(true);
       return;
     }
 
+    setDocLoaded(false);
     const doc = new Y.Doc();
     const registry = new ArtifactRoomRegistry();
     setArtifactRooms(registry);
@@ -329,10 +341,14 @@ export function useEpicDoc(
       setChats(readChatsFromEpicDoc(doc));
       setArtifacts(readArtifactsFromEpicDoc(doc));
     };
+    const markLoaded = (): void => {
+      if (disposed) return;
+      setDocLoaded(true);
+    };
 
     const handle = streamConnection.openEpic({
       epicId,
-      callbacks: makeEpicDocCallbacks(doc, registry, refresh),
+      callbacks: makeEpicDocCallbacks(doc, registry, refresh, markLoaded),
     });
 
     let currentState = handle.connection.getState();
@@ -360,5 +376,5 @@ export function useEpicDoc(
     };
   }, [streamConnection, epicId]);
 
-  return { chats, artifacts, connection, artifactRooms };
+  return { chats, artifacts, connection, artifactRooms, docLoaded };
 }

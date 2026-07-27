@@ -31,6 +31,7 @@ import {
   GuideRails,
   RowActionsButton,
   TreeChevron,
+  TreeRowSkeleton,
   rowIndentStyle,
   rowOpenButtonStyle,
   rowShellStyle,
@@ -44,6 +45,8 @@ export interface AgentsSectionProps {
   readonly chats: readonly EpicChatEntry[];
   readonly badges: Readonly<Record<string, ChatBadgeState>>;
   readonly connectionLive: boolean;
+  /** `false` while the epic snapshot is still decoding — renders a skeleton instead of a premature "no chats" empty-state. */
+  readonly docLoaded: boolean;
   readonly sortMode: SortMode;
   readonly onOpenChat: (chatId: string, chatTitle: string | null) => void;
   readonly onAddChild: (parentChatId: string | null) => void;
@@ -65,6 +68,7 @@ export function AgentsSection({
   chats,
   badges,
   connectionLive,
+  docLoaded,
   sortMode,
   onOpenChat,
   onAddChild,
@@ -120,7 +124,9 @@ export function AgentsSection({
 
       {!collapsed && (
         <>
-          {tree.roots.length === 0 ? (
+          {!docLoaded ? (
+            <TreeRowSkeleton />
+          ) : tree.roots.length === 0 ? (
             <p style={{ ...type.bodySm, color: theme.mutedText, padding: "0 8px" }}>
               No chats in this epic yet. Start one from the Traycer desktop app.
             </p>
