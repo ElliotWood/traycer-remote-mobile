@@ -28,19 +28,18 @@ import {
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useCurrentEpicDoc } from "@/host/current-epic-context";
+import { useArtifactNav } from "@/host/artifact-nav-context";
 import { useChatBadges, type ChatBadgeState } from "@/host/use-chat-badges";
 import { useSettledConnectionState } from "@/host/use-settled-connection-state";
 import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
-import { markSeen, seedUnseen } from "@/host/read-tracking-store";
+import { seedUnseen } from "@/host/read-tracking-store";
 import { DEFAULT_SORT_MODE, describeSortMode, nextSortMode, type SortMode } from "@/host/tree-sort";
 import { AuthorView } from "./author-view";
 import { CreateArtifactView } from "./create-artifact-view";
-import { ArtifactBodyView } from "./artifact-body-view";
 import { NotificationPermissionButton } from "./notification-permission-button";
 import { AgentsSection } from "./epic-tree/agents-section";
 import { ArtifactsSection } from "./epic-tree/artifacts-section";
 import { ConnectionPill } from "./epic-tree/connection-pill";
-import { ErrorBoundary } from "./error-boundary";
 import { Button, SectionHeading, screen } from "./design-tokens";
 
 interface EpicViewProps {
@@ -49,25 +48,23 @@ interface EpicViewProps {
   readonly epicTitle: string | null;
   /** P2 UX fix: the tree already knows every chat's title (`EpicChatEntry`) — threading it through means ChatView never shows "Untitled chat" while its own snapshot is still loading. `null` for a brand-new chat (its snapshot lands almost immediately). */
   readonly onOpenChat: (chatId: string, chatTitle: string | null) => void;
-  readonly onBack: () => void;
 }
 
 /** Which full-screen drill-in (if any) currently covers the tree. */
 type Drill =
   | { readonly kind: "author"; readonly parentId: string | null }
   | { readonly kind: "create-artifact"; readonly parentId: string | null }
-  | { readonly kind: "artifact-body"; readonly artifactId: string }
   | null;
 
 export function EpicView({
   epicId,
   epicTitle,
   onOpenChat,
-  onBack,
 }: EpicViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
-  const { chats, artifacts, artifactRooms, docLoaded, connection: rawConnection } = useCurrentEpicDoc();
+  const { chats, artifacts, docLoaded, connection: rawConnection } = useCurrentEpicDoc();
+  const { openArtifact } = useArtifactNav();
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
   const connection = useSettledConnectionState(rawConnection);
@@ -108,14 +105,6 @@ export function EpicView({
   const [drill, setDrill] = useState<Drill>(null);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT_MODE);
 
-  // The artifact body drill marks itself seen the moment it opens (mirrors
-  // ChatView doing the same for chats — see `read-tracking-store.ts`).
-  useEffect(() => {
-    if (drill?.kind === "artifact-body") {
-      markSeen(epicId, drill.artifactId);
-    }
-  }, [epicId, drill]);
-
   if (drill?.kind === "author" && hostClient !== null) {
     return (
       <AuthorView
@@ -134,40 +123,17 @@ export function EpicView({
         epicId={epicId}
         parentId={drill.parentId}
         client={hostClient}
-        onCreated={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
+        onCreated={(artifactId) => {
+          setDrill(null);
+          openArtifact(epicId, artifactId);
+        }}
         onCancel={() => setDrill(null)}
       />
     );
   }
 
-  // A stale `drill.artifactId` (its artifact left the tree — deleted
-  // elsewhere) falls through to the tree view below rather than calling
-  // `setDrill` during render — mirrors the pre-P1 `ArtifactTreeView`'s same
-  // stale-id handling.
-  if (drill?.kind === "artifact-body") {
-    const artifact = artifacts.find((a) => a.id === drill.artifactId);
-    if (artifact !== undefined) {
-      return (
-        <ErrorBoundary label="this artifact" key={artifact.id}>
-          <ArtifactBodyView
-            epicId={epicId}
-            artifact={artifact}
-            artifacts={artifacts}
-            artifactRooms={artifactRooms}
-            onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
-            onBack={() => setDrill(null)}
-          />
-        </ErrorBoundary>
-      );
-    }
-  }
-
   return (
     <main style={screen}>
-      <Button variant="ghost" onClick={onBack}>
-        ← Back
-      </Button>
-
       <header style={{ margin: "12px 0 10px" }}>
         <SectionHeading>{epicTitle ?? "Epic"}</SectionHeading>
         <ConnectionPill state={connection} />
@@ -211,7 +177,7 @@ export function EpicView({
         connectionLive={connectionLive}
         docLoaded={docLoaded}
         sortMode={sortMode}
-        onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
+        onOpenArtifact={(artifactId) => openArtifact(epicId, artifactId)}
         onAddChild={(parentId) => setDrill({ kind: "create-artifact", parentId })}
       />
     </main>

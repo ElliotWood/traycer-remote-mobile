@@ -8,6 +8,7 @@
 import { useState, type ReactElement } from "react";
 import type { ArtifactOperationBlock as ArtifactOperationBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { useSnapshotDiff } from "@/host/use-snapshot-diff";
+import { useArtifactNav } from "@/host/artifact-nav-context";
 import { KIND_LABELS, type CardKind } from "../../kind-tokens";
 import { colors, secondaryButton } from "../../ui";
 import { DiffView } from "../diff-view";
@@ -18,15 +19,21 @@ const OPERATION_LABEL: Readonly<Record<ArtifactOperationBlockType["operation"], 
   delete: "−",
 };
 
+/** U1 fix: the card already carries `artifactId` (its own field, not a link href), so opening it needs no RPC resolve — a direct in-app nav, same as every other artifact-opening surface. */
 export function ArtifactOperationBlock({
   block,
+  epicId,
 }: {
   readonly block: ArtifactOperationBlockType;
+  readonly epicId: string;
 }): ReactElement {
+  const { openArtifact } = useArtifactNav();
   const kind = block.kind as CardKind;
   const title = block.title ?? KIND_LABELS[kind];
   const [showDiff, setShowDiff] = useState(false);
   const hasDiff = block.beforeHash !== null || block.afterHash !== null;
+  // A delete leaves nothing to open — the artifact is gone from the tree.
+  const isOpenable = block.operation !== "delete";
 
   return (
     <div
@@ -38,7 +45,19 @@ export function ArtifactOperationBlock({
         marginBottom: 8,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        role={isOpenable ? "button" : undefined}
+        tabIndex={isOpenable ? 0 : undefined}
+        onClick={isOpenable ? () => openArtifact(epicId, block.artifactId) : undefined}
+        onKeyDown={
+          isOpenable
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") openArtifact(epicId, block.artifactId);
+              }
+            : undefined
+        }
+        style={{ display: "flex", alignItems: "center", gap: 8, cursor: isOpenable ? "pointer" : "default" }}
+      >
         <span aria-hidden="true">{OPERATION_LABEL[block.operation]}</span>
         <span style={{ fontWeight: 600 }}>{title}</span>
         <span style={{ color: colors.muted, fontSize: 12 }}>{KIND_LABELS[kind]}</span>

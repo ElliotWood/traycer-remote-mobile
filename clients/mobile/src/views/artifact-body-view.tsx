@@ -17,7 +17,7 @@ import { ArtifactChildIndex } from "./artifact-child-index";
 import { CommentsPanelBody } from "./comments/comments-panel";
 import { KIND_COLORS, KIND_ICONS, StatusPill, displayArtifactTitle } from "./kind-tokens";
 import { MobileMarkdown } from "./markdown/mobile-markdown";
-import { colors, screen, secondaryButton } from "./ui";
+import { colors, screen } from "./ui";
 
 interface ArtifactBodyViewProps {
   readonly epicId: string;
@@ -27,7 +27,6 @@ interface ArtifactBodyViewProps {
   readonly artifactRooms: ArtifactRoomRegistry | null;
   /** P3: navigates to a child artifact (opens it in the SAME drill-in, replacing the current one). */
   readonly onOpenArtifact: (artifactId: string) => void;
-  readonly onBack: () => void;
 }
 
 export function ArtifactBodyView({
@@ -36,7 +35,6 @@ export function ArtifactBodyView({
   artifacts,
   artifactRooms,
   onOpenArtifact,
-  onBack,
 }: ArtifactBodyViewProps): ReactElement {
   const body = useArtifactBody(artifactRooms, artifact.artifactRoomId, artifact.id);
   const Icon = KIND_ICONS[artifact.kind];
@@ -46,14 +44,6 @@ export function ArtifactBodyView({
 
   return (
     <main style={screen}>
-      <button
-        type="button"
-        style={{ ...secondaryButton, marginBottom: 16 }}
-        onClick={onBack}
-      >
-        ← Back
-      </button>
-
       <header style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <Icon size={20} color={color} aria-hidden="true" />
         <h1 style={{ fontSize: 18, margin: 0, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>

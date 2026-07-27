@@ -91,7 +91,7 @@ function renderEpicView(
   const result = render(
     <StreamConnectionProvider connection={fake.connection}>
       <CurrentEpicProvider epicId="e1">
-        <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={onOpenChat} onBack={() => {}} />
+        <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={onOpenChat} />
       </CurrentEpicProvider>
     </StreamConnectionProvider>,
   );

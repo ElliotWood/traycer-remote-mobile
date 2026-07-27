@@ -56,7 +56,7 @@ import {
 } from "@/host/notifications";
 import { NotificationPermissionButton } from "./notification-permission-button";
 import { markSeen } from "@/host/read-tracking-store";
-import { Button, radius, theme, type } from "./design-tokens";
+import { radius, theme, type } from "./design-tokens";
 import { ConnectionPill } from "./epic-tree/connection-pill";
 import { BranchChip } from "./chat/branch-chip";
 import { ContextUsageChip } from "./chat/context-usage-chip";
@@ -71,15 +71,20 @@ interface ChatViewProps {
   readonly chatId: string;
   /** P2 UX fix: the title as already known from the epic tree that opened this chat (or a freshly-created chat's echo) — shown immediately instead of "Untitled chat" while `chat.subscribe`'s own snapshot is still loading. `null` when reached a way that doesn't know it (e.g. a notification). */
   readonly initialTitle: string | null;
-  readonly onBack: () => void;
+  /** U2: pushes the live title up to `app-shell.tsx`'s `TopAppBar` as `chat.title` resolves — the screen itself no longer renders its own title/back button (the top bar is the one affordance). */
+  readonly onTitleChange: (chatId: string, title: string | null) => void;
 }
 
 const SCROLL_BOTTOM_THRESHOLD_PX = 48;
 
-export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps): ReactElement {
+export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
   const chat = useChat(streamConnection, epicId, chatId, hostClient?.getRequestContextUserId() ?? null);
+  const liveTitle = chat.title || initialTitle || null;
+  useEffect(() => {
+    onTitleChange(chatId, liveTitle);
+  }, [chatId, liveTitle, onTitleChange]);
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
   const displayConnection = useSettledConnectionState(chat.connection);
@@ -236,14 +241,6 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
   return (
     <div style={chatLayoutStyle}>
       <header style={headerStyle}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Button variant="ghost" onClick={onBack}>
-            ← Back
-          </Button>
-        </div>
-        <h1 style={{ ...type.titleSm, margin: "6px 0 2px", color: theme.text, wordBreak: "break-word" }}>
-          {chat.title || initialTitle || "Untitled chat"}
-        </h1>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <ConnectionPill state={displayConnection} />
           <BranchChip binding={chat.worktreeBinding} missingWorktreePaths={chat.missingWorktreePaths} />

@@ -79,7 +79,7 @@ function BlockNode({
     case "approval":
       return <ApprovalBlock block={block} />;
     case "artifact_operation":
-      return <ArtifactOperationBlock block={block} />;
+      return <ArtifactOperationBlock block={block} epicId={epicId} />;
     case "subagent":
       return <SubagentBlock node={node} epicId={epicId} chatId={chatId} />;
     case "steer":

@@ -24,10 +24,9 @@ import { useHostStatus } from "@/host/use-host-status";
 import { PROVIDER_DISPLAY_NAMES, type ProviderCliState } from "@traycer/protocol/host/provider-schemas";
 import type { HostNotificationSeverity } from "@traycer/protocol/host/notifications/host-notifications";
 import { HOST_WS_URL } from "@/config";
-import { Button, radius, screen, theme, type } from "@/views/design-tokens";
+import { radius, screen, theme, type } from "@/views/design-tokens";
 
 export interface SettingsScreenProps {
-  readonly onBack: () => void;
   readonly onSignOut: () => void;
 }
 
@@ -38,15 +37,12 @@ const SEVERITY_LABELS: Readonly<Record<HostNotificationSeverity, string>> = {
   done: "Completed",
 };
 
-export function SettingsScreen({ onBack, onSignOut }: SettingsScreenProps): ReactElement {
+export function SettingsScreen({ onSignOut }: SettingsScreenProps): ReactElement {
   const client = useHostClientOrNull();
 
   return (
     <main style={screen}>
-      <Button variant="ghost" onClick={onBack}>
-        ← Back
-      </Button>
-      <h1 style={{ ...type.titleMd, margin: "12px 0 16px", color: theme.text }}>Settings</h1>
+      <h1 style={{ ...type.titleMd, margin: "0 0 16px", color: theme.text }}>Settings</h1>
 
       <ProvidersSection client={client} />
       <NotificationsSection client={client} />

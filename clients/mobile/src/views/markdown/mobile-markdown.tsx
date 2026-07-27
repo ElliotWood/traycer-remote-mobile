@@ -11,8 +11,10 @@
  */
 import {
   isValidElement,
+  useState,
   type CSSProperties,
   type ComponentPropsWithoutRef,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -21,6 +23,9 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { PluggableList } from "unified";
+import { deriveArtifactPathLayoutRootAgnostic } from "@traycer/protocol/common/artifact-path";
+import { useHostClientOrNull } from "@/host/host-client-context";
+import { useArtifactNav } from "@/host/artifact-nav-context";
 import { colors } from "../ui";
 import { MermaidBlock } from "./mermaid-block";
 import { WireframeBlock } from "./wireframe-block";
@@ -133,8 +138,92 @@ function BlockquoteRenderer(props: ComponentPropsWithoutRef<"blockquote">): Reac
   );
 }
 
+/** A real `http(s)://` URL that ISN'T structurally an artifact link — a genuine external page. */
+const EXTERNAL_URL_PATTERN = /^https?:\/\//i;
+/** Protocol handoffs (mail client / dialer), not a page navigation — safe to leave as native anchor behavior. */
+const PASSTHROUGH_SCHEME_PATTERN = /^(mailto|tel):/i;
+
+const anchorLinkStyle: CSSProperties = { color: colors.accent };
+const notFoundHintStyle: CSSProperties = { fontSize: 11, color: colors.muted, marginLeft: 4 };
+
+/**
+ * U1 fix: an artifact reference authored by an agent (a plain markdown link
+ * to its on-disk `…/epics/<epicId>/artifacts/<chain>/index.md` path — desktop
+ * resolves the SAME shape via `epic.resolveArtifactByPath`, see
+ * `clients/gui-app/src/components/chat/build-chat-link-policy.ts`) must open
+ * the artifact IN-APP, never as a real `<a href>` navigation — that reboots
+ * the whole SPA, drops the nav stack, and re-pays the epic doc's decode cost.
+ *
+ * Only the structurally artifact-shaped case is handled here (an absolute-ish
+ * path already ending in `index.md` under an `epics/<id>/artifacts/` marker,
+ * root-agnostic — matches what agents actually emit into chat/artifact
+ * markdown). A RELATIVE href authored from within an artifact's own folder
+ * position (desktop's `resolveArtifactRelativeLinkPath`) is NOT rewritten —
+ * mobile's artifact projection doesn't carry the artifact's own folder chain
+ * to resolve it against, so that shape still falls through to the safe
+ * external/no-op branches below rather than a real navigation. Flagged
+ * simplification, not a silent gap: it degrades safely, it just doesn't
+ * resolve.
+ */
 function AnchorRenderer(props: ComponentPropsWithoutRef<"a">): ReactElement {
-  return <a {...props} style={{ color: colors.accent }} target="_blank" rel="noreferrer" />;
+  const { href, children, style: _ignoredStyle, target: _ignoredTarget, ...rest } = props;
+  const client = useHostClientOrNull();
+  const { openArtifact } = useArtifactNav();
+  const [notFound, setNotFound] = useState(false);
+
+  if (href === undefined || href.length === 0 || href.startsWith("#") || PASSTHROUGH_SCHEME_PATTERN.test(href)) {
+    // Empty/fragment/protocol-handoff hrefs never risk an SPA reload — leave native.
+    return (
+      <a {...rest} href={href} style={anchorLinkStyle}>
+        {children}
+      </a>
+    );
+  }
+
+  const artifactLayout = deriveArtifactPathLayoutRootAgnostic(href, null);
+  if (artifactLayout !== null) {
+    const handleArtifactClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+      event.preventDefault();
+      if (client === null) return;
+      client
+        .request("epic.resolveArtifactByPath", { epicId: artifactLayout.epicId, filePath: href })
+        .then((response) => {
+          if (response.artifact !== null) {
+            openArtifact(artifactLayout.epicId, response.artifact.artifactId);
+          } else {
+            setNotFound(true);
+          }
+        })
+        .catch(() => setNotFound(true));
+    };
+    return (
+      <a {...rest} href={href} onClick={handleArtifactClick} style={{ ...anchorLinkStyle, cursor: "pointer" }}>
+        {children}
+        {notFound && <span style={notFoundHintStyle}>(couldn't open that artifact)</span>}
+      </a>
+    );
+  }
+
+  if (EXTERNAL_URL_PATTERN.test(href)) {
+    // A genuine external page — the ONE case that still opens a new tab.
+    return (
+      <a {...rest} href={href} target="_blank" rel="noopener noreferrer" style={anchorLinkStyle}>
+        {children}
+      </a>
+    );
+  }
+
+  // Internal-shaped (relative/absolute path) but not artifact-resolvable —
+  // mobile has no workspace-file browser to open it into, so the safe
+  // behavior is a no-op, never a real navigation that reboots the SPA.
+  const handleNoOpClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+    event.preventDefault();
+  };
+  return (
+    <a {...rest} href={href} onClick={handleNoOpClick} style={anchorLinkStyle}>
+      {children}
+    </a>
+  );
 }
 
 const COMPONENTS: Components = {

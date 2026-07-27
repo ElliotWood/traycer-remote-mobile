@@ -79,7 +79,7 @@ describe("ChatView — blocked-transition notification (F1)", () => {
     const fake = createFakeStreamConnection();
     render(
       <StreamConnectionProvider connection={fake.connection}>
-        <ChatView epicId="e1" chatId="c1" initialTitle={null} onBack={() => {}} />
+        <ChatView epicId="e1" chatId="c1" initialTitle={null} onTitleChange={() => {}} />
       </StreamConnectionProvider>,
     );
     const session = fake.chatSessions[0];
@@ -129,7 +129,7 @@ describe("EpicView — blocked-transition notification (F1)", () => {
     render(
       <StreamConnectionProvider connection={fake.connection}>
         <CurrentEpicProvider epicId="e1">
-          <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={() => {}} onBack={() => {}} />
+          <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={() => {}} />
         </CurrentEpicProvider>
       </StreamConnectionProvider>,
     );

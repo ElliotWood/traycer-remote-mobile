@@ -21,7 +21,6 @@ import { useNotificationMutations } from "@/host/use-notification-mutations";
 import { Button, radius, screen, theme, type } from "@/views/design-tokens";
 
 export interface NotificationsScreenProps {
-  readonly onBack: () => void;
   readonly onOpenChat: (epicId: string, chatId: string) => void;
   readonly onOpenEpic: (epicId: string) => void;
 }
@@ -47,7 +46,7 @@ function formatRelativeTime(timestamp: number): string {
   return `${days}d`;
 }
 
-export function NotificationsScreen({ onBack, onOpenChat, onOpenEpic }: NotificationsScreenProps): ReactElement {
+export function NotificationsScreen({ onOpenChat, onOpenEpic }: NotificationsScreenProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
   const { entries, summary } = useHostNotifications(streamConnection);
@@ -86,18 +85,15 @@ export function NotificationsScreen({ onBack, onOpenChat, onOpenEpic }: Notifica
 
   return (
     <main style={screen}>
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <Button variant="ghost" onClick={onBack}>
-          ← Back
-        </Button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <h1 style={{ ...type.titleMd, margin: 0, color: theme.text }}>Notifications</h1>
         <Button variant="ghost" onClick={() => void markAllRead()} disabled={summary.unreadCount === 0}>
           <CheckCheck size={14} aria-hidden="true" style={{ marginRight: 4 }} />
           Mark all read
         </Button>
-      </header>
+      </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <h1 style={{ ...type.titleMd, margin: 0, color: theme.text }}>Notifications</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 12 }}>
         <button
           type="button"
           onClick={() => setUnreadOnly((v) => !v)}

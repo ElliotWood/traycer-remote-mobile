@@ -3,45 +3,54 @@
  * `clients/gui-app/src/editor-core/nodes/mermaid/mermaid-service.ts` for the
  * mobile client: the desktop version tracks a live light/dark toggle via a
  * MutationObserver; the mobile client has no theme toggle (dark-first, fixed),
- * so this file hardcodes a dark palette derived from `views/ui.ts` and skips
- * the observer entirely.
+ * so this file skips the observer entirely — but still samples the LIVE
+ * `traycer-green` palette off the DOM (via `resolveCssColor`) rather than
+ * hardcoding it, same as desktop, and for the same reason: see `css-color.ts`.
  *
  * `import("mermaid")` only happens on first call to `ensureMermaidReady` — kept
  * out of the initial `vite build` chunk (contract M2 / rubric §5).
  */
-import { colors } from "../ui";
+import { resolveCssColor } from "./css-color";
 
 type MermaidModule = (typeof import("mermaid"))["default"];
 
 let readyPromise: Promise<MermaidModule> | null = null;
 
-// Node fill/cluster fills need to read as distinct panels against the page
-// background (#111) rather than the accidental "invisible dark-on-dark" the
-// rubric calls out — a shade lighter than the page, not derived from a
-// theme-variable sample (mobile has none).
-const NODE_FILL = "#1c2a3a";
-const NOTE_FILL = "#332b1a";
-const CLUSTER_FILL = "#1a1a1a";
+// Fallbacks mirror the `.dark[data-theme="traycer-green"]` block in
+// `global.css` — the theme this app always renders in — so a jsdom test (no
+// real stylesheet applied) still gets a sensible, on-brand palette.
+const FALLBACK_BACKGROUND = "#121715";
+const FALLBACK_FOREGROUND = "#ffffff";
+const FALLBACK_BORDER = "#33433d";
+const FALLBACK_MUTED = "#1a2421";
 
 function buildThemeVariables(): Record<string, string> {
+  const background = resolveCssColor("--background", FALLBACK_BACKGROUND);
+  const foreground = resolveCssColor("--foreground", FALLBACK_FOREGROUND);
+  const border = resolveCssColor("--border", FALLBACK_BORDER);
+  // Node/cluster/note fills read as distinct panels against the page
+  // background rather than the "invisible dark-on-dark" the rubric calls
+  // out — `--muted` (the same "distinct panel" surface design-tokens.tsx
+  // uses elsewhere) does that job without hand-picking a shade.
+  const panelFill = resolveCssColor("--muted", FALLBACK_MUTED);
   return {
-    background: colors.bg,
-    primaryColor: NODE_FILL,
-    primaryTextColor: colors.text,
-    primaryBorderColor: colors.border,
-    secondaryColor: CLUSTER_FILL,
-    tertiaryColor: colors.bg,
-    lineColor: colors.border,
-    textColor: colors.text,
-    mainBkg: NODE_FILL,
-    nodeBorder: colors.border,
-    clusterBkg: CLUSTER_FILL,
-    clusterBorder: colors.border,
-    titleColor: colors.text,
-    edgeLabelBackground: colors.bg,
-    noteBkgColor: NOTE_FILL,
-    noteBorderColor: colors.border,
-    noteTextColor: colors.text,
+    background,
+    primaryColor: panelFill,
+    primaryTextColor: foreground,
+    primaryBorderColor: border,
+    secondaryColor: panelFill,
+    tertiaryColor: background,
+    lineColor: border,
+    textColor: foreground,
+    mainBkg: panelFill,
+    nodeBorder: border,
+    clusterBkg: panelFill,
+    clusterBorder: border,
+    titleColor: foreground,
+    edgeLabelBackground: background,
+    noteBkgColor: panelFill,
+    noteBorderColor: border,
+    noteTextColor: foreground,
   };
 }
 

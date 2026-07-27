@@ -27,7 +27,13 @@ export type Route =
   // onto the SAME stack (so "back" returns to wherever the user was) rather
   // than living outside the drilldown.
   | { readonly name: "notifications" }
-  | { readonly name: "settings" };
+  | { readonly name: "settings" }
+  // U1 fix: a top-level route (not EpicView-local state) so an artifact
+  // reference tapped from ANY screen (chat transcript, another artifact's
+  // child index, notifications) can open it via `dispatch` — see
+  // `artifact-nav-context.tsx`. Each open pushes a new frame, so drilling
+  // through a chain of child artifacts backs out one level at a time.
+  | { readonly name: "artifact"; readonly epicId: string; readonly artifactId: string };
 
 export type NavAction =
   | { readonly type: "open-epic"; readonly epicId: string; readonly epicTitle: string }
@@ -41,7 +47,8 @@ export type NavAction =
    */
   | { readonly type: "goto-chat"; readonly epicId: string; readonly chatId: string }
   | { readonly type: "open-notifications" }
-  | { readonly type: "open-settings" };
+  | { readonly type: "open-settings" }
+  | { readonly type: "open-artifact"; readonly epicId: string; readonly artifactId: string };
 
 /** The stack always holds at least the Fleet root, so `currentRoute` is total. */
 export type NavStack = readonly [Route, ...Route[]];
@@ -80,5 +87,7 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
       return [...stack, { name: "notifications" }];
     case "open-settings":
       return [...stack, { name: "settings" }];
+    case "open-artifact":
+      return [...stack, { name: "artifact", epicId: action.epicId, artifactId: action.artifactId }];
   }
 }

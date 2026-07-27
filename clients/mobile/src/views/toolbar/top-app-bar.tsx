@@ -1,10 +1,10 @@
 /**
- * The app-level top bar — reachable from every screen, ABOVE each screen's
- * own header (which keeps its existing back button/title/connection pill;
- * unifying those into this bar too is a larger visual refactor across
- * already-solid screens, deliberately deferred — see the toolbar's status
- * report). Left: wordmark. Right: usage chip → UsageSheet, bell →
- * NotificationsScreen, avatar → AccountSheet.
+ * The app-level top bar — reachable from every screen, and (U2) the ONE
+ * back affordance: [back] [title, truncated] [usage chip] [bell] [avatar].
+ * Screens no longer render their own floating "← Back" button/duplicate
+ * title — `app-shell.tsx` computes `title` per route (preferring a chat's
+ * LIVE title once it resolves) and `onBack` (`null` on Fleet, nothing to go
+ * back to).
  *
  * The usage chip is a plain icon here (not the live mini-gauge desktop's
  * spec describes) — polling `host.getRateLimitUsage` continuously just for
@@ -12,7 +12,7 @@
  * rarely-glanced-at element; the real gauges render once the sheet opens.
  * Flagged simplification, not a silent omission.
  */
-import { Gauge } from "lucide-react";
+import { ArrowLeft, Gauge } from "lucide-react";
 import type { ReactElement } from "react";
 import type { HostNotificationsSummary } from "@traycer/protocol/host/notifications/host-notifications";
 import type { AuthenticatedUser } from "@traycer/protocol/auth";
@@ -21,6 +21,9 @@ import { NotificationBell } from "./notification-bell";
 
 export interface TopAppBarProps {
   readonly user: AuthenticatedUser | null;
+  readonly title: string;
+  /** `null` hides the back button (Fleet, the nav root). */
+  readonly onBack: (() => void) | null;
   readonly notificationsSummary: HostNotificationsSummary | null;
   readonly onOpenUsage: () => void;
   readonly onOpenNotifications: () => void;
@@ -37,6 +40,8 @@ function computeInitials(name: string | null, email: string | null): string {
 
 export function TopAppBar({
   user,
+  title,
+  onBack,
   notificationsSummary,
   onOpenUsage,
   onOpenNotifications,
@@ -59,7 +64,42 @@ export function TopAppBar({
         background: theme.background,
       }}
     >
-      <span style={{ fontWeight: 700, fontSize: 14, color: theme.text, letterSpacing: "-0.01em" }}>Traycer</span>
+      {onBack !== null && (
+        <button
+          type="button"
+          aria-label="Back"
+          onClick={onBack}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            marginLeft: -6,
+            border: "none",
+            background: "transparent",
+            color: theme.text,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <ArrowLeft size={18} aria-hidden="true" />
+        </button>
+      )}
+      <span
+        style={{
+          fontWeight: 700,
+          fontSize: 14,
+          color: theme.text,
+          letterSpacing: "-0.01em",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {title}
+      </span>
       <div style={{ flex: 1 }} />
       <button
         type="button"

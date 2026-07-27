@@ -12,11 +12,12 @@
  * bypass), so the Evaluator can drive comments live in a real browser without
  * Sprint 3's artifact tree existing in this worktree.
  */
-import { useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
 import {
   currentRoute,
   INITIAL_NAV_STACK,
   navReducer,
+  type Route,
 } from "@/router/nav";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
@@ -25,15 +26,50 @@ import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import { FleetView } from "@/views/fleet-view";
 import { EpicView } from "@/views/epic-view";
 import { ChatView } from "@/views/chat-view";
+import { ArtifactRouteView } from "@/views/artifact-route-view";
 import { CommentsPanel } from "@/views/comments/comments-panel";
 import { parseCommentsHarnessParams } from "@/views/comments/comments-harness-params";
 import { ErrorBoundary } from "@/views/error-boundary";
 import { CurrentEpicProvider } from "@/host/current-epic-context";
+import { ArtifactNavProvider } from "@/host/artifact-nav-context";
 import { TopAppBar } from "@/views/toolbar/top-app-bar";
 import { AccountSheet } from "@/views/toolbar/account-sheet";
 import { UsageSheet } from "@/views/toolbar/usage-sheet";
 import { NotificationsScreen } from "@/views/toolbar/notifications-screen";
 import { SettingsScreen } from "@/views/toolbar/settings-screen";
+
+/** Live chat title override, scoped to a `chatId` so a screen change can never leak a stale title into the newly-rendered route for one frame (U2). */
+interface LiveChatTitle {
+  readonly chatId: string;
+  readonly title: string | null;
+}
+
+/**
+ * U2: the top bar always shows a title next to its back button — Fleet has
+ * none to go back to, so it keeps the wordmark. `chat` prefers the LIVE
+ * title (`liveTitle`, pushed by `ChatView` as `chat.title` resolves) over
+ * the nav-time snapshot, but only when it's for the SAME chat currently
+ * routed — a stale push from a just-left chat must never show through.
+ */
+function computeScreenTitle(route: Route, liveTitle: LiveChatTitle | null): string {
+  switch (route.name) {
+    case "fleet":
+      return "Traycer";
+    case "epic":
+      return route.epicTitle ?? "Epic";
+    case "chat":
+      if (liveTitle !== null && liveTitle.chatId === route.chatId && liveTitle.title !== null) {
+        return liveTitle.title;
+      }
+      return route.chatTitle ?? "Untitled chat";
+    case "artifact":
+      return "Artifact";
+    case "notifications":
+      return "Notifications";
+    case "settings":
+      return "Settings";
+  }
+}
 
 interface AppShellProps {
   readonly client: MobileHostClient;
@@ -65,6 +101,13 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
   const { summary: notificationsSummary } = useHostNotifications(streamConnection);
   const [accountOpen, setAccountOpen] = useState(false);
   const [usageOpen, setUsageOpen] = useState(false);
+  const [liveChatTitle, setLiveChatTitle] = useState<LiveChatTitle | null>(null);
+  // Stable identity (never reconstructed) so `ChatView`'s effect that calls
+  // this doesn't refire on every AppShell render.
+  const handleChatTitleChange = useCallback((chatId: string, title: string | null) => {
+    setLiveChatTitle({ chatId, title });
+  }, []);
+  const canGoBack = stack.length > 1;
 
   // S5 (C, P1): a blocked-chat notification's click posts a message to an
   // existing client (see `src/sw.ts`'s `notificationclick`); this is the one
@@ -102,28 +145,32 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
-      <TopAppBar
-        user={user}
-        notificationsSummary={notificationsSummary}
-        onOpenUsage={() => setUsageOpen(true)}
-        onOpenNotifications={() => dispatch({ type: "open-notifications" })}
-        onOpenAccount={() => setAccountOpen(true)}
-      />
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>{renderRoute()}</div>
-      {accountOpen && (
-        <AccountSheet
+    <ArtifactNavProvider dispatch={dispatch}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
+        <TopAppBar
           user={user}
-          onClose={() => setAccountOpen(false)}
-          onOpenSettings={() => {
-            setAccountOpen(false);
-            dispatch({ type: "open-settings" });
-          }}
-          onSignOut={onSignOut}
+          title={computeScreenTitle(route, liveChatTitle)}
+          onBack={canGoBack ? () => dispatch({ type: "back" }) : null}
+          notificationsSummary={notificationsSummary}
+          onOpenUsage={() => setUsageOpen(true)}
+          onOpenNotifications={() => dispatch({ type: "open-notifications" })}
+          onOpenAccount={() => setAccountOpen(true)}
         />
-      )}
-      {usageOpen && <UsageSheet onClose={() => setUsageOpen(false)} />}
-    </div>
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>{renderRoute()}</div>
+        {accountOpen && (
+          <AccountSheet
+            user={user}
+            onClose={() => setAccountOpen(false)}
+            onOpenSettings={() => {
+              setAccountOpen(false);
+              dispatch({ type: "open-settings" });
+            }}
+            onSignOut={onSignOut}
+          />
+        )}
+        {usageOpen && <UsageSheet onClose={() => setUsageOpen(false)} />}
+      </div>
+    </ArtifactNavProvider>
   );
 
   function renderRoute(): ReactElement {
@@ -145,7 +192,6 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
       return (
         <ErrorBoundary label="notifications" key={route.name}>
           <NotificationsScreen
-            onBack={() => dispatch({ type: "back" })}
             onOpenChat={(epicId, chatId) => dispatch({ type: "goto-chat", epicId, chatId })}
             onOpenEpic={(epicId) => dispatch({ type: "open-epic", epicId, epicTitle: "" })}
           />
@@ -156,16 +202,17 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
     if (route.name === "settings") {
       return (
         <ErrorBoundary label="settings" key={route.name}>
-          <SettingsScreen onBack={() => dispatch({ type: "back" })} onSignOut={onSignOut} />
+          <SettingsScreen onSignOut={onSignOut} />
         </ErrorBoundary>
       );
     }
 
-    // "epic" and "chat" both carry `epicId` and share ONE `epic.subscribe`
-    // session for the whole epic↔chat transition — `CurrentEpicProvider` is
-    // keyed by epicId (not by route.name), so switching between the tree and
-    // a chat within the SAME epic never tears the session down or re-decodes
-    // the snapshot (see `current-epic-context.tsx`'s docblock).
+    // "epic" / "chat" / "artifact" all carry `epicId` and share ONE
+    // `epic.subscribe` session for the whole nav transition —
+    // `CurrentEpicProvider` is keyed by epicId (not by route.name), so
+    // switching between the tree, a chat, and an artifact within the SAME
+    // epic never tears the session down or re-decodes the snapshot (see
+    // `current-epic-context.tsx`'s docblock).
     return (
       <CurrentEpicProvider epicId={route.epicId} key={route.epicId}>
         {route.name === "epic" ? (
@@ -176,17 +223,20 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
               onOpenChat={(chatId, chatTitle) =>
                 dispatch({ type: "open-chat", epicId: route.epicId, chatId, chatTitle })
               }
-              onBack={() => dispatch({ type: "back" })}
             />
           </ErrorBoundary>
-        ) : (
+        ) : route.name === "chat" ? (
           <ErrorBoundary label="this chat" key={`chat:${route.chatId}`}>
             <ChatView
               epicId={route.epicId}
               chatId={route.chatId}
               initialTitle={route.chatTitle}
-              onBack={() => dispatch({ type: "back" })}
+              onTitleChange={handleChatTitleChange}
             />
+          </ErrorBoundary>
+        ) : (
+          <ErrorBoundary label="this artifact" key={`artifact:${route.artifactId}`}>
+            <ArtifactRouteView epicId={route.epicId} artifactId={route.artifactId} />
           </ErrorBoundary>
         )}
       </CurrentEpicProvider>

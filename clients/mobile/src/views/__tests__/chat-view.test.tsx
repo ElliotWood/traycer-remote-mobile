@@ -132,7 +132,7 @@ const ackFrame = (opts: {
 function renderChatView(fake: FakeStreamConnection): void {
   render(
     <StreamConnectionProvider connection={fake.connection}>
-      <ChatView epicId="e1" chatId="c1" initialTitle={null} onBack={() => {}} />
+      <ChatView epicId="e1" chatId="c1" initialTitle={null} onTitleChange={() => {}} />
     </StreamConnectionProvider>,
   );
 }
