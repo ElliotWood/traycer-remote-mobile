@@ -6,22 +6,58 @@
  * prop/copy/icon contracts: send⇄stop, permission-mode toggle, agent-mode
  * toggle, a basic model picker (`agent.listHarnessModels`).
  *
- * Image attach is DEFERRED this round, flagged not silently dropped: the
- * `send` frame's `hasBinaryPayload` flag implies a binary transport
- * alongside the JSON frame that P2's research didn't verify — shipping a
- * button that stamps `hasBinaryPayload: true` without a working channel
- * behind it would send a malformed frame, which the Evaluator's own P2
- * tighten explicitly warned against. @-mention/slash pickers and mic input
- * are deferred per the accepted P2 contract (no file-search/command-list
- * RPC, no STT infra).
+ * Image attachments: the wire contract is confirmed (see
+ * `image-attachment.ts`'s docblock) — an `imageAttachment` node inlined
+ * into the SAME `send` frame every message already uses, no new transport.
+ * Two attach affordances (camera-capture input + library-picker input) — a
+ * real mobile win over desktop's single "attach" button. No model-support
+ * gate: desktop's own gate reads a `ModelOption.metadata` field that's
+ * entirely client-local and, per a dedicated research pass, never actually
+ * populated on any real model today — porting it would be faking a check
+ * off data neither client has (flagged + approved, not silently skipped).
+ * @-mention/slash pickers and mic input stay deferred per the accepted P2
+ * contract (no file-search/command-list RPC, no STT infra).
  */
-import { useEffect, useState, type ReactElement } from "react";
-import { ArrowUp, Code, FileCheck, Layers, LockKeyholeOpen, ShieldCheck, Square, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from "react";
+import {
+  ArrowUp,
+  Camera,
+  Code,
+  FileCheck,
+  Image as ImageIcon,
+  Layers,
+  LoaderCircle,
+  LockKeyholeOpen,
+  ShieldCheck,
+  Square,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persistence/epic/foundation";
 import type { AgentMode } from "@traycer/protocol/common/schemas";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useHarnessModels } from "@/host/use-harness-models";
+import {
+  AttachmentTooLargeError,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  prepareImageAttachment,
+  type PreparedAttachment,
+} from "@/host/image-attachment";
 import { radius, theme, type } from "@/views/design-tokens";
+
+interface AttachmentDraft {
+  readonly localId: string;
+  readonly fileName: string;
+  readonly status: "ingesting" | "ready" | "error";
+  readonly prepared: PreparedAttachment | null;
+  readonly errorMessage: string | null;
+}
+
+let localAttachmentCounter = 0;
+function nextLocalAttachmentId(): string {
+  localAttachmentCounter += 1;
+  return `pending-${localAttachmentCounter}`;
+}
 
 const PERMISSION_OPTIONS: readonly { readonly id: PermissionMode; readonly label: string; readonly icon: LucideIcon }[] = [
   { id: "supervised", label: "Supervised", icon: ShieldCheck },
@@ -56,7 +92,7 @@ export interface ComposerProps {
   readonly accessRole: "owner" | "viewer";
   readonly connectionLive: boolean;
   readonly sendDisabledHint: string | null;
-  readonly onSend: (text: string, settings: ChatRunSettings) => void;
+  readonly onSend: (text: string, settings: ChatRunSettings, attachments: readonly PreparedAttachment[]) => void;
   readonly onStop: () => void;
 }
 
@@ -75,6 +111,7 @@ export function Composer({
   onStop,
 }: ComposerProps): ReactElement {
   const [draftText, setDraftText] = useState("");
+  const [attachments, setAttachments] = useState<readonly AttachmentDraft[]>([]);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
     chatSettings?.permissionMode ?? "full_access",
   );
@@ -82,6 +119,8 @@ export function Composer({
   const [modelSlug, setModelSlug] = useState<string | null>(chatSettings?.model ?? null);
   const { models } = useHarnessModels(client, epicId, DEFAULT_HARNESS);
   const resolvedModel = modelSlug ?? models[0]?.id ?? null;
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const libraryInputRef = useRef<HTMLInputElement | null>(null);
 
   // Only fires when the PARENT explicitly bumps the nonce (queue-edit) — a
   // stable nonce across re-renders (typing, transcript updates, anything
@@ -91,22 +130,68 @@ export function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillNonce]);
 
+  const handleFilesPicked = (event: ChangeEvent<HTMLInputElement>): void => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = ""; // allow re-picking the same file later
+    const room = MAX_ATTACHMENTS_PER_MESSAGE - attachments.length;
+    const accepted = files.slice(0, Math.max(0, room));
+    if (accepted.length === 0) return;
+
+    const drafts: AttachmentDraft[] = accepted.map((file) => ({
+      localId: nextLocalAttachmentId(),
+      fileName: file.name,
+      status: "ingesting",
+      prepared: null,
+      errorMessage: null,
+    }));
+    setAttachments((prev) => [...prev, ...drafts]);
+
+    accepted.forEach((file, index) => {
+      const localId = drafts[index].localId;
+      prepareImageAttachment(file)
+        .then((prepared) => {
+          setAttachments((prev) =>
+            prev.map((a) => (a.localId === localId ? { ...a, status: "ready", prepared } : a)),
+          );
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof AttachmentTooLargeError ? err.message : "Couldn't attach this image.";
+          setAttachments((prev) =>
+            prev.map((a) => (a.localId === localId ? { ...a, status: "error", errorMessage: message } : a)),
+          );
+        });
+    });
+  };
+
+  const removeAttachment = (localId: string): void => {
+    setAttachments((prev) => prev.filter((a) => a.localId !== localId));
+  };
+
   const readOnly = accessRole === "viewer";
   const canType = !readOnly;
-  const canSubmit = canType && connectionLive && draftText.trim().length > 0 && resolvedModel !== null;
+  const readyAttachments = attachments.filter((a): a is AttachmentDraft & { prepared: PreparedAttachment } => a.status === "ready" && a.prepared !== null);
+  const isIngestingAttachments = attachments.some((a) => a.status === "ingesting");
+  const hasContent = draftText.trim().length > 0 || readyAttachments.length > 0;
+  const canSubmit =
+    canType && connectionLive && hasContent && !isIngestingAttachments && resolvedModel !== null;
 
   const handleSend = (): void => {
     if (!canSubmit || resolvedModel === null) return;
-    onSend(draftText, {
-      harnessId: DEFAULT_HARNESS,
-      model: resolvedModel,
-      permissionMode,
-      reasoningEffort: null,
-      serviceTier: null,
-      agentMode,
-      profileId: null,
-    });
+    onSend(
+      draftText,
+      {
+        harnessId: DEFAULT_HARNESS,
+        model: resolvedModel,
+        permissionMode,
+        reasoningEffort: null,
+        serviceTier: null,
+        agentMode,
+        profileId: null,
+      },
+      readyAttachments.map((a) => a.prepared),
+    );
     setDraftText("");
+    setAttachments([]);
   };
 
   return (
@@ -123,36 +208,70 @@ export function Composer({
           You have view-only access to this chat.
         </p>
       ) : (
-        <textarea
-          value={draftText}
-          onChange={(e) => setDraftText(e.target.value)}
-          placeholder="Message this agent…"
-          rows={2}
-          disabled={!connectionLive}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            border: "none",
-            background: "transparent",
-            color: theme.text,
-            fontSize: 15,
-            fontFamily: "inherit",
-            resize: "vertical",
-            outline: "none",
-            marginBottom: 6,
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-        />
+        <>
+          {attachments.length > 0 && (
+            <AttachmentStrip attachments={attachments} onRemove={removeAttachment} />
+          )}
+          <textarea
+            value={draftText}
+            onChange={(e) => setDraftText(e.target.value)}
+            placeholder="Message this agent…"
+            rows={2}
+            disabled={!connectionLive}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "none",
+              background: "transparent",
+              color: theme.text,
+              fontSize: 15,
+              fontFamily: "inherit",
+              resize: "vertical",
+              outline: "none",
+              marginBottom: 6,
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+          />
+        </>
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         {!readOnly && (
           <>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              style={{ display: "none" }}
+              onChange={handleFilesPicked}
+            />
+            <input
+              ref={libraryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: "none" }}
+              onChange={handleFilesPicked}
+            />
+            <AttachButton
+              icon={Camera}
+              label="Take photo"
+              disabled={!connectionLive || attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE}
+              onClick={() => cameraInputRef.current?.click()}
+            />
+            <AttachButton
+              icon={ImageIcon}
+              label="Add photo"
+              disabled={!connectionLive || attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE}
+              onClick={() => libraryInputRef.current?.click()}
+            />
             <PermissionModeToggle value={permissionMode} onChange={setPermissionMode} disabled={!connectionLive} />
             <AgentModeToggle value={agentMode} onChange={setAgentMode} disabled={!connectionLive} />
             <ModelChip
@@ -167,6 +286,7 @@ export function Composer({
         <SendStopButton
           stopping={stopping}
           running={canStop}
+          ingesting={!canStop && isIngestingAttachments}
           disabled={canStop ? false : !canSubmit}
           disabledHint={sendDisabledHint}
           onSend={handleSend}
@@ -192,6 +312,134 @@ function chipStyle(disabled: boolean) {
     cursor: disabled ? "default" : "pointer",
     opacity: disabled ? 0.5 : 1,
   } as const;
+}
+
+function AttachButton({
+  icon: Icon,
+  label,
+  disabled,
+  onClick,
+}: {
+  readonly icon: LucideIcon;
+  readonly label: string;
+  readonly disabled: boolean;
+  readonly onClick: () => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 32,
+        height: 32,
+        border: `1px solid ${theme.border}`,
+        borderRadius: radius.md,
+        background: "transparent",
+        color: theme.mutedText,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        flexShrink: 0,
+      }}
+    >
+      <Icon size={14} aria-hidden="true" />
+    </button>
+  );
+}
+
+/** Horizontally scrollable so a full set of attachments never pushes the textarea/toolbar off-screen — capped height, no wrap. */
+function AttachmentStrip({
+  attachments,
+  onRemove,
+}: {
+  readonly attachments: readonly AttachmentDraft[];
+  readonly onRemove: (localId: string) => void;
+}): ReactElement {
+  return (
+    <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
+      {attachments.map((attachment) => (
+        <AttachmentChip key={attachment.localId} attachment={attachment} onRemove={() => onRemove(attachment.localId)} />
+      ))}
+    </div>
+  );
+}
+
+const CHIP_SIZE = 56;
+
+function AttachmentChip({
+  attachment,
+  onRemove,
+}: {
+  readonly attachment: AttachmentDraft;
+  readonly onRemove: () => void;
+}): ReactElement {
+  return (
+    <div
+      style={{
+        position: "relative",
+        flexShrink: 0,
+        width: CHIP_SIZE,
+        height: CHIP_SIZE,
+        borderRadius: radius.md,
+        border: `1px solid ${attachment.status === "error" ? theme.danger : theme.border}`,
+        overflow: "hidden",
+        background: theme.background,
+      }}
+      title={attachment.errorMessage ?? attachment.fileName}
+    >
+      {attachment.prepared !== null ? (
+        <img
+          src={attachment.prepared.dataUrl}
+          alt={attachment.fileName}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      ) : (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: attachment.status === "error" ? theme.danger : theme.mutedText,
+            fontSize: 10,
+            textAlign: "center",
+            padding: 4,
+          }}
+        >
+          {attachment.status === "ingesting" ? "…" : "!"}
+        </div>
+      )}
+      <button
+        type="button"
+        aria-label={`Remove ${attachment.fileName}`}
+        onClick={onRemove}
+        style={{
+          position: "absolute",
+          top: 2,
+          right: 2,
+          width: 18,
+          height: 18,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: "50%",
+          border: "none",
+          background: "rgba(0, 0, 0, 0.6)",
+          color: "#fff",
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        <X size={11} aria-hidden="true" />
+      </button>
+    </div>
+  );
 }
 
 function PermissionModeToggle({
@@ -287,6 +535,7 @@ function ModelChip({
 function SendStopButton({
   running,
   stopping,
+  ingesting,
   disabled,
   disabledHint,
   onSend,
@@ -294,13 +543,15 @@ function SendStopButton({
 }: {
   readonly running: boolean;
   readonly stopping: boolean;
+  /** An attachment is still downscaling/encoding — desktop's own "pending-ingest" convention: a spinner replaces the send arrow rather than just disabling it. */
+  readonly ingesting: boolean;
   readonly disabled: boolean;
   readonly disabledHint: string | null;
   readonly onSend: () => void;
   readonly onStop: () => void;
 }): ReactElement {
   const stopMode = running || stopping;
-  const label = stopping ? "Stopping" : running ? "Stop" : "Send";
+  const label = stopping ? "Stopping" : running ? "Stop" : ingesting ? "Preparing attachment…" : "Send";
   const style = {
     display: "inline-flex",
     alignItems: "center",
@@ -319,12 +570,18 @@ function SendStopButton({
     <button
       type="button"
       aria-label={label}
-      title={stopMode ? "Stop assistant turn" : (disabledHint ?? "Send")}
+      title={stopMode ? "Stop assistant turn" : ingesting ? label : (disabledHint ?? "Send")}
       disabled={disabled}
       onClick={stopMode ? onStop : onSend}
       style={style}
     >
-      {stopMode ? <Square size={14} fill="currentColor" aria-hidden="true" /> : <ArrowUp size={16} aria-hidden="true" />}
+      {stopMode ? (
+        <Square size={14} fill="currentColor" aria-hidden="true" />
+      ) : ingesting ? (
+        <LoaderCircle className="traycer-spinner" size={16} aria-hidden="true" />
+      ) : (
+        <ArrowUp size={16} aria-hidden="true" />
+      )}
     </button>
   );
 }

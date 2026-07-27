@@ -43,6 +43,7 @@ import type {
   InterviewAnswer,
 } from "@traycer/protocol/persistence/epic/content-blocks";
 import { CACHE_SCHEMA_VERSION } from "./cache-config";
+import { messageContentWithAttachments, stripAttachmentPayloads, type PreparedAttachment } from "./image-attachment";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
 import { startLivenessRecovery } from "./liveness-recovery";
@@ -94,6 +95,8 @@ export type SendReplyArg =
 export interface SendMessageArgs {
   readonly text: string;
   readonly settings: ChatRunSettings;
+  /** Attachments — already downscaled/base64-encoded by `prepareImageAttachment` (image-attachment.ts). Empty by default. */
+  readonly attachments?: readonly PreparedAttachment[];
 }
 
 export interface UseChatResult {
@@ -249,12 +252,27 @@ export function chatCacheStorageKey(epicId: string, chatId: string): string {
   return `chat-cache:v${CACHE_SCHEMA_VERSION}:${epicId}:${chatId}`;
 }
 
+/**
+ * A phone attachment's base64 (downscaled, but still real bytes — see
+ * `image-attachment.ts`'s docblock) must never land in localStorage: a
+ * single cached photo could blow the ~5-10MB quota this whole cache layer
+ * shares with the epic-tree projection seed and TanStack's persisted
+ * queries, throwing `QuotaExceededError` and regressing the instant-paint
+ * win. Only user-role messages can carry an `imageAttachment` node.
+ */
+function stripAttachmentsForCache(message: ChatMessage): ChatMessage {
+  if (message.role !== "user") return message;
+  return { ...message, message: { ...message.message, content: stripAttachmentPayloads(message.message.content) } };
+}
+
 /** Pure serialize, kept separate from storage I/O for testability. */
 export function serializeChatCache(state: ChatState): string {
   const allMessages = [...state.messages, ...state.trailingMessages];
   const slice: ChatCacheSlice = {
     title: state.title,
-    messages: allMessages.slice(Math.max(0, allMessages.length - CHAT_CACHE_MAX_MESSAGES)),
+    messages: allMessages
+      .slice(Math.max(0, allMessages.length - CHAT_CACHE_MAX_MESSAGES))
+      .map(stripAttachmentsForCache),
     runStatus: state.runStatus,
     pendingApprovals: state.pendingApprovals,
     pendingFileEditApprovals: state.pendingFileEditApprovals,
@@ -749,7 +767,8 @@ export function useChat(
     (args: SendMessageArgs): void => {
       const stream = streamRef.current;
       const text = args.text.trim();
-      if (stream === null || userId === null || text.length === 0) return;
+      const attachments = args.attachments ?? [];
+      if (stream === null || userId === null || (text.length === 0 && attachments.length === 0)) return;
       const frame: ChatSubscribeClientFrame = {
         hasBinaryPayload: false,
         epicId,
@@ -757,7 +776,8 @@ export function useChat(
         clientActionId: uuidv4(),
         kind: "send",
         messageId: uuidv4(),
-        content: plainTextContent(text),
+        content:
+          attachments.length === 0 ? plainTextContent(text) : messageContentWithAttachments(text, attachments),
         sender: { type: "user", userId },
         settings: args.settings,
         accountContext: DEFAULT_ACCOUNT_CONTEXT,
