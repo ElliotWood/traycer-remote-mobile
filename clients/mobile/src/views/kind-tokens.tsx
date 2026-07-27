@@ -214,4 +214,15 @@ export function KindIcon({ kind, label }: KindIconProps): ReactElement {
   );
 }
 
+/**
+ * The title to render for an artifact row: the raw stored title when
+ * non-empty, else a per-kind "Untitled {kind}" fallback (mirrors desktop's
+ * `display-title.ts` `displayTitle()`, scoped to the four backend artifact
+ * kinds) — so a real artifact created but never titled never renders a
+ * blank row (Sprint 3 contract, round 2 SHOULD-7).
+ */
+export function displayArtifactTitle(title: string, kind: CardKind): string {
+  return title.length > 0 ? title : `Untitled ${KIND_LABELS[kind]}`;
+}
+
 export { isCardKind };
