@@ -33,6 +33,7 @@ import type {
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
+import { startLivenessRecovery } from "./liveness-recovery";
 import {
   interviewBlockFor,
   latestActivityText,
@@ -84,6 +85,17 @@ export interface UseChatResult {
   /** Live reply status for a pending key (see the `*Key` helpers), or undefined. */
   readonly replyStatusFor: (key: string) => ReplyStatus | undefined;
   readonly sendReply: (arg: SendReplyArg) => void;
+  /**
+   * True once the first `snapshot` frame has landed for this (epicId, chatId).
+   * S5 (C, F1 fix): distinguishes "not yet observed" from "observed and
+   * unblocked" — `INITIAL_STATE` has `pendingApprovals: []` etc. BEFORE any
+   * snapshot arrives, so a naive `blocked` boolean can't tell those apart on
+   * its own. Consumers doing blocked-transition detection must gate on this
+   * (see `notifications.ts`'s `detectBlockedTransitions`) or an already-blocked
+   * chat's first snapshot reads as a false→true flip and fires a spurious
+   * notification.
+   */
+  readonly hasSnapshot: boolean;
 }
 
 // Stable pending keys. Tool- and file-edit approvalIds share a namespace on the
@@ -102,6 +114,8 @@ interface ChatState {
   readonly replies: Readonly<Record<string, ReplyStatus>>;
   // clientActionId → pending key, so an `actionAck` can find the item it acks.
   readonly ackIndex: Readonly<Record<string, string>>;
+  /** S5 (C, F1 fix): true once the first `snapshot` frame has landed. */
+  readonly hasSnapshot: boolean;
 }
 
 const INITIAL_STATE: ChatState = {
@@ -113,6 +127,7 @@ const INITIAL_STATE: ChatState = {
   pendingInterviews: [],
   replies: {},
   ackIndex: {},
+  hasSnapshot: false,
 };
 
 type ChatEvent =
@@ -187,6 +202,7 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         pendingInterviews: snap.pendingInterviews,
         replies,
         ackIndex,
+        hasSnapshot: true,
       };
     }
     case "turnState":
@@ -369,12 +385,22 @@ export function useChat(
     });
     streamRef.current = handle.stream;
 
-    setConnection(handle.connection.getState());
+    let currentState = handle.connection.getState();
+    setConnection(currentState);
     const unsubscribe = handle.connection.subscribe(() => {
-      setConnection(handle.connection.getState());
+      currentState = handle.connection.getState();
+      setConnection(currentState);
+    });
+
+    // S5 (A): force a fast reconnect on wake signals instead of waiting out
+    // the raw backoff ceiling. One instance per mounted chat view.
+    const stopLivenessRecovery = startLivenessRecovery({
+      reconnect: (reason) => streamConnection.reconnectAll(reason),
+      isLive: () => currentState === "live",
     });
 
     return () => {
+      stopLivenessRecovery();
       unsubscribe();
       handle.stream.close();
       streamRef.current = null;
@@ -451,5 +477,6 @@ export function useChat(
     resolveInterview,
     replyStatusFor,
     sendReply,
+    hasSnapshot: state.hasSnapshot,
   };
 }

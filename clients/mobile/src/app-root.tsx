@@ -24,6 +24,7 @@ import { HostClientProvider } from "@/host/host-client-context";
 import { HostStreamConnection } from "@/host/stream-connection";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { App } from "@/App";
+import { VersionPromptBanner } from "@/views/version-prompt-banner";
 
 export function AppRoot(): ReactElement {
   const [auth] = useState(
@@ -64,6 +65,9 @@ export function AppRoot(): ReactElement {
           <App auth={auth} />
         </StreamConnectionProvider>
       </HostClientProvider>
+      {/* Auth-independent: installability/update prompt applies from the
+          sign-in screen onward, not just once signed in. */}
+      <VersionPromptBanner />
     </QueryClientProvider>
   );
 }

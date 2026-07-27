@@ -111,10 +111,12 @@ export interface FakeChatSession {
 }
 
 export interface FakeStreamConnection {
-  /** Cast to the `HostStreamConnection` the provider expects (uses only openEpic/openChat). */
+  /** Cast to the `HostStreamConnection` the provider expects (uses only openEpic/openChat/reconnectAll). */
   readonly connection: HostStreamConnection;
   readonly epicSessions: FakeEpicSession[];
   readonly chatSessions: FakeChatSession[];
+  /** S5: records every `reconnectAll(reason)` call the liveness-recovery wiring makes. */
+  readonly reconnectAll: ReturnType<typeof vi.fn>;
 }
 
 /**
@@ -128,8 +130,10 @@ export interface FakeStreamConnection {
 export function createFakeStreamConnection(): FakeStreamConnection {
   const epicSessions: FakeEpicSession[] = [];
   const chatSessions: FakeChatSession[] = [];
+  const reconnectAll = vi.fn();
 
   const connection = {
+    reconnectAll,
     openEpic(params: { epicId: string; callbacks: EpicStreamCallbacks }) {
       const store = new StreamConnectionStateStore();
       const close = vi.fn();
@@ -161,5 +165,5 @@ export function createFakeStreamConnection(): FakeStreamConnection {
     },
   } as unknown as HostStreamConnection;
 
-  return { connection, epicSessions, chatSessions };
+  return { connection, epicSessions, chatSessions, reconnectAll };
 }

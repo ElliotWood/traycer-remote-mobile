@@ -28,6 +28,7 @@ import * as Y from "yjs";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
+import { startLivenessRecovery } from "./liveness-recovery";
 
 /** One chat enumerated from the epic doc — the minimum a row + badge needs. */
 export interface EpicChatEntry {
@@ -144,13 +145,24 @@ export function useEpicDoc(
       callbacks: makeEpicDocCallbacks(doc, refresh),
     });
 
-    setConnection(handle.connection.getState());
+    let currentState = handle.connection.getState();
+    setConnection(currentState);
     const unsubscribe = handle.connection.subscribe(() => {
-      setConnection(handle.connection.getState());
+      currentState = handle.connection.getState();
+      setConnection(currentState);
+    });
+
+    // S5 (A): force a fast reconnect on wake signals instead of waiting out
+    // the raw backoff ceiling. One instance per mounted epic view — never
+    // per-badge-stream (see liveness-recovery.ts's module doc).
+    const stopLivenessRecovery = startLivenessRecovery({
+      reconnect: (reason) => streamConnection.reconnectAll(reason),
+      isLive: () => currentState === "live",
     });
 
     return () => {
       disposed = true;
+      stopLivenessRecovery();
       unsubscribe();
       handle.stream.close();
       doc.destroy();

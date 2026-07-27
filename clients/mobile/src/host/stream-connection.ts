@@ -279,6 +279,17 @@ export class HostStreamConnection {
     return openChatStream(this.client, params);
   }
 
+  /**
+   * Forces every open session (the epic stream AND every per-chat badge/chat
+   * stream, since they share this one client) to drop and immediately re-dial.
+   * S5 passthrough to `WsStreamClient.reconnectAll` — the transport already
+   * built this for gui-app's device-wake case; mobile's `liveness-recovery`
+   * wires it to focus/visibility/online signals. No-op on a closed client.
+   */
+  reconnectAll(reason: string): void {
+    this.client.reconnectAll(reason);
+  }
+
   /** Tears down every open session and stops reconnecting. Idempotent. */
   close(reason: string): void {
     this.unsubscribeBearerRotation();
