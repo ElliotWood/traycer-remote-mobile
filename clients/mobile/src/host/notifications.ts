@@ -16,9 +16,23 @@ export type NotificationPermissionState =
   | "denied"
   | "unsupported";
 
-/** `"unsupported"` when the `Notification` API doesn't exist in this runtime. */
+/**
+ * Service Worker + the Notification API are both hard-disabled by browsers
+ * outside a secure context (HTTPS or localhost) — on the phone's tailnet
+ * `http://` origin, `window.Notification` can still exist as a constructor
+ * (so a naive `typeof Notification === "undefined"` check misses it), but
+ * `requestPermission()` either silently rejects or resolves without ever
+ * showing the native prompt, so tapping "Enable alerts" visibly does
+ * nothing. Callers use this to degrade honestly (hide the button / show an
+ * explanation) instead of shipping a dead affordance.
+ */
+export function isNotificationsSecureContextBlocked(): boolean {
+  return typeof window !== "undefined" && window.isSecureContext === false;
+}
+
+/** `"unsupported"` when the `Notification` API doesn't exist in this runtime, OR the page isn't in a secure context (see `isNotificationsSecureContextBlocked`). */
 export function getNotificationPermission(): NotificationPermissionState {
-  if (typeof Notification === "undefined") {
+  if (typeof Notification === "undefined" || isNotificationsSecureContextBlocked()) {
     return "unsupported";
   }
   return Notification.permission;
@@ -30,7 +44,7 @@ export function getNotificationPermission(): NotificationPermissionState {
  * not tied to a user gesture, and an unprompted popup reads as spam).
  */
 export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
-  if (typeof Notification === "undefined") {
+  if (typeof Notification === "undefined" || isNotificationsSecureContextBlocked()) {
     return "unsupported";
   }
   try {
