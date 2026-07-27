@@ -115,9 +115,39 @@ describe("CommentsPanel", () => {
     );
 
     await screen.findAllByTestId("comment-thread-card");
+    // Default filter is "Open" (matches desktop) — the resolved thread is
+    // hidden until "All" is selected.
+    await userEvent.setup().click(screen.getByRole("tab", { name: "All" }));
+    await screen.findAllByTestId("comment-thread-card");
     expect(screen.getAllByRole("button", { name: "Resolve" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Reopen" })).toHaveLength(1);
-    expect(screen.getByText("Resolved")).toBeTruthy();
+    // `{ selector: "span" }` disambiguates the resolved-thread badge from the
+    // "Resolved" filter TAB, which is also present (and also reads "Resolved").
+    expect(screen.getByText("Resolved", { selector: "span" })).toBeTruthy();
+  });
+
+  it("Open/Resolved/All filter tabs partition threads correctly, defaulting to Open", async () => {
+    mount(() =>
+      Promise.resolve({
+        threads: [
+          thread({ threadId: "open", resolved: false }),
+          thread({ threadId: "closed", resolved: true, createdAt: 2 }),
+        ],
+      }),
+    );
+
+    // Default: only the open thread renders.
+    await screen.findAllByTestId("comment-thread-card");
+    expect(screen.getAllByTestId("comment-thread-card")).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: "Open" }).getAttribute("aria-selected")).toBe("true");
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Resolved" }));
+    expect(screen.getAllByTestId("comment-thread-card")).toHaveLength(1);
+    expect(screen.getAllByTestId("comment-thread-card")[0]?.dataset.resolved).toBe("true");
+
+    await user.click(screen.getByRole("tab", { name: "All" }));
+    expect(screen.getAllByTestId("comment-thread-card")).toHaveLength(2);
   });
 
   it("disables Add comment on empty/whitespace text and calls the RPC with plainTextContent + empty quotedText", async () => {

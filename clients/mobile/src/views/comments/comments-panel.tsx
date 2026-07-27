@@ -58,6 +58,30 @@ interface ConnectedCommentsPanelProps extends CommentsPanelProps {
   readonly client: MobileHostClient;
 }
 
+/** P3: matches desktop's comment-sidebar filter values (`comment-filter-utils.ts`). */
+type CommentThreadStatusFilter = "open" | "resolved" | "all";
+
+const FILTER_TABS: readonly { readonly value: CommentThreadStatusFilter; readonly label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "resolved", label: "Resolved" },
+  { value: "all", label: "All" },
+];
+
+/** Purely client-side over the already-fetched threads — no separate query/param, mirrors desktop's `filterThreadsByStatus`. */
+function filterThreadsByStatus(
+  threads: readonly CommentThreadWire[],
+  filter: CommentThreadStatusFilter,
+): readonly CommentThreadWire[] {
+  switch (filter) {
+    case "all":
+      return threads;
+    case "open":
+      return threads.filter((t) => !t.resolved);
+    case "resolved":
+      return threads.filter((t) => t.resolved);
+  }
+}
+
 function ConnectedCommentsPanelBody({
   client,
   epicId,
@@ -69,6 +93,9 @@ function ConnectedCommentsPanelBody({
     artifactType,
     artifactId,
   });
+  // Default "open" mirrors desktop — a resolved thread is done business, not
+  // the first thing a user should have to scroll past.
+  const [filter, setFilter] = useState<CommentThreadStatusFilter>("open");
 
   if (isLoading) {
     return <p style={{ color: colors.muted }}>Loading comments…</p>;
@@ -91,6 +118,8 @@ function ConnectedCommentsPanelBody({
     );
   }
 
+  const visibleThreads = filterThreadsByStatus(threads, filter);
+
   return (
     <>
       <h1 style={{ fontSize: 18, margin: "0 0 12px" }}>Comments</h1>
@@ -102,9 +131,26 @@ function ConnectedCommentsPanelBody({
         artifactId={artifactId}
       />
 
-      {threads.length > 0 ? (
+      {threads.length > 0 && (
+        <div role="tablist" aria-label="Filter comment threads" style={filterTabsStyle}>
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={filter === tab.value}
+              onClick={() => setFilter(tab.value)}
+              style={filterTabStyle(filter === tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {visibleThreads.length > 0 ? (
         <ul style={threadListStyle}>
-          {threads.map((thread) => (
+          {visibleThreads.map((thread) => (
             <ThreadCard
               key={thread.threadId}
               client={client}
@@ -115,6 +161,10 @@ function ConnectedCommentsPanelBody({
             />
           ))}
         </ul>
+      ) : threads.length > 0 ? (
+        <p style={{ color: colors.muted, fontSize: 13 }}>
+          No {filter === "all" ? "" : filter} threads.
+        </p>
       ) : null}
     </>
   );
@@ -394,6 +444,28 @@ const resolvedBadgeStyle: CSSProperties = {
 };
 
 const composerSectionStyle: CSSProperties = { marginBottom: 20 };
+
+const filterTabsStyle: CSSProperties = {
+  display: "flex",
+  gap: 4,
+  marginBottom: 12,
+};
+
+function filterTabStyle(active: boolean): CSSProperties {
+  return {
+    minHeight: 32,
+    padding: "4px 12px",
+    fontSize: 13,
+    fontWeight: 600,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: active ? colors.accent : colors.border,
+    background: active ? colors.accent : "transparent",
+    color: active ? "var(--primary-foreground)" : colors.muted,
+    cursor: "pointer",
+  };
+}
 
 const textareaStyle: CSSProperties = {
   width: "100%",

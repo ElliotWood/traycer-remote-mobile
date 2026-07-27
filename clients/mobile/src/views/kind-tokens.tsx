@@ -141,6 +141,42 @@ export function StatusDot({ kind, status }: StatusDotProps): ReactElement | null
   );
 }
 
+/**
+ * P3 — the artifact-detail header's status pill: dot + label, mirroring
+ * desktop's `StatusPill` (`ticket-tile.tsx`). Read-only (mobile has no
+ * status-editing UI yet) — a static chip, not the desktop dropdown trigger.
+ * Same ticket/story-only gating as `StatusDot`.
+ */
+export function StatusPill({ kind, status }: StatusDotProps): ReactElement | null {
+  if (!showsStatusDot(kind, status)) return null;
+  const dotColor = STATUS_DOT_COLORS[status as ArtifactStatus];
+  return (
+    <span
+      data-testid="status-pill"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderStyle: "solid",
+        borderColor: colors.border,
+        background: hexToRgba(dotColor, 0.08),
+        padding: "4px 10px",
+        fontSize: 12,
+        fontWeight: 600,
+        color: colors.text,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0 }}
+      />
+      {STATUS_LABELS[status as ArtifactStatus]}
+    </span>
+  );
+}
+
 const ICON_TILE_SIZE = 32;
 
 export interface KindCardProps {

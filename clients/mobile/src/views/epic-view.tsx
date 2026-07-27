@@ -150,7 +150,9 @@ export function EpicView({
         <ArtifactBodyView
           epicId={epicId}
           artifact={artifact}
+          artifacts={artifacts}
           artifactRooms={artifactRooms}
+          onOpenArtifact={(artifactId) => setDrill({ kind: "artifact-body", artifactId })}
           onBack={() => setDrill(null)}
         />
       );

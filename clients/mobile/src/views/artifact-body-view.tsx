@@ -13,27 +13,36 @@ import type { ReactElement } from "react";
 import type { ArtifactRoomRegistry } from "@/host/artifact-room-registry";
 import { useArtifactBody, type ArtifactBodyState } from "@/host/use-artifact-body";
 import type { EpicArtifactEntry } from "@/host/use-epic-doc";
+import { ArtifactChildIndex } from "./artifact-child-index";
 import { CommentsPanelBody } from "./comments/comments-panel";
-import { KIND_COLORS, KIND_ICONS, StatusDot, displayArtifactTitle } from "./kind-tokens";
+import { KIND_COLORS, KIND_ICONS, StatusPill, displayArtifactTitle } from "./kind-tokens";
 import { MobileMarkdown } from "./markdown/mobile-markdown";
 import { colors, screen, secondaryButton } from "./ui";
 
 interface ArtifactBodyViewProps {
   readonly epicId: string;
   readonly artifact: EpicArtifactEntry;
+  /** P3: the epic's full artifact list, so the child-index below the body can find this artifact's children without a separate query. */
+  readonly artifacts: readonly EpicArtifactEntry[];
   readonly artifactRooms: ArtifactRoomRegistry | null;
+  /** P3: navigates to a child artifact (opens it in the SAME drill-in, replacing the current one). */
+  readonly onOpenArtifact: (artifactId: string) => void;
   readonly onBack: () => void;
 }
 
 export function ArtifactBodyView({
   epicId,
   artifact,
+  artifacts,
   artifactRooms,
+  onOpenArtifact,
   onBack,
 }: ArtifactBodyViewProps): ReactElement {
   const body = useArtifactBody(artifactRooms, artifact.artifactRoomId, artifact.id);
   const Icon = KIND_ICONS[artifact.kind];
   const color = KIND_COLORS[artifact.kind];
+  const showsStatus =
+    artifact.status !== null && (artifact.kind === "ticket" || artifact.kind === "story");
 
   return (
     <main style={screen}>
@@ -45,15 +54,22 @@ export function ArtifactBodyView({
         ← Back
       </button>
 
-      <header style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <header style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <Icon size={20} color={color} aria-hidden="true" />
         <h1 style={{ fontSize: 18, margin: 0, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
           {displayArtifactTitle(artifact.title, artifact.kind)}
         </h1>
-        <StatusDot kind={artifact.kind} status={artifact.status ?? undefined} />
       </header>
 
+      {showsStatus && (
+        <div style={{ marginBottom: 16 }}>
+          <StatusPill kind={artifact.kind} status={artifact.status ?? undefined} />
+        </div>
+      )}
+
       <ArtifactBodyContent state={body} />
+
+      <ArtifactChildIndex parentId={artifact.id} artifacts={artifacts} onOpen={onOpenArtifact} />
 
       <hr style={{ border: 0, borderTop: `1px solid ${colors.border}`, margin: "24px 0" }} />
 
