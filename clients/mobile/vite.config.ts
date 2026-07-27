@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
@@ -11,6 +12,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     // S5 (B): installable PWA + "new version" prompt. `injectManifest` (not
     // `generateSW`) because `src/sw.ts` needs to own the `notificationclick`
     // handler (§C) — a `generateSW`-produced opaque SW couldn't host it, so

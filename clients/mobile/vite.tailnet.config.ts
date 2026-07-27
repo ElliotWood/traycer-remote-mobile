@@ -3,6 +3,7 @@
 // binds ONLY the Tailscale interface and proxies /authn (HTTP) + /rpc + /stream
 // (WebSocket) so a phone on the tailnet loads app + authn + host WS from ONE
 // origin (what the D4 host will eventually do). Mirrors vite.config.ts aliases.
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
@@ -19,6 +20,7 @@ export default defineConfig({
   // comes from a production build.
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       strategies: "injectManifest",
       srcDir: "src",

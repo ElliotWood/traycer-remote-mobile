@@ -1,5 +1,13 @@
 <!doctype html>
-<html lang="en">
+<!--
+  `class="dark" data-theme="traycer-green"` — mobile has exactly one theme
+  (no theme switcher, unlike desktop's `theme-applier` + settings store), so
+  these are hardcoded rather than set at runtime. Without BOTH attributes,
+  global.css's `:root`/`.dark` tokens are a neutral GRAYSCALE fallback —
+  the teal/near-black palette only activates under
+  `.dark[data-theme="traycer-green"]` (Evaluator finding).
+-->
+<html lang="en" class="dark" data-theme="traycer-green">
   <head>
     <meta charset="UTF-8" />
     <meta
