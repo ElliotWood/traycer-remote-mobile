@@ -9,7 +9,11 @@
  * projector. Framework-agnostic (no React) so they unit-test directly.
  */
 import type { Message } from "@traycer/protocol/persistence/epic/messages";
-import type { InterviewBlock } from "@traycer/protocol/persistence/epic/content-blocks";
+import type {
+  ContentBlock,
+  InterviewBlock,
+  TodoItem,
+} from "@traycer/protocol/persistence/epic/content-blocks";
 import type { TokenUsage } from "@traycer/protocol/persistence/epic/foundation";
 
 export type { InterviewBlock } from "@traycer/protocol/persistence/epic/content-blocks";
@@ -86,4 +90,78 @@ export function lastAssistantTurn(messages: readonly ChatMessage[]): LastAssista
     };
   }
   return null;
+}
+
+/** Lower-dock Todo panel: the pinned snapshot — the active item plus a done/total/cancelled tally. */
+export interface PinnedTodoSnapshot {
+  readonly items: readonly TodoItem[];
+  readonly activeItem: TodoItem | null;
+  readonly doneCount: number;
+  readonly totalCount: number;
+  readonly cancelledCount: number;
+}
+
+/**
+ * Derives the lower dock's Todo panel purely from THIS chat's own block
+ * stream (confirmed against desktop's `chat-pinned-todos.ts`: it reads the
+ * SAME chat's rendered messages, not epic-wide data — unlike the active-
+ * agents panel below, which needs the epic tree and is deferred for that
+ * reason). Folds two block kinds already present in a single chat's
+ * `chat.subscribe` snapshot:
+ *   - a `todo`-type block's `items` fully REPLACE the running snapshot
+ *     (mirrors desktop: a semantic todo segment always outranks/resets the
+ *     task-list accumulation).
+ *   - a `tool_call` block's `taskTodoItems` (TaskCreate/TaskUpdate, parsed
+ *     on the host) are folded item-by-item into the running snapshot by id.
+ *
+ * Simplified vs. desktop: does not reset accumulation on the first `create`
+ * after a user turn (desktop's `applyParsedTaskTodoItems` does) — a chat
+ * with two genuinely UNRELATED todo lists back-to-back could merge them
+ * here. Flagged, not silently wrong: acceptable for a phone's at-a-glance
+ * summary — the full chat always has the real per-block detail. An item
+ * with a `null` id (can't be tracked/upserted) is skipped from the
+ * accumulation.
+ */
+export function pinnedTodoSnapshot(
+  messages: readonly ChatMessage[],
+  liveBlocks: readonly ContentBlock[],
+): PinnedTodoSnapshot | null {
+  let running = new Map<string, TodoItem>();
+  let sawAny = false;
+
+  const allBlocks: readonly ContentBlock[] = [
+    ...messages.filter((m) => m.role === "assistant").flatMap((m) => m.blocks),
+    ...liveBlocks,
+  ];
+
+  for (const block of allBlocks) {
+    if (block.type === "todo") {
+      sawAny = true;
+      running = new Map(block.items.map((item) => [item.id ?? item.text, item]));
+    } else if (block.type === "tool_call" && block.taskTodoItems !== null) {
+      for (const raw of block.taskTodoItems) {
+        if (raw.id === null) continue;
+        sawAny = true;
+        const prev = running.get(raw.id);
+        running.set(raw.id, {
+          id: raw.id,
+          text: raw.text ?? prev?.text ?? "",
+          status: raw.action === "cancel" ? "cancelled" : (raw.status ?? prev?.status ?? "pending"),
+          priority: raw.priority ?? prev?.priority ?? null,
+          activeForm: raw.activeForm ?? prev?.activeForm ?? null,
+        });
+      }
+    }
+  }
+
+  if (!sawAny || running.size === 0) return null;
+  const items = [...running.values()];
+  const activeItem = items.find((i) => i.status === "in_progress") ?? null;
+  return {
+    items,
+    activeItem,
+    doneCount: items.filter((i) => i.status === "completed").length,
+    totalCount: items.length,
+    cancelledCount: items.filter((i) => i.status === "cancelled").length,
+  };
 }

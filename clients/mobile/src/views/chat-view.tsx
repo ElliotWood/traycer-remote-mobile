@@ -35,7 +35,7 @@ import {
   type ReplyStatus,
   type UseChatResult,
 } from "@/host/use-chat";
-import { lastAssistantTurn, type InterviewBlock } from "@/host/chat-projection";
+import { lastAssistantTurn, pinnedTodoSnapshot, type InterviewBlock } from "@/host/chat-projection";
 import type {
   ChatApprovalState,
   ChatFileEditApprovalState,
@@ -183,6 +183,10 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
   const canMutate = hostClient !== null && connectionLive && chat.accessRole === "owner";
   const isRunning = chat.runStatus === "running" || chat.runStatus === "stopping";
   const turn = useMemo(() => lastAssistantTurn(chat.transcriptMessages), [chat.transcriptMessages]);
+  const todoSnapshot = useMemo(
+    () => pinnedTodoSnapshot(chat.transcriptMessages, chat.liveTurnBlocks),
+    [chat.transcriptMessages, chat.liveTurnBlocks],
+  );
 
   return (
     <div style={chatLayoutStyle}>
@@ -239,6 +243,7 @@ export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps
       <footer style={footerStyle}>
         {hasPending && <PendingSection chat={chat} />}
         <LowerDock
+          todoSnapshot={todoSnapshot}
           queue={chat.queue}
           backgroundItems={chat.backgroundItems}
           accumulatedFileChanges={chat.accumulatedFileChanges}

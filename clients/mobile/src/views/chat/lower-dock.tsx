@@ -1,7 +1,7 @@
 /**
- * P2 — orchestrates the lower-dock panels above the composer: queue,
- * background items, accumulated changes. Each panel returns `null` when
- * empty, so the dock takes zero space when there's nothing to show.
+ * P2/P2.1 — orchestrates the lower-dock panels above the composer: todo,
+ * queue, background items, accumulated changes. Each panel returns `null`
+ * when empty, so the dock takes zero space when there's nothing to show.
  *
  * UX fix (user feedback): the FULL dock used to render open by default and
  * could push the composer/transcript out of view. Collapsed by default now
@@ -11,26 +11,32 @@
  *
  * Active-agents summary is DEFERRED, flagged not hollow: desktop sources it
  * from the epic-wide `useEpicActiveAgentIds` (the in-process canvas store's
- * aggregate over ALL descendant chats), which needs the epic's chat tree —
- * `ChatView` only has this ONE chat's own stream, not the tree. Building a
- * faithful descendant-aware panel would mean threading the epic tree into
- * ChatView (a real architecture change), which the P2 contract's Evaluator
- * tighten explicitly said to defer rather than fake with a hollow count.
+ * aggregate over ALL descendant chats, unioning Yjs presence-awareness
+ * across every host — confirmed via a dedicated research pass, not a guess).
+ * `ChatView` only has this ONE chat's own stream, not the epic tree or
+ * cross-host awareness. Building a faithful descendant-aware panel would
+ * mean threading the epic tree AND a new awareness subsystem into ChatView
+ * — a real architecture change, out of scope for this pass; the Todo panel
+ * below is the piece of the same ask that WAS reachable from a single
+ * chat's own stream (confirmed via the same research pass).
  */
 import { useMemo, useState, type ReactElement } from "react";
-import { ChevronDown, ChevronUp, FileDiff, ListOrdered, Radio } from "lucide-react";
+import { CheckSquare, ChevronDown, ChevronUp, FileDiff, ListOrdered, Radio } from "lucide-react";
 import type {
   BackgroundItem,
   ChatAccumulatedFileChange,
   ChatQueuedItem,
   ChatQueueState,
 } from "@traycer/protocol/host/agent/gui/subscribe";
+import type { PinnedTodoSnapshot } from "@/host/chat-projection";
 import { radius, theme, type } from "@/views/design-tokens";
 import { AccumulatedChangesPanel } from "./accumulated-changes-panel";
 import { BackgroundItemsPanel } from "./background-items-panel";
+import { PinnedTodoPanel } from "./pinned-todo-panel";
 import { QueuePanel } from "./queue-panel";
 
 export interface LowerDockProps {
+  readonly todoSnapshot: PinnedTodoSnapshot | null;
   readonly queue: ChatQueueState;
   readonly backgroundItems: readonly BackgroundItem[] | undefined;
   readonly accumulatedFileChanges: readonly ChatAccumulatedFileChange[];
@@ -51,6 +57,13 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
 
   const chips = useMemo(() => {
     const out: { readonly key: string; readonly icon: typeof ListOrdered; readonly label: string }[] = [];
+    if (props.todoSnapshot !== null) {
+      out.push({
+        key: "todo",
+        icon: CheckSquare,
+        label: `${props.todoSnapshot.doneCount}/${props.todoSnapshot.totalCount} done`,
+      });
+    }
     if (props.queue.items.length > 0) {
       out.push({ key: "queue", icon: ListOrdered, label: `${props.queue.items.length} queued` });
     }
@@ -65,7 +78,7 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
       });
     }
     return out;
-  }, [props.queue.items.length, props.backgroundItems, props.accumulatedFileChanges.length]);
+  }, [props.todoSnapshot, props.queue.items.length, props.backgroundItems, props.accumulatedFileChanges.length]);
 
   if (chips.length === 0) return null;
 
@@ -103,6 +116,7 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
 
       {expanded && (
         <div style={{ border: `1px solid ${theme.borderHairline}`, borderTop: "none", borderRadius: `0 0 ${radius.lg}px ${radius.lg}px`, padding: 6 }}>
+          {props.todoSnapshot !== null && <PinnedTodoPanel snapshot={props.todoSnapshot} />}
           <QueuePanel
             queue={props.queue}
             canMutate={props.canMutate}
