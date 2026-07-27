@@ -37,6 +37,7 @@ import { ArtifactBodyView } from "./artifact-body-view";
 import { colors, screen, secondaryButton } from "./ui";
 
 interface ArtifactTreeViewProps {
+  readonly epicId: string;
   readonly artifacts: readonly EpicArtifactEntry[];
   readonly artifactRooms: ArtifactRoomRegistry | null;
   readonly connection: StreamConnectionState;
@@ -49,6 +50,7 @@ const CHEVRON_HIT = 44;
 const INDENT_PX = 16;
 
 export function ArtifactTreeView({
+  epicId,
   artifacts,
   artifactRooms,
   connection,
@@ -77,6 +79,7 @@ export function ArtifactTreeView({
   if (openArtifact !== null) {
     return (
       <ArtifactBodyView
+        epicId={epicId}
         artifact={openArtifact}
         artifactRooms={artifactRooms}
         onBack={() => setOpenArtifactId(null)}

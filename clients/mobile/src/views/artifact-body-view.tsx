@@ -1,27 +1,32 @@
 /**
- * Read-only artifact body (Mobile v2, Sprint 3 / M6).
+ * Read-only artifact body (Mobile v2, Sprint 3 / M6, + Sprint 4 integration).
  *
  * Header = kind icon/color + title + status dot (Sprint 1's `kind-tokens`);
  * body = `useArtifactBody`'s state rendered via Sprint 1's `MobileMarkdown`
  * (markdown + mermaid + wireframe), with an explicit, never-blank message
  * for every degraded state (rubric §3: "artifact-room unavailable -> clear
- * message, not blank").
+ * message, not blank"). Below the body: Sprint 4's `CommentsPanelBody`
+ * (embedded, no page chrome of its own) — the artifact body screen is
+ * comments' real home, not the standalone `?comments=` harness route.
  */
 import type { ReactElement } from "react";
 import type { ArtifactRoomRegistry } from "@/host/artifact-room-registry";
 import { useArtifactBody, type ArtifactBodyState } from "@/host/use-artifact-body";
 import type { EpicArtifactEntry } from "@/host/use-epic-doc";
+import { CommentsPanelBody } from "./comments/comments-panel";
 import { KIND_COLORS, KIND_ICONS, StatusDot, displayArtifactTitle } from "./kind-tokens";
 import { MobileMarkdown } from "./markdown/mobile-markdown";
 import { colors, screen, secondaryButton } from "./ui";
 
 interface ArtifactBodyViewProps {
+  readonly epicId: string;
   readonly artifact: EpicArtifactEntry;
   readonly artifactRooms: ArtifactRoomRegistry | null;
   readonly onBack: () => void;
 }
 
 export function ArtifactBodyView({
+  epicId,
   artifact,
   artifactRooms,
   onBack,
@@ -49,6 +54,14 @@ export function ArtifactBodyView({
       </header>
 
       <ArtifactBodyContent state={body} />
+
+      <hr style={{ border: 0, borderTop: `1px solid ${colors.border}`, margin: "24px 0" }} />
+
+      <CommentsPanelBody
+        epicId={epicId}
+        artifactType={artifact.kind}
+        artifactId={artifact.id}
+      />
     </main>
   );
 }

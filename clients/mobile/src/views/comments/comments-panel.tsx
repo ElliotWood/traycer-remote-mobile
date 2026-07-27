@@ -7,9 +7,11 @@
  * Deliberately embeddable: props are exactly `{epicId, artifactType,
  * artifactId}` — the client itself comes from `useHostClientOrNull()`
  * (matching `EpicView`/`ChatView`'s pattern of sourcing shared services from
- * context, not props), so a future artifact view (Sprint 3) can mount this
- * directly. This sprint proves it via a standalone harness route
- * (`app-shell.tsx`'s `?comments=1&epicId=&artifactType=&artifactId=`).
+ * context, not props). `CommentsPanel` is the standalone full-page shell (the
+ * harness route, `app-shell.tsx`'s `?comments=1&epicId=&artifactType=&
+ * artifactId=`); `CommentsPanelBody` is the same content WITHOUT the `<main>`
+ * page chrome, for embedding inline inside another screen's own `<main>` —
+ * Sprint 3's `ArtifactBodyView` is that real embed (integration wiring).
  *
  * Every thread renders always-expanded (no collapse/expand toggle) - mobile
  * has no sidebar real-estate pressure to manage, so desktop's collapsed-by-
@@ -36,22 +38,27 @@ export interface CommentsPanelProps {
 }
 
 export function CommentsPanel(props: CommentsPanelProps): ReactElement {
+  return (
+    <main style={screen}>
+      <CommentsPanelBody {...props} />
+    </main>
+  );
+}
+
+/** Same content as `CommentsPanel`, without the `<main>` page chrome — for embedding inline (Sprint 3's `ArtifactBodyView`). */
+export function CommentsPanelBody(props: CommentsPanelProps): ReactElement {
   const client = useHostClientOrNull();
   if (client === null) {
-    return (
-      <main style={screen}>
-        <p style={{ color: colors.muted }}>Not connected to a host.</p>
-      </main>
-    );
+    return <p style={{ color: colors.muted }}>Not connected to a host.</p>;
   }
-  return <ConnectedCommentsPanel {...props} client={client} />;
+  return <ConnectedCommentsPanelBody {...props} client={client} />;
 }
 
 interface ConnectedCommentsPanelProps extends CommentsPanelProps {
   readonly client: MobileHostClient;
 }
 
-function ConnectedCommentsPanel({
+function ConnectedCommentsPanelBody({
   client,
   epicId,
   artifactType,
@@ -64,16 +71,12 @@ function ConnectedCommentsPanel({
   });
 
   if (isLoading) {
-    return (
-      <main style={screen}>
-        <p style={{ color: colors.muted }}>Loading comments…</p>
-      </main>
-    );
+    return <p style={{ color: colors.muted }}>Loading comments…</p>;
   }
 
   if (isError) {
     return (
-      <main style={screen}>
+      <>
         <p role="alert" style={{ color: colors.danger, marginBottom: 12 }}>
           Couldn't load comments.
         </p>
@@ -84,12 +87,12 @@ function ConnectedCommentsPanel({
         >
           Try again
         </button>
-      </main>
+      </>
     );
   }
 
   return (
-    <main style={screen}>
+    <>
       <h1 style={{ fontSize: 18, margin: "0 0 12px" }}>Comments</h1>
 
       <NewThreadComposer
@@ -113,7 +116,7 @@ function ConnectedCommentsPanel({
           ))}
         </ul>
       ) : null}
-    </main>
+    </>
   );
 }
 

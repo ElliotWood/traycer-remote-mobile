@@ -56,6 +56,7 @@ function renderTree(
 ) {
   return render(
     <ArtifactTreeView
+      epicId="e1"
       artifacts={artifacts}
       artifactRooms={opts.artifactRooms ?? new ArtifactRoomRegistry()}
       connection="live"

@@ -71,6 +71,7 @@ export function EpicView({
   if (browsingArtifacts) {
     return (
       <ArtifactTreeView
+        epicId={epicId}
         artifacts={artifacts}
         artifactRooms={artifactRooms}
         connection={connection}
