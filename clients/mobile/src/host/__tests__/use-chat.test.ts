@@ -52,10 +52,14 @@ function snapshotFrame(messages: readonly unknown[]) {
     kind: "snapshot",
     snapshot: {
       runStatus: "idle",
-      chat: { title: "Chat", messages },
+      chat: { title: "Chat", messages, settings: null },
+      access: { role: "owner", ownerUserId: "u1" },
+      queue: { status: "idle", items: [] },
       pendingApprovals: [],
       pendingFileEditApprovals: [],
       pendingInterviews: [],
+      accumulatedFileChanges: [],
+      activeTurn: null,
     },
   } as unknown as never;
 }
@@ -63,7 +67,7 @@ function snapshotFrame(messages: readonly unknown[]) {
 describe("useChat — snapshot/live-overlay reconciliation", () => {
   it("resets trailingMessages + liveTurn on a fresh snapshot: no duplicate messageId or blockId", () => {
     const fake = createFakeStreamConnection();
-    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1"));
+    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1", "u1"));
     const callbacks = () => fake.chatSessions[0].callbacks;
 
     // A: initial snapshot with one turn already persisted.
@@ -102,7 +106,7 @@ describe("useChat — snapshot/live-overlay reconciliation", () => {
 
   it("onMessageAccepted does not duplicate a message the snapshot already carries", () => {
     const fake = createFakeStreamConnection();
-    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1"));
+    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1", "u1"));
     const callbacks = () => fake.chatSessions[0].callbacks;
 
     act(() => {

@@ -41,10 +41,16 @@ function snapshotFrame(opts: Pendings): SnapshotFrame {
     kind: "snapshot",
     snapshot: {
       runStatus: opts.runStatus ?? "running",
-      chat: { title: opts.title ?? "Chat", messages: opts.messages ?? [] },
+      chat: { title: opts.title ?? "Chat", messages: opts.messages ?? [], settings: null },
+      access: { role: "owner", ownerUserId: "u1" },
+      queue: { status: "idle", items: [] },
       pendingApprovals: opts.approvals ?? [],
       pendingFileEditApprovals: opts.fileEditApprovals ?? [],
       pendingInterviews: opts.interviews ?? [],
+      accumulatedFileChanges: [],
+      activeTurn: null,
+      worktreeBinding: null,
+      missingWorktreePaths: [],
     },
   } as unknown as SnapshotFrame;
 }

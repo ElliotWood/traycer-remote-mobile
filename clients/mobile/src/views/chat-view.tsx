@@ -1,31 +1,31 @@
 /**
- * Chat detail view (T6, Flow 4): the payoff surface where a blocked agent gets
- * its answer from the phone.
+ * Chat detail view (T6, P2 desktop-fidelity rebuild).
  *
- * Streams one `chat.subscribe` (`useChat`) for the selected epic/chat and shows
- * `runStatus` + recent activity + connection state. When the agent is waiting on
- * the user it surfaces the pending item(s) prominently, in a stable priority
- * (interview → tool approval → file-edit approval), each wired to its OWN reply
- * frame:
- *   - tool approval      → Approve / Reject (`approvalDecision`)
- *   - file-edit approval → Approve / Reject, showing the file(s)/operation
- *     (`fileEditApprovalDecision` — a DISTINCT frame)
- *   - interview          → the resolved question + options, free-form or
- *     multi-select, submitting an `interviewAnswer`; a loading state (never an
- *     empty one) until the prompt block resolves from the chat tree.
+ * P2's core is the BOTTOM-ANCHORED layout (Planner clarification): the
+ * transcript flows top→bottom with the newest message at the bottom,
+ * scrolling in the region ABOVE a fixed footer; the footer holds the
+ * pending-approval/interview block, the lower dock (queue/background
+ * items/accumulated changes), and the composer, in that order, closest to
+ * the user's thumb. Auto-scrolls to bottom on open and on new content,
+ * UNLESS the user has scrolled up — then a "Jump to latest" chip appears
+ * instead of yanking their view.
  *
- * A reply is optimistic ("Submitting…") until the `actionAck` of record: an
- * `accepted` ack lets the streamed resolve-delta drop the item (agent unblocks);
- * a `rejected` ack shows an inline error against the still-true pending state.
+ * Streams one `chat.subscribe` (`useChat`) for the selected epic/chat. When
+ * the agent is waiting on the user, the pending item(s) surface in a stable
+ * priority (interview → tool approval → file-edit approval), each wired to
+ * its OWN reply frame — unchanged from T6/pre-P2, still covered by the same
+ * tests.
  */
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type ReactElement,
 } from "react";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
+import { useHostClientOrNull } from "@/host/host-client-context";
 import {
   approvalKey,
   fileEditKey,
@@ -34,15 +34,14 @@ import {
   type ReplyStatus,
   type UseChatResult,
 } from "@/host/use-chat";
-import type { InterviewBlock } from "@/host/chat-projection";
+import { lastAssistantTurn, type InterviewBlock } from "@/host/chat-projection";
 import type {
   ChatApprovalState,
   ChatFileEditApprovalState,
   ChatPendingInterviewState,
-  ChatRunStatus,
+  ChatQueuedItem,
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
-import type { StreamConnectionState } from "@/host/stream-connection";
 import { TranscriptView } from "./chat/transcript-view";
 import { useSettledConnectionState } from "@/host/use-settled-connection-state";
 import {
@@ -52,7 +51,15 @@ import {
 } from "@/host/notifications";
 import { NotificationPermissionButton } from "./notification-permission-button";
 import { markSeen } from "@/host/read-tracking-store";
-import { colors, screen, secondaryButton } from "./ui";
+import { Button, radius, theme, type } from "./design-tokens";
+import { ConnectionPill } from "./epic-tree/connection-pill";
+import { BranchChip } from "./chat/branch-chip";
+import { ContextUsageChip } from "./chat/context-usage-chip";
+import { RunIndicator } from "./chat/run-indicator";
+import { ElapsedFooter } from "./chat/elapsed-footer";
+import { ScrollToBottomChip } from "./chat/scroll-to-bottom-chip";
+import { LowerDock } from "./chat/lower-dock";
+import { Composer } from "./chat/composer";
 
 interface ChatViewProps {
   readonly epicId: string;
@@ -60,12 +67,16 @@ interface ChatViewProps {
   readonly onBack: () => void;
 }
 
+const SCROLL_BOTTOM_THRESHOLD_PX = 48;
+
 export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
-  const chat = useChat(streamConnection, epicId, chatId);
+  const hostClient = useHostClientOrNull();
+  const chat = useChat(streamConnection, epicId, chatId, hostClient?.getRequestContextUserId() ?? null);
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
   const displayConnection = useSettledConnectionState(chat.connection);
+  const connectionLive = displayConnection === "live";
 
   // P1 (Epic tree unread markers): the moment this chat is actually opened,
   // it reads as seen — clears any `done-unread`/`failed` ladder tier the
@@ -95,56 +106,198 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
     prevRef.current = next;
   }, [chat.hasSnapshot, hasPending, chat.title, epicId, chatId]);
 
-  return (
-    <main style={screen}>
-      <button
-        type="button"
-        style={{ ...secondaryButton, marginBottom: 16 }}
-        onClick={onBack}
-      >
-        ← Back
-      </button>
+  // ---- Bottom-anchored scroll (P2 core) ----
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
-      <header style={{ marginBottom: 12 }}>
-        <h1 style={{ fontSize: 20, margin: 0, wordBreak: "break-word" }}>
+  const scrollToBottom = (smooth: boolean): void => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    // jsdom (tests) has no `scrollTo` — fall back to the plain assignment,
+    // which every real DOM (and jsdom) supports.
+    if (typeof el.scrollTo === "function") {
+      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+    setIsAtBottom(true);
+  };
+
+  // Auto-scroll on open.
+  useEffect(() => {
+    scrollToBottom(false);
+    // Only on mount / chat switch — not a dependency on every transcript change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [epicId, chatId]);
+
+  // Auto-scroll on new content, but only while already at the bottom — a
+  // user who's scrolled up to read history never gets yanked back down.
+  useEffect(() => {
+    if (isAtBottom) scrollToBottom(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.transcriptMessages, chat.liveTurnBlocks]);
+
+  const handleScroll = (): void => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_BOTTOM_THRESHOLD_PX;
+    setIsAtBottom(atBottom);
+  };
+
+  // ---- Composer draft ----
+  const [draftText, setDraftText] = useState("");
+
+  const handleSend = (text: string, settings: Parameters<typeof chat.sendMessage>[0]["settings"]): void => {
+    chat.sendMessage({ text, settings });
+    setDraftText("");
+  };
+
+  const handleEditQueueItem = (item: ChatQueuedItem, text: string): void => {
+    chat.dispatchAction((base) => ({ ...base, kind: "queueCancel", queueItemId: item.queueItemId }));
+    setDraftText(text);
+  };
+
+  const [undoAllPending, setUndoAllPending] = useState(false);
+  const handleUndoAll = (): void => {
+    setUndoAllPending(true);
+    chat.dispatchAction((base) => ({
+      ...base,
+      kind: "revertFileChanges",
+      fromMessageId: null,
+      filePaths: null,
+      revertArtifacts: true,
+    }));
+    // No ack tracked for this frame today — clear the pending flag optimistically
+    // once the snapshot that follows resolves accumulatedFileChanges away.
+    setTimeout(() => setUndoAllPending(false), 3000);
+  };
+
+  const canMutate = hostClient !== null && connectionLive && chat.accessRole === "owner";
+  const isRunning = chat.runStatus === "running" || chat.runStatus === "stopping";
+  const turn = useMemo(() => lastAssistantTurn(chat.transcriptMessages), [chat.transcriptMessages]);
+
+  return (
+    <div style={chatLayoutStyle}>
+      <header style={headerStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Button variant="ghost" onClick={onBack}>
+            ← Back
+          </Button>
+        </div>
+        <h1 style={{ ...type.titleSm, margin: "6px 0 2px", color: theme.text, wordBreak: "break-word" }}>
           {chat.title || "Untitled chat"}
         </h1>
-        <RunStatusLine runStatus={chat.runStatus} blocked={hasPending} />
-        <ConnectionIndicator state={displayConnection} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <ConnectionPill state={displayConnection} />
+          <BranchChip binding={chat.worktreeBinding} missingWorktreePaths={chat.missingWorktreePaths} />
+          <ContextUsageChip usage={turn?.usage ?? null} />
+        </div>
       </header>
 
-      {chat.recentActivity !== "" && (
-        <p
-          style={{
-            color: colors.muted,
-            fontSize: 13,
-            margin: "0 0 16px",
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {chat.recentActivity}
-        </p>
-      )}
+      <div ref={scrollRef} onScroll={handleScroll} style={scrollAreaStyle}>
+        <NotificationPermissionButton compact />
+        <TranscriptView
+          messages={chat.transcriptMessages}
+          liveBlocks={chat.liveTurnBlocks}
+          epicId={epicId}
+          chatId={chatId}
+        />
+        {isRunning && (
+          <RunIndicator
+            seed={chat.activeTurn?.turnId ?? chatId}
+            runState={chat.activeTurn?.status === "stopping" || chat.runStatus === "stopping" ? "stopping" : "running"}
+          />
+        )}
+        {!isRunning && turn !== null && turn.replyText !== "" && turn.startedAt !== null && (
+          <ElapsedFooter
+            seed={turn.turnId ?? chatId}
+            elapsedMs={Math.max(0, turn.timestamp - turn.startedAt)}
+            stopped={false}
+            usage={turn.usage}
+            replyText={turn.replyText}
+          />
+        )}
+        <ScrollToBottomChip visible={!isAtBottom} onClick={() => scrollToBottom(true)} />
+      </div>
 
-      <NotificationPermissionButton />
-
-      {hasPending ? (
-        <PendingSection chat={chat} />
-      ) : (
-        <p style={{ color: colors.muted }}>
-          Nothing is waiting on you in this chat right now.
-        </p>
-      )}
-
-      <TranscriptView
-        messages={chat.transcriptMessages}
-        liveBlocks={chat.liveTurnBlocks}
-        epicId={epicId}
-        chatId={chatId}
-      />
-    </main>
+      <footer style={footerStyle}>
+        {hasPending && <PendingSection chat={chat} />}
+        <LowerDock
+          queue={chat.queue}
+          backgroundItems={chat.backgroundItems}
+          accumulatedFileChanges={chat.accumulatedFileChanges}
+          canMutate={canMutate}
+          undoAllPending={undoAllPending}
+          onUndoAll={handleUndoAll}
+          onStopBackgroundItem={(taskId) =>
+            chat.dispatchAction((base) => ({ ...base, kind: "stopBackgroundItem", taskId }))
+          }
+          onStopAllBackgroundItems={() =>
+            chat.dispatchAction((base) => ({ ...base, kind: "stopAllBackgroundItems" }))
+          }
+          onPauseQueue={() => chat.dispatchAction((base) => ({ ...base, kind: "pauseQueue" }))}
+          onResumeQueue={() => chat.dispatchAction((base) => ({ ...base, kind: "resumeQueue" }))}
+          onCancelQueueItem={(queueItemId) =>
+            chat.dispatchAction((base) => ({ ...base, kind: "queueCancel", queueItemId }))
+          }
+          onSteerQueueItemNow={(queueItemId) =>
+            chat.dispatchAction((base) => ({ ...base, kind: "queueSteerNow", queueItemId, newSettings: null }))
+          }
+          onEditQueueItem={handleEditQueueItem}
+        />
+        <Composer
+          epicId={epicId}
+          client={hostClient}
+          draftText={draftText}
+          onDraftTextChange={setDraftText}
+          chatSettings={chat.chatSettings}
+          canStop={isRunning}
+          stopping={chat.runStatus === "stopping"}
+          accessRole={chat.accessRole}
+          connectionLive={connectionLive}
+          sendDisabledHint={
+            !connectionLive ? "Reconnecting to the host…" : chat.accessRole === "viewer" ? "You have view-only access" : null
+          }
+          onSend={handleSend}
+          onStop={chat.stopTurn}
+        />
+      </footer>
+    </div>
   );
 }
+
+const chatLayoutStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  height: "100dvh",
+  maxWidth: 480,
+  margin: "0 auto",
+  background: theme.background,
+  color: theme.text,
+  fontFamily: "'Figtree Variable', Figtree, ui-sans-serif, system-ui, -apple-system, sans-serif",
+  overflow: "hidden",
+};
+
+const headerStyle: CSSProperties = {
+  flexShrink: 0,
+  padding: "10px 16px 8px",
+  borderBottom: `1px solid ${theme.borderHairline}`,
+};
+
+const scrollAreaStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
+  position: "relative",
+  padding: "8px 16px",
+};
+
+const footerStyle: CSSProperties = {
+  flexShrink: 0,
+  padding: "8px 16px 12px",
+  borderTop: `1px solid ${theme.borderHairline}`,
+  background: theme.background,
+};
 
 /**
  * Every pending block, in a stable priority so the ordering never jitters as
@@ -153,8 +306,8 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
  */
 function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElement {
   return (
-    <section>
-      <h2 style={{ fontSize: 15, margin: "0 0 8px", color: colors.danger }}>
+    <section style={{ marginBottom: 8 }}>
+      <h2 style={{ ...type.bodySm, fontWeight: 600, margin: "0 0 8px", color: theme.danger }}>
         Waiting on you
       </h2>
       {chat.pendingInterviews.map((interview) => (
@@ -210,7 +363,7 @@ function ApprovalCard({
       <div style={cardLabel}>
         {approval.kind === "plan" ? "Plan approval" : "Tool approval"}
         {" · "}
-        <span style={{ color: colors.text }}>{approval.toolName}</span>
+        <span style={{ color: theme.text }}>{approval.toolName}</span>
       </div>
       <p style={cardDescription}>{approval.description}</p>
       <ApproveRejectRow status={status} onDecide={onDecide} />
@@ -231,14 +384,14 @@ function FileEditApprovalCard({
   return (
     <article style={card}>
       <div style={cardLabel}>
-        File edit · <span style={{ color: colors.text }}>{approval.operation}</span>
+        File edit · <span style={{ color: theme.text }}>{approval.operation}</span>
       </div>
       <p style={cardDescription}>{approval.description}</p>
       <ul style={{ margin: "0 0 12px", paddingLeft: 18 }}>
         {approval.paths.map((path) => (
           <li
             key={path}
-            style={{ color: colors.text, fontSize: 13, wordBreak: "break-all" }}
+            style={{ color: theme.text, fontSize: 13, wordBreak: "break-all" }}
           >
             {path}
           </li>
@@ -263,7 +416,7 @@ function ApproveRejectRow({
       <button
         type="button"
         disabled={busy}
-        style={decisionButton(colors.accent, busy)}
+        style={decisionButton(theme.primary, busy)}
         onClick={() => onDecide(true)}
       >
         Approve
@@ -271,7 +424,7 @@ function ApproveRejectRow({
       <button
         type="button"
         disabled={busy}
-        style={decisionButton(colors.danger, busy)}
+        style={decisionButton(theme.danger, busy)}
         onClick={() => onDecide(false)}
       >
         Reject
@@ -372,7 +525,7 @@ function InterviewForm({
           style={{ border: 0, margin: 0, padding: "0 0 12px" }}
         >
           {question.header !== null && (
-            <div style={{ color: colors.muted, fontSize: 12 }}>{question.header}</div>
+            <div style={{ color: theme.mutedText, fontSize: 12 }}>{question.header}</div>
           )}
           <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>
             {question.question}
@@ -395,7 +548,7 @@ function InterviewForm({
                     <span style={{ fontWeight: 600 }}>{option.label}</span>
                     {option.description !== null && (
                       <span
-                        style={{ display: "block", color: colors.muted, fontSize: 12 }}
+                        style={{ display: "block", color: theme.mutedText, fontSize: 12 }}
                       >
                         {option.description}
                       </span>
@@ -420,7 +573,7 @@ function InterviewForm({
       <button
         type="button"
         disabled={!canSubmit}
-        style={decisionButton(colors.accent, !canSubmit)}
+        style={decisionButton(theme.primary, !canSubmit)}
         onClick={() => onSubmit(answers)}
       >
         Submit answer
@@ -443,77 +596,29 @@ function ReplyStatusLine({
   if (status === undefined) return null;
   if (status.phase === "submitting") {
     return (
-      <p role="status" style={{ color: colors.muted, fontSize: 13, margin: "8px 0 0" }}>
+      <p role="status" style={{ color: theme.mutedText, fontSize: 13, margin: "8px 0 0" }}>
         Submitting…
       </p>
     );
   }
   return (
-    <p role="alert" style={{ color: colors.danger, fontSize: 13, margin: "8px 0 0" }}>
+    <p role="alert" style={{ color: theme.danger, fontSize: 13, margin: "8px 0 0" }}>
       {status.message}
     </p>
   );
 }
 
-function RunStatusLine({
-  runStatus,
-  blocked,
-}: {
-  readonly runStatus: ChatRunStatus;
-  readonly blocked: boolean;
-}): ReactElement {
-  if (blocked) {
-    return (
-      <p role="status" style={{ color: colors.danger, margin: "4px 0 0", fontSize: 13 }}>
-        Blocked — waiting on you
-      </p>
-    );
-  }
-  const label =
-    runStatus === "running"
-      ? "Running"
-      : runStatus === "stopping"
-        ? "Stopping"
-        : "Idle";
-  return (
-    <p role="status" style={{ color: colors.muted, margin: "4px 0 0", fontSize: 13 }}>
-      {label}
-    </p>
-  );
-}
-
-function ConnectionIndicator({
-  state,
-}: {
-  readonly state: StreamConnectionState;
-}): ReactElement {
-  const { label, color } = CONNECTION_LABEL[state];
-  return (
-    <p role="status" style={{ color, margin: "4px 0 0", fontSize: 13 }}>
-      {label}
-    </p>
-  );
-}
-
-const CONNECTION_LABEL: Record<
-  StreamConnectionState,
-  { readonly label: string; readonly color: string }
-> = {
-  live: { label: "Live", color: colors.accent },
-  reconnecting: { label: "Reconnecting…", color: colors.muted },
-  disconnected: { label: "Disconnected", color: colors.danger },
-};
-
 const card: CSSProperties = {
-  border: `1px solid ${colors.border}`,
-  borderRadius: 8,
+  border: `1px solid ${theme.borderHairline}`,
+  background: theme.surface,
+  borderRadius: radius.lg,
   padding: 12,
   marginBottom: 12,
 };
 
 const cardLabel: CSSProperties = {
   fontSize: 12,
-  color: colors.muted,
+  color: theme.mutedText,
   marginBottom: 6,
 };
 
@@ -521,6 +626,7 @@ const cardDescription: CSSProperties = {
   margin: "0 0 12px",
   fontSize: 14,
   wordBreak: "break-word",
+  color: theme.text,
 };
 
 const textInput: CSSProperties = {
@@ -528,10 +634,10 @@ const textInput: CSSProperties = {
   boxSizing: "border-box",
   padding: "8px 10px",
   fontSize: 14,
-  borderRadius: 8,
-  border: `1px solid ${colors.border}`,
+  borderRadius: radius.md,
+  border: `1px solid ${theme.border}`,
   background: "transparent",
-  color: colors.text,
+  color: theme.text,
 };
 
 function decisionButton(color: string, disabled: boolean): CSSProperties {
@@ -540,7 +646,7 @@ function decisionButton(color: string, disabled: boolean): CSSProperties {
     padding: "10px 14px",
     fontSize: 15,
     fontWeight: 600,
-    borderRadius: 8,
+    borderRadius: radius.md,
     border: `1px solid ${color}`,
     background: "transparent",
     color,
@@ -553,10 +659,10 @@ function optionButton(selected: boolean, disabled: boolean): CSSProperties {
   return {
     textAlign: "left",
     padding: "10px 12px",
-    borderRadius: 8,
-    border: `1px solid ${selected ? colors.accent : colors.border}`,
+    borderRadius: radius.md,
+    border: `1px solid ${selected ? theme.primary : theme.border}`,
     background: "transparent",
-    color: colors.text,
+    color: theme.text,
     cursor: disabled ? "default" : "pointer",
   };
 }

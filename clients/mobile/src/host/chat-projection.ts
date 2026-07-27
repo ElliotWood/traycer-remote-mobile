@@ -10,6 +10,7 @@
  */
 import type { Message } from "@traycer/protocol/persistence/epic/messages";
 import type { InterviewBlock } from "@traycer/protocol/persistence/epic/content-blocks";
+import type { TokenUsage } from "@traycer/protocol/persistence/epic/foundation";
 
 export type { InterviewBlock } from "@traycer/protocol/persistence/epic/content-blocks";
 export type ChatMessage = Message;
@@ -57,4 +58,32 @@ export function latestActivityText(messages: readonly ChatMessage[]): string {
     }
   }
   return "";
+}
+
+export interface LastAssistantTurn {
+  readonly turnId: string | null;
+  readonly startedAt: number | null;
+  readonly timestamp: number;
+  readonly usage: TokenUsage | null;
+  readonly replyText: string;
+}
+
+/** P2 — the most recent assistant message's turn metadata, for the elapsed footer. `null` when there is no assistant message yet. */
+export function lastAssistantTurn(messages: readonly ChatMessage[]): LastAssistantTurn | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.role !== "assistant") continue;
+    const textParts: string[] = [];
+    for (const block of message.blocks) {
+      if (block.type === "text" && block.text.trim() !== "") textParts.push(block.text);
+    }
+    return {
+      turnId: message.turnId,
+      startedAt: message.startedAt,
+      timestamp: message.timestamp,
+      usage: message.usage,
+      replyText: textParts.join("\n\n"),
+    };
+  }
+  return null;
 }

@@ -20,16 +20,23 @@
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import { DEFAULT_ACCOUNT_CONTEXT } from "@traycer/protocol/common/schemas";
 import type { ChatStreamClient } from "@traycer-clients/shared/host-transport/chat-stream-client";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
 import type {
+  BackgroundItem,
+  ChatAccumulatedFileChange,
+  ChatActiveTurn,
   ChatApprovalState,
   ChatFileEditApprovalState,
   ChatPendingInterviewState,
+  ChatQueueState,
   ChatRunStatus,
   ChatSnapshot,
   ChatSubscribeClientFrame,
 } from "@traycer/protocol/host/agent/gui/subscribe";
+import type { ChatRunSettings } from "@traycer/protocol/persistence/epic/foundation";
+import type { WorktreeBinding } from "@traycer/protocol/host/worktree-schemas";
 import type { RuntimeEvent } from "@traycer/protocol/host/agent/gui/agent-runtime";
 import type {
   ContentBlock,
@@ -50,6 +57,7 @@ import {
   liveTurnBlocks as computeLiveTurnBlocks,
   type LiveTurnState,
 } from "./chat-live-turn";
+import { plainTextContent } from "./use-create-chat";
 
 /**
  * Live reply status for one pending item, keyed by its stable pending key. The
@@ -81,6 +89,12 @@ export type SendReplyArg =
       readonly answers: readonly InterviewAnswer[];
     };
 
+/** P2 composer send: plain-text instruction + the explicit settings the composer's toggles resolved (harness/model/permission mode/agent mode). */
+export interface SendMessageArgs {
+  readonly text: string;
+  readonly settings: ChatRunSettings;
+}
+
 export interface UseChatResult {
   readonly connection: StreamConnectionState;
   readonly runStatus: ChatRunStatus;
@@ -99,6 +113,41 @@ export interface UseChatResult {
   readonly transcriptMessages: readonly ChatMessage[];
   /** The current in-progress turn's blocks, folded live from `blockDelta` (Sprint 2). */
   readonly liveTurnBlocks: readonly ContentBlock[];
+  /** P2: queued messages (pause/resume/edit/steer surface). */
+  readonly queue: ChatQueueState;
+  /**
+   * P2: in-flight background work (backgrounded subagents/`run_in_background`
+   * commands/Monitors). `undefined` is the host-capability sentinel — no
+   * frame has ever advertised background items for this host/session, so
+   * the lower dock's Background section should be hidden entirely, not
+   * shown empty (mirrors the wire's own OPTIONAL-on-purpose convention).
+   */
+  readonly backgroundItems: readonly BackgroundItem[] | undefined;
+  /** P2: cumulative file changes for the whole chat — the lower dock's accumulated-changes panel. Refreshed on snapshot; may lag slightly mid-turn (no dedicated delta frame exists for it). */
+  readonly accumulatedFileChanges: readonly ChatAccumulatedFileChange[];
+  /** P2: the current turn's live record (status/model/harness/startedAt), or `null` between turns — drives the run indicator + elapsed footer. */
+  readonly activeTurn: ChatActiveTurn | null;
+  /** P2: authoritative "is there a turn to stop right now" — narrower than `runStatus !== "idle"`. `undefined` on an older host; callers fall back to `runStatus`. */
+  readonly turnInProgress: boolean | undefined;
+  readonly accessRole: "owner" | "viewer";
+  /** The chat's persisted default run settings (harness/model/permission mode/agent mode), or `null` if never set — seeds the composer's pickers. */
+  readonly chatSettings: ChatRunSettings | null;
+  /** Current worktree binding (read-only branch/workspace chip) — `null` before the first snapshot. */
+  readonly worktreeBinding: WorktreeBinding | null;
+  readonly missingWorktreePaths: readonly string[];
+  /** Sends a new user message with explicit settings (the composer's model/permission/agent-mode toggles) — P2's `send` client frame. */
+  readonly sendMessage: (args: SendMessageArgs) => void;
+  /** Stops the active turn (P2's `stop` client frame). No-ops if there is nothing to stop. */
+  readonly stopTurn: () => void;
+  /** Builds and sends any other client frame (queue actions, background-item stops, revert-file-changes) with `epicId`/`chatId`/`clientActionId` already filled in. No-ops if disconnected. */
+  readonly dispatchAction: (
+    build: (base: {
+      readonly hasBinaryPayload: false;
+      readonly epicId: string;
+      readonly chatId: string;
+      readonly clientActionId: string;
+    }) => ChatSubscribeClientFrame,
+  ) => void;
   /**
    * True once the first `snapshot` frame has landed for this (epicId, chatId).
    * S5 (C, F1 fix): distinguishes "not yet observed" from "observed and
@@ -136,7 +185,19 @@ interface ChatState {
   readonly ackIndex: Readonly<Record<string, string>>;
   /** S5 (C, F1 fix): true once the first `snapshot` frame has landed. */
   readonly hasSnapshot: boolean;
+  // P2 additions — all sourced from fields the wire already carries.
+  readonly queue: ChatQueueState;
+  readonly backgroundItems: readonly BackgroundItem[] | undefined;
+  readonly accumulatedFileChanges: readonly ChatAccumulatedFileChange[];
+  readonly activeTurn: ChatActiveTurn | null;
+  readonly turnInProgress: boolean | undefined;
+  readonly accessRole: "owner" | "viewer";
+  readonly chatSettings: ChatRunSettings | null;
+  readonly worktreeBinding: WorktreeBinding | null;
+  readonly missingWorktreePaths: readonly string[];
 }
+
+const INITIAL_QUEUE: ChatQueueState = { status: "idle", items: [] };
 
 const INITIAL_STATE: ChatState = {
   runStatus: "idle",
@@ -150,12 +211,28 @@ const INITIAL_STATE: ChatState = {
   replies: {},
   ackIndex: {},
   hasSnapshot: false,
+  queue: INITIAL_QUEUE,
+  backgroundItems: undefined,
+  accumulatedFileChanges: [],
+  activeTurn: null,
+  turnInProgress: undefined,
+  accessRole: "owner",
+  chatSettings: null,
+  worktreeBinding: null,
+  missingWorktreePaths: [],
 };
 
 type ChatEvent =
   | { readonly type: "reset" }
   | { readonly type: "snapshot"; readonly snapshot: ChatSnapshot }
-  | { readonly type: "turnState"; readonly runStatus: ChatRunStatus }
+  | {
+      readonly type: "turnState";
+      readonly runStatus: ChatRunStatus;
+      readonly activeTurn: ChatActiveTurn | null;
+      readonly backgroundItems: readonly BackgroundItem[] | undefined;
+      readonly turnInProgress: boolean | undefined;
+    }
+  | { readonly type: "queueChanged"; readonly queue: ChatQueueState }
   | { readonly type: "approvalRequested"; readonly approval: ChatApprovalState }
   | { readonly type: "approvalResolved"; readonly approvalId: string }
   | {
@@ -233,10 +310,27 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         replies,
         ackIndex,
         hasSnapshot: true,
+        queue: snap.queue,
+        backgroundItems: snap.backgroundItems,
+        accumulatedFileChanges: snap.accumulatedFileChanges,
+        activeTurn: snap.activeTurn,
+        turnInProgress: snap.turnInProgress,
+        accessRole: snap.access.role,
+        chatSettings: snap.chat.settings,
+        worktreeBinding: snap.worktreeBinding,
+        missingWorktreePaths: snap.missingWorktreePaths,
       };
     }
     case "turnState":
-      return { ...state, runStatus: event.runStatus };
+      return {
+        ...state,
+        runStatus: event.runStatus,
+        activeTurn: event.activeTurn,
+        backgroundItems: event.backgroundItems,
+        turnInProgress: event.turnInProgress,
+      };
+    case "queueChanged":
+      return { ...state, queue: event.queue };
     case "messageAccepted": {
       const alreadyKnown =
         state.messages.some((m) => m.messageId === event.message.messageId) ||
@@ -347,14 +441,23 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
 /**
  * Builds the chat-stream callbacks that fold frames into the reducer. The
  * run/blocked/reply-bearing frames drive the T6 reply surface; `messageAccepted`
- * and `blockDelta` (Sprint 2) drive the transcript. The rest (restore
- * progress, queue, worktree, etc.) remain intentionally inert.
+ * and `blockDelta` (Sprint 2) drive the transcript; `turnStateChanged` (P2)
+ * also carries `activeTurn`/`backgroundItems`/`turnInProgress` for the run
+ * indicator + lower dock. The rest (restore progress, worktree, etc.) remain
+ * intentionally inert.
  */
 function makeChatCallbacks(dispatch: (event: ChatEvent) => void): ChatStreamCallbacks {
   return {
     onSnapshot: (frame) => dispatch({ type: "snapshot", snapshot: frame.snapshot }),
     onTurnStateChanged: (frame) =>
-      dispatch({ type: "turnState", runStatus: frame.runStatus }),
+      dispatch({
+        type: "turnState",
+        runStatus: frame.runStatus,
+        activeTurn: frame.activeTurn,
+        backgroundItems: frame.backgroundItems,
+        turnInProgress: frame.turnInProgress,
+      }),
+    onQueueChanged: (frame) => dispatch({ type: "queueChanged", queue: frame.queue }),
     onApprovalRequested: (frame) =>
       dispatch({ type: "approvalRequested", approval: frame.approval }),
     onApprovalResolved: (frame) =>
@@ -382,8 +485,6 @@ function makeChatCallbacks(dispatch: (event: ChatEvent) => void): ChatStreamCall
       }),
     onMessageAccepted: (frame) => dispatch({ type: "messageAccepted", message: frame.message }),
     onBlockDelta: (frame) => dispatch({ type: "blockDelta", event: frame.event }),
-    // Frames neither the reply surface nor the transcript consume.
-    onQueueChanged: () => {},
     // A DIFFERENT durable timeline log (turn/queue/approval state
     // transitions), not content-block deltas — see `chat-live-turn.ts`'s
     // docblock. Not consumed by the transcript.
@@ -404,11 +505,17 @@ function makeChatCallbacks(dispatch: (event: ChatEvent) => void): ChatStreamCall
  * "disconnected" state without opening anything. Otherwise one `chat.subscribe`
  * session is opened per (connection, epicId, chatId); its close spy runs on
  * unmount or an id change.
+ *
+ * `userId` (P2): needed only for `sendMessage`'s `sender` field — a `null`
+ * userId (signed out) makes `sendMessage` a no-op rather than throwing;
+ * every read-only capability here (transcript, badges, replies) works
+ * without it, matching `useCreateChat`'s same signed-out handling.
  */
 export function useChat(
   streamConnection: HostStreamConnection | null,
   epicId: string,
   chatId: string,
+  userId: string | null,
 ): UseChatResult {
   const [state, dispatch] = useReducer(chatReducer, INITIAL_STATE);
   const [connection, setConnection] =
@@ -501,6 +608,74 @@ export function useChat(
     [epicId, chatId],
   );
 
+  const sendMessage = useCallback(
+    (args: SendMessageArgs): void => {
+      const stream = streamRef.current;
+      const text = args.text.trim();
+      if (stream === null || userId === null || text.length === 0) return;
+      const frame: ChatSubscribeClientFrame = {
+        hasBinaryPayload: false,
+        epicId,
+        chatId,
+        clientActionId: uuidv4(),
+        kind: "send",
+        messageId: uuidv4(),
+        content: plainTextContent(text),
+        sender: { type: "user", userId },
+        settings: args.settings,
+        accountContext: DEFAULT_ACCOUNT_CONTEXT,
+        deliveryPolicy: "auto",
+        worktreeIntent: null,
+      };
+      stream.sendAction(frame);
+    },
+    [epicId, chatId, userId],
+  );
+
+  const stopTurn = useCallback((): void => {
+    const stream = streamRef.current;
+    if (stream === null) return;
+    const frame: ChatSubscribeClientFrame = {
+      hasBinaryPayload: false,
+      epicId,
+      chatId,
+      clientActionId: uuidv4(),
+      kind: "stop",
+      turnId: state.activeTurn?.turnId ?? null,
+    };
+    stream.sendAction(frame);
+  }, [epicId, chatId, state.activeTurn]);
+
+  /**
+   * Low-level escape hatch for the lower dock's simpler actions (queue
+   * pause/resume/edit/cancel/steer, background-item stop/stop-all,
+   * revert-file-changes) — `sendMessage`/`stopTurn` stay dedicated
+   * functions since they're the most-used and easiest to get wrong by
+   * hand; everything else just needs `epicId`/`chatId`/`clientActionId`
+   * filled in, which this does once instead of in every caller.
+   */
+  const dispatchAction = useCallback(
+    (
+      build: (base: {
+        readonly hasBinaryPayload: false;
+        readonly epicId: string;
+        readonly chatId: string;
+        readonly clientActionId: string;
+      }) => ChatSubscribeClientFrame,
+    ): void => {
+      const stream = streamRef.current;
+      if (stream === null) return;
+      const base = {
+        hasBinaryPayload: false as const,
+        epicId,
+        chatId,
+        clientActionId: uuidv4(),
+      };
+      stream.sendAction(build(base));
+    },
+    [epicId, chatId],
+  );
+
   const resolveInterview = useCallback(
     (blockId: string): InterviewBlock | null =>
       interviewBlockFor(state.messages, blockId),
@@ -526,5 +701,17 @@ export function useChat(
     transcriptMessages: [...state.messages, ...state.trailingMessages],
     liveTurnBlocks: computeLiveTurnBlocks(state.liveTurn),
     hasSnapshot: state.hasSnapshot,
+    queue: state.queue,
+    backgroundItems: state.backgroundItems,
+    accumulatedFileChanges: state.accumulatedFileChanges,
+    activeTurn: state.activeTurn,
+    turnInProgress: state.turnInProgress,
+    accessRole: state.accessRole,
+    chatSettings: state.chatSettings,
+    worktreeBinding: state.worktreeBinding,
+    missingWorktreePaths: state.missingWorktreePaths,
+    sendMessage,
+    stopTurn,
+    dispatchAction,
   };
 }

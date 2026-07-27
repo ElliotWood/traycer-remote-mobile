@@ -28,11 +28,16 @@ function snapshotFrame(approvals: readonly unknown[]): SnapshotFrame {
     kind: "snapshot",
     snapshot: {
       runStatus: "running",
-      chat: { title: "Fix bug", messages: [] },
+      chat: { title: "Fix bug", messages: [], settings: null },
       access: { role: "owner", ownerUserId: "u1" },
+      queue: { status: "idle", items: [] },
       pendingApprovals: approvals,
       pendingFileEditApprovals: [],
       pendingInterviews: [],
+      accumulatedFileChanges: [],
+      activeTurn: null,
+      worktreeBinding: null,
+      missingWorktreePaths: [],
     },
   } as unknown as SnapshotFrame;
 }

@@ -9,8 +9,26 @@
  */
 @import "@fontsource-variable/figtree";
 
+/**
+ * Fix (user report): the browser's default `<body>` 8px margin + white
+ * canvas showed through as a white frame around the dark app on real
+ * devices — global.css set the font but never reset the box model or gave
+ * the page itself a background, so anything outside a screen's own
+ * `screen`-style padding fell through to the browser default. `#root`
+ * fills the viewport so there's no gap for the white canvas to show
+ * through even before React mounts.
+ */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+}
+
 html,
 body {
+  min-height: 100%;
+  background: #121715;
   font-family:
     "Figtree Variable",
     Figtree,
@@ -19,6 +37,10 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
+}
+
+#root {
+  min-height: 100dvh;
 }
 
 /**
@@ -38,4 +60,43 @@ body {
 
 .traycer-spinner {
   animation: traycer-spin 0.9s linear infinite;
+}
+
+/**
+ * P2 — the chat run indicator's working-verb text shimmer + 3-dot loader
+ * (mobile port of gui-app's `.working-text-shimmer`/`WorkingDots`, index.css).
+ */
+@keyframes traycer-shimmer {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.traycer-working-text {
+  animation: traycer-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes traycer-working-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.traycer-working-dot {
+  animation: traycer-working-dot 1.4s ease-in-out infinite;
+}
+.traycer-working-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.traycer-working-dot:nth-child(3) {
+  animation-delay: 0.4s;
 }
