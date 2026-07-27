@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppRoot } from "@/app-root";
 import { ShowcaseView } from "@/views/showcase-view";
+import "./global.css";
 
 const container = document.getElementById("root");
 if (container === null) {

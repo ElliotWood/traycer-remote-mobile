@@ -121,7 +121,7 @@ describe("EpicView — blocked-transition notification (F1)", () => {
     const fake = createFakeStreamConnection();
     render(
       <StreamConnectionProvider connection={fake.connection}>
-        <EpicView epicId="e1" onOpenChat={() => {}} onBack={() => {}} />
+        <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={() => {}} onBack={() => {}} />
       </StreamConnectionProvider>,
     );
 

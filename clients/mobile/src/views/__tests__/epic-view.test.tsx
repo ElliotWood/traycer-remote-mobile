@@ -69,7 +69,7 @@ function renderEpicView(
 ): { readonly unmount: () => void } {
   const result = render(
     <StreamConnectionProvider connection={fake.connection}>
-      <EpicView epicId="e1" onOpenChat={onOpenChat} onBack={() => {}} />
+      <EpicView epicId="e1" epicTitle="Epic 1" onOpenChat={onOpenChat} onBack={() => {}} />
     </StreamConnectionProvider>,
   );
   return { unmount: result.unmount };

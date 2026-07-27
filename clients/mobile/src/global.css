@@ -1,0 +1,22 @@
+/**
+ * Sprint 6 (round 1): sets the real brand font at the root so nothing can
+ * fall back to the browser's serif default (the exact bug the Evaluator
+ * flagged — `<body>` had no deliberate font-family, so anything rendered
+ * outside a per-screen inline style computed to Times New Roman). Mirrors
+ * gui-app's own `index.css` (`@import "@fontsource-variable/figtree"` +
+ * `body { font-family: var(--traycer-font-ui) }`), minus the full Tailwind
+ * theme — mobile has no CSS framework, just this one deliberate base rule.
+ */
+@import "@fontsource-variable/figtree";
+
+html,
+body {
+  font-family:
+    "Figtree Variable",
+    Figtree,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}

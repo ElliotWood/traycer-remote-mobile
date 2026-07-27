@@ -92,13 +92,16 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
         <FleetView
           client={client}
           onSignOut={onSignOut}
-          onOpenEpic={(epicId) => dispatch({ type: "open-epic", epicId })}
+          onOpenEpic={(epicId, epicTitle) =>
+            dispatch({ type: "open-epic", epicId, epicTitle })
+          }
         />
       );
     case "epic":
       return (
         <EpicView
           epicId={route.epicId}
+          epicTitle={route.epicTitle}
           onOpenChat={(chatId) =>
             dispatch({ type: "open-chat", epicId: route.epicId, chatId })
           }

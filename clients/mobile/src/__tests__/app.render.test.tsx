@@ -182,11 +182,14 @@ describe("App gate → view render", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: /Alpha/ }));
-    // T5 replaced the epic placeholder with the real `EpicView`. renderApp does
-    // not provide a stream connection, so it renders its "Chats" header for the
-    // reached epic id and a disconnected indicator — enough to prove routing.
-    expect(await screen.findByText("Chats")).toBeTruthy();
-    expect(screen.getByText("e1")).toBeTruthy();
+    // T5 replaced the epic placeholder with the real `EpicView`. Fleet now
+    // threads the epic's real TITLE through (Sprint 6) so the epic screen's
+    // heading is "Alpha", not a raw UUID; renderApp provides no stream
+    // connection, so a non-live indicator also confirms routing landed
+    // ("Reconnecting…" is `useEpicDoc`'s initial connection-state value
+    // before its effect settles it to "disconnected").
+    expect(await screen.findByRole("heading", { name: "Alpha" })).toBeTruthy();
+    expect(screen.getByText("Reconnecting…")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: /Back/ }));
     expect(await screen.findByText("Alpha")).toBeTruthy();

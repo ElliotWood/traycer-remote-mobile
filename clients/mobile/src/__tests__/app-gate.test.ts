@@ -79,8 +79,8 @@ describe("navReducer — Fleet → Epic → Chat stack", () => {
 
   it("drills in and backs out through the stack", () => {
     let stack: NavStack = INITIAL_NAV_STACK;
-    stack = navReducer(stack, { type: "open-epic", epicId: "e1" });
-    expect(currentRoute(stack)).toEqual({ name: "epic", epicId: "e1" });
+    stack = navReducer(stack, { type: "open-epic", epicId: "e1", epicTitle: "Epic 1" });
+    expect(currentRoute(stack)).toEqual({ name: "epic", epicId: "e1", epicTitle: "Epic 1" });
 
     stack = navReducer(stack, {
       type: "open-chat",
@@ -94,7 +94,7 @@ describe("navReducer — Fleet → Epic → Chat stack", () => {
     });
 
     stack = navReducer(stack, { type: "back" });
-    expect(currentRoute(stack)).toEqual({ name: "epic", epicId: "e1" });
+    expect(currentRoute(stack)).toEqual({ name: "epic", epicId: "e1", epicTitle: "Epic 1" });
 
     stack = navReducer(stack, { type: "back" });
     expect(currentRoute(stack)).toEqual({ name: "fleet" });

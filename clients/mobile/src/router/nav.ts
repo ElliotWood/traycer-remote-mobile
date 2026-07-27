@@ -13,11 +13,15 @@
 /** A location in the drilldown. Discriminated on `name` for exhaustive routing. */
 export type Route =
   | { readonly name: "fleet" }
-  | { readonly name: "epic"; readonly epicId: string }
+  // Sprint 6: carries the epic's title (known when opened from Fleet, which
+  // already has it) so EpicView can show real text instead of the raw id.
+  // `null` when reached a way that doesn't know it (e.g. `goto-chat` from a
+  // notification) — EpicView omits the subtitle rather than showing the uuid.
+  | { readonly name: "epic"; readonly epicId: string; readonly epicTitle: string | null }
   | { readonly name: "chat"; readonly epicId: string; readonly chatId: string };
 
 export type NavAction =
-  | { readonly type: "open-epic"; readonly epicId: string }
+  | { readonly type: "open-epic"; readonly epicId: string; readonly epicTitle: string }
   | { readonly type: "open-chat"; readonly epicId: string; readonly chatId: string }
   | { readonly type: "back" }
   /**
@@ -40,7 +44,10 @@ export function currentRoute(stack: NavStack): Route {
 export function navReducer(stack: NavStack, action: NavAction): NavStack {
   switch (action.type) {
     case "open-epic":
-      return [...stack, { name: "epic", epicId: action.epicId }];
+      return [
+        ...stack,
+        { name: "epic", epicId: action.epicId, epicTitle: action.epicTitle },
+      ];
     case "open-chat":
       return [
         ...stack,
@@ -55,7 +62,7 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
     case "goto-chat":
       return [
         { name: "fleet" },
-        { name: "epic", epicId: action.epicId },
+        { name: "epic", epicId: action.epicId, epicTitle: null },
         { name: "chat", epicId: action.epicId, chatId: action.chatId },
       ];
   }

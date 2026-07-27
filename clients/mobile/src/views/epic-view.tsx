@@ -11,6 +11,11 @@
  * Tapping a chat drills into the chat detail (T6); this view only wires the
  * navigation. All streams (the epic stream + every per-chat badge stream) are
  * torn down by the hooks' effect cleanups when the user backs out.
+ *
+ * Sprint 6 (round 1): restyled on the ported desktop design tokens
+ * (`design-tokens.ts`) — real card rows, teal-green primary/running badges,
+ * and the header shows the epic's TITLE (threaded from Fleet via `nav.ts`),
+ * not the raw id.
  */
 import {
   useEffect,
@@ -34,16 +39,20 @@ import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
 import { AuthorView } from "./author-view";
 import { ArtifactTreeView } from "./artifact-tree-view";
 import { NotificationPermissionButton } from "./notification-permission-button";
-import { colors, row, screen, secondaryButton } from "./ui";
+import { KIND_COLORS, KIND_ICONS } from "./kind-tokens";
+import { Button, Card, SectionHeading, radius, screen, theme, type } from "./design-tokens";
 
 interface EpicViewProps {
   readonly epicId: string;
+  /** The epic's title, known when opened from Fleet; `null` when reached another way (e.g. a notification). */
+  readonly epicTitle: string | null;
   readonly onOpenChat: (chatId: string) => void;
   readonly onBack: () => void;
 }
 
 export function EpicView({
   epicId,
+  epicTitle,
   onOpenChat,
   onBack,
 }: EpicViewProps): ReactElement {
@@ -112,46 +121,25 @@ export function EpicView({
 
   return (
     <main style={screen}>
-      <button
-        type="button"
-        style={{ ...secondaryButton, marginBottom: 16 }}
-        onClick={onBack}
-      >
+      <Button variant="ghost" onClick={onBack}>
         ← Back
-      </button>
+      </Button>
 
-      <header style={{ marginBottom: 12 }}>
-        <h1 style={{ fontSize: 20, margin: 0 }}>Chats</h1>
-        <p
-          style={{
-            color: colors.muted,
-            margin: "4px 0 0",
-            fontSize: 13,
-            wordBreak: "break-all",
-          }}
-        >
-          {epicId}
-        </p>
+      <header style={{ margin: "16px 0 12px" }}>
+        <SectionHeading>{epicTitle ?? "Epic"}</SectionHeading>
         <ConnectionIndicator state={connection} />
       </header>
 
-      {hostClient !== null && (
-        <button
-          type="button"
-          style={{ ...secondaryButton, marginBottom: 12 }}
-          onClick={() => setAuthoring(true)}
-        >
-          + New agent here
-        </button>
-      )}
-
-      <button
-        type="button"
-        style={{ ...secondaryButton, marginBottom: 12 }}
-        onClick={() => setBrowsingArtifacts(true)}
-      >
-        Artifacts
-      </button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {hostClient !== null && (
+          <Button variant="secondary" onClick={() => setAuthoring(true)}>
+            + New agent here
+          </Button>
+        )}
+        <Button variant="secondary" onClick={() => setBrowsingArtifacts(true)}>
+          Artifacts
+        </Button>
+      </div>
 
       <NotificationPermissionButton />
 
@@ -171,7 +159,7 @@ function ChatList({
 }): ReactElement {
   if (ordered.length === 0) {
     return (
-      <p style={{ color: colors.muted }}>
+      <p style={{ ...type.body, color: theme.mutedText }}>
         No chats in this epic yet. Start one from the Traycer desktop app.
       </p>
     );
@@ -199,20 +187,42 @@ function ChatRow({
   readonly badge: ChatBadgeState;
   readonly onOpen: () => void;
 }): ReactElement {
+  const ChatIcon = KIND_ICONS.chat;
   return (
-    <button type="button" style={row} onClick={onOpen}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <span style={{ fontWeight: 600 }}>{chat.title || "Untitled chat"}</span>
-        <ChatBadge badge={badge} />
+    <Card onClick={onOpen} accentColor={badge.blocked ? theme.danger : undefined}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            flexShrink: 0,
+            borderRadius: radius.md,
+            background: "rgba(56, 189, 248, 0.1)",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+          }}
+        >
+          <ChatIcon size={16} color={KIND_COLORS.chat} aria-hidden="true" />
+        </span>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <span style={{ ...type.titleSm, color: theme.textRow }}>
+            {chat.title || "Untitled chat"}
+          </span>
+          <ChatBadge badge={badge} />
+        </div>
       </div>
-    </button>
+    </Card>
   );
 }
 
@@ -224,14 +234,14 @@ function ChatRow({
 function ChatBadge({ badge }: { readonly badge: ChatBadgeState }): ReactElement | null {
   if (badge.blocked) {
     return (
-      <span role="status" style={badgeStyle(colors.danger, colors.dangerBg)}>
+      <span role="status" style={badgeStyle(theme.danger, theme.dangerSurface)}>
         Blocked
       </span>
     );
   }
   if (badge.runStatus === "running" || badge.runStatus === "stopping") {
     return (
-      <span role="status" style={badgeStyle(colors.accent, "transparent")}>
+      <span role="status" style={badgeStyle(theme.primary, "transparent")}>
         {badge.runStatus === "stopping" ? "Stopping" : "Running"}
       </span>
     );
@@ -246,7 +256,7 @@ function ConnectionIndicator({
 }): ReactElement {
   const { label, color } = CONNECTION_LABEL[state];
   return (
-    <p role="status" style={{ color, margin: "8px 0 0", fontSize: 13 }}>
+    <p role="status" style={{ ...type.bodySm, color, margin: "4px 0 0" }}>
       {label}
     </p>
   );
@@ -256,9 +266,9 @@ const CONNECTION_LABEL: Record<
   StreamConnectionState,
   { readonly label: string; readonly color: string }
 > = {
-  live: { label: "Live", color: colors.accent },
-  reconnecting: { label: "Reconnecting…", color: colors.muted },
-  disconnected: { label: "Disconnected", color: colors.danger },
+  live: { label: "Live", color: theme.primary },
+  reconnecting: { label: "Reconnecting…", color: theme.mutedText },
+  disconnected: { label: "Disconnected", color: theme.danger },
 };
 
 function badgeStyle(fg: string, bg: string): CSSProperties {

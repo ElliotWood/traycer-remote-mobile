@@ -7,7 +7,13 @@
  * don't imply liveness the data can't back). Tapping a row drills into the epic
  * (the epic detail itself arrives in T5). An empty fleet shows a clear empty
  * state rather than a blank screen.
+ *
+ * Sprint 6 (round 1): restyled on the ported desktop design tokens
+ * (`design-tokens.ts`) — real card surfaces, teal-green primary buttons, and
+ * status-language coloring on rows (epics aren't kind-typed like artifacts,
+ * so this is the desktop's status-text idiom, not artifact kind colors).
  */
+import { Layers } from "lucide-react";
 import type { ReactElement } from "react";
 import {
   formatEpicMeta,
@@ -15,11 +21,20 @@ import {
   type FleetEpic,
 } from "@/host/use-epic-list";
 import type { MobileHostClient } from "@/host/host-client-context";
-import { colors, primaryButton, row, secondaryButton, screen } from "./ui";
+import {
+  Button,
+  Card,
+  SectionHeading,
+  radius,
+  screen,
+  statusToneColor,
+  theme,
+  type,
+} from "./design-tokens";
 
 interface FleetViewProps {
   readonly client: MobileHostClient;
-  readonly onOpenEpic: (epicId: string) => void;
+  readonly onOpenEpic: (epicId: string, epicTitle: string) => void;
   readonly onSignOut: () => void;
 }
 
@@ -37,22 +52,21 @@ export function FleetView({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 12,
+          marginBottom: 16,
         }}
       >
-        <h1 style={{ fontSize: 20, margin: 0 }}>Your work</h1>
+        <SectionHeading>Your work</SectionHeading>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            style={secondaryButton}
+          <Button
+            variant="secondary"
             onClick={list.refetch}
             disabled={list.isRefetching || list.isLoading}
           >
             {list.isRefetching ? "Refreshing…" : "Refresh"}
-          </button>
-          <button type="button" style={secondaryButton} onClick={onSignOut}>
+          </Button>
+          <Button variant="ghost" onClick={onSignOut}>
             Sign out
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -66,20 +80,20 @@ function FleetBody({
   onOpenEpic,
 }: {
   readonly list: ReturnType<typeof useEpicList>;
-  readonly onOpenEpic: (epicId: string) => void;
+  readonly onOpenEpic: (epicId: string, epicTitle: string) => void;
 }): ReactElement {
   if (list.isLoading) {
-    return <p style={{ color: colors.muted }}>Loading your epics…</p>;
+    return <p style={{ ...type.body, color: theme.mutedText }}>Loading your epics…</p>;
   }
   if (list.isError) {
     return (
       <div>
-        <p role="alert" style={{ color: colors.danger }}>
+        <p role="alert" style={{ ...type.body, color: theme.danger }}>
           Couldn't load your epics.
         </p>
-        <button type="button" style={secondaryButton} onClick={list.refetch}>
+        <Button variant="secondary" onClick={list.refetch}>
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -89,7 +103,7 @@ function FleetBody({
   // rather than dead-ending on the empty copy.
   if (list.epics.length === 0 && !list.hasNextPage) {
     return (
-      <p style={{ color: colors.muted }}>
+      <p style={{ ...type.body, color: theme.mutedText }}>
         No epics yet. Start one from the Traycer desktop app, then refresh here.
       </p>
     );
@@ -98,17 +112,21 @@ function FleetBody({
   return (
     <div>
       {list.epics.map((epic) => (
-        <EpicRow key={epic.id} epic={epic} onOpen={() => onOpenEpic(epic.id)} />
+        <EpicRow
+          key={epic.id}
+          epic={epic}
+          onOpen={() => onOpenEpic(epic.id, epic.title || "Untitled epic")}
+        />
       ))}
       {list.hasNextPage ? (
-        <button
-          type="button"
-          style={{ ...primaryButton, marginTop: 4 }}
+        <Button
+          variant="primary"
+          fullWidth
           onClick={list.fetchNextPage}
           disabled={list.isFetchingNextPage}
         >
           {list.isFetchingNextPage ? "Loading…" : "Show more"}
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -122,14 +140,36 @@ function EpicRow({
   readonly onOpen: () => void;
 }): ReactElement {
   const meta = formatEpicMeta(epic);
+  const statusColor = epic.status.trim().length > 0 ? statusToneColor(epic.status) : null;
   return (
-    <button type="button" style={row} onClick={onOpen}>
-      <div style={{ fontWeight: 600 }}>{epic.title || "Untitled epic"}</div>
-      {meta.length > 0 ? (
-        <div style={{ color: colors.muted, marginTop: 4, fontSize: 14 }}>
-          {meta}
+    <Card onClick={onOpen} accentColor={statusColor ?? undefined}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            flexShrink: 0,
+            borderRadius: radius.md,
+            background: "rgba(255, 255, 255, 0.06)",
+            border: `1px solid ${theme.borderHairline}`,
+          }}
+        >
+          <Layers size={16} color={theme.mutedText} aria-hidden="true" />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...type.titleSm, color: theme.textRow }}>
+            {epic.title || "Untitled epic"}
+          </div>
+          {meta.length > 0 ? (
+            <div style={{ ...type.bodySm, color: statusColor ?? theme.mutedText, marginTop: 2 }}>
+              {meta}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-    </button>
+      </div>
+    </Card>
   );
 }
