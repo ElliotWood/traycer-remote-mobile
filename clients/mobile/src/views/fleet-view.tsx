@@ -21,6 +21,7 @@ import {
   type FleetEpic,
 } from "@/host/use-epic-list";
 import type { MobileHostClient } from "@/host/host-client-context";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Button,
   Card,
@@ -82,8 +83,13 @@ function FleetBody({
   readonly list: ReturnType<typeof useEpicList>;
   readonly onOpenEpic: (epicId: string, epicTitle: string) => void;
 }): ReactElement {
-  if (list.isLoading) {
-    return <p style={{ ...type.body, color: theme.mutedText }}>Loading your epics…</p>;
+  // UX fix: `isError` flips true on the FIRST failed attempt, before
+  // TanStack's automatic retries have run — showing the hard error then
+  // reads as broken mid-load. Only the retries-EXHAUSTED case (isError &&
+  // !isFetching) is a genuine failure; isError-while-still-fetching means a
+  // retry is in flight, so it renders the same skeleton as the initial load.
+  if (list.isLoading || (list.isError && list.isFetching)) {
+    return <FleetLoadingSkeleton />;
   }
   if (list.isError) {
     return (
@@ -131,6 +137,30 @@ function FleetBody({
     </div>
   );
 }
+
+/** Row-shaped skeleton (not spinner text) so the initial load reads as "content incoming", not "broken". */
+function FleetLoadingSkeleton(): ReactElement {
+  return (
+    <div aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} style={{ ...cardShellStyle, display: "flex", gap: 10, alignItems: "center" }}>
+          <Skeleton className="size-8 shrink-0 rounded-md" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <Skeleton className="mt-2 h-3 w-1/3 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const cardShellStyle = {
+  borderRadius: radius.lg,
+  background: theme.surface,
+  padding: 12,
+  marginBottom: 8,
+} as const;
 
 function EpicRow({
   epic,

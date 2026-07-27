@@ -64,12 +64,14 @@ import { Composer } from "./chat/composer";
 interface ChatViewProps {
   readonly epicId: string;
   readonly chatId: string;
+  /** P2 UX fix: the title as already known from the epic tree that opened this chat (or a freshly-created chat's echo) — shown immediately instead of "Untitled chat" while `chat.subscribe`'s own snapshot is still loading. `null` when reached a way that doesn't know it (e.g. a notification). */
+  readonly initialTitle: string | null;
   readonly onBack: () => void;
 }
 
 const SCROLL_BOTTOM_THRESHOLD_PX = 48;
 
-export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElement {
+export function ChatView({ epicId, chatId, initialTitle, onBack }: ChatViewProps): ReactElement {
   const streamConnection = useStreamConnectionOrNull();
   const hostClient = useHostClientOrNull();
   const chat = useChat(streamConnection, epicId, chatId, hostClient?.getRequestContextUserId() ?? null);
@@ -185,7 +187,7 @@ export function ChatView({ epicId, chatId, onBack }: ChatViewProps): ReactElemen
           </Button>
         </div>
         <h1 style={{ ...type.titleSm, margin: "6px 0 2px", color: theme.text, wordBreak: "break-word" }}>
-          {chat.title || "Untitled chat"}
+          {chat.title || initialTitle || "Untitled chat"}
         </h1>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <ConnectionPill state={displayConnection} />

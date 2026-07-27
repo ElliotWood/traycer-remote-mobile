@@ -78,7 +78,7 @@ describe("ChatView — blocked-transition notification (F1)", () => {
     const fake = createFakeStreamConnection();
     render(
       <StreamConnectionProvider connection={fake.connection}>
-        <ChatView epicId="e1" chatId="c1" onBack={() => {}} />
+        <ChatView epicId="e1" chatId="c1" initialTitle={null} onBack={() => {}} />
       </StreamConnectionProvider>,
     );
     const session = fake.chatSessions[0];

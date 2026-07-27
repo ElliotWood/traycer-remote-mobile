@@ -148,6 +148,16 @@ export interface EpicListResult {
   readonly epics: readonly FleetEpic[];
   readonly isLoading: boolean;
   readonly isError: boolean;
+  /**
+   * True while a fetch attempt (initial OR an automatic retry) is actually
+   * in flight. UX fix: `isError` alone flips true on the FIRST failed
+   * attempt's frame, before TanStack's default retries have run — showing
+   * the hard "Couldn't load" error then reads as broken even though a
+   * retry is already queued. Callers should treat `isError && isFetching`
+   * as "still retrying" (render loading), and only `isError && !isFetching`
+   * as the genuine, retries-exhausted failure.
+   */
+  readonly isFetching: boolean;
   readonly error: Error | null;
   readonly hasNextPage: boolean;
   readonly isFetchingNextPage: boolean;
@@ -194,6 +204,7 @@ export function useEpicList(client: EpicListClient): EpicListResult {
     epics,
     isLoading: query.isPending,
     isError: query.isError,
+    isFetching: query.isFetching,
     error: query.error,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,

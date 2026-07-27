@@ -86,11 +86,13 @@ describe("navReducer — Fleet → Epic → Chat stack", () => {
       type: "open-chat",
       epicId: "e1",
       chatId: "c1",
+      chatTitle: "Chat 1",
     });
     expect(currentRoute(stack)).toEqual({
       name: "chat",
       epicId: "e1",
       chatId: "c1",
+      chatTitle: "Chat 1",
     });
 
     stack = navReducer(stack, { type: "back" });

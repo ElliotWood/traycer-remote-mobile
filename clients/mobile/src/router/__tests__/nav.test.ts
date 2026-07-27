@@ -15,14 +15,14 @@ describe("navReducer — goto-chat", () => {
     expect(next).toEqual([
       { name: "fleet" },
       { name: "epic", epicId: "e1", epicTitle: null },
-      { name: "chat", epicId: "e1", chatId: "c1" },
+      { name: "chat", epicId: "e1", chatId: "c1", chatTitle: null },
     ]);
   });
 
   it("replaces a deep stack rather than pushing onto it (no duplicate epic frame)", () => {
     const deep = navReducer(
       navReducer(INITIAL_NAV_STACK, { type: "open-epic", epicId: "e1", epicTitle: "Epic 1" }),
-      { type: "open-chat", epicId: "e1", chatId: "c-old" },
+      { type: "open-chat", epicId: "e1", chatId: "c-old", chatTitle: "Old chat" },
     );
     const next = navReducer(deep, {
       type: "goto-chat",
@@ -32,14 +32,14 @@ describe("navReducer — goto-chat", () => {
     expect(next).toEqual([
       { name: "fleet" },
       { name: "epic", epicId: "e1", epicTitle: null },
-      { name: "chat", epicId: "e1", chatId: "c1" },
+      { name: "chat", epicId: "e1", chatId: "c1", chatTitle: null },
     ]);
   });
 
   it("switches epics cleanly even when already deep in a different epic", () => {
     const deep = navReducer(
       navReducer(INITIAL_NAV_STACK, { type: "open-epic", epicId: "other-epic", epicTitle: "Other Epic" }),
-      { type: "open-chat", epicId: "other-epic", chatId: "other-chat" },
+      { type: "open-chat", epicId: "other-epic", chatId: "other-chat", chatTitle: "Other chat" },
     );
     const next = navReducer(deep, {
       type: "goto-chat",
@@ -49,7 +49,7 @@ describe("navReducer — goto-chat", () => {
     expect(next).toEqual([
       { name: "fleet" },
       { name: "epic", epicId: "e2", epicTitle: null },
-      { name: "chat", epicId: "e2", chatId: "c2" },
+      { name: "chat", epicId: "e2", chatId: "c2", chatTitle: null },
     ]);
   });
 });

@@ -45,7 +45,7 @@ export interface AgentsSectionProps {
   readonly badges: Readonly<Record<string, ChatBadgeState>>;
   readonly connectionLive: boolean;
   readonly sortMode: SortMode;
-  readonly onOpenChat: (chatId: string) => void;
+  readonly onOpenChat: (chatId: string, chatTitle: string | null) => void;
   readonly onAddChild: (parentChatId: string | null) => void;
 }
 
@@ -197,7 +197,7 @@ function ChatNode({
   readonly tierById: Readonly<Record<string, LadderTier>>;
   readonly expandedIds: ReadonlySet<string>;
   readonly onToggleExpanded: (id: string) => void;
-  readonly onOpen: (id: string) => void;
+  readonly onOpen: (id: string, title: string | null) => void;
   readonly onOpenActions: (id: string) => void;
 }): ReactElement | null {
   const chat = tree.byId[id];
@@ -231,7 +231,7 @@ function ChatNode({
             ...rowIndentStyle(0),
             background: "color-mix(in oklch, var(--primary) 6%, transparent)",
           }}
-          onClick={() => onOpen(id)}
+          onClick={() => onOpen(id, chat.title || null)}
         >
           <span role="status" title={LADDER_TIER_LABELS[selfTier]} aria-label={LADDER_TIER_LABELS[selfTier]}>
             <LadderIcon tier={selfTier} size={15} />

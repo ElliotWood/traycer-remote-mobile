@@ -102,8 +102,8 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
         <EpicView
           epicId={route.epicId}
           epicTitle={route.epicTitle}
-          onOpenChat={(chatId) =>
-            dispatch({ type: "open-chat", epicId: route.epicId, chatId })
+          onOpenChat={(chatId, chatTitle) =>
+            dispatch({ type: "open-chat", epicId: route.epicId, chatId, chatTitle })
           }
           onBack={() => dispatch({ type: "back" })}
         />
@@ -113,6 +113,7 @@ export function AppShell({ client, onSignOut }: AppShellProps): ReactElement {
         <ChatView
           epicId={route.epicId}
           chatId={route.chatId}
+          initialTitle={route.chatTitle}
           onBack={() => dispatch({ type: "back" })}
         />
       );

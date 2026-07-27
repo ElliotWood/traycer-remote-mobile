@@ -18,11 +18,15 @@ export type Route =
   // `null` when reached a way that doesn't know it (e.g. `goto-chat` from a
   // notification) — EpicView omits the subtitle rather than showing the uuid.
   | { readonly name: "epic"; readonly epicId: string; readonly epicTitle: string | null }
-  | { readonly name: "chat"; readonly epicId: string; readonly chatId: string };
+  // P2 UX fix: carries the chat's title (already known from the epic tree
+  // that opened it) so ChatView shows real text instantly instead of
+  // "Untitled chat" until chat.subscribe's snapshot lands. `null` when
+  // reached a way that doesn't know it (e.g. `goto-chat` from a notification).
+  | { readonly name: "chat"; readonly epicId: string; readonly chatId: string; readonly chatTitle: string | null };
 
 export type NavAction =
   | { readonly type: "open-epic"; readonly epicId: string; readonly epicTitle: string }
-  | { readonly type: "open-chat"; readonly epicId: string; readonly chatId: string }
+  | { readonly type: "open-chat"; readonly epicId: string; readonly chatId: string; readonly chatTitle: string | null }
   | { readonly type: "back" }
   /**
    * S5 (C, P1): a notification click always lands on a clean [fleet, epic,
@@ -51,7 +55,7 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
     case "open-chat":
       return [
         ...stack,
-        { name: "chat", epicId: action.epicId, chatId: action.chatId },
+        { name: "chat", epicId: action.epicId, chatId: action.chatId, chatTitle: action.chatTitle },
       ];
     case "back":
       // The Fleet root is never popped: backing out of it is a no-op (there is
@@ -63,7 +67,7 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
       return [
         { name: "fleet" },
         { name: "epic", epicId: action.epicId, epicTitle: null },
-        { name: "chat", epicId: action.epicId, chatId: action.chatId },
+        { name: "chat", epicId: action.epicId, chatId: action.chatId, chatTitle: null },
       ];
   }
 }

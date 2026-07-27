@@ -43,7 +43,8 @@ interface EpicViewProps {
   readonly epicId: string;
   /** The epic's title, known when opened from Fleet; `null` when reached another way (e.g. a notification). */
   readonly epicTitle: string | null;
-  readonly onOpenChat: (chatId: string) => void;
+  /** P2 UX fix: the tree already knows every chat's title (`EpicChatEntry`) — threading it through means ChatView never shows "Untitled chat" while its own snapshot is still loading. `null` for a brand-new chat (its snapshot lands almost immediately). */
+  readonly onOpenChat: (chatId: string, chatTitle: string | null) => void;
   readonly onBack: () => void;
 }
 
@@ -120,7 +121,7 @@ export function EpicView({
         epicId={epicId}
         client={hostClient}
         parentId={drill.parentId}
-        onCreated={onOpenChat}
+        onCreated={(chatId) => onOpenChat(chatId, null)}
         onCancel={() => setDrill(null)}
       />
     );
