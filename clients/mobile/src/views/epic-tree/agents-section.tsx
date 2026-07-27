@@ -25,7 +25,7 @@ import { getLastSeenAt, isUnread } from "@/host/read-tracking-store";
 import { resortTree, type SortMode } from "@/host/tree-sort";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useRenameChat, useDeleteChat } from "@/host/use-node-mutations";
-import { LADDER_TIER_LABELS, LadderIcon, hexToRgba } from "@/views/kind-tokens";
+import { LADDER_TIER_LABELS, LadderIcon } from "@/views/kind-tokens";
 import { theme, type } from "@/views/design-tokens";
 import {
   GuideRails,
@@ -229,7 +229,7 @@ function ChatNode({
           style={{
             ...rowOpenButtonStyle(),
             ...rowIndentStyle(0),
-            background: hexToRgba(theme.primary, 0.06),
+            background: "color-mix(in oklch, var(--primary) 6%, transparent)",
           }}
           onClick={() => onOpen(id)}
         >

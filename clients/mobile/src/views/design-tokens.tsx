@@ -1,40 +1,47 @@
 /**
- * Desktop-ported design tokens + primitives (Sprint 6, round 1).
+ * Design tokens + primitives (Sprint 6 → P1/P2 → Tailwind-foundation pivot).
  *
- * Values are the REAL computed sRGB hex for gui-app's actual default theme —
- * `DEFAULT_THEME_PRESET = "traycer-green"` (`lib/theme-presets.ts`), dark mode
- * — not the plain `:root`/`.dark` base tokens in `index.css` (those are an
- * inert neutral-gray fallback no real install shows). The two OKLCH-defined
- * values in the `traycer-green` dark block (`--success`, and the unmodified
- * `--destructive`/`--warning` inherited from the base `.dark` block) were
- * converted to sRGB hex via `culori` — the same color library gui-app itself
- * uses — for bit-accurate values, not eyeballed.
- *
- * Scope: applied to Fleet + Epic-detail only this round (Sprint 6 contract).
- * `views/ui.ts`'s original tokens stay byte-identical so chat/artifact/
- * comments screens are unaffected until the rest of the app migrates here.
+ * `theme.*` now reference the LIVE CSS custom properties `global.css` sets
+ * under `.dark[data-theme="traycer-green"]` (hardcoded on `<html>` —
+ * `index.html`) rather than hand-copied hex — every screen using `theme.*`
+ * in an inline style picks up the exact same resolved values Tailwind
+ * utility classes do, with zero per-screen changes. `Button`/`Card` now
+ * DELEGATE to the vendored shadcn primitives (`@/components/ui/button`,
+ * `@/components/ui/card` — copied verbatim from gui-app) so every existing
+ * call site gets the real desktop button/card markup for free; the touch
+ * bump (`min-h-11` ≈ 44px) layers on top via `cn()`, since desktop's own
+ * `h-8`/`h-9` targets are mouse-sized (Sprint 6 finding, still valid).
  */
+import type { VariantProps } from "class-variance-authority";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
+import { Button as ShadButton, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+type ShadButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+
+/** The vendored `Card`'s own base classes (`@/components/ui/card.tsx`) — duplicated here since that component has no `asChild` escape hatch for the clickable-row case below. */
+const CARD_BASE_CLASSES =
+  "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-ui-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0";
 
 export const theme = {
-  background: "#121715",
-  surface: "#1a2421",
-  text: "#ffffff",
+  background: "var(--background)",
+  surface: "var(--card)",
+  text: "var(--foreground)",
   // Row/list-item title color — the desktop convention is foreground at
   // ~75% opacity, not flat 100% white (Evaluator round-1 finding).
-  textRow: "rgba(255, 255, 255, 0.87)",
-  mutedText: "#a8a8a8",
-  border: "#33433d",
-  borderHairline: "rgba(255, 255, 255, 0.1)",
-  primary: "#257174",
-  primaryForeground: "#ffffff",
-  danger: "#ff6467",
-  dangerSurface: "rgba(255, 100, 103, 0.12)",
-  success: "#6eba66",
-  warning: "#e6ac3d",
+  textRow: "color-mix(in oklch, var(--foreground) 87%, transparent)",
+  mutedText: "var(--muted-foreground)",
+  border: "var(--border)",
+  borderHairline: "color-mix(in oklch, var(--foreground) 10%, transparent)",
+  primary: "var(--primary)",
+  primaryForeground: "var(--primary-foreground)",
+  danger: "var(--destructive)",
+  dangerSurface: "color-mix(in oklch, var(--destructive) 12%, transparent)",
+  success: "var(--success)",
+  warning: "var(--warning)",
 } as const;
 
-/** `--radius: 0.375rem` base — 6px (buttons) → 8px (rows) → 10px (elevated cards), rising with elevation. */
+/** `--radius: 0.375rem` base — 6px (buttons) → 8px (rows) → 10px (elevated cards), rising with elevation. Mirrors `global.css`'s `@theme inline` radius scale. */
 export const radius = {
   sm: 4,
   md: 6,
@@ -43,7 +50,7 @@ export const radius = {
   xl: 13,
 } as const;
 
-/** `index.css`'s `@theme inline` text scale, px-converted. Titles are MEDIUM weight (500) — desktop's `CardTitle` is `font-medium`, not semibold. */
+/** `global.css`'s `@theme inline` text scale, px-converted. Titles are MEDIUM weight (500) — desktop's `CardTitle` is `font-medium`, not semibold. */
 export const type = {
   titleLg: { fontSize: 30, lineHeight: "36px", fontWeight: 600 } as CSSProperties,
   titleMd: { fontSize: 20, lineHeight: "26px", fontWeight: 600 } as CSSProperties,
@@ -65,16 +72,14 @@ export const screen: CSSProperties = {
   color: theme.text,
 };
 
-const MIN_TOUCH = 44;
-
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "outline" | "destructive";
 
-const BUTTON_VARIANT_STYLE: Readonly<Record<ButtonVariant, CSSProperties>> = {
-  primary: { background: theme.primary, color: theme.primaryForeground, border: "1px solid transparent" },
-  secondary: { background: theme.surface, color: theme.text, border: "1px solid transparent" },
-  ghost: { background: "transparent", color: theme.text, border: "1px solid transparent" },
-  outline: { background: "transparent", color: theme.text, border: `1px solid ${theme.border}` },
-  destructive: { background: theme.dangerSurface, color: theme.danger, border: "1px solid transparent" },
+const VARIANT_TO_SHAD: Readonly<Record<ButtonVariant, ShadButtonVariant>> = {
+  primary: "default",
+  secondary: "secondary",
+  ghost: "ghost",
+  outline: "outline",
+  destructive: "destructive",
 };
 
 export interface ButtonProps {
@@ -86,7 +91,7 @@ export interface ButtonProps {
   readonly type?: "button" | "submit";
 }
 
-/** Desktop's button language (`components/ui/button.tsx`), touch-sized (≥44px — desktop's 32-36px targets are mouse-sized). */
+/** Thin wrapper over the vendored shadcn `Button` — real desktop classes, bumped to a ≥44px touch target (`min-h-11`) since desktop's own sizes are mouse-sized. */
 export function Button({
   variant = "primary",
   children,
@@ -95,68 +100,51 @@ export function Button({
   fullWidth = false,
   type = "button",
 }: ButtonProps): ReactElement {
-  const variantStyle = BUTTON_VARIANT_STYLE[variant];
-  const style: CSSProperties = {
-    ...variantStyle,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: MIN_TOUCH,
-    width: fullWidth ? "100%" : undefined,
-    padding: "0 16px",
-    borderRadius: radius.md,
-    fontSize: 15,
-    fontWeight: 500,
-    cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    whiteSpace: "nowrap",
-  };
   return (
-    <button type={type} style={style} onClick={onClick} disabled={disabled}>
+    <ShadButton
+      type={type}
+      variant={VARIANT_TO_SHAD[variant]}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn("min-h-11 px-4 text-[15px]", fullWidth && "w-full")}
+    >
       {children}
-    </button>
+    </ShadButton>
   );
 }
 
 export interface CardProps {
   readonly children: ReactNode;
   readonly onClick?: () => void;
-  /** A status accent — renders as a LEFT edge only, never replaces the neutral hairline border on the other 3 sides. */
+  /** A status accent — renders as a LEFT edge only, never replaces the neutral hairline ring on the other 3 sides. */
   readonly accentColor?: string;
 }
 
 /**
- * Desktop's card surface (`components/ui/card.tsx`): a LIGHTER surface than
- * the page background (elevation) + a neutral hairline ring — never a flat
- * same-color box with a hard 1px line. `accentColor` (status coloring) only
- * ever tints the LEFT edge, mirroring S1's `KindCard` convention — it never
- * recolors the whole border.
+ * Thin wrapper over the vendored shadcn `Card` classes (real `rounded-xl
+ * ring-1 ring-foreground/10` desktop surface, not a hand-rolled border).
+ * `accentColor` (status coloring) only ever tints the LEFT edge, mirroring
+ * S1's `KindCard` convention — it never recolors the whole ring. Renders a
+ * real `<button>` (not `<div onClick>`) when tappable, for correct
+ * semantics/keyboard support — `@/components/ui/card`'s `Card` has no
+ * `asChild` escape hatch, so the clickable variant applies the same base
+ * classes directly rather than nesting a button inside a div.
  */
 export function Card({ children, onClick, accentColor }: CardProps): ReactElement {
-  const style: CSSProperties = {
-    display: "block",
-    width: "100%",
-    textAlign: "left",
-    background: theme.surface,
-    border: `1px solid ${theme.borderHairline}`,
-    borderLeft: accentColor ? `3px solid ${accentColor}` : `1px solid ${theme.borderHairline}`,
-    borderRadius: radius.lg,
-    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.24)",
-    padding: 12,
-    marginBottom: 8,
-    minHeight: onClick ? MIN_TOUCH : undefined,
-    cursor: onClick ? "pointer" : undefined,
-    color: theme.text,
-  };
+  const style: CSSProperties = accentColor ? { borderLeft: `3px solid ${accentColor}` } : {};
+  const className = cn(CARD_BASE_CLASSES, "mb-2 gap-2 px-4 py-3 text-left", onClick && "min-h-11 w-full cursor-pointer");
   if (onClick) {
     return (
-      <button type="button" style={style} onClick={onClick}>
+      <button type="button" data-slot="card" style={style} className={className} onClick={onClick}>
         {children}
       </button>
     );
   }
-  return <div style={style}>{children}</div>;
+  return (
+    <div data-slot="card" style={style} className={className}>
+      {children}
+    </div>
+  );
 }
 
 export function SectionHeading({ children }: { readonly children: ReactNode }): ReactElement {

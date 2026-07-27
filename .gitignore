@@ -6,6 +6,7 @@
 **/build/
 **/lib/
 !/clients/gui-app/src/lib/
+!/clients/mobile/src/lib/
 **/@types/
 **/.eslintcache
 **/.env
