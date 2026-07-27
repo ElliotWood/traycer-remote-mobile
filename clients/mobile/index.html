@@ -15,6 +15,11 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Traycer Remote</title>
+    <!-- No dedicated favicon asset exists — point the browser at the same
+         PWA icon `vite.config.ts`'s manifest already ships (`icons/icon-192.png`)
+         rather than leaving `/favicon.ico` to 404 on every load. -->
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   </head>
   <body>
     <div id="root"></div>
