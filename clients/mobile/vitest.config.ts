@@ -56,7 +56,14 @@ export default defineConfig({
     ],
   },
   test: {
-    include: ["src/**/__tests__/**/*.test.ts", "src/**/__tests__/**/*.test.tsx"],
+    include: [
+      "src/**/__tests__/**/*.test.ts",
+      "src/**/__tests__/**/*.test.tsx",
+      // Build-time-only helpers (Vite config plugins) live outside `src/`
+      // deliberately — they're Node build tooling, not app bundle code — but
+      // still get the same test coverage.
+      "vite/**/__tests__/**/*.test.ts",
+    ],
     globals: false,
     setupFiles: ["./vitest.setup.ts"],
   },

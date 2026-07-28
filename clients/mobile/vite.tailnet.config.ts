@@ -3,11 +3,14 @@
 // binds ONLY the Tailscale interface and proxies /authn (HTTP) + /rpc + /stream
 // (WebSocket) so a phone on the tailnet loads app + authn + host WS from ONE
 // origin (what the D4 host will eventually do). Mirrors vite.config.ts aliases.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { assetsNotFoundPlugin } from "./vite/assets-not-found-plugin";
+import { collectEntryCriticalUrls } from "./vite/collect-entry-critical-urls";
 
 // Bind loopback; `tailscale serve` fronts this over real HTTPS at
 // https://tonberry.tail267a92.ts.net (secure context → SW/notifications/PWA work).
@@ -23,6 +26,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    assetsNotFoundPlugin(),
     VitePWA({
       strategies: "injectManifest",
       srcDir: "src",
@@ -49,6 +53,26 @@ export default defineConfig({
           "assets/index-*.js",
           "manifest.webmanifest",
           "icons/*.png",
+        ],
+        // Staleness incident (2026-07-28): mirrors vite.config.ts's fix — see
+        // `vite/collect-entry-critical-urls.ts`'s docblock.
+        manifestTransforms: [
+          async (entries) => {
+            const html = readFileSync(resolve(__dirname, "dist", "index.html"), "utf8");
+            const required = collectEntryCriticalUrls(html);
+            const known = new Set(entries.map((entry) => entry.url));
+            const added: string[] = [];
+            for (const url of required) {
+              if (known.has(url)) continue;
+              entries.push({ url, revision: null });
+              added.push(url);
+            }
+            if (added.length > 0) {
+              // eslint-disable-next-line no-console
+              console.log(`[pwa] precached ${added.length} entry-critical asset(s) globPatterns missed: ${added.join(", ")}`);
+            }
+            return { manifest: entries, warnings: [] };
+          },
         ],
       },
     }),
