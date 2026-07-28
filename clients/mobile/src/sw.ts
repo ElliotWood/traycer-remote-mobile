@@ -36,10 +36,15 @@ self.addEventListener("message", (event: ExtendableMessageEvent) => {
   }
 });
 
-self.addEventListener("activate", (event: ExtendableEvent) => {
-  event.waitUntil(self.clients.claim());
-});
-
+// No `self.clients.claim()` on "activate" here — deliberately. Under
+// `registerType: "prompt"`, taking control early buys nothing: the only
+// path a NEW version ever takes control is the explicit skipWaiting →
+// reload flow above, which controls the page naturally via the reload's
+// own fresh navigation. `clients.claim()`'s actual effect was firing a
+// spurious `controllerchange` on the very FIRST install (no previous SW
+// existed to "update" from) — `version-prompt-banner.tsx`'s unconditional
+// `controllerchange` → `window.location.reload()` then reloaded the page
+// once for every user on first install, with nothing to show for it.
 /**
  * S5 (C, P1): a blocked-chat notification's click focuses an existing app
  * client and hands it `{epicId, chatId}` so `AppShell`'s message listener

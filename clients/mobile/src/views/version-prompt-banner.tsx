@@ -23,7 +23,7 @@
  * listener below reloads unconditionally whenever control actually changes,
  * making the tap-to-refresh reload airtight regardless of that edge case.
  */
-import { useEffect, type ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { colors, primaryButton } from "./ui";
 
@@ -35,6 +35,14 @@ import { colors, primaryButton } from "./ui";
 const SW_UPDATE_CHECK_INTERVAL_MS = 60_000;
 
 export function VersionPromptBanner(): ReactElement | null {
+  // #15 fix: `onRegisteredSW` isn't a React effect, so a bare `setInterval`
+  // here had no cleanup path at all — every registration (and this
+  // component only ever mounts once, at the app root, for the whole
+  // session) leaked a forever-running poll timer with no handle retained
+  // to clear it. Tracked in a ref so the effect below can clear it on
+  // unmount, and so a defensive re-registration can never stack a second
+  // interval on top of the first.
+  const updateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -43,11 +51,22 @@ export function VersionPromptBanner(): ReactElement | null {
       if (registration === undefined) {
         return;
       }
-      setInterval(() => {
+      if (updateIntervalRef.current !== null) {
+        clearInterval(updateIntervalRef.current);
+      }
+      updateIntervalRef.current = setInterval(() => {
         void registration.update();
       }, SW_UPDATE_CHECK_INTERVAL_MS);
     },
   });
+
+  useEffect(() => {
+    return () => {
+      if (updateIntervalRef.current !== null) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
