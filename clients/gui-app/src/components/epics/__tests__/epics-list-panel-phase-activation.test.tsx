@@ -181,7 +181,9 @@ function renderPanel() {
         <TooltipProvider>
           <EpicsListPanel
             variant="embedded"
+            className={undefined}
             onSelectEpic={null}
+            onOpenItem={null}
             routeSearch={null}
             historyNowMs={null}
             autoFocusSearch={false}
