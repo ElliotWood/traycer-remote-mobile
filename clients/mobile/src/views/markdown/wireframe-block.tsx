@@ -90,7 +90,12 @@ export function WireframeBlock({ code }: WireframeBlockProps): ReactElement {
         height,
         border: `1px solid ${colors.border}`,
         borderRadius: 8,
-        background: "#fff",
+        // Follows the live theme background (matches desktop's
+        // `.tc-node-wireframe__iframe`'s `var(--color-background)`) — a
+        // hardcoded white here reads as a broken blank box on this app's
+        // dark-first theme whenever the wireframe's own HTML doesn't paint
+        // an opaque background of its own.
+        background: colors.bg,
       }}
     />
   );
