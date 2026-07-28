@@ -35,6 +35,8 @@ function epicRow(
     reviewCount: number;
     status: string;
     createdAt: number;
+    updatedAt: number;
+    pinned: boolean;
   }> = {},
 ): ListTaskLight {
   return {
@@ -49,7 +51,7 @@ function epicRow(
         reviewCount: overrides.reviewCount ?? 0,
         status: overrides.status ?? "in progress",
         createdAt: overrides.createdAt ?? 1,
-        updatedAt: 1,
+        updatedAt: overrides.updatedAt ?? 1,
         createdBy: "u1",
         version: "2.0.0",
       },
@@ -58,6 +60,7 @@ function epicRow(
       workspaces: [],
       roomInfo: null,
     },
+    pinned: overrides.pinned,
   };
 }
 
@@ -133,6 +136,22 @@ describe("toFleetEpics", () => {
     expect(epics.map((e) => e.id)).toEqual(["a", "b"]);
     expect(epics[0]?.title).toBe("Alpha");
   });
+
+  it("projects updatedAt and pinned, defaulting pinned to false when the wire omits it", () => {
+    const epics = toFleetEpics([epicRow("a", { updatedAt: 42, pinned: true }), epicRow("b", { updatedAt: 7 })]);
+    expect(epics.find((e) => e.id === "a")).toMatchObject({ updatedAt: 42, pinned: true });
+    expect(epics.find((e) => e.id === "b")).toMatchObject({ updatedAt: 7, pinned: false });
+  });
+
+  it("sorts pinned rows first, stable within each group", () => {
+    const tasks = [
+      epicRow("a", { title: "A" }),
+      epicRow("b", { title: "B", pinned: true }),
+      epicRow("c", { title: "C" }),
+      epicRow("d", { title: "D", pinned: true }),
+    ];
+    expect(toFleetEpics(tasks).map((e) => e.id)).toEqual(["b", "d", "a", "c"]);
+  });
 });
 
 describe("formatEpicMeta", () => {
@@ -145,6 +164,8 @@ describe("formatEpicMeta", () => {
     reviewCount: 0,
     status: "",
     createdAt: 0,
+    updatedAt: 0,
+    pinned: false,
   };
 
   it("joins non-zero counts and status, pluralizing correctly", () => {

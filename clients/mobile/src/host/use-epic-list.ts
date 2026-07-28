@@ -26,6 +26,7 @@ import type { HostRpcRegistry } from "@traycer/protocol/host/index";
 import type {
   ListTaskLight,
   ListTasksRequest,
+  ListTasksSort,
   ListTasksResponse,
 } from "@traycer/protocol/host/epic/unary-schemas";
 import {
@@ -39,34 +40,55 @@ const PAGE_LIMIT = 20;
 /** Only `request` is needed to fetch a page; kept narrow so tests inject a fake. */
 type EpicListClient = Pick<HostRequester<HostRpcRegistry>, "request">;
 
+/** P4: the sort options mobile exposes — same set desktop's `EpicsSortMenu` offers minus `"relevance"` (meaningful only mid-search-ranking on desktop's larger surface; skipped here as a bounded simplification). */
+export type FleetSort = Exclude<ListTasksSort, "relevance">;
+export const DEFAULT_FLEET_SORT: FleetSort = "recent";
+
+export interface EpicListOptions {
+  /** Free-text search, sent as `filters.query` (server-side — same `epic.listTasks` param desktop's search uses). Empty string sends `filters: null`. */
+  readonly query?: string;
+  readonly sort?: FleetSort;
+}
+
 /**
  * The cursor-less base request, mirroring gui-app's `LIST_CLOUD_TASKS_REQUEST`.
- * `filters: null` (no server-side taskType filter, exactly as gui-app sends);
- * the epic/phase split is handled client-side in `toFleetEpics`.
+ * The epic/phase split is handled client-side in `toFleetEpics`.
  */
-export const EPIC_LIST_REQUEST: Omit<ListTasksRequest, "cursor"> = {
-  limit: PAGE_LIMIT,
-  filters: null,
-  sort: "recent",
-  extensionPhaseVersion: String(CURRENT_PHASE_VERSION),
-  extensionEpicVersion: String(CURRENT_EPIC_VERSION),
-};
+function buildBaseRequest(options: EpicListOptions): Omit<ListTasksRequest, "cursor"> {
+  const trimmedQuery = (options.query ?? "").trim();
+  return {
+    limit: PAGE_LIMIT,
+    filters: trimmedQuery.length > 0 ? { query: trimmedQuery } : null,
+    sort: options.sort ?? DEFAULT_FLEET_SORT,
+    extensionPhaseVersion: String(CURRENT_PHASE_VERSION),
+    extensionEpicVersion: String(CURRENT_EPIC_VERSION),
+  };
+}
 
-const EPIC_LIST_QUERY_KEY = ["mobile", "epic.listTasks", "fleet"] as const;
+/** Back-compat export for the default (no search/sort) request shape existing callers/tests rely on. */
+export const EPIC_LIST_REQUEST: Omit<ListTasksRequest, "cursor"> = buildBaseRequest({});
+
+/** Shared prefix every fleet-list query key starts with, regardless of search/sort — TanStack's partial-key matching lets `use-epic-set-pinned-mutation.ts` invalidate every variant with one call. */
+export const EPIC_LIST_QUERY_KEY_PREFIX = ["mobile", "epic.listTasks", "fleet"] as const;
+
+function epicListQueryKey(options: EpicListOptions) {
+  return [...EPIC_LIST_QUERY_KEY_PREFIX, options.query ?? "", options.sort ?? DEFAULT_FLEET_SORT] as const;
+}
 
 export function buildEpicListRequest(
   cursor: string | undefined,
+  options: EpicListOptions = {},
 ): ListTasksRequest {
-  return cursor === undefined
-    ? { ...EPIC_LIST_REQUEST }
-    : { ...EPIC_LIST_REQUEST, cursor };
+  const base = buildBaseRequest(options);
+  return cursor === undefined ? { ...base } : { ...base, cursor };
 }
 
 export function fetchEpicListPage(
   client: EpicListClient,
   cursor: string | undefined,
+  options: EpicListOptions = {},
 ): Promise<ListTasksResponse> {
-  return client.request("epic.listTasks", buildEpicListRequest(cursor));
+  return client.request("epic.listTasks", buildEpicListRequest(cursor, options));
 }
 
 /**
@@ -81,7 +103,7 @@ export function epicListNextCursor(page: ListTasksResponse): string | undefined 
     : undefined;
 }
 
-/** One Fleet row: an epic's title, artifact counts, and freeform status. */
+/** One Fleet row: an epic's title, artifact counts, freeform status, and (P4) last-activity time + pin state. */
 export interface FleetEpic {
   readonly id: string;
   readonly title: string;
@@ -91,6 +113,10 @@ export interface FleetEpic {
   readonly reviewCount: number;
   readonly status: string;
   readonly createdAt: number;
+  /** `epicLightSchema.updatedAt` — already on the wire, just wasn't projected before P4. */
+  readonly updatedAt: number;
+  /** `ListTaskLight.pinned` is `optional()` on the wire (an older host omits it) — defaults to `false`, never `undefined`, so callers never need an extra null-check. */
+  readonly pinned: boolean;
 }
 
 /**
@@ -98,6 +124,17 @@ export interface FleetEpic {
  * (dropping phase rows and rows whose light is null — deleted / not permitted),
  * and de-dupes by id (first occurrence wins) so an id repeated across page
  * boundaries never renders twice.
+ *
+ * P4: pinned rows sort first WITHIN the tasks passed in (stable — relative
+ * order preserved inside each of the pinned/unpinned groups). This is a
+ * bounded simplification versus desktop's cross-ALL-pages pin reconciliation
+ * (which needs a full accumulation store desktop's Zustand page cache
+ * provides and mobile deliberately doesn't carry — see this module's
+ * docblock): a pinned epic sorts to the top of whichever page(s) are
+ * currently loaded, not necessarily the very top of the whole list once
+ * later pages load. Good enough for the common case (pinned epics are
+ * usually recently-touched, so they're on page 1 anyway); flagged, not
+ * silent.
  */
 export function toFleetEpics(
   tasks: readonly ListTaskLight[],
@@ -118,9 +155,11 @@ export function toFleetEpics(
       reviewCount: light.reviewCount,
       status: light.status,
       createdAt: light.createdAt,
+      updatedAt: light.updatedAt,
+      pinned: task.pinned === true,
     });
   }
-  return epics;
+  return [...epics.filter((e) => e.pinned), ...epics.filter((e) => !e.pinned)];
 }
 
 function pluralize(n: number, singular: string, plural?: string): string {
@@ -177,16 +216,16 @@ export interface EpicListResult {
  */
 const FLEET_REFETCH_INTERVAL_MS = 20_000;
 
-export function useEpicList(client: EpicListClient): EpicListResult {
+export function useEpicList(client: EpicListClient, options: EpicListOptions = {}): EpicListResult {
   const query = useInfiniteQuery<
     ListTasksResponse,
     Error,
     InfiniteData<ListTasksResponse, string | undefined>,
-    typeof EPIC_LIST_QUERY_KEY,
+    ReturnType<typeof epicListQueryKey>,
     string | undefined
   >({
-    queryKey: EPIC_LIST_QUERY_KEY,
-    queryFn: ({ pageParam }) => fetchEpicListPage(client, pageParam),
+    queryKey: epicListQueryKey(options),
+    queryFn: ({ pageParam }) => fetchEpicListPage(client, pageParam, options),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => epicListNextCursor(lastPage),
     refetchOnWindowFocus: true,
