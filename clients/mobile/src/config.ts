@@ -44,3 +44,18 @@ export const AUTHN_CONFIGURED: boolean =
 export const AUTHN_BASE_URL: string = AUTHN_CONFIGURED
   ? (rawAuthn as string)
   : "https://authn.traycer.ai";
+
+// The mobile-push-service HTTP API base — `null` means background push isn't
+// configured for this build, and the alerts affordance degrades to
+// "unsupported" rather than a dead subscribe attempt.
+//
+// This is the FULL, prefixed origin the client calls (e.g. `<origin>/push`).
+// Note the deployment asymmetry: a reverse proxy mounting the service under a
+// path prefix typically STRIPS that prefix before forwarding, so the service
+// itself is mounted prefix-free and only the client carries the prefix.
+// Verify the received path against a real request rather than assuming — this
+// exact mismatch has bitten on this rig before.
+const rawPushBase: unknown = import.meta.env.VITE_PUSH_BASE_URL;
+
+export const PUSH_BASE_URL: string | null =
+  typeof rawPushBase === "string" && rawPushBase.length > 0 ? rawPushBase : null;

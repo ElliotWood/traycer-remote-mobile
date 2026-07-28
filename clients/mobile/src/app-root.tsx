@@ -28,6 +28,7 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { AUTHN_BASE_URL, AUTHN_CONFIGURED, HOST_WS_URL } from "@/config";
 import { computeConfigProblems } from "@/config-diagnostics";
 import { MobileAuthService } from "@/host/auth-service";
+import { AuthServiceProvider } from "@/host/auth-service-context";
 import { CACHE_MAX_AGE_MS, CACHE_SCHEMA_VERSION } from "@/host/cache-config";
 import { createHostConnection } from "@/host/connection";
 import { HostClientProvider } from "@/host/host-client-context";
@@ -141,14 +142,16 @@ export function AppRoot(): ReactElement {
 
   const shell = (
     <RestoreGate>
-      <HostClientProvider client={connection?.hostClient ?? null}>
-        <StreamConnectionProvider connection={streamConnection}>
-          {/* Last resort: catches anything the per-screen boundaries (app-shell.tsx) miss (e.g. the sign-in gate itself). */}
-          <ErrorBoundary label="Traycer Remote">
-            <App auth={auth} />
-          </ErrorBoundary>
-        </StreamConnectionProvider>
-      </HostClientProvider>
+      <AuthServiceProvider auth={auth}>
+        <HostClientProvider client={connection?.hostClient ?? null}>
+          <StreamConnectionProvider connection={streamConnection}>
+            {/* Last resort: catches anything the per-screen boundaries (app-shell.tsx) miss (e.g. the sign-in gate itself). */}
+            <ErrorBoundary label="Traycer Remote">
+              <App auth={auth} />
+            </ErrorBoundary>
+          </StreamConnectionProvider>
+        </HostClientProvider>
+      </AuthServiceProvider>
     </RestoreGate>
   );
 

@@ -134,13 +134,19 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
   }, []);
   const canGoBack = stack.length > 1;
 
-  // S5 (C, P1): a blocked-chat notification's click posts a message to an
-  // existing client (see `src/sw.ts`'s `notificationclick`); this is the one
-  // place that turns it into real navigation, reusing the existing nav stack
-  // rather than adding URL routing. `goto-chat` replaces the stack outright so
-  // clicking a notification can never duplicate an epic/chat frame. Runs
-  // unconditionally (before the harness-route early return below) so every
-  // hook in this component fires on every render.
+  // S5 (C, P1): a blocked-chat / background-push notification's click posts a
+  // message to an existing client (see `src/sw.ts`'s `notificationclick`);
+  // this is the one place that turns it into real navigation, reusing the
+  // existing nav stack rather than adding URL routing. `goto-chat` replaces
+  // the stack outright so clicking a notification can never duplicate an
+  // epic/chat frame. Runs unconditionally (before the harness-route early
+  // return below) so every hook in this component fires on every render.
+  //
+  // Push sprint: the SW sends this over a `MessageChannel` port and waits up
+  // to 1s for an ack (see `sw.ts`'s `postOpenChatWithAck`) — if this listener
+  // hasn't mounted yet (a narrow boot race right after a fresh tab opens),
+  // the SW falls back to a real `navigate()` instead of the tap silently
+  // doing nothing. Acking here is what lets the SW tell the two cases apart.
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
       return;
@@ -154,11 +160,32 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
         epicId: event.data.epicId,
         chatId: event.data.chatId,
       });
+      event.ports[0]?.postMessage({ type: "ack" });
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => {
       navigator.serviceWorker.removeEventListener("message", onMessage);
     };
+  }, []);
+
+  // Push sprint: cold-open deep-link. `sw.ts`'s `notificationclick` carries
+  // the target chat in the reopen URL (`/?epicId=…&chatId=…`) when no
+  // existing client was found to `postMessage` — precedented by this file's
+  // own `?comments=1&…` harness params and `main.tsx`'s `?showcase=1`, both
+  // boot-time `window.location.search` reads. One-shot (empty deps): fires
+  // once on mount, then strips the params so they don't linger in the URL bar
+  // or re-trigger on an unrelated re-render. Malformed/incomplete params
+  // (only one of the two present, or either empty) are left alone — no
+  // dispatch, the default Fleet stack stands.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const epicId = params.get("epicId");
+    const chatId = params.get("chatId");
+    if (epicId === null || epicId.length === 0 || chatId === null || chatId.length === 0) {
+      return;
+    }
+    dispatch({ type: "goto-chat", epicId, chatId });
+    window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   const harnessParams = useMemo(
