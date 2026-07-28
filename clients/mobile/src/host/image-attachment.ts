@@ -51,6 +51,36 @@ export interface PreparedAttachment {
 
 export class AttachmentTooLargeError extends Error {}
 
+/**
+ * In-memory, session-only cache of just-sent attachment bytes, keyed by
+ * attachment id — NEVER persisted (not localStorage, not IndexedDB).
+ *
+ * Bug fix: the host rewrites a persisted `imageAttachment` node's
+ * `b64content` to a `hash` reference after the turn lands, and there is no
+ * attachment-read-by-hash RPC to re-fetch the bytes from — so the "next
+ * live snapshot always re-supplies it" assumption this module's docblock
+ * used to make was wrong; a sent image went permanently unviewable once the
+ * host rewrote it. This cache is populated at send time (`use-chat.ts`'s
+ * `sendMessage`, from the `PreparedAttachment.dataUrl` already sitting in
+ * memory) so the SENDER can still view what they just sent. It does nothing
+ * for attachments authored elsewhere (another device/session) whose bytes
+ * this client never held — those degrade to `UserMessageBubble`'s honest
+ * labeled-chip fallback, same as desktop's `renderImageAttachment` (desktop
+ * doesn't render thumbnails AT ALL — this is mobile's bounded improvement on
+ * that, not a regression from it).
+ */
+const sentAttachmentDataUrls = new Map<string, string>();
+
+export function rememberSentAttachments(attachments: readonly PreparedAttachment[]): void {
+  for (const attachment of attachments) {
+    sentAttachmentDataUrls.set(attachment.id, attachment.dataUrl);
+  }
+}
+
+export function getRememberedAttachmentDataUrl(id: string): string | null {
+  return sentAttachmentDataUrls.get(id) ?? null;
+}
+
 function loadImage(objectUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -178,10 +208,11 @@ export function extractImageAttachments(content: JsonContent): readonly ImageAtt
  * Deep-clones a message doc with every `imageAttachment` node's `b64content`
  * removed — the ONLY thing excluded from the localStorage transcript cache
  * (`use-chat.ts`'s `serializeChatCache`). A cache-seeded render of a message
- * carrying a stripped attachment shows a "photo not cached" placeholder
- * (`user-message-bubble.tsx`) rather than a broken image — the next live
- * snapshot always re-supplies the real bytes (this only affects the
- * cache-seed window before `hasSnapshot` flips true).
+ * carrying a stripped attachment falls back to the same honest labeled chip
+ * `UserMessageBubble` shows for any attachment with no viewable bytes (see
+ * `sentAttachmentDataUrls` above) — not a broken image, but also not
+ * necessarily re-supplied by the next live snapshot, since the HOST also
+ * strips `b64content` (to a `hash`) once the turn is persisted.
  */
 export function stripAttachmentPayloads(content: JsonContent): JsonContent {
   if (content.type === IMAGE_ATTACHMENT_NODE_TYPE && content.attrs !== undefined) {

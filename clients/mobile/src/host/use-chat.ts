@@ -43,7 +43,12 @@ import type {
   InterviewAnswer,
 } from "@traycer/protocol/persistence/epic/content-blocks";
 import { CACHE_SCHEMA_VERSION } from "./cache-config";
-import { messageContentWithAttachments, stripAttachmentPayloads, type PreparedAttachment } from "./image-attachment";
+import {
+  messageContentWithAttachments,
+  rememberSentAttachments,
+  stripAttachmentPayloads,
+  type PreparedAttachment,
+} from "./image-attachment";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
 import { startLivenessRecovery } from "./liveness-recovery";
@@ -769,6 +774,10 @@ export function useChat(
       const text = args.text.trim();
       const attachments = args.attachments ?? [];
       if (stream === null || userId === null || (text.length === 0 && attachments.length === 0)) return;
+      // So the sender can still view what they just sent once the host
+      // rewrites the persisted b64content to a hash — see the docblock on
+      // `rememberSentAttachments`.
+      rememberSentAttachments(attachments);
       const frame: ChatSubscribeClientFrame = {
         hasBinaryPayload: false,
         epicId,
