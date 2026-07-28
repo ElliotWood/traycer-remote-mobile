@@ -29,7 +29,18 @@ export const CONFIGURED_HOST_ID: string | null =
 // `process.env`.
 const rawAuthn: unknown = import.meta.env.VITE_AUTHN_BASE_URL;
 
-export const AUTHN_BASE_URL: string =
-  typeof rawAuthn === "string" && rawAuthn.length > 0
-    ? rawAuthn
-    : "https://authn.traycer.ai";
+/**
+ * Whether `VITE_AUTHN_BASE_URL` was actually supplied at build time, as
+ * opposed to `AUTHN_BASE_URL` having fallen back to the production default
+ * below. `config-diagnostics.ts` needs this distinction: the default is only
+ * SAFE when this build is served from the real production origin (authn's
+ * CORS allowlist is that one origin, see the docblock below) — everywhere
+ * else, a defaulted value is a guaranteed CORS failure on sign-in, not a
+ * degraded-but-working state.
+ */
+export const AUTHN_CONFIGURED: boolean =
+  typeof rawAuthn === "string" && rawAuthn.length > 0;
+
+export const AUTHN_BASE_URL: string = AUTHN_CONFIGURED
+  ? (rawAuthn as string)
+  : "https://authn.traycer.ai";

@@ -25,7 +25,8 @@ import {
 } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { AUTHN_BASE_URL } from "@/config";
+import { AUTHN_BASE_URL, AUTHN_CONFIGURED, HOST_WS_URL } from "@/config";
+import { computeConfigProblems } from "@/config-diagnostics";
 import { MobileAuthService } from "@/host/auth-service";
 import { CACHE_MAX_AGE_MS, CACHE_SCHEMA_VERSION } from "@/host/cache-config";
 import { createHostConnection } from "@/host/connection";
@@ -33,6 +34,7 @@ import { HostClientProvider } from "@/host/host-client-context";
 import { HostStreamConnection } from "@/host/stream-connection";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { App } from "@/App";
+import { ConfigErrorScreen } from "@/views/config-error-screen";
 import { ErrorBoundary } from "@/views/error-boundary";
 import { VersionPromptBanner } from "@/views/version-prompt-banner";
 
@@ -72,6 +74,21 @@ function RestoreGate({ children }: { readonly children: ReactNode }): ReactEleme
 }
 
 export function AppRoot(): ReactElement {
+  // Fail loudly, before constructing auth/the host connection/anything else:
+  // a build missing required env config can't work regardless of what the
+  // user does next (see `config-diagnostics.ts`). Computed from build-time
+  // constants + `window.location.origin` — both invariant for the page's
+  // lifetime — so this early return (before any hooks run) is safe: hook
+  // order for a given mounted instance never actually varies.
+  const configProblems = computeConfigProblems({
+    authnConfigured: AUTHN_CONFIGURED,
+    hostWsUrl: HOST_WS_URL,
+    origin: typeof window === "undefined" ? "" : window.location.origin,
+  });
+  if (configProblems.length > 0) {
+    return <ConfigErrorScreen problems={configProblems} />;
+  }
+
   const [auth] = useState(
     () =>
       new MobileAuthService({

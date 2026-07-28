@@ -10,7 +10,11 @@
  * `auth` is injected (not constructed here) so this component is renderable in a
  * test with a fake auth + a fake host client provided through
  * `HostClientProvider`. The composition root that wires the real services is
- * `AppRoot`.
+ * `AppRoot` — which is also where the config-validity gate lives
+ * (`config-diagnostics.ts`'s `ConfigErrorScreen`): a check reading real
+ * build-time env constants belongs ahead of this component, not inside it,
+ * so this component stays renderable in tests with an injected fake client
+ * regardless of what `VITE_*` happens to be at test time.
  */
 import type { ReactElement } from "react";
 import { selectAppScreen } from "@/app-screen";
