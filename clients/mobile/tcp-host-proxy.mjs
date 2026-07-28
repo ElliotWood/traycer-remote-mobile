@@ -5,8 +5,15 @@
 // (protocol-agnostic, unlike Vite's ws proxy which ECONNRESETs on WS-RPC).
 import net from "node:net";
 
-const LISTEN_HOST = "100.110.27.82";
-const LISTEN_PORT = 5274;
+// Loopback: `tailscale serve` fronts this over HTTPS, so the phone reaches it
+// as wss://<magicdns>/rpc (a SECURE origin — required for service workers,
+// notifications and push, which browsers disable over plain http/ws).
+const LISTEN_HOST = "127.0.0.1";
+// `tailscale serve --set-path=/rpc` strips the prefix before proxying, so the
+// host would receive `GET /` and reject the upgrade. Each instance therefore
+// forces the request path it fronts. Usage: node tcp-host-proxy.mjs [port] [path]
+const LISTEN_PORT = Number(process.argv[2] ?? 5274);
+const FORCE_PATH = process.argv[3] ?? "/rpc";
 const TARGET_HOST = "127.0.0.1";
 // The Traycer host picks a NEW random port every restart, so never hardcode it:
 // read the authoritative port from ~/.traycer/host/pid.json at connect time.
@@ -61,6 +68,8 @@ const server = net.createServer((client) => {
     }
     let head = buf.slice(0, idx).toString("utf8");
     const body = buf.slice(idx + 4); // bytes after headers (usually empty pre-upgrade)
+    // Force the path this instance fronts (the tunnel may have stripped it).
+    head = head.replace(/^(GET|POST|HEAD)\s+\S+\s+(HTTP\/[\d.]+)/i, `$1 ${FORCE_PATH} $2`);
     head = head.replace(/Host:[^\r\n]*/i, `Host: ${LOOPBACK_HOST}`);
     head = head.replace(/Origin:[^\r\n]*/i, `Origin: ${LOOPBACK_ORIGIN}`);
     upstream.write(Buffer.concat([Buffer.from(head + "\r\n\r\n", "utf8"), body]));

@@ -9,7 +9,9 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const TAILSCALE_IP = "100.110.27.82";
+// Bind loopback; `tailscale serve` fronts this over real HTTPS at
+// https://tonberry.tail267a92.ts.net (secure context → SW/notifications/PWA work).
+const TAILSCALE_IP = "127.0.0.1";
 const HOST_WS = "ws://127.0.0.1:55945"; // loopback host, proxied below
 
 export default defineConfig({
