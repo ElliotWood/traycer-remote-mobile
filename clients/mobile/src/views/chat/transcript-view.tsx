@@ -27,6 +27,9 @@ export interface TranscriptViewProps {
   readonly liveBlocks: readonly ContentBlock[];
   readonly epicId: string;
   readonly chatId: string;
+  /** Delivery status for an optimistically-sent message (batch 1 #4/#5) — `undefined` for anything not our own in-flight/failed send. */
+  readonly sendStatusFor: (messageId: string) => "pending" | "failed" | undefined;
+  readonly onRetrySend: (messageId: string) => void;
 }
 
 function TranscriptViewImpl({
@@ -34,6 +37,8 @@ function TranscriptViewImpl({
   liveBlocks,
   epicId,
   chatId,
+  sendStatusFor,
+  onRetrySend,
 }: TranscriptViewProps): ReactElement {
   return (
     <div data-testid="transcript-view">
@@ -43,6 +48,8 @@ function TranscriptViewImpl({
             key={message.messageId}
             content={message.message.content}
             sender={message.sender}
+            sendStatus={sendStatusFor(message.messageId)}
+            onRetry={() => onRetrySend(message.messageId)}
           />
         ) : (
           <AssistantTurn

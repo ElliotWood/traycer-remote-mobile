@@ -274,6 +274,8 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
             liveBlocks={chat.liveTurnBlocks}
             epicId={epicId}
             chatId={chatId}
+            sendStatusFor={chat.sendStatusFor}
+            onRetrySend={chat.retrySend}
           />
         )}
         {isRunning && (

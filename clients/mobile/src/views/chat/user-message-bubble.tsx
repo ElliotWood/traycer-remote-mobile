@@ -20,12 +20,17 @@ export interface UserMessageBubbleProps {
   readonly content: JsonContent;
   readonly sender: UserMessageSender | null;
   readonly steered?: boolean;
+  /** Optimistic-send delivery status (batch 1 #4/#5) — `undefined`/`"pending"` render normally; `"failed"` shows the retry affordance. Absent for a `steer` block, which isn't a tracked send. */
+  readonly sendStatus?: "pending" | "failed" | undefined;
+  readonly onRetry?: () => void;
 }
 
 function UserMessageBubbleImpl({
   content,
   sender,
   steered = false,
+  sendStatus,
+  onRetry,
 }: UserMessageBubbleProps): ReactElement {
   const markdown = userContentToMarkdown(content);
   const provenance = sender !== null ? userSenderProvenance(sender) : null;
@@ -128,10 +133,34 @@ function UserMessageBubbleImpl({
               background: "#1f2b3a",
               borderRadius: 12,
               padding: "8px 12px",
+              // A "failed" send is still shown (never silently disappears —
+              // that was the original bug) but visually dimmed so it doesn't
+              // read as a normal, successfully-delivered message.
+              opacity: sendStatus === "failed" ? 0.6 : 1,
             }}
           >
             <MobileMarkdown>{markdown}</MobileMarkdown>
           </div>
+        )}
+        {sendStatus === "failed" && (
+          <button
+            type="button"
+            data-testid="retry-send"
+            onClick={onRetry}
+            style={{
+              display: "block",
+              marginLeft: "auto",
+              marginTop: 4,
+              border: "none",
+              background: "transparent",
+              color: colors.danger,
+              fontSize: 12,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            Didn't send — tap to retry
+          </button>
         )}
       </div>
       {lightboxSrc !== null && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}

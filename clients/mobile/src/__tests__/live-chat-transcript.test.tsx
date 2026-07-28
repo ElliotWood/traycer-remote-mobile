@@ -151,7 +151,14 @@ runIf("live chat transcript — real content robustness", () => {
 
       expect(() =>
         renderToStaticMarkup(
-          <TranscriptView messages={messages} liveBlocks={[]} epicId={EPIC_ID} chatId={CHAT_ID} />,
+          <TranscriptView
+            messages={messages}
+            liveBlocks={[]}
+            epicId={EPIC_ID}
+            chatId={CHAT_ID}
+            sendStatusFor={() => undefined}
+            onRetrySend={() => {}}
+          />,
         ),
       ).not.toThrow();
     },
