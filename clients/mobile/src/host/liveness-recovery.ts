@@ -8,14 +8,18 @@
  * a reconnect is enough to refresh a view's data with no new decode logic.
  * This module only decides WHEN to call it:
  *
- *   - `focus` / `visibilitychange`→visible / `online` — unconditional. A
- *     backgrounded mobile tab can have a silently-dead socket the status
- *     store hasn't noticed yet, so these fire even if `connection` still
- *     reads "live" (gating them on liveness would miss exactly that case).
+ *   - `focus` / `visibilitychange`→visible / `online` / `pageshow` —
+ *     unconditional. A backgrounded mobile tab can have a silently-dead
+ *     socket the status store hasn't noticed yet, so these fire even if
+ *     `connection` still reads "live" (gating them on liveness would miss
+ *     exactly that case). `pageshow` covers iOS Safari/PWA's
+ *     back-forward-cache restore specifically — a long background
+ *     suspension there can resurrect the page via bfcache in a tick where
+ *     `visibilitychange`/`focus` don't reliably fire first.
  *   - A gentle interval backstop, gated on `!isLive()` (true no-op while
  *     healthy) — nudges a still-stuck session if neither wake signal fired.
  *
- * All four routes share ONE cooldown so a burst (`focus` + `visibilitychange`
+ * All five routes share ONE cooldown so a burst (`focus` + `visibilitychange`
  * firing together, or the backstop ticking moments after a wake signal
  * already reconnected) collapses into a single `reconnectAll` call rather than
  * hammering the transport.
@@ -103,6 +107,7 @@ export function startLivenessRecovery(options: LivenessRecoveryOptions): () => v
 
   const onFocus = (): void => trigger("window-focus");
   const onOnline = (): void => trigger("network-online");
+  const onPageShow = (): void => trigger("page-show");
   const onVisibilityChange = (): void => {
     if (documentTarget.visibilityState === "visible") {
       trigger("visibility-visible");
@@ -111,6 +116,7 @@ export function startLivenessRecovery(options: LivenessRecoveryOptions): () => v
 
   windowTarget.addEventListener("focus", onFocus);
   windowTarget.addEventListener("online", onOnline);
+  windowTarget.addEventListener("pageshow", onPageShow);
   documentTarget.addEventListener("visibilitychange", onVisibilityChange);
 
   const backstopHandle = setIntervalFn(() => {
@@ -125,6 +131,7 @@ export function startLivenessRecovery(options: LivenessRecoveryOptions): () => v
     torn = true;
     windowTarget.removeEventListener("focus", onFocus);
     windowTarget.removeEventListener("online", onOnline);
+    windowTarget.removeEventListener("pageshow", onPageShow);
     documentTarget.removeEventListener("visibilitychange", onVisibilityChange);
     clearIntervalFn(backstopHandle);
   };

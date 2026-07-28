@@ -91,7 +91,11 @@ describe("startLivenessRecovery", () => {
     documentTarget.fire("visibilitychange");
     expect(reconnect).toHaveBeenCalledWith("visibility-visible");
 
-    expect(reconnect).toHaveBeenCalledTimes(3);
+    clock.advance(6_000);
+    windowTarget.fire("pageshow");
+    expect(reconnect).toHaveBeenCalledWith("page-show");
+
+    expect(reconnect).toHaveBeenCalledTimes(4);
   });
 
   it("does not reconnect on visibilitychange when the document is hidden", () => {
@@ -232,6 +236,7 @@ describe("startLivenessRecovery", () => {
 
     expect(windowTarget.listenerCount("focus")).toBe(1);
     expect(windowTarget.listenerCount("online")).toBe(1);
+    expect(windowTarget.listenerCount("pageshow")).toBe(1);
     expect(documentTarget.listenerCount("visibilitychange")).toBe(1);
     expect(interval.activeCount()).toBe(1);
 
@@ -239,6 +244,7 @@ describe("startLivenessRecovery", () => {
 
     expect(windowTarget.listenerCount("focus")).toBe(0);
     expect(windowTarget.listenerCount("online")).toBe(0);
+    expect(windowTarget.listenerCount("pageshow")).toBe(0);
     expect(documentTarget.listenerCount("visibilitychange")).toBe(0);
     expect(interval.activeCount()).toBe(0);
 

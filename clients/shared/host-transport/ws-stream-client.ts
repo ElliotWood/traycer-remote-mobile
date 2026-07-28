@@ -554,15 +554,21 @@ class StreamSession<
   }
 
   /**
-   * Proactively drops the current socket and re-dials immediately. Used on a
-   * device-wake / network-online signal: the socket may be half-open (the OS
-   * froze it during sleep) while we still believe we are subscribed, and we
-   * would otherwise wait out the full pong timeout (~60s) before noticing.
-   * `teardownSocket` closes the (possibly half-open) socket with its `onclose`
-   * already detached, so it cannot re-enter the drop path; resetting the attempt
-   * counters makes the redial immediate rather than on the accumulated backoff;
-   * `onTransportDrop` re-arms the reconnect and the dial re-sends the subscribe
-   * frame. No-op once the session is permanently closed.
+   * Proactively drops the current socket and re-dials IMMEDIATELY (0ms, not
+   * merely reset-to-attempt-0). Used on a device-wake / network-online
+   * signal: the socket may be half-open (the OS froze it during sleep)
+   * while we still believe we are subscribed, and we would otherwise wait
+   * out the full pong timeout (~60s) before noticing.
+   *
+   * Deliberately bypasses `onTransportDrop()` (used by every OTHER drop
+   * path) because that always schedules through `backoffFor`, whose
+   * `attempt<=0` case still returns the flat `initialBackoffMs` (not 0) —
+   * fine for an ordinary drop, but a wasted second on a signal that already
+   * knows reconnecting now is worth it. `teardownSocket` closes the
+   * (possibly half-open) socket with its `onclose` already detached, so it
+   * cannot re-enter the drop path; resetting the attempt counters keeps
+   * subsequent-failure backoff escalation starting fresh from this redial,
+   * same as before. No-op once the session is permanently closed.
    */
   forceReconnect(reason: string): void {
     if (this.disposed) {
@@ -571,7 +577,8 @@ class StreamSession<
     this.teardownSocket(1000, reason);
     this.reconnectAttempt = 0;
     this.slowClientReconnectStreak = 0;
-    this.onTransportDrop();
+    this.resetForReconnect();
+    this.scheduleReconnect(true);
   }
 
   /**
@@ -1243,7 +1250,15 @@ class StreamSession<
     this.transitionTo("reconnecting", null);
   }
 
-  private scheduleReconnect(): void {
+  /**
+   * `immediate` (only `forceReconnect` passes `true`) skips straight to a
+   * 0ms delay instead of `backoffFor`'s schedule — a wake/online signal
+   * already knows the drop wasn't a failed attempt to escalate away from.
+   * `reconnectAttempt` still advances either way, so a redial that itself
+   * fails resumes normal exponential escalation from there, same as any
+   * other drop.
+   */
+  private scheduleReconnect(immediate = false): void {
     if (this.disposed) {
       return;
     }
@@ -1256,11 +1271,13 @@ class StreamSession<
     // rather than retrying at the initial delay (which resets on every
     // successful subscribe). For all other drops the streak is 0 and this is
     // exactly `backoffFor(reconnectAttempt, ...)`.
-    const delay = backoffFor(
-      Math.max(this.reconnectAttempt, this.slowClientReconnectStreak),
-      this.config.initialBackoffMs,
-      this.config.maxBackoffMs,
-    );
+    const delay = immediate
+      ? 0
+      : backoffFor(
+          Math.max(this.reconnectAttempt, this.slowClientReconnectStreak),
+          this.config.initialBackoffMs,
+          this.config.maxBackoffMs,
+        );
     this.reconnectAttempt += 1;
     this.backoffTimer = setTimeout(() => {
       this.backoffTimer = null;
