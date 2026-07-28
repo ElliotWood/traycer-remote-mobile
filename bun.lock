@@ -251,6 +251,28 @@
         "workbox-window": "^7.4.1",
       },
     },
+    "clients/remote": {
+      "name": "@traycer-clients/remote",
+      "version": "0.1.0",
+      "bin": {
+        "traycer-remote": "./src/index.ts",
+      },
+      "dependencies": {
+        "commander": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@traycer-clients/shared": "workspace:*",
+        "@traycer/protocol": "workspace:*",
+        "@types/node": "catalog:",
+        "@typescript-eslint/eslint-plugin": "catalog:",
+        "@typescript-eslint/parser": "catalog:",
+        "eslint": "catalog:",
+        "prettier": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "clients/shared": {
       "name": "@traycer-clients/shared",
       "dependencies": {
@@ -1600,6 +1622,8 @@
     "@traycer-clients/gui-app": ["@traycer-clients/gui-app@workspace:clients/gui-app"],
 
     "@traycer-clients/mobile": ["@traycer-clients/mobile@workspace:clients/mobile"],
+
+    "@traycer-clients/remote": ["@traycer-clients/remote@workspace:clients/remote"],
 
     "@traycer-clients/shared": ["@traycer-clients/shared@workspace:clients/shared"],
 
