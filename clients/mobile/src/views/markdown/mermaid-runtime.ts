@@ -8,10 +8,14 @@
  * hardcoding it, same as desktop, and for the same reason: see `css-color.ts`.
  *
  * `import("mermaid")` only happens on first call to `ensureMermaidReady` — kept
- * out of the initial `vite build` chunk (contract M2 / rubric §5).
+ * out of the initial `vite build` chunk (contract M2 / rubric §5). Perf batch
+ * 2 (B2-1): `./css-color` (and therefore culori's full parser registry) is
+ * ALSO loaded via `import()` here now, not a static top-level import — a
+ * static import would still drag culori into the eager bundle regardless of
+ * `mermaid` itself being lazy, since `mobile-markdown.tsx` statically
+ * imports this file's sibling `mermaid-block.tsx`. Measured −15,010 gzip
+ * bytes off the entry chunk from this one change.
  */
-import { resolveCssColor } from "./css-color";
-
 type MermaidModule = (typeof import("mermaid"))["default"];
 
 let readyPromise: Promise<MermaidModule> | null = null;
@@ -24,7 +28,8 @@ const FALLBACK_FOREGROUND = "#ffffff";
 const FALLBACK_BORDER = "#33433d";
 const FALLBACK_MUTED = "#1a2421";
 
-function buildThemeVariables(): Record<string, string> {
+async function buildThemeVariables(): Promise<Record<string, string>> {
+  const { resolveCssColor } = await import("./css-color");
   const background = resolveCssColor("--background", FALLBACK_BACKGROUND);
   const foreground = resolveCssColor("--foreground", FALLBACK_FOREGROUND);
   const border = resolveCssColor("--border", FALLBACK_BORDER);
@@ -61,8 +66,8 @@ function buildThemeVariables(): Record<string, string> {
  */
 export function ensureMermaidReady(): Promise<MermaidModule> {
   if (readyPromise !== null) return readyPromise;
-  readyPromise = import("mermaid")
-    .then((mod) => {
+  readyPromise = Promise.all([import("mermaid"), buildThemeVariables()])
+    .then(([mod, themeVariables]) => {
       const mermaid = mod.default;
       mermaid.initialize({
         startOnLoad: false,
@@ -76,7 +81,7 @@ export function ensureMermaidReady(): Promise<MermaidModule> {
         // desktop `mermaid-service.ts` fix for the same upstream bug).
         suppressErrorRendering: true,
         theme: "base",
-        themeVariables: buildThemeVariables(),
+        themeVariables,
         fontFamily: "system-ui, sans-serif",
       });
       return mermaid;
