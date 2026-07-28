@@ -253,12 +253,36 @@
         "workbox-window": "^7.4.1",
       },
     },
-    "clients/shared": {
-      "name": "@traycer-clients/shared",
+    "clients/remote-bridge": {
+      "name": "@traycer-clients/remote-bridge",
+      "version": "0.1.0",
+      "bin": {
+        "traycer-remote-bridge": "./src/index.ts",
+      },
       "dependencies": {
+        "@traycer-clients/shared": "workspace:*",
+        "@traycer/protocol": "workspace:*",
+        "commander": "catalog:",
         "zod": "catalog:",
       },
       "devDependencies": {
+        "@types/node": "catalog:",
+        "@typescript-eslint/eslint-plugin": "catalog:",
+        "@typescript-eslint/parser": "catalog:",
+        "eslint": "catalog:",
+        "prettier": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "clients/shared": {
+      "name": "@traycer-clients/shared",
+      "dependencies": {
+        "ws": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@types/ws": "catalog:",
         "@typescript-eslint/eslint-plugin": "catalog:",
         "@typescript-eslint/parser": "catalog:",
         "eslint": "catalog:",
@@ -386,6 +410,7 @@
     "@types/pdfmake": "^0.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "@uiw/react-codemirror": "^4.25.11",
@@ -461,6 +486,7 @@
     "uuid": "^14.0.1",
     "vite": "^8.1.5",
     "vitest": "^4.1.10",
+    "ws": "^8.21.1",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.31",
     "zod": "^4.4.3",
@@ -1603,6 +1629,8 @@
 
     "@traycer-clients/mobile": ["@traycer-clients/mobile@workspace:clients/mobile"],
 
+    "@traycer-clients/remote-bridge": ["@traycer-clients/remote-bridge@workspace:clients/remote-bridge"],
+
     "@traycer-clients/shared": ["@traycer-clients/shared@workspace:clients/shared"],
 
     "@traycer-clients/traycer-cli": ["@traycer-clients/traycer-cli@workspace:clients/traycer-cli"],
@@ -1740,6 +1768,8 @@
     "@types/use-sync-external-store": ["@types/use-sync-external-store@0.0.6", "", {}, "sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg=="],
 
     "@types/validate-npm-package-name": ["@types/validate-npm-package-name@4.0.2", "", {}, "sha512-lrpDziQipxCEeK5kWxvljWYhUvOiB2A9izZd9B2AFarYAkqZshb4lPbRs7zKEic6eGtH8V/2qJW+dPp9OtF6bw=="],
+
+    "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
 
     "@typescript-eslint/eslint-plugin": ["@typescript-eslint/eslint-plugin@8.65.0", "", { "dependencies": { "@eslint-community/regexpp": "^4.12.2", "@typescript-eslint/scope-manager": "8.65.0", "@typescript-eslint/type-utils": "8.65.0", "@typescript-eslint/utils": "8.65.0", "@typescript-eslint/visitor-keys": "8.65.0", "ignore": "^7.0.5", "natural-compare": "^1.4.0", "ts-api-utils": "^2.5.0" }, "peerDependencies": { "@typescript-eslint/parser": "^8.65.0", "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.1.0" } }, "sha512-IEgob78X12rHpUmtcwFsXhZdVGJtwTVP8FiCLZkR6GlYVrl2PcuB+KhCE5BlVC/eQpQnu8WXRtkHZuPar+gCRA=="],
 
@@ -3964,6 +3994,8 @@
     "wrap-ansi": ["wrap-ansi@7.0.0", "", { "dependencies": { "ansi-styles": "^4.0.0", "string-width": "^4.1.0", "strip-ansi": "^6.0.0" } }, "sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q=="],
 
     "wrappy": ["wrappy@1.0.2", "", {}, "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="],
+
+    "ws": ["ws@8.21.1", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw=="],
 
     "wsl-utils": ["wsl-utils@0.3.1", "", { "dependencies": { "is-wsl": "^3.1.0", "powershell-utils": "^0.1.0" } }, "sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg=="],
 

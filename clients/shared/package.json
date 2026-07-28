@@ -10,9 +10,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/ws": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
     "eslint": "catalog:",
