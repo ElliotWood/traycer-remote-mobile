@@ -12,7 +12,7 @@
  * bypass), so the Evaluator can drive comments live in a real browser without
  * Sprint 3's artifact tree existing in this worktree.
  */
-import { useCallback, useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
 import {
   currentRoute,
   INITIAL_NAV_STACK,
@@ -25,8 +25,6 @@ import { useHostNotifications } from "@/host/use-host-notifications";
 import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import { FleetView } from "@/views/fleet-view";
 import { EpicView } from "@/views/epic-view";
-import { ChatView } from "@/views/chat-view";
-import { ArtifactRouteView } from "@/views/artifact-route-view";
 import { CommentsPanel } from "@/views/comments/comments-panel";
 import { parseCommentsHarnessParams } from "@/views/comments/comments-harness-params";
 import { ErrorBoundary } from "@/views/error-boundary";
@@ -37,6 +35,28 @@ import { AccountSheet } from "@/views/toolbar/account-sheet";
 import { UsageSheet } from "@/views/toolbar/usage-sheet";
 import { NotificationsScreen } from "@/views/toolbar/notifications-screen";
 import { SettingsScreen } from "@/views/toolbar/settings-screen";
+
+/**
+ * Perf batch 2 (B2-2): `ChatView` and `ArtifactRouteView` (→ `ArtifactBodyView`)
+ * are the only routes that pull in the markdown stack (`react-markdown` +
+ * `unified` + `micromark` + `parse5` via `rehypeRaw` — 316,198 raw / 98,493
+ * gzip measured) — the first screen after sign-in is Fleet, which renders no
+ * markdown at all. Lazy-loading these two keeps that stack out of the entry
+ * chunk until the user actually opens a chat or artifact.
+ */
+const ChatView = lazy(() => import("@/views/chat-view").then((mod) => ({ default: mod.ChatView })));
+const ArtifactRouteView = lazy(() =>
+  import("@/views/artifact-route-view").then((mod) => ({ default: mod.ArtifactRouteView })),
+);
+
+/** Minimal, brief-by-design fallback — chunk load, not a data fetch (the real "Loading…" states live inside the lazy views themselves). */
+function RouteLoadingFallback(): ReactElement {
+  return (
+    <div role="status" style={{ padding: 16, color: "var(--muted-foreground)", fontSize: 14 }}>
+      Loading…
+    </div>
+  );
+}
 
 /** Live chat title override, scoped to a `chatId` so a screen change can never leak a stale title into the newly-rendered route for one frame (U2). */
 interface LiveChatTitle {
@@ -227,16 +247,20 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
           </ErrorBoundary>
         ) : route.name === "chat" ? (
           <ErrorBoundary label="this chat" key={`chat:${route.chatId}`}>
-            <ChatView
-              epicId={route.epicId}
-              chatId={route.chatId}
-              initialTitle={route.chatTitle}
-              onTitleChange={handleChatTitleChange}
-            />
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <ChatView
+                epicId={route.epicId}
+                chatId={route.chatId}
+                initialTitle={route.chatTitle}
+                onTitleChange={handleChatTitleChange}
+              />
+            </Suspense>
           </ErrorBoundary>
         ) : (
           <ErrorBoundary label="this artifact" key={`artifact:${route.artifactId}`}>
-            <ArtifactRouteView epicId={route.epicId} artifactId={route.artifactId} />
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <ArtifactRouteView epicId={route.epicId} artifactId={route.artifactId} />
+            </Suspense>
           </ErrorBoundary>
         )}
       </CurrentEpicProvider>

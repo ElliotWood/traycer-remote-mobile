@@ -40,7 +40,6 @@
     "rehype-raw": "catalog:",
     "rehype-sanitize": "catalog:",
     "remark-gfm": "catalog:",
-    "shiki": "catalog:",
     "tailwind-merge": "catalog:",
     "unified": "catalog:",
     "uuid": "catalog:",
