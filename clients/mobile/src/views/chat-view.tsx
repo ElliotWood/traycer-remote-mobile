@@ -28,6 +28,7 @@ import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useCurrentEpicDocOrNull } from "@/host/current-epic-context";
 import { buildChatTree } from "@/host/use-epic-doc";
+import { isForeignHostChat } from "@/host/connection";
 import { collectDescendantIds } from "@/host/agent-ladder";
 import { isDescendantRunning, useDescendantAgents } from "@/host/use-descendant-agents";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -209,6 +210,12 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   // just never appears, same "absent = not reachable" convention already
   // used for `backgroundItems`.
   const epicDoc = useCurrentEpicDocOrNull();
+  // H2: this chat's durable host binding, read from the SAME shared epic-doc
+  // session (never a second RPC just to check this). `null` degrades to
+  // "assume local" — see `isForeignHostChat`'s doc.
+  const isForeignHost = isForeignHostChat(
+    epicDoc?.chats.find((c) => c.chatId === chatId)?.hostId ?? null,
+  );
   const descendantChatIds = useMemo(() => {
     if (epicDoc === null) return [];
     const tree = buildChatTree(epicDoc.chats);
@@ -249,6 +256,11 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
       </header>
 
       <div ref={scrollRef} onScroll={handleScroll} style={scrollAreaStyle}>
+        {isForeignHost && (
+          <div style={foreignHostBannerStyle} role="status">
+            Runs on another device — history only; live status and approvals aren't available here.
+          </div>
+        )}
         <NotificationPermissionButton compact />
         {chat.transcriptMessages.length === 0 && chat.liveTurnBlocks.length === 0 && !chat.hasSnapshot ? (
           // Cache-seeded content (mobile-v3-cache) paints instantly even
@@ -319,10 +331,19 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
           chatSettings={chat.chatSettings}
           canStop={isRunning}
           stopping={chat.runStatus === "stopping"}
-          accessRole={chat.accessRole}
+          // H2: a foreign-host chat has no reachable runtime to send a turn
+          // to — reusing the existing viewer-only gate (rather than adding a
+          // new Composer prop) keeps this additive and small.
+          accessRole={isForeignHost ? "viewer" : chat.accessRole}
           connectionLive={connectionLive}
           sendDisabledHint={
-            !connectionLive ? "Reconnecting to the host…" : chat.accessRole === "viewer" ? "You have view-only access" : null
+            isForeignHost
+              ? "This chat runs on another device"
+              : !connectionLive
+                ? "Reconnecting to the host…"
+                : chat.accessRole === "viewer"
+                  ? "You have view-only access"
+                  : null
           }
           onSend={handleSend}
           onStop={chat.stopTurn}
@@ -348,6 +369,15 @@ const headerStyle: CSSProperties = {
   flexShrink: 0,
   padding: "10px 16px 8px",
   borderBottom: `1px solid ${theme.borderHairline}`,
+};
+
+const foreignHostBannerStyle: CSSProperties = {
+  ...type.bodyXs,
+  padding: "8px 12px",
+  margin: "10px 0",
+  borderRadius: radius.md,
+  background: "color-mix(in oklch, var(--muted-foreground) 12%, transparent)",
+  color: theme.mutedText,
 };
 
 const scrollAreaStyle: CSSProperties = {

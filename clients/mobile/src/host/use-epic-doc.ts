@@ -57,6 +57,8 @@ export interface EpicChatEntry {
   readonly parentId: string | null;
   readonly createdAt: number;
   readonly updatedAt: number;
+  /** H2: the host this chat is durably bound to (`chatSchema.hostId`) — `null` only for a malformed/not-yet-replicated entry, never a legitimate "no host". */
+  readonly hostId: string | null;
 }
 
 /**
@@ -80,12 +82,14 @@ export function readChatsFromEpicDoc(doc: Y.Doc): readonly EpicChatEntry[] {
     }
     const rawTitle = entry.get("title");
     const rawParentId = entry.get("parentId");
+    const rawHostId = entry.get("hostId");
     out.push({
       chatId,
       title: typeof rawTitle === "string" ? rawTitle : "",
       parentId: typeof rawParentId === "string" ? rawParentId : null,
       createdAt: readMaybeNumber(entry.get("createdAt"), 0),
       updatedAt: readMaybeNumber(entry.get("updatedAt"), 0),
+      hostId: typeof rawHostId === "string" ? rawHostId : null,
     });
   }
   return out;

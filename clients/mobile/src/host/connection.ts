@@ -42,7 +42,7 @@ import type { HostDirectoryEntry } from "@traycer-clients/shared/host-client/hos
 import type { AuthorityBoundAuthRevalidator } from "@traycer-clients/shared/auth/bearer-revalidator";
 import type { RequestContext } from "@traycer/protocol/auth/request-context";
 import type { RequestContextListener } from "@traycer-clients/shared/auth/request-context-provider";
-import { HOST_WS_URL } from "@/config";
+import { CONFIGURED_HOST_ID, HOST_WS_URL } from "@/config";
 
 /**
  * The slice of `MobileAuthService` this module consumes. Deliberately narrow:
@@ -102,12 +102,32 @@ const defaultMessengerFactory: MessengerFactory = ({ registry }) =>
 const DEFAULT_WS_FRAME_TIMEOUT_MS = 30_000;
 
 /**
- * Stable id for the single mobile-configured host. Exported so RPCs that must
- * name the bound host explicitly (e.g. `epic.createChat`'s `hostId`, T7) stamp
- * the SAME id this connection binds its `HostDirectoryEntry` to — otherwise the
- * created chat would be bound to a host the client never dialed.
+ * Local UI label for the single mobile-configured host connection — what this
+ * `HostDirectoryEntry` binds to so `HostClient` has something to key on. NOT
+ * the host's real, durable id (`chatSchema.hostId`): that value is a
+ * server-recognized identity the wire protocol never exposes to a fresh
+ * client (see H1's finding), so it can't be derived from this label. Where a
+ * durable binding is actually needed (`epic.createChat`'s `hostId`,
+ * `use-create-chat.ts`), this is only the FALLBACK when no real id has been
+ * configured via `VITE_HOST_ID` (`config.ts`'s `CONFIGURED_HOST_ID`).
  */
 export const MOBILE_HOST_ID = "mobile-host";
+
+/**
+ * H2: is `hostId` (a chat's durable binding, `EpicChatEntry.hostId`) a
+ * DIFFERENT host than the one this connection is dialed into? A `null`
+ * hostId (not yet replicated) is treated as "unknown, assume local" rather
+ * than foreign — avoids a false-positive flash on a chat whose epic-doc
+ * entry hasn't synced yet. Only meaningful once a real `VITE_HOST_ID` is
+ * configured (`CONFIGURED_HOST_ID`); without one every chat this client
+ * itself creates is ALSO stamped with the `MOBILE_HOST_ID` fallback, so it
+ * reads as local even when it may not durably be — a known limitation of
+ * running without the real id, not a bug in this check.
+ */
+export function isForeignHostChat(hostId: string | null): boolean {
+  if (hostId === null) return false;
+  return hostId !== (CONFIGURED_HOST_ID ?? MOBILE_HOST_ID);
+}
 
 /**
  * No-op `IHostQueryInvalidator`. `HostClient` requires an invalidator (it calls

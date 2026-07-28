@@ -49,6 +49,7 @@ function chatEntry(overrides: Partial<EpicChatEntry> & { readonly chatId: string
     parentId: null,
     createdAt: 0,
     updatedAt: 0,
+    hostId: null,
     ...overrides,
   };
 }

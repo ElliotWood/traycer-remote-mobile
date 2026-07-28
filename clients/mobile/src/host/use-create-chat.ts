@@ -35,6 +35,7 @@ import type {
 } from "@traycer/protocol/host/epic/unary-schemas";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { MOBILE_HOST_ID } from "@/host/connection";
+import { CONFIGURED_HOST_ID } from "@/config";
 
 /**
  * Default harness for a phone-authored agent. "claude" is a member of both
@@ -126,7 +127,17 @@ export function buildCreateChatRequest(
   return {
     epicId: args.epicId,
     parentId: args.parentId ?? null,
-    hostId: MOBILE_HOST_ID,
+    // H1: `hostId` is a durable, for-life binding (`chatSchema.hostId`,
+    // `protocol/src/persistence/epic/chat.ts:34-52`) — NOT the connection's
+    // own `HostDirectoryEntry.hostId` label (`MOBILE_HOST_ID`, which exists
+    // only so `HostClient.bind()` has something to key on). The real value
+    // is unreachable over the wire protocol itself (checked exhaustively —
+    // no handshake field, no bootstrap-safe RPC), so it can only arrive via
+    // this out-of-band config value. `MOBILE_HOST_ID` remains the fallback
+    // for a host that hasn't supplied one — a chat created that way renders
+    // as an unreachable host on desktop, a real protocol gap tracked
+    // separately, not something faked here.
+    hostId: CONFIGURED_HOST_ID ?? MOBILE_HOST_ID,
     title: deriveChatTitle(args.instruction),
     chatId: args.chatId,
     initialMessage,

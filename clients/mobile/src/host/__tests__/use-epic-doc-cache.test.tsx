@@ -22,7 +22,7 @@ import {
 import { act, renderHook, waitFor } from "@/test-utils/dom";
 import { createFakeStreamConnection } from "@/test-utils/fakes";
 
-const CHAT: EpicChatEntry = { chatId: "c1", title: "Alpha", parentId: null, createdAt: 1, updatedAt: 1 };
+const CHAT: EpicChatEntry = { chatId: "c1", title: "Alpha", parentId: null, createdAt: 1, updatedAt: 1, hostId: null };
 const ARTIFACT: EpicArtifactEntry = {
   id: "a1",
   kind: "spec",
@@ -84,7 +84,7 @@ describe("y-indexeddb replay (real IndexedDB via fake-indexeddb)", () => {
     await idb2.whenSynced;
 
     expect(readChatsFromEpicDoc(doc2)).toEqual([
-      { chatId: "c1", title: "Restored chat", parentId: null, createdAt: 0, updatedAt: 0 },
+      { chatId: "c1", title: "Restored chat", parentId: null, createdAt: 0, updatedAt: 0, hostId: null },
     ]);
 
     await idb2.destroy();
