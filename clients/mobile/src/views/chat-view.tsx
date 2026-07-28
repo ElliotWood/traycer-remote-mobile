@@ -66,6 +66,7 @@ import { ElapsedFooter } from "./chat/elapsed-footer";
 import { ScrollToBottomChip } from "./chat/scroll-to-bottom-chip";
 import { LowerDock } from "./chat/lower-dock";
 import { Composer } from "./chat/composer";
+import { NextStepsProvider, type NextStepsValue } from "./chat/next-steps-context";
 
 interface ChatViewProps {
   readonly epicId: string;
@@ -174,6 +175,20 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
     chat.sendMessage({ text, settings, attachments });
   };
 
+  // Next-step options push into the SAME composer prefill channel as
+  // "edit a queued item" — deliberately reusing it rather than adding a
+  // second path into the composer's draft. Memoized on nothing but the
+  // stable setter so the provider value doesn't change identity per render
+  // (which would defeat B2-3's memoized transcript below it).
+  const nextStepsValue = useMemo<NextStepsValue>(
+    () => ({
+      insertPrompt: (prompt: string) => {
+        setPrefill((prev) => ({ text: prompt, nonce: (prev?.nonce ?? 0) + 1 }));
+      },
+    }),
+    [],
+  );
+
   const handleEditQueueItem = (item: ChatQueuedItem, text: string): void => {
     chat.dispatchAction((base) => ({ ...base, kind: "queueCancel", queueItemId: item.queueItemId }));
     setPrefill((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -246,6 +261,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   };
 
   return (
+    <NextStepsProvider value={nextStepsValue}>
     <div style={chatLayoutStyle}>
       <header style={headerStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -352,6 +368,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
         />
       </footer>
     </div>
+    </NextStepsProvider>
   );
 }
 
