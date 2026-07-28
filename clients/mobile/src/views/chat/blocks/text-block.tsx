@@ -4,12 +4,13 @@
  * instead of plain prose — `text` is still the fallback if it were somehow
  * empty, so the notice metadata is never silently dropped.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { TextBlock as TextBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { MobileMarkdown } from "../../markdown/mobile-markdown";
 import { colors } from "../../ui";
 
-export function TextBlock({ block }: { readonly block: TextBlockType }): ReactElement {
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const TextBlock = memo(function TextBlock({ block }: { readonly block: TextBlockType }): ReactElement {
   if (block.providerNotice !== null) {
     const notice = block.providerNotice;
     const tone = notice.tone === "warning" ? colors.danger : colors.accent;
@@ -31,4 +32,4 @@ export function TextBlock({ block }: { readonly block: TextBlockType }): ReactEl
     );
   }
   return <MobileMarkdown>{block.text}</MobileMarkdown>;
-}
+});

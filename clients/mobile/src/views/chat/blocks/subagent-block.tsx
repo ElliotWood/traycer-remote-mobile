@@ -5,7 +5,7 @@
  * activity/agent-count/token lines to the SAME card rather than a distinct
  * component.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { SubAgentBlock as SubAgentBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { colors } from "../../ui";
 import { CollapsibleCard } from "../collapsible-card";
@@ -19,7 +19,8 @@ function summaryLine(block: SubAgentBlockType): string {
   return last ?? "Starting…";
 }
 
-export function SubagentBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const SubagentBlock = memo(function SubagentBlock({
   node,
   epicId,
   chatId,
@@ -94,4 +95,4 @@ export function SubagentBlock({
       {block.result !== null && <p style={{ fontSize: 13, margin: "6px 0 0" }}>{block.result}</p>}
     </CollapsibleCard>
   );
-}
+});

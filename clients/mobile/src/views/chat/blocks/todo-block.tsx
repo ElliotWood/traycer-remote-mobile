@@ -2,7 +2,7 @@
  * `todo` block (Sprint 2) — always-visible, non-collapsible (small, useful
  * to scan at a glance).
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { TodoBlock as TodoBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { colors } from "../../ui";
 import { StaticCard } from "../collapsible-card";
@@ -14,7 +14,8 @@ const STATUS_ICON: Readonly<Record<TodoBlockType["items"][number]["status"], str
   cancelled: "✕",
 };
 
-export function TodoBlock({ block }: { readonly block: TodoBlockType }): ReactElement {
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const TodoBlock = memo(function TodoBlock({ block }: { readonly block: TodoBlockType }): ReactElement {
   const done = block.items.filter((i) => i.status === "completed").length;
   return (
     <StaticCard>
@@ -41,4 +42,4 @@ export function TodoBlock({ block }: { readonly block: TodoBlockType }): ReactEl
       </ul>
     </StaticCard>
   );
-}
+});

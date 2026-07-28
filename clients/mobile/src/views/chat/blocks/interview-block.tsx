@@ -5,12 +5,13 @@
  * interview as a historical record: collapsed by default, header "Answered
  * N/M questions".
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { InterviewBlock as InterviewBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { colors } from "../../ui";
 import { CollapsibleCard } from "../collapsible-card";
 
-export function InterviewBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const InterviewBlock = memo(function InterviewBlock({
   block,
 }: {
   readonly block: InterviewBlockType;
@@ -51,4 +52,4 @@ export function InterviewBlock({
       {block.error !== null && <p style={{ color: colors.danger, fontSize: 13 }}>{block.error}</p>}
     </CollapsibleCard>
   );
-}
+});

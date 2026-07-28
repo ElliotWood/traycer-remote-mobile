@@ -3,7 +3,7 @@
  * `+N/-M` counts (no fetch needed for those); body (on expand) lazy-fetches
  * `snapshots.readSnapshotDiff` and renders a minimal line diff.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { FileChangeBlock as FileChangeBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { useSnapshotDiff } from "@/host/use-snapshot-diff";
 import { colors } from "../../ui";
@@ -18,7 +18,8 @@ function verb(operation: string): string {
   return "Edit";
 }
 
-export function FileChangeBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const FileChangeBlock = memo(function FileChangeBlock({
   block,
 }: {
   readonly block: FileChangeBlockType;
@@ -60,7 +61,7 @@ export function FileChangeBlock({
       <FileChangeDiffPanel block={block} />
     </CollapsibleCard>
   );
-}
+});
 
 function FileChangeDiffPanel({ block }: { readonly block: FileChangeBlockType }): ReactElement {
   const query = useSnapshotDiff({

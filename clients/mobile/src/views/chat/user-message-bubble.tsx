@@ -22,7 +22,19 @@ export interface UserMessageBubbleProps {
   readonly steered?: boolean;
   /** Optimistic-send delivery status (batch 1 #4/#5) — `undefined`/`"pending"` render normally; `"failed"` shows the retry affordance. Absent for a `steer` block, which isn't a tracked send. */
   readonly sendStatus?: "pending" | "failed" | undefined;
-  readonly onRetry?: () => void;
+  /**
+   * Perf batch 2 (B2-3): the STABLE top-level `chat.retrySend` function
+   * itself, plus the `messageId` to call it with — NOT a pre-bound
+   * `onRetry: () => void`. The caller (`transcript-view.tsx`) used to build
+   * `onRetry={() => onRetrySend(messageId)}` inline on every render, a
+   * fresh closure every time that defeated THIS component's own
+   * `React.memo` regardless of `content`/`sender` being unchanged. The
+   * closure is built here instead, inside the leaf that actually renders
+   * the button — harmless there since it's a native DOM handler, not a
+   * prop threaded to another memoized child.
+   */
+  readonly messageId?: string;
+  readonly onRetrySend?: (messageId: string) => void;
 }
 
 function UserMessageBubbleImpl({
@@ -30,7 +42,8 @@ function UserMessageBubbleImpl({
   sender,
   steered = false,
   sendStatus,
-  onRetry,
+  messageId,
+  onRetrySend,
 }: UserMessageBubbleProps): ReactElement {
   const markdown = userContentToMarkdown(content);
   const provenance = sender !== null ? userSenderProvenance(sender) : null;
@@ -146,7 +159,9 @@ function UserMessageBubbleImpl({
           <button
             type="button"
             data-testid="retry-send"
-            onClick={onRetry}
+            onClick={() => {
+              if (messageId !== undefined) onRetrySend?.(messageId);
+            }}
             style={{
               display: "block",
               marginLeft: "auto",

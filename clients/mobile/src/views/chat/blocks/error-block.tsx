@@ -1,9 +1,10 @@
 /** `error` block (Sprint 2) — static, non-collapsible. */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { ErrorBlock as ErrorBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { colors } from "../../ui";
 
-export function ErrorBlock({ block }: { readonly block: ErrorBlockType }): ReactElement {
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const ErrorBlock = memo(function ErrorBlock({ block }: { readonly block: ErrorBlockType }): ReactElement {
   return (
     <div
       role="alert"
@@ -21,4 +22,4 @@ export function ErrorBlock({ block }: { readonly block: ErrorBlockType }): React
       <p style={{ margin: "4px 0 0", fontSize: 13, wordBreak: "break-word" }}>{block.message}</p>
     </div>
   );
-}
+});

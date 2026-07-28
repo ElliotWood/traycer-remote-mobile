@@ -2,7 +2,7 @@
  * `compaction` block (Sprint 2) — a divider line; collapsible only when it
  * carries a `summary`.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { CompactionBlock as CompactionBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { MobileMarkdown } from "../../markdown/mobile-markdown";
 import { colors } from "../../ui";
@@ -18,7 +18,8 @@ function summaryLine(block: CompactionBlockType): string {
   return `Compacted${tokens}${duration}`;
 }
 
-export function CompactionBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const CompactionBlock = memo(function CompactionBlock({
   block,
 }: {
   readonly block: CompactionBlockType;
@@ -41,4 +42,4 @@ export function CompactionBlock({
       <MobileMarkdown>{block.summary}</MobileMarkdown>
     </CollapsibleCard>
   );
-}
+});

@@ -5,13 +5,14 @@
  * No `RuntimeEvent` produces this block (the host synthesizes it atomically
  * at turn-start) — it only ever arrives via a snapshot, never live.
  */
-import { useState, type ReactElement } from "react";
+import { memo, useState, type ReactElement } from "react";
 import type { AutonomousResumeBlock as AutonomousResumeBlockType, AutonomousResumeTrigger } from "@traycer/protocol/persistence/epic/content-blocks";
 import { useResumeOutput } from "@/host/use-resume-output";
 import { colors, secondaryButton } from "../../ui";
 import { StaticCard } from "../collapsible-card";
 
-export function AutonomousResumeBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const AutonomousResumeBlock = memo(function AutonomousResumeBlock({
   block,
 }: {
   readonly block: AutonomousResumeBlockType;
@@ -23,7 +24,7 @@ export function AutonomousResumeBlock({
       ))}
     </>
   );
-}
+});
 
 function TriggerCard({ trigger }: { readonly trigger: AutonomousResumeTrigger }): ReactElement {
   const [expanded, setExpanded] = useState(false);
