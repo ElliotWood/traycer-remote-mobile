@@ -22,6 +22,7 @@ import {
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostNotifications } from "@/host/use-host-notifications";
+import { useScreenWakeLock, useWakeLockPreference } from "@/host/use-screen-wake-lock";
 import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import { FleetView } from "@/views/fleet-view";
 import { EpicView } from "@/views/epic-view";
@@ -116,6 +117,10 @@ function isOpenChatMessage(data: unknown): data is OpenChatMessage {
 
 export function AppShell({ client, user, onSignOut }: AppShellProps): ReactElement {
   const [stack, dispatch] = useReducer(navReducer, INITIAL_NAV_STACK);
+  // "always" is held here, app-wide. The "while-running" variant lives in
+  // ChatView instead, since only it knows whether a turn is in flight — the
+  // two are mutually exclusive, so at most one lock is ever held.
+  useScreenWakeLock(useWakeLockPreference() === "always");
   const route = currentRoute(stack);
   const streamConnection = useStreamConnectionOrNull();
   const { summary: notificationsSummary } = useHostNotifications(streamConnection);

@@ -11,7 +11,13 @@
  * not silently missing.
  */
 import { useState, type ReactElement } from "react";
-import { LogOut, Wifi } from "lucide-react";
+import { Check, LogOut, Wifi } from "lucide-react";
+import {
+  isWakeLockSupported,
+  useWakeLockPreference,
+  writeWakeLockPreference,
+  type WakeLockPreference,
+} from "@/host/use-screen-wake-lock";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useProviders, useRateLimitUsage, extractUsageWindows } from "@/host/use-provider-usage";
 import { useNotificationConfig } from "@/host/use-notification-config";
@@ -46,6 +52,7 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps): ReactElement
 
       <ProvidersSection client={client} />
       <NotificationsSection client={client} />
+      <DisplaySection />
       <AboutSection client={client} onSignOut={onSignOut} />
     </main>
   );
@@ -237,6 +244,65 @@ function NotificationsSection({ client }: { readonly client: ReturnType<typeof u
       <p style={{ ...type.bodyXs, color: theme.mutedText, marginTop: 6 }}>
         Email delivery is configured on the desktop app — not shown here.
       </p>
+    </section>
+  );
+}
+
+const WAKE_LOCK_OPTIONS: ReadonlyArray<{
+  readonly value: WakeLockPreference;
+  readonly label: string;
+}> = [
+  { value: "always", label: "Always while the app is open" },
+  { value: "while-running", label: "Only while an agent is running" },
+  { value: "off", label: "Off" },
+];
+
+/**
+ * Hidden entirely where the Screen Wake Lock API is unsupported — a control
+ * that silently does nothing is worse than no control.
+ */
+function DisplaySection(): ReactElement | null {
+  const preference = useWakeLockPreference();
+  if (!isWakeLockSupported()) return null;
+
+  return (
+    <section style={{ marginBottom: 24 }}>
+      <SectionHeading>Display</SectionHeading>
+      <div style={{ ...type.bodyXs, color: theme.mutedText, margin: "0 0 10px" }}>
+        Keep the screen on so a run stays visible.{" "}
+        <strong style={{ color: theme.text }}>Uses significantly more battery</strong> — the screen
+        costs more power than everything else in this app combined.
+      </div>
+      {WAKE_LOCK_OPTIONS.map((option) => {
+        const selected = preference === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => writeWakeLockPreference(option.value)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%",
+              minHeight: 44,
+              padding: "0 4px",
+              border: "none",
+              borderTop: `1px solid ${theme.borderHairline}`,
+              background: "transparent",
+              color: theme.text,
+              fontSize: 14,
+              fontFamily: "inherit",
+              textAlign: "left",
+              cursor: "pointer",
+            }}
+          >
+            <span style={{ flex: 1 }}>{option.label}</span>
+            {selected && <Check size={16} color={theme.primary} aria-hidden="true" />}
+          </button>
+        );
+      })}
     </section>
   );
 }

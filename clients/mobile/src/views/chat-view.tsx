@@ -67,6 +67,7 @@ import { ScrollToBottomChip } from "./chat/scroll-to-bottom-chip";
 import { LowerDock } from "./chat/lower-dock";
 import { Composer } from "./chat/composer";
 import { NextStepsProvider, type NextStepsValue } from "./chat/next-steps-context";
+import { useScreenWakeLock, useWakeLockPreference } from "@/host/use-screen-wake-lock";
 
 interface ChatViewProps {
   readonly epicId: string;
@@ -211,6 +212,9 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
 
   const canMutate = hostClient !== null && connectionLive && chat.accessRole === "owner";
   const isRunning = chat.runStatus === "running" || chat.runStatus === "stopping";
+  // The "while-running" preference — hold the screen awake only while a turn
+  // is actually in flight. "always" is handled once, app-wide, in AppShell.
+  useScreenWakeLock(useWakeLockPreference() === "while-running" && isRunning);
   const turn = useMemo(() => lastAssistantTurn(chat.transcriptMessages), [chat.transcriptMessages]);
   const todoSnapshot = useMemo(
     () => pinnedTodoSnapshot(chat.transcriptMessages, chat.liveTurnBlocks),
