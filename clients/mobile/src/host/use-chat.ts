@@ -949,29 +949,40 @@ export function useChat(
    * Does NOT rely on the transport to replay a frame it couldn't send —
    * that was the original (rejected) design for this fix: buffering and
    * blind-replaying a dropped frame at the `WsStreamClient` layer risked
-   * the host processing the SAME decision twice with no way for this client
-   * to confirm the host dedupes on `clientActionId` (host source lives
-   * outside this repo). A double-processed approval is largely
-   * self-protecting (the host should reject a decision on an item that's
-   * already resolved), but an interview answer is not obviously idempotent,
-   * so nothing here assumes the host is defensive either way.
-   *
-   * Instead: the existing snapshot-reconcile (the `"snapshot"` reducer
-   * case's `liveKeys` filter) already clears a resolved reply's status for
-   * free once a fresh snapshot confirms the item is gone. What that alone
-   * can't do is distinguish "still pending because the host hasn't gotten
-   * to it yet" from "still pending because our frame never arrived" — both
-   * look identical from here. `scheduleReplyTimeout` is the bounded,
-   * connection-aware answer to that ambiguity: after a fair, live-connected
-   * wait, surface a manual retry rather than hang forever.
+   * the host processing the SAME decision twice, silently, with no user
+   * action behind the retry. Instead: the existing snapshot-reconcile (the
+   * `"snapshot"` reducer case's `liveKeys` filter) already clears a
+   * resolved reply's status for free once a fresh snapshot confirms the
+   * item is gone. What that alone can't do is distinguish "still pending
+   * because the host hasn't gotten to it yet" from "still pending because
+   * our frame never arrived" — both look identical from here.
+   * `scheduleReplyTimeout` is the bounded, connection-aware answer to that
+   * ambiguity: after a fair, live-connected wait, surface a manual retry
+   * rather than hang forever.
    *
    * A manual retry (the user tapping the same decision again) reuses the
-   * SAME `clientActionId` via `lastReplyAttemptRef`, not a fresh one — if
-   * the original attempt actually did land, a host that dedupes on
-   * `clientActionId` absorbs the retry as a no-op; if it doesn't dedupe,
-   * this is still a world better than the automatic-replay design: the
-   * retry is user-initiated, visible, and one tap, not an invisible replay
-   * the user never asked for and can't see happened.
+   * SAME `clientActionId` via `lastReplyAttemptRef`, not a fresh one.
+   * MEASURED against the real host (not assumed): `fileEditApprovalDecision`
+   * is deduped on `clientActionId` in host-persisted state — a duplicate
+   * frame always gets `actionAck: "accepted"` back (never `"rejected"`,
+   * never absent), confirmed same-session. Retrying `fileEditApproval` with
+   * the reused id is therefore genuinely idempotent, not merely defensible.
+   * The generic `approvalDecision` kind's dedupe behavior is UNESTABLISHED
+   * — the probe that confirmed the above didn't happen to exercise it — so
+   * treat that one as still only defensible: if the host doesn't dedupe it,
+   * a reused-id retry is at worst a second, harmless-if-rejected decision
+   * on an item the host should already treat as resolved, surfaced as one
+   * visible user-initiated tap rather than an invisible automatic replay.
+   * Interview answers were never measured either way.
+   *
+   * Important asymmetry either measurement leaves open: `actionAck:
+   * "accepted"` on a duplicate proves the host PROCESSED the frame, not
+   * that it did anything — the wire has no "no-op" ack distinct from a
+   * genuine first application. Never treat an ack as proof of effect
+   * elsewhere in this file; `pendingApprovals`/`pendingFileEditApprovals`/
+   * `pendingInterviews` shrinking on the next snapshot is what's actually
+   * authoritative for whether an item resolved, exactly what the
+   * snapshot-reconcile above already relies on.
    */
   const sendReply = useCallback(
     (arg: SendReplyArg): void => {
@@ -1028,9 +1039,19 @@ export function useChat(
   /**
    * Sends a new user message. Same reasoning as `sendReply` on why this
    * does NOT rely on transport-level replay — for `send` specifically the
-   * stakes are higher than an approval: a replayed `send` risks the host
+   * stakes were higher than an approval: a replayed `send` risked the host
    * starting a SECOND live agent turn on the same instruction, not just a
-   * cosmetic duplicate bubble.
+   * cosmetic duplicate bubble. MEASURED against the real host (not
+   * assumed): `send` is deduped on `messageId` in host-persisted chat
+   * state — two identical frames produce two `actionAck: "accepted"`
+   * responses but exactly ONE `messageAccepted`/turn-start, confirmed
+   * ACROSS a fresh reconnect (a third identical send after a full
+   * close+resubscribe still acked `accepted` with no new message, no new
+   * turn). `retrySend`'s reused-`messageId` retry is therefore genuinely
+   * idempotent for this action, not merely defensible — see `retrySend`'s
+   * docblock for the one asymmetry that measurement doesn't resolve
+   * (an "accepted" ack proves the frame was processed, not that it did
+   * anything the first time).
    *
    * The optimistic bubble (`optimisticSend`) is dispatched BEFORE the frame
    * reaches the transport, since the composer clears its draft immediately
@@ -1091,12 +1112,23 @@ export function useChat(
   /**
    * User-initiated retry for a `"failed"` send — re-sends the ORIGINAL frame
    * unchanged (via `sentFramesRef`), never rebuilds one with a fresh
-   * `messageId`. Reusing the id is the entire safety argument: if the
-   * original send actually did land (the ack was just slow/lost, not the
-   * frame itself), a host that dedupes on `messageId` absorbs this as a
-   * no-op via `messageAccepted`'s existing dedupe; if it doesn't dedupe,
-   * this can still double-post, but as a single visible, user-initiated tap
-   * rather than a silent automatic replay.
+   * `messageId`. Reusing the id is genuinely idempotent for this action —
+   * MEASURED against the real host, not just defensible (see `sendMessage`'s
+   * docblock for the full measurement): a duplicate `send` is absorbed via
+   * the host's persisted-state dedupe, surviving even a full reconnect,
+   * with `messageAccepted`'s existing `messageId` dedupe (line ~530) then
+   * absorbing it client-side too if it somehow arrived twice.
+   *
+   * One thing the measurement does NOT resolve, so this still degrades
+   * safely if it's ever wrong: a duplicate always acks `"accepted"`, never
+   * `"rejected"` or absent, so a retry can't hang on a missing/negative
+   * ack — but `"accepted"` only proves the host processed the frame, not
+   * that the retry did anything the original send hadn't already done.
+   * That's fine here specifically because nothing in this file acts on the
+   * ack at all: `sendStatus` clears on the `messageAccepted` EVENT (the
+   * `"messageAccepted"` reducer case), not on `actionAck` — the same
+   * reconcile-against-real-confirmation path `sendMessage`'s optimistic
+   * bubble already uses, not a shortcut this retry takes on its own.
    */
   const retrySend = useCallback(
     (messageId: string): void => {
