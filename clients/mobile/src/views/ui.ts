@@ -33,7 +33,11 @@ export const screen: CSSProperties = {
     "'Figtree Variable', Figtree, ui-sans-serif, system-ui, -apple-system, sans-serif",
   maxWidth: 480,
   margin: "0 auto",
-  minHeight: "100vh",
+  // `100dvh`, not `100vh` — plain `100vh` overshoots the visible viewport on
+  // mobile browsers, causing the page to scroll behind the app's
+  // fixed-height layout. See `global.css`'s `body` rule / `design-tokens.tsx`'s
+  // `screen` token for the same fix.
+  minHeight: "100dvh",
   boxSizing: "border-box",
   padding: 16,
   background: colors.bg,

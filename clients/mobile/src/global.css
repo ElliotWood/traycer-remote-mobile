@@ -117,7 +117,17 @@
   }
 
   body {
+    /* `100vh` on a mobile browser is the viewport with the URL bar
+       COLLAPSED — taller than what's actually visible, so the body scrolls
+       behind the app's own fixed-height layout (`#root`/`chatLayoutStyle`
+       are already `100dvh`). `100vh` stays first as a fallback for browsers
+       without `dvh` support; the `dvh` line below wins the cascade wherever
+       it's understood. `overflow: hidden` makes the transcript (not the
+       page) the one scroll container, matching the app's own layout intent. */
     min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
     @apply bg-background text-foreground font-sans text-ui antialiased;
   }
 

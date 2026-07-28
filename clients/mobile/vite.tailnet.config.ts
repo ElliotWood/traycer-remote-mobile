@@ -42,9 +42,19 @@ export default defineConfig({
         display: "standalone",
         background_color: "#111111",
         theme_color: "#111111",
+        // MUST stay identical to `vite.config.ts`'s icon list — this config
+        // carries its own copy of the manifest, so a change made in only one
+        // place ships a tailnet build that silently differs from production.
+        // See that file for why both `any` and `maskable` are needed.
         icons: [
-          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          {
+            src: "icons/icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
       },
       injectManifest: {

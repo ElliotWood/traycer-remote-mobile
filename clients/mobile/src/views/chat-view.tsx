@@ -406,6 +406,11 @@ function TranscriptSkeleton(): ReactElement {
 const footerStyle: CSSProperties = {
   flexShrink: 0,
   padding: "8px 16px 12px",
+  // `max()` so the home-indicator inset only adds space when it's actually
+  // bigger than the existing 12px — a notched phone gets real clearance
+  // instead of the composer sitting under the home indicator; a
+  // non-notched device (env() unsupported or zero) just keeps the 12px.
+  paddingBottom: "max(12px, env(safe-area-inset-bottom))",
   borderTop: `1px solid ${theme.borderHairline}`,
   background: theme.background,
 };

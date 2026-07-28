@@ -41,9 +41,22 @@ export default defineConfig({
         display: "standalone",
         background_color: "#111111",
         theme_color: "#111111",
+        // `any` + `maskable` are BOTH required. Android applies its own
+        // adaptive-icon mask (circle/squircle/etc) and, given only `any`
+        // icons, crops the artwork to fit — clipping the logo's edges. The
+        // `maskable` variant is the same artwork inset into a 14% safe zone
+        // on the brand background, so the mask lands on padding instead.
+        // Keep the `any` entries too: `maskable` alone renders padded and
+        // undersized in contexts that don't mask (favicon, task switcher).
         icons: [
-          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          {
+            src: "icons/icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
       },
       injectManifest: {
