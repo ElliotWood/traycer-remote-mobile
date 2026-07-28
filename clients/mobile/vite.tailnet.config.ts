@@ -82,4 +82,25 @@ export default defineConfig({
       "/stream": { target: HOST_WS, ws: true, changeOrigin: true },
     },
   },
+  // Production-build preview, fronted separately by `tailscale serve --https=9443`.
+  // WHY THIS EXISTS: `devOptions.enabled:false` above means the service worker
+  // does NOT register under the dev server, so PWA install, the version-prompt
+  // banner, `clients.claim()` behaviour and push are all untestable on the :443
+  // dev origin. Anything touching the SW must be verified against a real
+  // production build — this preview is that build, running alongside (not
+  // replacing) the dev server so both origins stay available.
+  // `/authn` is duplicated here because Vite does not inherit `server.proxy`
+  // into preview; without it, sign-in 404s on the preview origin.
+  preview: {
+    host: TAILSCALE_IP,
+    port: 5278,
+    allowedHosts: true,
+    proxy: {
+      "/authn": {
+        target: "https://authn.traycer.ai",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/authn/, ""),
+      },
+    },
+  },
 });
