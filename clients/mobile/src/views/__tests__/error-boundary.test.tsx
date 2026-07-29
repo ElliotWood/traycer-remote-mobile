@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { render, screen } from "@/test-utils/dom";
 import { ErrorBoundary } from "../error-boundary";
 
@@ -9,7 +9,7 @@ function Throws({ message }: { readonly message: string }): never {
 }
 
 describe("ErrorBoundary", () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleErrorSpy: MockInstance;
 
   beforeEach(() => {
     // React logs the caught error to console.error too — expected noise,

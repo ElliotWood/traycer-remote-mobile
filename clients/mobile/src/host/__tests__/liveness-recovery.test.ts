@@ -31,7 +31,7 @@ function fakeVisibilityTarget(initial: string) {
   return { ...base, visibilityState: initial };
 }
 
-function fakeClock(startMs = 0) {
+function fakeClock(startMs: number) {
   let now = startMs;
   return {
     now: () => now,
@@ -68,7 +68,7 @@ describe("startLivenessRecovery", () => {
     const reconnect = vi.fn();
     const windowTarget = fakeEventTarget();
     const documentTarget = fakeVisibilityTarget("visible");
-    const clock = fakeClock();
+    const clock = fakeClock(0);
 
     startLivenessRecovery({
       reconnect,
@@ -120,7 +120,7 @@ describe("startLivenessRecovery", () => {
     const reconnect = vi.fn();
     const windowTarget = fakeEventTarget();
     const documentTarget = fakeVisibilityTarget("visible");
-    const clock = fakeClock();
+    const clock = fakeClock(0);
 
     startLivenessRecovery({
       reconnect,
@@ -147,7 +147,7 @@ describe("startLivenessRecovery", () => {
     const reconnect = vi.fn();
     const windowTarget = fakeEventTarget();
     const documentTarget = fakeVisibilityTarget("visible");
-    const clock = fakeClock();
+    const clock = fakeClock(0);
 
     startLivenessRecovery({
       reconnect,
@@ -197,7 +197,7 @@ describe("startLivenessRecovery", () => {
     const windowTarget = fakeEventTarget();
     const documentTarget = fakeVisibilityTarget("visible");
     const interval = fakeIntervalRegistry();
-    const clock = fakeClock();
+    const clock = fakeClock(0);
 
     startLivenessRecovery({
       reconnect,

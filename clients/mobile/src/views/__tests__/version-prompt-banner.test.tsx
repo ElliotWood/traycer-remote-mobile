@@ -12,7 +12,7 @@ let needRefresh = false;
 let onRegisteredSWCallback: ((swUrl: string, reg: unknown) => void) | undefined;
 
 vi.mock("virtual:pwa-register/react", () => ({
-  useRegisterSW: (options?: { onRegisteredSW?: (swUrl: string, reg: unknown) => void }) => {
+  useRegisterSW: (options: { onRegisteredSW?: (swUrl: string, reg: unknown) => void }) => {
     onRegisteredSWCallback = options?.onRegisteredSW;
     return {
       needRefresh: [needRefresh, vi.fn()],

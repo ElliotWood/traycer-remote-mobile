@@ -51,7 +51,7 @@ function requestImpl(opts: {
 
 function renderAuthor(
   fake: FakeHostClient,
-  onCreated: (chatId: string) => void = () => {},
+  onCreated: (chatId: string) => void,
 ): void {
   render(
     <AuthorView
@@ -75,7 +75,7 @@ function createChatBody(fake: FakeHostClient): Record<string, unknown> {
 describe("AuthorView", () => {
   it("resolves a model then dispatches epic.createChat with the instruction and no workspace/settings", async () => {
     const fake = createFakeHostClient(requestImpl({}));
-    renderAuthor(fake);
+    renderAuthor(fake, () => {});
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "Add a health check");
