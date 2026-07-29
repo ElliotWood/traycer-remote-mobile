@@ -35,7 +35,7 @@ the environment on every call, with no OS- or Node-level cache:
 
 ```
 node -e "os.homedir()" with HOME mutated mid-process:
-before:       C:\Users\gigaf
+before:       C:\Users\example
 after HOME=1: C:/fake/home/1
 after HOME=2: C:/fake/home/2
 ```

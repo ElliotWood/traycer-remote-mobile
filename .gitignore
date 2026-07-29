@@ -24,3 +24,6 @@ coverage*.json
 .claude
 .agents
 *.tsbuildinfo
+# Real deployment parameters (SSH keys, hostnames) - see
+# infra/azure/bicep/main.example.bicepparam for the placeholder shape.
+infra/azure/bicep/main.bicepparam
