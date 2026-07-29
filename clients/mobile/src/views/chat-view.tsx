@@ -47,7 +47,7 @@ import type {
   ChatPendingInterviewState,
   ChatQueuedItem,
 } from "@traycer/protocol/host/agent/gui/subscribe";
-import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
+import type { InterviewAnswer, InterviewQuestion } from "@traycer/protocol/persistence/epic/content-blocks";
 import { TranscriptView } from "./chat/transcript-view";
 import { useSettledConnectionState } from "@/host/use-settled-connection-state";
 import {
@@ -440,6 +440,18 @@ const footerStyle: CSSProperties = {
  * Every pending block, in a stable priority so the ordering never jitters as
  * items resolve: interviews first (they carry the richest ask), then tool
  * approvals, then file-edit approvals. Each item dispatches its OWN reply frame.
+ *
+ * `pendingListStyle` caps and scrolls the WHOLE list, not each card
+ * individually — `PendingCardShell`'s own `50dvh` cap only bounds a single
+ * card; with N pending cards (two interviews arriving together, or an
+ * interview alongside a tool/file-edit approval — all real, all observed)
+ * nothing bounded their SUM, so N cards could add up to N×50dvh and push the
+ * composer out of the viewport regardless of any one card's own size. This
+ * wrapper is the actual footer-height guarantee: whatever the card count,
+ * `PendingSection`'s own footprint is capped, and it scrolls internally —
+ * every card and every option stays reachable via scroll, none of them
+ * shrunk or hidden (unlike a per-card cap, which can't help once there's
+ * more than one card).
  */
 function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElement {
   return (
@@ -447,41 +459,43 @@ function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElemen
       <h2 style={{ ...type.bodySm, fontWeight: 600, margin: "0 0 8px", color: theme.danger }}>
         Waiting on you
       </h2>
-      {chat.pendingInterviews.map((interview) => (
-        <InterviewCard
-          key={interviewKey(interview.blockId)}
-          interview={interview}
-          block={chat.resolveInterview(interview.blockId)}
-          status={chat.replyStatusFor(interviewKey(interview.blockId))}
-          onSubmit={(answers) =>
-            chat.sendReply({ kind: "interview", blockId: interview.blockId, answers })
-          }
-        />
-      ))}
-      {chat.pendingApprovals.map((approval) => (
-        <ApprovalCard
-          key={approvalKey(approval.approvalId)}
-          approval={approval}
-          status={chat.replyStatusFor(approvalKey(approval.approvalId))}
-          onDecide={(approved) =>
-            chat.sendReply({ kind: "approval", approvalId: approval.approvalId, approved })
-          }
-        />
-      ))}
-      {chat.pendingFileEditApprovals.map((approval) => (
-        <FileEditApprovalCard
-          key={fileEditKey(approval.approvalId)}
-          approval={approval}
-          status={chat.replyStatusFor(fileEditKey(approval.approvalId))}
-          onDecide={(approved) =>
-            chat.sendReply({
-              kind: "fileEditApproval",
-              approvalId: approval.approvalId,
-              approved,
-            })
-          }
-        />
-      ))}
+      <div style={pendingListStyle}>
+        {chat.pendingInterviews.map((interview) => (
+          <InterviewCard
+            key={interviewKey(interview.blockId)}
+            interview={interview}
+            block={chat.resolveInterview(interview.blockId)}
+            status={chat.replyStatusFor(interviewKey(interview.blockId))}
+            onSubmit={(answers) =>
+              chat.sendReply({ kind: "interview", blockId: interview.blockId, answers })
+            }
+          />
+        ))}
+        {chat.pendingApprovals.map((approval) => (
+          <ApprovalCard
+            key={approvalKey(approval.approvalId)}
+            approval={approval}
+            status={chat.replyStatusFor(approvalKey(approval.approvalId))}
+            onDecide={(approved) =>
+              chat.sendReply({ kind: "approval", approvalId: approval.approvalId, approved })
+            }
+          />
+        ))}
+        {chat.pendingFileEditApprovals.map((approval) => (
+          <FileEditApprovalCard
+            key={fileEditKey(approval.approvalId)}
+            approval={approval}
+            status={chat.replyStatusFor(fileEditKey(approval.approvalId))}
+            onDecide={(approved) =>
+              chat.sendReply({
+                kind: "fileEditApproval",
+                approvalId: approval.approvalId,
+                approved,
+              })
+            }
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -641,6 +655,51 @@ function InterviewCard({
   return <InterviewForm block={block} status={status} onSubmit={onSubmit} />;
 }
 
+/**
+ * A key per question, unique across the CURRENT `questions` array.
+ * `questionId` is nullable in the schema (`content-blocks.ts`) — and per
+ * gui-app's `interview-segment.tsx:119-120`, a null id is the NORMAL case
+ * for `AskUserQuestion` answers, not a corner one. `question` (the text)
+ * never is, so it's always available as a base identity when `questionId`
+ * is absent — never the question's ARRAY POSITION, which is what let a
+ * reorder under a stable count silently misattribute one question's answer
+ * to another (measured: submitted verbatim against the wrong `question`
+ * text, no crash, no warning).
+ *
+ * `header` folds into that fallback too: it exists specifically to
+ * disambiguate otherwise-identical questions, so two null-id questions with
+ * the SAME text but DIFFERENT headers are distinct here, not duplicates —
+ * without it they'd wrongly take the lossy `::dup:` path below and lose an
+ * answered draft across every reconnect for no reason (they were never
+ * actually ambiguous).
+ *
+ * Only questions with a null id, identical text, AND identical header
+ * produce the same base key — genuinely indistinguishable from each other,
+ * since nothing else in the schema tells them apart. Rather than let them
+ * share ONE draft (an even more visible bug: ticking an option for one
+ * instantly shows it ticked for the other too), they get disambiguated by
+ * occurrence order WITHIN the current render — accepted knowingly as the
+ * narrower fix: a reorder that swaps two truly-identical-looking questions
+ * relative to each other can still misattribute between JUST that pair,
+ * since there is no signal left to tell them apart. `InterviewForm`
+ * additionally drops (never carries forward) any draft under a `::dup:` key
+ * whenever a NEW snapshot's block object arrives, rather than risk pairing
+ * it to the wrong occurrence — losing an in-progress answer to a duplicate
+ * question is the accepted cost of never guessing which one it belonged to.
+ */
+function computeQuestionKeys(questions: readonly InterviewQuestion[]): readonly string[] {
+  const baseKeys = questions.map((q) => q.questionId ?? JSON.stringify([q.question, q.header]));
+  const counts = new Map<string, number>();
+  for (const key of baseKeys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return baseKeys.map((key) => {
+    if ((counts.get(key) ?? 0) <= 1) return key;
+    const occurrence = seen.get(key) ?? 0;
+    seen.set(key, occurrence + 1);
+    return `${key}::dup:${occurrence}`;
+  });
+}
+
 function InterviewForm({
   block,
   status,
@@ -650,35 +709,77 @@ function InterviewForm({
   readonly status: ReplyStatus | undefined;
   readonly onSubmit: (answers: readonly InterviewAnswer[]) => void;
 }): ReactElement {
-  // One draft entry per question: `selected` labels (options) plus `text`
-  // (free-form). Indexed by question position, which is stable for a block.
-  const [drafts, setDrafts] = useState<readonly QuestionDraft[]>(() =>
-    block.questions.map(() => ({ selected: [], text: "" })),
+  const keys = computeQuestionKeys(block.questions);
+  // One draft per question, keyed by identity — NOT by array position. A
+  // streamed/cache-seeded interview block can change shape after this
+  // already mounted (a reconnect's fresh snapshot, or a cache-seeded partial
+  // block replaced by a longer live one): more questions arrive, options
+  // arrive later for an already-open question, or — per the schema, nothing
+  // rules it out — the same questions arrive in a different order. Indexing
+  // `drafts[qi]` positionally broke on the first (crashed past this chat's
+  // ErrorBoundary) and silently mis-happened on the third (Q1's answer
+  // submitted as Q2's, no cue). Keying by identity makes every one of those
+  // a non-event: a question keeps its own draft regardless of where it sits
+  // in the array.
+  const [drafts, setDrafts] = useState<Readonly<Record<string, QuestionDraft>>>(() =>
+    Object.fromEntries(keys.map((key) => [key, { selected: [], text: "" }])),
   );
+  // Compares against the PREVIOUS render's `block` — the official React
+  // pattern for "adjust state when a prop changes" (see useState's
+  // reference docs): both pieces of state update together, conditionally,
+  // during render.
+  const [prevBlock, setPrevBlock] = useState(block);
+  const isNewBlock = block !== prevBlock;
+
+  // Reconciled DURING render, not in an effect — an effect runs after
+  // commit, so it would still let this same render crash (or read a missing
+  // key) once before it could ever fire. Explicitly mutable (not inferred
+  // from `drafts`'s `Readonly<...>`) — this is a fresh, locally-owned copy
+  // once cloned below, never the state object itself.
+  let effectiveDrafts: Record<string, QuestionDraft> = drafts;
+  const keysToReset = keys.filter((key) => {
+    if (!(key in drafts)) return true; // never seen — needs a default entry
+    // A `::dup:` key's PREVIOUS entry may belong to a different occurrence
+    // than the one now claiming this key (see `computeQuestionKeys`'s
+    // docblock) — only trust it across a snapshot boundary if it's the
+    // SAME block object, i.e. nothing changed and this is just an
+    // unrelated re-render.
+    return key.includes("::dup:") && isNewBlock;
+  });
+  if (keysToReset.length > 0) {
+    effectiveDrafts = { ...drafts };
+    for (const key of keysToReset) effectiveDrafts[key] = { selected: [], text: "" };
+    setDrafts(effectiveDrafts);
+  }
+  if (isNewBlock) setPrevBlock(block);
   const busy = status?.phase === "submitting";
 
-  const toggleOption = (qi: number, label: string, multiSelect: boolean): void => {
-    setDrafts((prev) =>
-      prev.map((draft, i) => {
-        if (i !== qi) return draft;
-        if (!multiSelect) return { ...draft, selected: [label] };
-        const has = draft.selected.includes(label);
-        return {
+  const toggleOption = (key: string, label: string, multiSelect: boolean): void => {
+    setDrafts((prev) => {
+      const draft = prev[key];
+      if (draft === undefined) return prev;
+      if (!multiSelect) return { ...prev, [key]: { ...draft, selected: [label] } };
+      const has = draft.selected.includes(label);
+      return {
+        ...prev,
+        [key]: {
           ...draft,
-          selected: has
-            ? draft.selected.filter((l) => l !== label)
-            : [...draft.selected, label],
-        };
-      }),
-    );
+          selected: has ? draft.selected.filter((l) => l !== label) : [...draft.selected, label],
+        },
+      };
+    });
   };
 
-  const setText = (qi: number, text: string): void => {
-    setDrafts((prev) => prev.map((draft, i) => (i === qi ? { ...draft, text } : draft)));
+  const setText = (key: string, text: string): void => {
+    setDrafts((prev) => {
+      const draft = prev[key];
+      if (draft === undefined) return prev;
+      return { ...prev, [key]: { ...draft, text } };
+    });
   };
 
   const answers = block.questions.map((question, qi): InterviewAnswer => {
-    const draft = drafts[qi];
+    const draft = effectiveDrafts[keys[qi]];
     const values =
       question.options.length > 0
         ? [...draft.selected]
@@ -700,57 +801,74 @@ function InterviewForm({
         <>
           <div style={cardLabel}>Interview</div>
           {block.title !== null && <p style={cardDescription}>{block.title}</p>}
-          {block.questions.map((question, qi) => (
-            <fieldset
-              key={question.questionId ?? qi}
-              style={{ border: 0, margin: 0, padding: "0 0 12px" }}
-            >
-              {question.header !== null && (
-                <div style={{ color: theme.mutedText, fontSize: 12 }}>{question.header}</div>
-              )}
-              <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>
-                {question.question}
-              </legend>
-              {question.options.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {question.options.map((option) => {
-                    const selected = drafts[qi].selected.includes(option.label);
-                    return (
-                      <button
-                        key={option.label}
-                        type="button"
-                        disabled={busy}
-                        aria-pressed={selected}
-                        style={optionButton(selected, busy)}
-                        onClick={() =>
-                          toggleOption(qi, option.label, question.multiSelect)
-                        }
-                      >
-                        <span style={{ fontWeight: 600 }}>{option.label}</span>
-                        {option.description !== null && (
-                          <span
-                            style={{ display: "block", color: theme.mutedText, fontSize: 12 }}
+          {block.questions.map((question, qi) => {
+            const key = keys[qi];
+            const draft = effectiveDrafts[key];
+            // A question that had no options yet (rendered as free text)
+            // can gain them in a later snapshot at the SAME question count
+            // — the branch below flips to option buttons, and a typed
+            // answer sitting in `draft.text` would otherwise vanish from
+            // the screen with no explanation. The text itself is never
+            // deleted (kept in state, not submitted while unselected — see
+            // `values` above), but the user needs to be told it no longer
+            // counts as their answer.
+            const strandedText =
+              question.options.length > 0 && draft.selected.length === 0 && draft.text.trim() !== "";
+            return (
+              <fieldset key={key} style={{ border: 0, margin: 0, padding: "0 0 12px" }}>
+                {question.header !== null && (
+                  <div style={{ color: theme.mutedText, fontSize: 12 }}>{question.header}</div>
+                )}
+                <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>
+                  {question.question}
+                </legend>
+                {question.options.length > 0 ? (
+                  <>
+                    {strandedText && (
+                      <p style={{ margin: "0 0 6px", fontSize: 12, color: theme.danger }}>
+                        You typed “{draft.text.trim()}” before options were added — pick one below
+                        to answer.
+                      </p>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {question.options.map((option) => {
+                        const selected = draft.selected.includes(option.label);
+                        return (
+                          <button
+                            key={option.label}
+                            type="button"
+                            disabled={busy}
+                            aria-pressed={selected}
+                            style={optionButton(selected, busy)}
+                            onClick={() => toggleOption(key, option.label, question.multiSelect)}
                           >
-                            {option.description}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  disabled={busy}
-                  value={drafts[qi].text}
-                  placeholder="Type your answer"
-                  aria-label={question.question}
-                  style={textInput}
-                  onChange={(e) => setText(qi, e.target.value)}
-                />
-              )}
-            </fieldset>
-          ))}
+                            <span style={{ fontWeight: 600 }}>{option.label}</span>
+                            {option.description !== null && (
+                              <span
+                                style={{ display: "block", color: theme.mutedText, fontSize: 12 }}
+                              >
+                                {option.description}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <input
+                    type="text"
+                    disabled={busy}
+                    value={draft.text}
+                    placeholder="Type your answer"
+                    aria-label={question.question}
+                    style={textInput}
+                    onChange={(e) => setText(key, e.target.value)}
+                  />
+                )}
+              </fieldset>
+            );
+          })}
         </>
       }
       footer={
@@ -801,6 +919,29 @@ const card: CSSProperties = {
   borderRadius: radius.lg,
   padding: 12,
   marginBottom: 12,
+};
+
+/**
+ * Conservative reserved budget (px) for everything ELSE in the footer's
+ * column besides the pending-card list: `headerStyle`'s row, this section's
+ * own "Waiting on you" label, `LowerDock`'s collapsed chip strip when
+ * present, the composer at its tallest (its toolbar row wraps to two lines
+ * on a narrow screen or a long model name — `composer.tsx`'s `flexWrap:
+ * "wrap"`), and the footer's own padding. Measured against the real
+ * rendered chrome (`tests/layout/measure.mjs`) rather than guessed; errs
+ * generous on purpose — a slightly shorter card list is a fine trade for
+ * the composer never leaving the viewport.
+ */
+const PENDING_LIST_RESERVED_PX = 260;
+
+/**
+ * The shared scroll/cap for the WHOLE pending-card list — see
+ * `PendingSection`'s docblock for why this replaces relying on each card's
+ * own independent `50dvh` cap.
+ */
+const pendingListStyle: CSSProperties = {
+  overflowY: "auto",
+  maxHeight: `min(50dvh, calc(100dvh - ${PENDING_LIST_RESERVED_PX}px))`,
 };
 
 /**

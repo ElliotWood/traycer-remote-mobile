@@ -117,7 +117,7 @@ export function Composer({
   );
   const [agentMode, setAgentMode] = useState<AgentMode>(chatSettings?.agentMode ?? "regular");
   const [modelSlug, setModelSlug] = useState<string | null>(chatSettings?.model ?? null);
-  const { models } = useHarnessModels(client, epicId, DEFAULT_HARNESS);
+  const { models, phase: modelsPhase } = useHarnessModels(client, epicId, DEFAULT_HARNESS);
   const resolvedModel = modelSlug ?? models[0]?.id ?? null;
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
@@ -174,6 +174,17 @@ export function Composer({
   const hasContent = draftText.trim().length > 0 || readyAttachments.length > 0;
   const canSubmit =
     canType && connectionLive && hasContent && !isIngestingAttachments && resolvedModel !== null;
+  // `canSubmit` above already requires a resolved model, but `sendDisabledHint`
+  // (the parent's reason: foreign host / offline / view-only) knows nothing
+  // about the model fetch — when it's null and the ONLY thing blocking Send is
+  // `agent.listHarnessModels` having failed, the button was disabled with a
+  // tooltip that just said "Send", no cue why tapping did nothing. `"loading"`
+  // is excluded on purpose: that's the ordinary first render, not a failure.
+  const modelsUnavailableHint =
+    modelsPhase === "error" && resolvedModel === null
+      ? "Couldn't load available models — check your connection and try again."
+      : null;
+  const effectiveSendHint = sendDisabledHint ?? modelsUnavailableHint;
 
   const handleSend = (): void => {
     if (!canSubmit || resolvedModel === null) return;
@@ -302,7 +313,7 @@ export function Composer({
           running={canStop}
           ingesting={!canStop && isIngestingAttachments}
           disabled={canStop ? false : !canSubmit}
-          disabledHint={sendDisabledHint}
+          disabledHint={effectiveSendHint}
           onSend={handleSend}
           onStop={onStop}
         />
