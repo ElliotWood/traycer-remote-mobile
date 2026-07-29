@@ -46,9 +46,26 @@ PATTERNS=(
   # bare host address identifies a machine.
   "tailscale CGNAT address|\b100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b(?!/[0-9])"
 
-  # Home paths whose username is NOT a known placeholder.
+  # Home paths whose username is NOT a known placeholder. No `/.traycer`
+  # suffix requirement - that narrowing existed for noise reduction against
+  # upstream fixtures, but scope is already limited to OWNED below, so it
+  # only made this pattern miss a real leak that isn't inside .traycer
+  # (ported from scripts/azure's own gate, ticket A5 - ownership consolidated
+  # here so there is one gate instead of two that could flag each other).
   "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)\\\\)[A-Za-z0-9._-]+"
-  "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+/\.traycer"
+  "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+"
+
+  # A real-looking email address identifies a person. Excludes RFC 2606
+  # reserved test domains (example.com/.org/.net/.test) - the standard, safe
+  # placeholder this repo's own git fixtures use - and the project's own
+  # traycer.ai domain, which the codebase legitimately publishes as a
+  # required contact URI (mobile-push-service's VAPID subject,
+  # `mailto:push@traycer.ai`, is a role account the Web Push spec requires,
+  # not a person). Ported from scripts/azure's gate (ticket A5) - was a
+  # straight omission here before; the traycer.ai exclusion is new, found by
+  # actually running this pattern against the real tree rather than only the
+  # planted test cases.
+  "email address|[A-Za-z0-9._%+-]+@(?!([A-Za-z0-9.-]*\.)?(example)\.(com|org|net|test)\b|traycer\.ai\b)[A-Za-z0-9.-]+\.[a-z]{2,}"
 )
 
 EXCLUDES=(':!*.lock' ':!**/dist/**' ':!**/node_modules/**' ':!**/*.snap' ':!scripts/oss-hygiene.sh')
@@ -68,10 +85,13 @@ fail=0
 for entry in "${PATTERNS[@]}"; do
   desc="${entry%%|*}"
   rx="${entry#*|}"
-  # Infrastructure identifiers are always wrong; home paths only in owned code.
+  # Infrastructure identifiers are always wrong; personal identifiers (home
+  # paths, email addresses) only in owned code - upstream packages carry
+  # their own maintainers' identifiers in fixtures, inherited, not ours to
+  # rewrite.
   case "$desc" in
-    *"home path"*) scope=("${OWNED[@]}") ;;
-    *)             scope=(.) ;;
+    *"home path"*|*"email address"*) scope=("${OWNED[@]}") ;;
+    *)                                scope=(.) ;;
   esac
   # -P for lookahead (the placeholder exclusion); tracked files only.
   if hits=$(git grep -nIP "$rx" -- "${scope[@]}" "${EXCLUDES[@]}" 2>/dev/null); then
