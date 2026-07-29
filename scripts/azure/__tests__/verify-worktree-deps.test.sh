@@ -12,7 +12,7 @@
 # brokenness. This test proves the fix against that exact shape.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-# shellcheck source=./lib.sh
+# shellcheck source=/dev/null
 source ./lib.sh
 
 echo "=== verify-worktree-deps.test.sh ==="

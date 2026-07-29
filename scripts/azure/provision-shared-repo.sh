@@ -33,7 +33,7 @@ set -euo pipefail
 # safe: it only defines functions/readonly vars when sourced (the file's
 # own CLI-invocation guard checks BASH_SOURCE[0] == $0, which is false when
 # sourced from another script).
-# shellcheck source=./branch-namespace.sh
+# shellcheck source=/dev/null
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/branch-namespace.sh"
 
 usage() {

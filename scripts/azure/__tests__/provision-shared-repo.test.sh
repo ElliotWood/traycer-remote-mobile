@@ -8,7 +8,7 @@
 # detected SKIP - never a silent pass and never an unexplained red.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-# shellcheck source=./lib.sh
+# shellcheck source=/dev/null
 source ./lib.sh
 
 echo "=== provision-shared-repo.test.sh ==="

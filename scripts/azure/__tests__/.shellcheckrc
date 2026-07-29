@@ -36,14 +36,3 @@
 # because it was NOT part of this pattern.
 disable=SC2016
 disable=SC2034
-
-# Actually follow `source ./lib.sh` / `source ../branch-namespace.sh` when
-# checking these files, using each file's own `# shellcheck source=...`
-# directive to know where to look. Without this, shellcheck reports SC1091
-# ("not following") for every source line regardless of the directive - the
-# directive only says WHICH path to use IF following is enabled; it doesn't
-# enable following by itself. That "info"-severity SC1091 note still fails
-# this pre-commit hook's exit code, so this is required for the hook to pass
-# cleanly, not just cosmetic (found the hard way in eval round 4 - a `source=`
-# directive alone did not clear it).
-external-sources=true

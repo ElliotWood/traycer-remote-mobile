@@ -13,7 +13,7 @@
 # ownership check.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-# shellcheck source=./lib.sh
+# shellcheck source=/dev/null
 source ./lib.sh
 
 echo "=== permissions.test.sh ==="
