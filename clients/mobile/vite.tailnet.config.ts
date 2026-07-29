@@ -12,8 +12,12 @@ import { VitePWA } from "vite-plugin-pwa";
 import { assetsNotFoundPlugin } from "./vite/assets-not-found-plugin";
 import { collectEntryCriticalUrls } from "./vite/collect-entry-critical-urls";
 
-// Bind loopback; `tailscale serve` fronts this over real HTTPS at
-// https://tonberry.tail267a92.ts.net (secure context → SW/notifications/PWA work).
+// Bind loopback; `tailscale serve` fronts this over real HTTPS at your
+// tailnet's own magic-DNS hostname (<device>.<tailnet-id>.ts.net) - secure
+// context, so SW/notifications/PWA work. No hostname is hardcoded anywhere
+// in this file (verified - allowedHosts is a bare `true`, not a list), so
+// there is nothing to parameterize: this was a machine name in a comment,
+// not a config value anything reads.
 const TAILSCALE_IP = "127.0.0.1";
 const HOST_WS = "ws://127.0.0.1:55945"; // loopback host, proxied below
 

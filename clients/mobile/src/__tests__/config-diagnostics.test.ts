@@ -7,7 +7,12 @@ import { describe, expect, it } from "vitest";
 import { computeConfigProblems } from "../config-diagnostics";
 
 const PRODUCTION_ORIGIN = "https://platform.traycer.ai";
-const TAILNET_ORIGIN = "https://tonberry.tail267a92.ts.net";
+// Any origin that is NOT PRODUCTION_ORIGIN exercises this suite identically -
+// `computeConfigProblems` only ever compares against the production origin
+// string, never inspects this value's shape (verified by reading it before
+// choosing a replacement). Renamed from a constant carrying a real machine's
+// hostname to a generic non-production example; no functional change.
+const NON_PRODUCTION_ORIGIN = "https://device.example-tailnet.ts.net";
 
 describe("computeConfigProblems", () => {
   it("reports nothing when authn is configured and a host URL is set", () => {
@@ -15,7 +20,7 @@ describe("computeConfigProblems", () => {
       computeConfigProblems({
         authnConfigured: true,
         hostWsUrl: "wss://example/rpc",
-        origin: TAILNET_ORIGIN,
+        origin: NON_PRODUCTION_ORIGIN,
       }),
     ).toEqual([]);
   });
@@ -34,7 +39,7 @@ describe("computeConfigProblems", () => {
     const problems = computeConfigProblems({
       authnConfigured: false,
       hostWsUrl: "wss://example/rpc",
-      origin: TAILNET_ORIGIN,
+      origin: NON_PRODUCTION_ORIGIN,
     });
     expect(problems).toHaveLength(1);
     expect(problems[0].id).toBe("authn-cross-origin-default");
@@ -44,7 +49,7 @@ describe("computeConfigProblems", () => {
     const problems = computeConfigProblems({
       authnConfigured: true,
       hostWsUrl: null,
-      origin: TAILNET_ORIGIN,
+      origin: NON_PRODUCTION_ORIGIN,
     });
     expect(problems).toHaveLength(1);
     expect(problems[0].id).toBe("host-ws-url-missing");
@@ -54,7 +59,7 @@ describe("computeConfigProblems", () => {
     const problems = computeConfigProblems({
       authnConfigured: false,
       hostWsUrl: null,
-      origin: TAILNET_ORIGIN,
+      origin: NON_PRODUCTION_ORIGIN,
     });
     expect(problems.map((p) => p.id).sort()).toEqual(
       ["authn-cross-origin-default", "host-ws-url-missing"].sort(),
