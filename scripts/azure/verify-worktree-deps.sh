@@ -12,6 +12,26 @@
 # `bun install` in that worktree fixed it. This script exists so that trap
 # is caught mechanically after every worktree provision, instead of
 # rediscovered by a confused agent mid-task.
+#
+# AUTHORITY, stated explicitly (Evaluator eval-round-01 addendum B4): this
+# script's self-heal path runs `eval` against the `setup` command from
+# `<worktree>/.traycer/environment.json` - a file the protocol describes as
+# "committable & shareable", i.e. controlled by whoever can commit to that
+# worktree's branch. Executing it is CORRECT behavior, not a hole - the
+# Traycer host already executes setup scripts by design, and agents running
+# arbitrary code is an accepted risk in the decision log. What matters is
+# WHO invokes this script and under what authority, exactly as
+# housekeeping-sweep.sh states for itself:
+#   - Run as **per-identity self-service** (an identity repairing their own
+#     worktree): the tenant is executing their own committed code under
+#     their own HOME - no authority question, same as any other command
+#     that identity could already run.
+#   - Run by a **central ops process across many worktrees**: it executes
+#     EACH tenant's committed setup command as ops, not as that tenant -
+#     sharper than housekeeping-sweep.sh's read-only listing, because this
+#     is arbitrary code execution. If provisioning automation invokes this
+#     script centrally, that invocation is itself the authority decision
+#     and should be made deliberately, not incidentally.
 set -euo pipefail
 
 usage() {
@@ -32,35 +52,69 @@ fi
 
 env_file="${worktree_dir}/.traycer/environment.json"
 
-# A worktree is "healthy" here if every node_modules directory under it (bun
-# workspaces symlink several, not just the root) resolves - i.e. is either a
-# real directory or a symlink whose target exists. A dangling symlink is the
-# exact failure mode from the incident above.
-broken=0
-while IFS= read -r -d '' nm_dir; do
-  if [ -L "$nm_dir" ] && [ ! -e "$nm_dir" ]; then
-    echo "verify-worktree-deps: dangling node_modules symlink at '${nm_dir}'"
-    broken=1
-  fi
-done < <(find "$worktree_dir" -maxdepth 4 -name node_modules -print0 2>/dev/null)
-
-if [ ! -e "${worktree_dir}/node_modules" ]; then
-  echo "verify-worktree-deps: no root node_modules at all under '${worktree_dir}' - dependencies were never installed in this worktree"
-  broken=1
+if ! command -v node >/dev/null 2>&1; then
+  echo "verify-worktree-deps: 'node' not found on PATH - cannot enumerate workspace members or parse '${env_file}' (this is the exact 'spawned processes don't inherit PATH' trap from the decision log; a silent exit here would read as broken code, so failing loudly with this message instead) - escalate" >&2
+  exit 1
 fi
 
+# POSITIVE expectation, not a scan for brokenness: derive which directories
+# SHOULD have a node_modules from the root package.json's `workspaces`
+# globs, then check each one. This is the actual fix for eval round 1's
+# addendum B3 - the previous version used `find -name node_modules` to
+# locate EXISTING node_modules entries and only checked those for a
+# dangling symlink, which structurally cannot see a nested node_modules
+# that is simply ABSENT (find cannot enumerate a path that was never
+# created). That is exactly the documented incident this script exists to
+# catch, and the scan-based version missed it. You can't find an absence by
+# looking for it - you have to know what should be there.
+root_pkg="${worktree_dir}/package.json"
+if [ ! -f "$root_pkg" ]; then
+  echo "verify-worktree-deps: no root package.json at '${root_pkg}' - not a bun/npm workspace root, nothing to verify"
+  exit 0
+fi
+
+workspace_patterns="$(node -e '
+  const fs = require("fs");
+  const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const patterns = Array.isArray(pkg.workspaces)
+    ? pkg.workspaces
+    : (pkg.workspaces && Array.isArray(pkg.workspaces.packages)) ? pkg.workspaces.packages : [];
+  process.stdout.write(patterns.join("\n"));
+' "$root_pkg" 2>/dev/null || true)"
+
+expected_dirs=("$worktree_dir")
+if [ -n "$workspace_patterns" ]; then
+  while IFS= read -r pattern; do
+    [ -z "$pattern" ] && continue
+    # Simple glob expansion (workspace patterns here are plain directory
+    # globs like "clients/*", not full minimatch) - relative to worktree_dir.
+    for member_dir in "${worktree_dir}"/${pattern}; do
+      [ -d "$member_dir" ] || continue
+      [ -f "${member_dir}/package.json" ] || continue
+      expected_dirs+=("$member_dir")
+    done
+  done <<<"$workspace_patterns"
+fi
+
+broken=0
+for member_dir in "${expected_dirs[@]}"; do
+  nm="${member_dir}/node_modules"
+  # `[ -e ]` follows a symlink and tests the RESOLVED target, so this one
+  # check catches both a completely absent node_modules AND a present-but-
+  # dangling symlink - no separate `-L` branch needed.
+  if [ ! -e "$nm" ]; then
+    echo "verify-worktree-deps: missing (or dangling-symlink) node_modules at '${nm}' - this workspace member is expected to have one"
+    broken=1
+  fi
+done
+
 if [ "$broken" -eq 0 ]; then
-  echo "verify-worktree-deps: '${worktree_dir}' dependency graph looks healthy"
+  echo "verify-worktree-deps: '${worktree_dir}' dependency graph looks healthy (${#expected_dirs[@]} workspace member(s) checked)"
   exit 0
 fi
 
 if [ ! -f "$env_file" ]; then
   echo "verify-worktree-deps: dependency graph is broken and no '${env_file}' exists to re-run - cannot self-heal, escalate" >&2
-  exit 1
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "verify-worktree-deps: 'node' not found on PATH - cannot parse '${env_file}' to self-heal (this is the exact 'spawned processes don't inherit PATH' trap from the decision log; a silent exit here would read as broken code, so failing loudly with this message instead) - escalate" >&2
   exit 1
 fi
 

@@ -238,8 +238,30 @@ provisions it. Already observed to fail silently and read exactly like a code
 defect (a missing `node_modules` symlink; `bun install` fixed it). After
 provisioning a worktree, run
 [`verify-worktree-deps.sh`](../../scripts/azure/verify-worktree-deps.sh),
-which detects a dangling symlink or absent install and re-runs the worktree's
-own setup script rather than leaving it silently broken.
+which checks a **positive expectation** - the workspace member directories
+derived from the root `package.json`'s `workspaces` globs - rather than
+scanning for existing-but-broken entries, specifically so a nested
+`node_modules` that is completely *absent* (not merely a dangling symlink) is
+still caught. An earlier version scanned only for existing `node_modules`
+directories and checked those for a dangling symlink, which cannot see a
+path that was never created - exactly the documented incident - and reported
+such a worktree "healthy" (caught in review, fixed; see
+`verify-worktree-deps.test.sh`, which regression-tests this exact shape).
+
+**Authority for `eval`-ing the setup command, stated explicitly:** the
+self-heal path runs the `setup` command from `<worktree>/.traycer/environment.json`
+- a file the protocol describes as "committable & shareable," i.e. controlled
+by whoever can commit to that worktree's branch. Executing it is correct
+behavior (the Traycer host already does this by design, and agents running
+arbitrary code is an accepted risk in this project's decision log), but *who*
+invokes this script changes what that execution means: run as per-identity
+self-service, a tenant is just running their own committed code under their
+own `HOME` - no new authority question. Run by a central ops process across
+many worktrees, it executes **each tenant's committed command as ops** - a
+sharper version of the same authority question `housekeeping-sweep.sh`
+states for its own, read-only case. If provisioning automation invokes this
+script centrally, that is itself the authority decision and should be made
+deliberately.
 
 ## Permissions
 
