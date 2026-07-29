@@ -350,8 +350,8 @@ is the design:
 
 | Mode | Cost | Catches |
 |---|---|---|
-| structural (on the timer) | free | missing/broken binary, **credential with no auth material**, repo unreadable by the owning user |
-| `--spawn` (**not** scheduled) | one real Claude call | a credential that is present and well-formed but **dead** — expired, revoked, or quota-exhausted |
+| structural (on the timer) | free | missing/broken binary, token not configured, **token configured but not reaching the running host**, repo unreadable by the owning user |
+| `--spawn` (**not** scheduled) | one real Claude call | a token that is present and delivered but **dead** — expired, revoked, or quota-exhausted |
 
 `--spawn` is deliberately not on a timer. The deployment shares one Claude
 Max account across N people (A7), so a probe that spawned an agent every
@@ -359,24 +359,73 @@ few minutes would consume the quota it exists to protect — monitoring that
 causes the outage it watches for. Enabling it is an explicit, costed
 decision, not one this repo makes for the operator.
 
-**This probe found a live defect on its first run, and then found a defect
-in itself.** `--spawn` against the real tenant returned `Not logged in ·
-Please run /login`. Investigating (keys only, never values) showed
-`.claude.json` contained *nothing but* telemetry and migration fields —
-`machineID`, `userID`, `cachedExperimentData`, `migrationVersion` — with no
-token of any kind, and no `.claude/.credentials.json` at all. Claude Code
-writes that file on first run whether or not anyone has authenticated.
+### How the harness is actually authenticated (and two wrong checks)
 
-So the structural check as first written (`[ -s ~/.claude.json ]`) was
-itself a false-green for the one condition that matters: file present,
-0600, 389 bytes, valid JSON, zero credentials. It now requires an
-auth-bearing key and **fails on the real box**, at zero quota cost.
-Verified both directions — fails against the live unauthenticated state,
-passes against a synthetic credential carrying `oauthAccount`.
+`claude setup-token` prints a long-lived OAuth token and **persists
+nothing**. There is no credentials file to find, by design. The token
+lives in `/etc/traycer/claude.env` (0600 root:root) as
+`CLAUDE_CODE_OAUTH_TOKEN` and reaches the harness through
+`traycer-host@.service.d/10-claude-auth.conf`'s `EnvironmentFile=-`.
 
-This check is coupled to Claude Code's on-disk layout, which is an
-internal detail. If it starts failing on a box that genuinely works,
-check the layout before trusting the alert.
+**Two drafts of this check were wrong in opposite directions**, and the
+pair is more instructive than either alone:
+
+1. `[ -s ~/.claude.json ]` — a false **green**. That file is first-run
+   scaffolding Claude Code writes whether or not anyone authenticated: on
+   this box 0600, 389 bytes, valid JSON, and containing *only* telemetry
+   and migration keys (`machineID`, `userID`, `cachedExperimentData`,
+   `migrationVersion`). Zero credentials, check passes.
+2. Then requiring an auth-bearing key *in that file* — a false **red**.
+   Under `setup-token` it never gains one, and a bare `claude -p` from any
+   shell lacking the env var always reports `Not logged in`. The probe
+   reported the agent surface broken while it was working.
+
+The second is the mirror of the first: **strictness aimed at the wrong
+mechanism is not rigour.** Fixing a false-green by tightening the same
+wrong measurement just relocates the error.
+
+What it checks now, verified against the live box:
+
+- **Configured** — `/etc/traycer/claude.env` defines a non-empty
+  `CLAUDE_CODE_OAUTH_TOKEN` (presence and value *length* only; the value
+  is never read, printed, or logged, so it cannot leak into the journal or
+  Log Analytics).
+- **Delivered** — the variable is actually present in the running host's
+  `/proc/<pid>/environ`. This is the half a config check cannot give you: a
+  correct env file plus a host that started *before* the drop-in landed is
+  a running harness with no credential — config green, capability absent.
+- Unreadable env file is treated as **inconclusive and alerted**, named
+  distinctly, because the file is 0600 root:root and that means "probe ran
+  as the wrong user", not "credential missing".
+
+Verified in all three directions: passes on the real working config, fails
+when the env file is absent, fails when it defines an empty token.
+
+### Onboarding a tenant by hand? Enable its timers, or it is unmonitored
+
+**This has already happened once.** The only real tenant on the box
+(`elliot`) had **no functional health probe at all** — `traycer-health-probe@elliot.timer`
+was `disabled` — while the timer for a throwaway test canary was active.
+Monitoring that looked deployed and covered nothing that mattered.
+
+**Root cause, which will recur:** `bootstrap.sh` enables the per-tenant
+timers inside its `for tenant_id in ${TRAYCER_TENANT_IDS}` loop, and
+`tenantIds` is still `[]` in the live parameter file. `elliot` was created
+by hand, outside that loop, so nothing ever enabled its timers. Nothing
+failed; the tenant simply had no monitoring, and the only visible signal
+was a canary's timer sitting in the list looking reassuring.
+
+So: **any tenant added outside `bootstrap.sh` must have its timers enabled
+explicitly**, or A3 must go through the loop.
+
+```sh
+systemctl enable --now traycer-health-probe@<tenant>.timer
+systemctl enable --now traycer-agent-probe@<tenant>.timer
+```
+
+Verify with `systemctl list-timers 'traycer*'` and confirm a line exists
+**per tenant** — the check is that the list matches the tenants you expect,
+not merely that it is non-empty.
 
 ### A note on `az vm run-command` and probe provenance
 

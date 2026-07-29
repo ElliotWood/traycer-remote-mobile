@@ -43,32 +43,59 @@ fail() { echo "agent-probe: FAIL $1" >&2; exit 1; }
 #    call that healthy.
 "$CLAUDE_BIN" --version >/dev/null 2>&1 || fail "${CLAUDE_BIN} did not execute (--version failed)"
 
-# 2. Credential must be AUTH-BEARING, not merely present.
+# 2. Credential must be CONFIGURED and DELIVERED.
 #
-#    An earlier draft of this checked `[ -s ~/.claude.json ]` and passed on
-#    the live VM while `claude -p` returned "Not logged in - Please run
-#    /login". `.claude.json` is first-run scaffolding that Claude Code
-#    writes on startup whether or not anyone has authenticated: on this box
-#    it existed, was 0600, was 389 bytes, parsed cleanly, and contained
-#    ONLY telemetry and migration keys (machineID, userID,
-#    cachedExperimentData, migrationVersion...) with no token of any kind.
-#    So the file-exists check was itself a false-green for the one
-#    condition that matters. Caught by running --spawn, not by reading the
-#    code.
+#    This deployment authenticates the harness with `claude setup-token`,
+#    which prints a long-lived OAuth token and PERSISTS NOTHING. There is
+#    no credentials file to look for, by design. The token lives in
+#    /etc/traycer/claude.env as CLAUDE_CODE_OAUTH_TOKEN and reaches the
+#    harness through a systemd drop-in's `EnvironmentFile=`.
 #
-#    So: look for an actual credential. Never prints or logs any value -
-#    key presence and file existence only, so this can never leak a token
-#    into the journal or Log Analytics.
+#    TWO EARLIER DRAFTS OF THIS CHECK WERE BOTH WRONG, in opposite
+#    directions, and the pair is the lesson:
+#      - `[ -s ~/.claude.json ]` was a false GREEN: that file is first-run
+#        scaffolding Claude Code writes whether or not anyone
+#        authenticated (0600, 389 bytes, valid JSON, telemetry keys only).
+#      - Then requiring an auth-bearing key in it was a false RED: under
+#        `setup-token` that file NEVER gains one, and a bare `claude -p`
+#        from a shell without the env var ALWAYS says "Not logged in".
+#        Strictness aimed at the wrong mechanism is not rigour.
+#    So this now checks the mechanism actually in use, verified against
+#    the live box (env file mode/owner, key presence, and the variable
+#    present in the running host's /proc/<pid>/environ).
 #
-#    COUPLED TO CLAUDE CODE'S ON-DISK LAYOUT (~/.claude/.credentials.json,
-#    or an oauth/token key inside ~/.claude.json). That is an internal
-#    detail and may change between versions - if this starts failing on a
-#    box that genuinely works, check the layout before trusting the alert.
-CRED_JSON="${TENANT_HOME}/.claude.json"
-CRED_FILE="${TENANT_HOME}/.claude/.credentials.json"
-if [ ! -s "$CRED_FILE" ]; then
-  if ! { [ -s "$CRED_JSON" ] && grep -qE '"(oauthAccount|accessToken|refreshToken|primaryApiKey)"' "$CRED_JSON"; }; then
-    fail "no Claude credential for '${TENANT_ID}': neither ${CRED_FILE} nor an auth key in ${CRED_JSON}. Agents cannot authenticate - someone must run 'claude' interactively as ${OS_USER} with HOME=${TENANT_HOME} and complete /login. NOTE: ${CRED_JSON} existing is NOT evidence of login; it is written on first run regardless."
+#    Never reads, prints, or logs the token VALUE - only key presence and
+#    value length - so this cannot leak a credential into the journal or
+#    into Log Analytics.
+CLAUDE_ENV_FILE="${TRAYCER_CLAUDE_ENV:-/etc/traycer/claude.env}"
+
+# 2a. Configured: the env file defines a non-empty token.
+if [ ! -f "$CLAUDE_ENV_FILE" ]; then
+  fail "no Claude credential for '${TENANT_ID}': ${CLAUDE_ENV_FILE} does not exist. The harness is authenticated by CLAUDE_CODE_OAUTH_TOKEN from that file (via a traycer-host@.service.d drop-in), NOT by any credentials file - \`claude setup-token\` persists nothing."
+fi
+if [ ! -r "$CLAUDE_ENV_FILE" ]; then
+  # Unreadable is INCONCLUSIVE, not healthy. The file is 0600 root:root, so
+  # this fires if the probe is ever run as a non-root user rather than
+  # meaning the credential is missing - named separately so the alert does
+  # not send someone hunting for a credential that is fine.
+  fail "cannot verify the Claude credential for '${TENANT_ID}': ${CLAUDE_ENV_FILE} exists but is unreadable by $(id -un). It is 0600 root:root by design - this probe must run as root."
+fi
+TOKEN_LEN="$(awk -F= '/^CLAUDE_CODE_OAUTH_TOKEN=/{print length($2); exit}' "$CLAUDE_ENV_FILE")"
+if [ -z "${TOKEN_LEN:-}" ] || [ "$TOKEN_LEN" -eq 0 ]; then
+  fail "no usable Claude credential for '${TENANT_ID}': ${CLAUDE_ENV_FILE} does not define a non-empty CLAUDE_CODE_OAUTH_TOKEN."
+fi
+
+# 2b. Delivered: the running host actually carries the variable.
+#
+#     This is the half a config check cannot give you. A correct env file
+#     plus a host process that started BEFORE the drop-in landed (or
+#     without a `daemon-reload`) is a running harness with no credential -
+#     config green, capability absent. Only inspected when the host is up;
+#     a down host is the health probe's business, not this one's.
+HOST_PID="$(systemctl show -p MainPID --value "traycer-host@${TENANT_ID}.service" 2>/dev/null || echo 0)"
+if [ -n "$HOST_PID" ] && [ "$HOST_PID" != "0" ] && [ -r "/proc/${HOST_PID}/environ" ]; then
+  if ! tr '\0' '\n' < "/proc/${HOST_PID}/environ" | grep -q '^CLAUDE_CODE_OAUTH_TOKEN=.'; then
+    fail "Claude credential is configured in ${CLAUDE_ENV_FILE} but did NOT reach the running host process for '${TENANT_ID}' (pid ${HOST_PID}). The harness cannot authenticate. Most likely the host started before the traycer-host@.service.d drop-in landed - 'systemctl daemon-reload && systemctl restart traycer-host@${TENANT_ID}' should fix it."
   fi
 fi
 
@@ -86,7 +113,7 @@ if [ -d "$REPO_ROOT" ]; then
 fi
 
 if [ "$MODE" != "--spawn" ]; then
-  echo "agent-probe: OK structural checks passed for '${TENANT_ID}' (binary, credential, repo git). Credential LIVENESS not proven - run with --spawn for that, at quota cost."
+  echo "agent-probe: OK structural checks passed for '${TENANT_ID}' (binary; CLAUDE_CODE_OAUTH_TOKEN configured and delivered to the host; repo git). Token VALIDITY not proven - run with --spawn for that, at quota cost."
   exit 0
 fi
 
@@ -95,12 +122,22 @@ fi
 #    project has already been burned by a probe that read output it did not
 #    own. A marker the prompt itself demands is the only proof the model
 #    actually answered.
+#    Must carry CLAUDE_CODE_OAUTH_TOKEN in explicitly. Without it `claude`
+#    reports "Not logged in" no matter how healthy the deployment is -
+#    which is exactly the false-red an earlier draft of this script built a
+#    whole check around.
 SENTINEL="A6PROBE$(date -u +%s)"
+# shellcheck disable=SC1090
+CLAUDE_CODE_OAUTH_TOKEN="$(awk -F= '/^CLAUDE_CODE_OAUTH_TOKEN=/{sub(/^CLAUDE_CODE_OAUTH_TOKEN=/,"");print;exit}' "$CLAUDE_ENV_FILE")"
 OUT="$(cd / && runuser -u "$OS_USER" -- env HOME="$TENANT_HOME" \
+  CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" \
   "$CLAUDE_BIN" -p "Reply with exactly this token and nothing else: ${SENTINEL}" 2>&1)" || true
 
 if echo "$OUT" | grep -q "$SENTINEL"; then
   echo "agent-probe: OK real spawn authenticated and answered for '${TENANT_ID}'"
   exit 0
 fi
-fail "real spawn did not return the sentinel for '${TENANT_ID}' - credential likely expired/revoked or quota exhausted. First 200 chars: $(echo "$OUT" | head -c 200)"
+# Deliberately truncates and does not echo the whole output: a failing
+# `claude` can print request context, and this string travels to syslog and
+# on to Log Analytics.
+fail "real spawn did not return the sentinel for '${TENANT_ID}' - token likely expired/revoked or quota exhausted. First 200 chars: $(echo "$OUT" | head -c 200)"
