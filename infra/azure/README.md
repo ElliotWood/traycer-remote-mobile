@@ -643,3 +643,26 @@ proves the decision is being made from a genuine production credential.
 `traycer-ws-deflate.service`'s unit file is left in place (stopped and
 disabled). `systemctl disable --now traycer-tenant-router && systemctl enable
 --now traycer-ws-deflate` restores the previous single-tenant behaviour.
+
+### Third harness: a real browser session
+
+`verify-pwa-session.mjs <origin-url>` drives real chromium (via
+`playwright-core`, resolving a browser from the local Playwright cache) against
+the public origin and asserts the PWA **renders**, not merely that the protocol
+chain carries frames. The first two harnesses can both pass while the app is
+blank — a WebSocket that opens and exchanges one frame is not a working client.
+
+It reads `~/.traycer/cli/credentials` on the machine running it and seeds
+`localStorage["traycer.mobile.auth"]` before app code runs, because the app
+would otherwise boot into the device-code sign-in flow, which needs a human.
+Nothing is copied off the VM; only a hash prefix of the user id is printed.
+
+Checks: valid TLS + 200, a `wss://` connection actually opened, non-trivial
+rendered content, **not** on a sign-in/unauthorized screen, **not** showing a
+connection-failure banner, and no uncaught page errors. It also writes a
+screenshot and the rendered text.
+
+One note for whoever edits it: the `try/catch` around the `localStorage` seed is
+load-bearing. Init scripts run in *every* frame, and this app renders wireframe
+previews in sandboxed iframes where `localStorage` access throws — without the
+guard the harness manufactures the page errors it exists to detect.
