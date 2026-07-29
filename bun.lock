@@ -298,8 +298,10 @@
       "dependencies": {
         "@microsoft/agents-hosting": "^1.7.1",
         "jsonwebtoken": "^9.0.3",
+        "zod": "catalog:",
       },
       "devDependencies": {
+        "@traycer-clients/shared": "workspace:*",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/node": "catalog:",
         "@typescript-eslint/eslint-plugin": "catalog:",

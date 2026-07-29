@@ -10,6 +10,10 @@ export default defineConfig({
         find: "@traycer-clients/teams-bot",
         replacement: path.resolve(__dirname, "./src"),
       },
+      {
+        find: "@traycer-clients/shared",
+        replacement: path.resolve(__dirname, "..", "shared"),
+      },
     ],
   },
   test: {
