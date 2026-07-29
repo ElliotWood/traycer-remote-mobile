@@ -53,7 +53,7 @@ export async function runApprove(
 export async function runReject(
   bridge: BridgeClient,
   approvalId: string,
-  reason: string | undefined,
+  reason: string | null,
   logger: ILogger,
 ): Promise<void> {
   const chatId = await bridge.findChatForApproval(approvalId);

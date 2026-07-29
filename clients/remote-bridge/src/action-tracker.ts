@@ -92,7 +92,7 @@ interface PendingEntry {
   readonly resolve: (outcome: ActionOutcome) => void;
   attempts: number;
   settled: boolean;
-  timer: ReturnType<typeof setTimeout> | null;
+  timer: NodeJS.Timeout | null;
 }
 
 export interface ActionTrackerDeps {

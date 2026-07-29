@@ -31,11 +31,11 @@ export interface RemoteBridgeActions {
    */
   approve(chatId: string, approvalId: string): Promise<ActionOutcome>;
 
-  /** Rejects a pending approval. `reason` is surfaced to the agent as the denial explanation. */
+  /** Rejects a pending approval. `reason` is surfaced to the agent as the denial explanation; pass `null` for no reason. */
   reject(
     chatId: string,
     approvalId: string,
-    reason?: string,
+    reason: string | null,
   ): Promise<ActionOutcome>;
 
   /** Answers a pending interview block. */

@@ -181,9 +181,7 @@ export class ChatSession {
    * see `connected: false` / empty pending lists that are merely "not
    * loaded yet", not a true absence.
    */
-  private waitForFirstSnapshot(
-    timeoutMs: number = FIRST_SNAPSHOT_TIMEOUT_MS,
-  ): Promise<void> {
+  private waitForFirstSnapshot(timeoutMs: number): Promise<void> {
     if (this.snapshot !== null) return Promise.resolve();
     return new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -200,7 +198,7 @@ export class ChatSession {
   }
 
   async getStatus(): Promise<ChatStatus> {
-    await this.waitForFirstSnapshot();
+    await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     return {
       chatId: this.chatId,
       title: this.snapshot?.chat.title ?? null,
@@ -233,21 +231,24 @@ export class ChatSession {
   }
 
   async approve(approvalId: string): Promise<ActionOutcome> {
-    return this.decide(approvalId, { approved: true });
+    return this.decide(approvalId, { approved: true, reason: null });
   }
 
-  async reject(approvalId: string, reason?: string): Promise<ActionOutcome> {
+  async reject(
+    approvalId: string,
+    reason: string | null,
+  ): Promise<ActionOutcome> {
     return this.decide(approvalId, { approved: false, reason });
   }
 
   private async decide(
     approvalId: string,
-    decision: { readonly approved: boolean; readonly reason?: string },
+    decision: { readonly approved: boolean; readonly reason: string | null },
   ): Promise<ActionOutcome> {
     if (this.terminated !== null) {
       return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
     }
-    await this.waitForFirstSnapshot();
+    await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     if (this.terminated !== null) {
       return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
     }
@@ -277,7 +278,17 @@ export class ChatSession {
         chatId: this.chatId,
         clientActionId,
         approvalId,
-        decision,
+        // `runtimeApprovalDecisionSchema` (protocol/src/host/agent/gui/
+        // agent-runtime.ts) declares `reason` as `z.string().optional()` -
+        // it accepts an absent key or a string, not an explicit `null`.
+        // This class's own `decide()` boundary uses `string | null`
+        // internally (no optional params, per this repo's lint rule), so
+        // the conversion to "omit the key entirely" happens right here, at
+        // the wire boundary, not upstream.
+        decision:
+          decision.reason === null
+            ? { approved: decision.approved }
+            : { approved: decision.approved, reason: decision.reason },
       },
       isSettled: (view) => !view.pendingApprovalIds.has(approvalId),
     });
@@ -290,7 +301,7 @@ export class ChatSession {
     if (this.terminated !== null) {
       return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
     }
-    await this.waitForFirstSnapshot();
+    await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     if (this.terminated !== null) {
       return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
     }
@@ -323,7 +334,7 @@ export class ChatSession {
     if (this.terminated !== null) {
       return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
     }
-    await this.waitForFirstSnapshot();
+    await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     if (this.terminated !== null) {
       return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
     }

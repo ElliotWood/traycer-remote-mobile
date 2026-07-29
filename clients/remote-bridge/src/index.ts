@@ -72,7 +72,7 @@ program
     "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
   )
   .action(async (opts: { epicId?: string; senderAgentId?: string }) => {
-    const logger = createLogger();
+    const logger = createLogger("info");
     await withBridge(opts, (bridge) => runList(bridge, logger));
   });
 
@@ -106,7 +106,7 @@ program
       approvalId: string,
       opts: { epicId?: string; senderAgentId?: string },
     ) => {
-      const logger = createLogger();
+      const logger = createLogger("info");
       await withBridge(opts, (bridge) => runApprove(bridge, approvalId, logger));
     },
   );
@@ -125,9 +125,13 @@ program
       reason: string | undefined,
       opts: { epicId?: string; senderAgentId?: string },
     ) => {
-      const logger = createLogger();
+      const logger = createLogger("info");
+      // commander's optional positional arg is `string | undefined` at
+      // this framework boundary; converted to `string | null` here so it
+      // can cross into `runReject`/`RemoteBridgeActions.reject`, which use
+      // `| null` throughout (this repo bans optional parameters).
       await withBridge(opts, (bridge) =>
-        runReject(bridge, approvalId, reason, logger),
+        runReject(bridge, approvalId, reason ?? null, logger),
       );
     },
   );
@@ -143,7 +147,7 @@ program
     "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
   )
   .action(async (opts: { epicId?: string; senderAgentId?: string }) => {
-    const logger = createLogger();
+    const logger = createLogger("info");
     await withBridge(opts, (bridge) => runWatch(bridge, logger));
   });
 

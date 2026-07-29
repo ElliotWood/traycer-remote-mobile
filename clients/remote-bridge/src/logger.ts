@@ -34,10 +34,14 @@ export function redact(text: string): string {
 }
 
 export interface ILogger {
-  debug(message: string, fields?: Record<string, unknown>): void;
-  info(message: string, fields?: Record<string, unknown>): void;
-  warn(message: string, fields?: Record<string, unknown>): void;
-  error(message: string, fields?: Record<string, unknown>, error?: Error): void;
+  debug(message: string, fields: Record<string, unknown> | null): void;
+  info(message: string, fields: Record<string, unknown> | null): void;
+  warn(message: string, fields: Record<string, unknown> | null): void;
+  error(
+    message: string,
+    fields: Record<string, unknown> | null,
+    error: Error | null,
+  ): void;
 }
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
@@ -47,20 +51,20 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
-export function createLogger(threshold: LogLevel = "info"): ILogger {
+export function createLogger(threshold: LogLevel): ILogger {
   const write = (
     level: LogLevel,
     message: string,
-    fields: Record<string, unknown> | undefined,
-    error: Error | undefined,
+    fields: Record<string, unknown> | null,
+    error: Error | null,
   ): void => {
     if (LEVEL_ORDER[level] < LEVEL_ORDER[threshold]) return;
     const line = {
       timestamp: new Date().toISOString(),
       level,
       message: redact(message),
-      ...(fields !== undefined ? { fields: redact(JSON.stringify(fields)) } : {}),
-      ...(error !== undefined
+      ...(fields !== null ? { fields: redact(JSON.stringify(fields)) } : {}),
+      ...(error !== null
         ? { error: { name: error.name, message: redact(error.message) } }
         : {}),
     };
@@ -68,9 +72,9 @@ export function createLogger(threshold: LogLevel = "info"): ILogger {
   };
 
   return {
-    debug: (message, fields) => write("debug", message, fields, undefined),
-    info: (message, fields) => write("info", message, fields, undefined),
-    warn: (message, fields) => write("warn", message, fields, undefined),
+    debug: (message, fields) => write("debug", message, fields, null),
+    info: (message, fields) => write("info", message, fields, null),
+    warn: (message, fields) => write("warn", message, fields, null),
     error: (message, fields, error) => write("error", message, fields, error),
   };
 }

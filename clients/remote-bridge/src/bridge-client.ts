@@ -6,6 +6,8 @@ import {
 import { hostNotificationsSubscribeServerFrameSchema } from "@traycer/protocol/host/notifications/host-notifications";
 import { WsRpcClient } from "@traycer-clients/shared/host-transport/ws-rpc-client";
 import { WsStreamClient } from "@traycer-clients/shared/host-transport/ws-stream-client";
+import type { IStreamSession } from "@traycer-clients/shared/host-transport/i-stream-session";
+import type { ProactiveRefreshScheduler } from "@traycer-clients/shared/auth/token-refresh-scheduler";
 import { withTransientRetry } from "./transient-retry";
 import { createNodeWebSocketFactory } from "@traycer-clients/shared/host-transport/node-ws-factory";
 import { createNodeStreamWebSocketFactory } from "@traycer-clients/shared/host-transport/node-ws-stream-factory";
@@ -62,12 +64,8 @@ export class BridgeClient implements RemoteBridgeActions {
   private readonly streamClient: WsStreamClient<typeof hostStreamRpcRegistry>;
   private readonly logger: ILogger;
   private readonly chatSessions = new Map<string, ChatSession>();
-  private readonly refreshScheduler: ReturnType<
-    typeof createProactiveRefreshScheduler<NodeJS.Timeout>
-  >;
-  private notificationsSession: ReturnType<
-    WsStreamClient<typeof hostStreamRpcRegistry>["subscribe"]
-  > | null = null;
+  private readonly refreshScheduler: ProactiveRefreshScheduler;
+  private notificationsSession: IStreamSession | null = null;
   private disposed = false;
 
   private constructor(opts: {
@@ -128,7 +126,7 @@ export class BridgeClient implements RemoteBridgeActions {
       clearTimer: (handle) => clearTimeout(handle),
       leadMs: DEFAULT_REFRESH_LEAD_MS,
       minDelayMs: DEFAULT_REFRESH_MIN_DELAY_MS,
-      onDiagnostic: (message) => this.logger.debug(message),
+      onDiagnostic: (message) => this.logger.debug(message, null),
     });
     this.refreshScheduler.start();
 
@@ -186,7 +184,7 @@ export class BridgeClient implements RemoteBridgeActions {
           { epicId: this.epicId, senderAgentId: this.senderAgentId, scope: "user" },
           { endpoint, bearer: this.auth.lease, abortSignal: new AbortController().signal },
         ),
-      onDiagnostic: (message) => this.logger.warn(message),
+      onDiagnostic: (message) => this.logger.warn(message, null),
       delayMs: TRANSIENT_RETRY_DELAY_MS,
     });
     return response.agents.map((a) => ({
@@ -209,7 +207,7 @@ export class BridgeClient implements RemoteBridgeActions {
   async reject(
     chatId: string,
     approvalId: string,
-    reason?: string,
+    reason: string | null,
   ): Promise<ActionOutcome> {
     return this.ensureChatSession(chatId).reject(approvalId, reason);
   }
@@ -279,7 +277,7 @@ export class BridgeClient implements RemoteBridgeActions {
         userId: this.auth.lease.identity.userId,
         wsStreamClient: this.streamClient,
         auth: this.auth,
-        onDiagnostic: (message) => this.logger.debug(message),
+        onDiagnostic: (message) => this.logger.debug(message, null),
       });
       this.chatSessions.set(chatId, session);
     }
