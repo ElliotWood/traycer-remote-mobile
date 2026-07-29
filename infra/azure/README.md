@@ -455,6 +455,17 @@ agent's state gets read as another's.
   root cause makes the stream noisier, not more informative.
 - Ingestion lag between `logger` and a queryable Log Analytics row is
   minutes. The alert rule's floor is `PT5M`. A6 is not a real-time pager.
+- **The agent probe's structural mode proves the token is PRESENT and
+  DELIVERED, never that it is VALID.** A revoked, expired, or
+  quota-exhausted token is still a non-empty string in
+  `/etc/traycer/claude.env` and still appears in the host's environ, so it
+  sails through every structural check while no agent can actually run.
+  Only `--spawn` — a real Claude call asserting on a sentinel in the reply —
+  distinguishes a live credential from a dead one. Until `--spawn` is on a
+  timer, **treat a green agent probe as "wired correctly", not "working"**.
+  This is the same present-vs-functional distinction the rest of A6 exists
+  to close, left deliberately open here because closing it costs quota on
+  a shared account (see the mode table above).
 
 ## Agent execution — the thing the VM exists for
 
