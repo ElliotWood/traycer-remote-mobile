@@ -1,0 +1,40 @@
+{
+  "name": "@traycer-clients/teams-bot",
+  "version": "0.1.0",
+  "description": "Microsoft Teams bot skeleton (Bot Framework / Microsoft 365 Agents SDK) — validates every inbound activity's JWT before dispatch, health endpoint, echo activity handler. Holds no Traycer protocol knowledge.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "traycer-teams-bot": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/traycerai/traycer.git",
+    "directory": "clients/teams-bot"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "compile": "tsc --noEmit",
+    "format": "bun x prettier --write .",
+    "lint": "eslint . --cache --fix --max-warnings 0",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@microsoft/agents-hosting": "^1.7.1",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

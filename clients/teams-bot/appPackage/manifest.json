@@ -1,0 +1,35 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.25",
+  "version": "0.1.0",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "packageName": "ai.traycer.teamsbot",
+  "developer": {
+    "name": "REPLACE_WITH_DEVELOPER_NAME",
+    "websiteUrl": "https://example.invalid",
+    "privacyUrl": "https://example.invalid/privacy",
+    "termsOfUseUrl": "https://example.invalid/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Traycer Remote",
+    "full": "Traycer Remote — approve and monitor agent runs from Teams"
+  },
+  "description": {
+    "short": "Approve, reject, and monitor Traycer agent runs from Teams.",
+    "full": "Relays through the Traycer remote bridge to your own desktop host — browse the fleet, read a chat's transcript, and approve or reject pending actions without leaving Teams."
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "00000000-0000-0000-0000-000000000000",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "validDomains": []
+}
