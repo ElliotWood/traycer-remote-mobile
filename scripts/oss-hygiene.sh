@@ -41,7 +41,10 @@ PATTERNS=(
 
   # Tailscale CGNAT range (100.64.0.0/10). Deliberately NOT generic RFC1918:
   # 10.x matched version strings and SVG coordinates in the first draft.
-  "tailscale CGNAT address|\b100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b"
+  # The negative lookahead skips CIDR notation — `100.64.0.0/10` names the
+  # range itself, which docs and other scanners legitimately reference. Only a
+  # bare host address identifies a machine.
+  "tailscale CGNAT address|\b100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b(?!/[0-9])"
 
   # Home paths whose username is NOT a known placeholder.
   "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)\\\\)[A-Za-z0-9._-]+"
