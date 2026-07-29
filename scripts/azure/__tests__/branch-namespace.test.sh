@@ -5,7 +5,9 @@
 # contract's original "already verified" table.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=./lib.sh
 source ./lib.sh
+# shellcheck source=../branch-namespace.sh
 source ../branch-namespace.sh
 
 echo "=== branch-namespace.test.sh ==="

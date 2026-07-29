@@ -7,6 +7,7 @@
 # rather than crash.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=./lib.sh
 source ./lib.sh
 
 echo "=== duplicate-race.test.sh ==="

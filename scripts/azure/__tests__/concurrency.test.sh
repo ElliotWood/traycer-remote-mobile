@@ -8,7 +8,9 @@
 # contract's original probe).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=./lib.sh
 source ./lib.sh
+# shellcheck source=../branch-namespace.sh
 source ../branch-namespace.sh
 
 N="${AZURE_TEST_CONCURRENCY:-8}"
@@ -20,7 +22,13 @@ worktree_root="$(mktemp -d)"
 
 echo "--- N-way concurrent worktree add, distinct identities ---"
 declare -a pids=()
-declare -a results_dir
+# NOT `declare -a` - this is a single scratch directory PATH (a scalar), not
+# an array. A leftover `declare -a results_dir` here was a genuine copy-paste
+# bug (caught by shellcheck SC2178/SC2128 in eval round 4): it worked
+# functionally by accident (bash treats a bare `$var` on a one-element array
+# as index 0, same as a scalar), but every subsequent `${results_dir}` use
+# was flagged as "expanding an array without an index." Fixed by removing
+# the incorrect declaration rather than indexing every use.
 results_dir="$(mktemp -d)"
 for i in $(seq 1 "$N"); do
   (

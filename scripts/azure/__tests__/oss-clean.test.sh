@@ -26,6 +26,16 @@ echo "=== oss-clean.test.sh (scanning: ${scan_paths[*]}) ==="
 
 failures=0
 
+# Bash-native line-prefixing (avoids an external `sed 's/^/    /'` per
+# shellcheck SC2001's suggestion - a plain `${var//search/replace}` doesn't
+# work here since these are anchored per-line, not a single substring).
+indent() {
+  local line
+  while IFS= read -r line; do
+    printf '    %s\n' "$line"
+  done
+}
+
 # Self-exemption is still necessary and still correct here: every pattern
 # below would match its OWN definition line in this file (the regex source
 # text literally contains the shape it's looking for, e.g. the string
@@ -39,7 +49,7 @@ check_pattern() {
   hits="$(grep -rnE "$pattern" --include="$glob" "${scan_paths[@]}" 2>/dev/null | grep -v '__tests__/oss-clean\.test\.sh' || true)"
   if [ -n "$hits" ]; then
     echo "  FAIL: ${description}"
-    echo "$hits" | sed 's/^/    /'
+    indent <<<"$hits"
     failures=$((failures + 1))
   else
     echo "  PASS: ${description}"
@@ -71,7 +81,7 @@ posix_home_hits="$(grep -rnE '/(home|Users)/[A-Za-z0-9_.-]+' --include='*' "${sc
   || true)"
 if [ -n "$posix_home_hits" ]; then
   echo "  FAIL: no hardcoded /home/<realname> or /Users/<realname> outside the documented placeholder allow-list"
-  echo "$posix_home_hits" | sed 's/^/    /'
+  indent <<<"$posix_home_hits"
   failures=$((failures + 1))
 else
   echo "  PASS: no hardcoded /home/<realname> or /Users/<realname> outside the documented placeholder allow-list"
@@ -86,7 +96,7 @@ email_hits="$(grep -rnE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' --include=
   || true)"
 if [ -n "$email_hits" ]; then
   echo "  FAIL: no hardcoded email addresses (outside RFC 2606 example.com/.org/.net)"
-  echo "$email_hits" | sed 's/^/    /'
+  indent <<<"$email_hits"
   failures=$((failures + 1))
 else
   echo "  PASS: no hardcoded email addresses (outside RFC 2606 example.com/.org/.net)"

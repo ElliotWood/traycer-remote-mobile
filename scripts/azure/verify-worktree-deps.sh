@@ -89,6 +89,14 @@ if [ -n "$workspace_patterns" ]; then
     # Simple glob expansion (workspace patterns here are plain directory
     # globs like "clients/*", not full minimatch) - relative to worktree_dir.
     matched_this_pattern=0
+    # shellcheck disable=SC2086  # deliberate: ${pattern} must word-split and glob-expand
+    #   (workspace patterns are plain directory globs like "clients/*"). Quoting it
+    #   makes the path literal, every [ -d ] fails, and the expectation set silently
+    #   collapses to the root - reintroducing the B3 blindness this function fixes.
+    #   (Not flagged by shellcheck in practice as of eval round 4 - shellcheck's own
+    #   heuristics recognize the quoted-prefix + unquoted-glob-suffix shape as
+    #   intentional - kept anyway as documentation and a guard against future/other
+    #   shellcheck versions flagging it.)
     for member_dir in "${worktree_dir}"/${pattern}; do
       [ -d "$member_dir" ] || continue
       [ -f "${member_dir}/package.json" ] || continue

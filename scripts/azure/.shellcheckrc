@@ -1,0 +1,29 @@
+# Scoped to scripts/azure/ only (shellcheck discovers this file by walking
+# up from each source file's own directory) - does not affect shellcheck
+# elsewhere in the repo.
+#
+# Both disables below exist for ONE reason: lib.sh's `azure_test_assert`
+# helper takes a shell CONDITION as a single-quoted STRING and evaluates it
+# later via `eval`, deliberately - the whole point is deferring evaluation
+# to assert-time rather than call-time. Every test in this suite (52+
+# checks across 9 files) uses this pattern.
+#
+# SC2016 ("expressions don't expand in single quotes") is the CORRECT
+# observation applied to the WRONG intent: not expanding at the call site is
+# exactly what's wanted here. Quoting the string differently would break the
+# deferred-evaluation design, not fix a bug.
+#
+# SC2034 ("X appears unused") fires on variables that ARE used, but only
+# inside one of these deferred-eval string literals - shellcheck's static
+# analysis has no way to see into a string it doesn't parse as code, so it
+# reports a false unused-variable warning for every variable referenced only
+# this way.
+#
+# Verified before disabling, not assumed: every SC2016/SC2034 hit in this
+# directory's shellcheck output (eval round 4) was inside or downstream of
+# an azure_test_assert call - none were a genuine bug the suppression would
+# hide. A real, unrelated array-usage bug in the SAME run (concurrency.test.sh's
+# `declare -a results_dir`, SC2178/SC2128) was fixed directly, not suppressed,
+# because it was NOT part of this pattern.
+disable=SC2016
+disable=SC2034
