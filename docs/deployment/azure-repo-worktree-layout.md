@@ -298,6 +298,9 @@ by or exposed this asymmetry, and is flagged rather than silently ported.
 
 ## Distance from the shipping branch
 
-At hand-off: `traycer-azure-repo-layout` is **0 commits ahead/behind**
-`traycer/traycer-remote-mobile-electric-stork` (both at `a6d9bb3d` prior to
-this sprint's commits; re-verify before merging).
+`traycer-azure-repo-layout` branched from `traycer/traycer-remote-mobile-electric-stork`
+at `a6d9bb3d` (0/0 at that point). This sprint added 2 commits on top (the
+A4 deliverable, then an executable-bit fix) - **2 ahead, 0 behind** at
+hand-off. Re-verify before merging; this is the actual number, not the
+pre-commit "0 ahead" this section stated in an earlier draft, which was true
+only because none of the sprint's work was in git yet.
