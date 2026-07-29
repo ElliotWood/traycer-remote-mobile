@@ -185,6 +185,8 @@ server {
         proxy_hide_header Access-Control-Allow-Credentials;
         proxy_hide_header Access-Control-Allow-Methods;
         proxy_hide_header Access-Control-Allow-Headers;
+        proxy_hide_header Access-Control-Expose-Headers;
+        proxy_hide_header Access-Control-Max-Age;
     }
 
     # No Traycer host process exists until A1 (supervision) and A3
