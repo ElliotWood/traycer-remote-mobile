@@ -88,11 +88,22 @@ if [ -n "$workspace_patterns" ]; then
     [ -z "$pattern" ] && continue
     # Simple glob expansion (workspace patterns here are plain directory
     # globs like "clients/*", not full minimatch) - relative to worktree_dir.
+    matched_this_pattern=0
     for member_dir in "${worktree_dir}"/${pattern}; do
       [ -d "$member_dir" ] || continue
       [ -f "${member_dir}/package.json" ] || continue
       expected_dirs+=("$member_dir")
+      matched_this_pattern=1
     done
+    # A declared workspace pattern matching zero members is a signal, not a
+    # normal state - a stale or typo'd glob would otherwise silently
+    # downgrade this whole script to root-only verification, the same class
+    # of blindness B3 was (a real problem that goes undetected because
+    # nothing looked in the right place). Warn loudly rather than stay
+    # quiet about it (Evaluator eval-round-03).
+    if [ "$matched_this_pattern" -eq 0 ]; then
+      echo "verify-worktree-deps: WARNING - workspace pattern '${pattern}' (from ${root_pkg}) matched no directory with a package.json; verification for it silently degrades to root-only unless this is fixed" >&2
+    fi
   done <<<"$workspace_patterns"
 fi
 

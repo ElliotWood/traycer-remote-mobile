@@ -90,6 +90,20 @@ azure_test_assert "missing root node_modules is detected as broken" \
   '! echo "$out4" | grep -q "looks healthy"'
 rm -rf "$(dirname "$wt4")"
 
+echo "--- a declared workspace glob matching nothing warns loudly, doesn't silently degrade ---"
+wt6="$(mktemp -d)/wt"
+mkdir -p "${wt6}/node_modules" "${wt6}/.traycer"
+cat >"${wt6}/package.json" <<'EOF'
+{"name":"root","workspaces":["packages/*"]}
+EOF
+# "packages/*" deliberately matches nothing - no packages/ dir exists at all.
+out6="$(bash "$script" "$wt6" 2>&1)"
+azure_test_assert "a zero-match glob prints an explicit WARNING naming the pattern" \
+  'echo "$out6" | grep -q "WARNING.*packages/\*"'
+azure_test_assert "verification still completes (root-only) instead of crashing" \
+  'echo "$out6" | grep -q "looks healthy"'
+rm -rf "$(dirname "$wt6")"
+
 echo "--- non-workspace directory (no root package.json): skipped gracefully, not an error ---"
 wt5="$(mktemp -d)"
 set +e
