@@ -57,15 +57,35 @@ PATTERNS=(
 
   # A real-looking email address identifies a person. Excludes RFC 2606
   # reserved test domains (example.com/.org/.net/.test) - the standard, safe
-  # placeholder this repo's own git fixtures use - and the project's own
-  # traycer.ai domain, which the codebase legitimately publishes as a
-  # required contact URI (mobile-push-service's VAPID subject,
-  # `mailto:push@traycer.ai`, is a role account the Web Push spec requires,
-  # not a person). Ported from scripts/azure's gate (ticket A5) - was a
-  # straight omission here before; the traycer.ai exclusion is new, found by
-  # actually running this pattern against the real tree rather than only the
-  # planted test cases.
-  "email address|[A-Za-z0-9._%+-]+@(?!([A-Za-z0-9.-]*\.)?(example)\.(com|org|net|test)\b|traycer\.ai\b)[A-Za-z0-9.-]+\.[a-z]{2,}"
+  # placeholder this repo's own git fixtures use - and this project's own
+  # published role accounts at traycer.ai (mobile-push-service's VAPID
+  # subject, `mailto:push@traycer.ai`, is a role account the Web Push spec
+  # requires, not a person). Ported from scripts/azure's gate (ticket A5) -
+  # was a straight omission here before.
+  #
+  # Allow-lists the ROLE ACCOUNT, not the whole traycer.ai domain (Evaluator
+  # eval-round-01 finding): an earlier version excluded any @traycer.ai
+  # address, which would have silently passed a real person's address at
+  # that domain (elliot.wood@traycer.ai) alongside the one legitimate role
+  # account - broader than its own justification.
+  #
+  # The exclusion is a whole-match negative lookahead anchored at a word
+  # boundary BEFORE the local part, not a lookahead placed after `@` - a
+  # first attempt placed after `@` (matching only the domain half) cannot
+  # see the local part at all, so it excluded nothing; the correct fix is
+  # excluding the full "role@domain" shape from the start of the match.
+  # `\b` before the lookahead matters too: without it, a regex engine can
+  # still find a match by starting mid-word (e.g. treating "ush@traycer.ai"
+  # inside "push@traycer.ai" as its own address, which the lookahead
+  # wouldn't recognize as excluded) - verified this failure mode happens by
+  # testing the un-anchored version first, then fixing it, rather than
+  # assuming the anchor was unnecessary.
+  #
+  # Verified with git grep -P against planted cases: push@/support@ at
+  # traycer.ai pass; a real personal address at the same domain
+  # (elliot.wood@traycer.ai) and a generic personal address elsewhere are
+  # both still flagged.
+  "email address|\b(?!(push|support|release|noreply)@traycer\.ai\b)[A-Za-z0-9._%+-]+@(?!([A-Za-z0-9.-]*\.)?(example)\.(com|org|net|test)\b)[A-Za-z0-9.-]+\.[a-z]{2,}"
 )
 
 EXCLUDES=(':!*.lock' ':!**/dist/**' ':!**/node_modules/**' ':!**/*.snap' ':!scripts/oss-hygiene.sh')
