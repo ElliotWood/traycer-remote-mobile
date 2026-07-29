@@ -23,11 +23,25 @@ const ShowcaseView = lazy(() =>
   import("@/views/showcase-view").then((mod) => ({ default: mod.ShowcaseView })),
 );
 
+// `?repro=1` — same no-auth/no-host proof-surface pattern as `?showcase=1`,
+// for the headless Playwright layout harness (`tests/layout/measure.mjs`).
+// Never reachable from a normal session; excluded from the precache
+// manifest the same way the showcase route is (both are lazy, both are
+// unreferenced by any in-app link).
+const isLayoutRepro = new URLSearchParams(window.location.search).get("repro") === "1";
+const LayoutReproView = lazy(() =>
+  import("@/views/layout-repro-view").then((mod) => ({ default: mod.LayoutReproView })),
+);
+
 createRoot(container).render(
   <StrictMode>
     {isShowcase ? (
       <Suspense fallback={null}>
         <ShowcaseView />
+      </Suspense>
+    ) : isLayoutRepro ? (
+      <Suspense fallback={null}>
+        <LayoutReproView />
       </Suspense>
     ) : (
       <AppRoot />
