@@ -34,8 +34,8 @@ param adminUsername string
 @secure()
 param adminSshPublicKey string
 
-@description('VM size. Defaults to the 4 vCPU / 16 GiB AMD SKU already in use elsewhere in this subscription (`altra-ab-sensormine-demo-aue`), for consistency — not a load-bearing choice; A7 (capacity) is expected to revisit this once real per-tenant resource usage is measured.')
-param vmSize string = 'Standard_D4as_v5'
+@description('VM size. Defaults to `Standard_D4s_v3` (4 vCPU / 16 GiB) - chosen for quota, not for fit. `Standard_D4as_v5` looks nominally consistent with `altra-ab-sensormine-demo-aue`, an existing resource in this subscription, but the `Standard DASv5 Family vCPUs` quota is 0 on this subscription (that existing resource already consumes the family\'s entire allotment) - a live deploy attempt with the AMD SKU failed on quota for exactly this reason. `Standard DSv3 Family vCPUs` had headroom instead (see infra/azure/README.md\'s quota-check prerequisite: check the PER-FAMILY limit, not just `Total Regional vCPUs` - they can diverge sharply and the family limit binds first). Revisit once quota changes or A7 (capacity) measures real per-tenant usage - this value documents what deploys today, not a sizing recommendation.')
+param vmSize string = 'Standard_D4s_v3'
 
 @description('Public DNS name the ingress will terminate TLS for (e.g. `traycer.example.com`). The DNS zone/delegation is assumed to already exist and is NOT provisioned by this template — A0\'s ticket describes "real DNS, real certificate", not zone creation, and this subscription\'s existing zone ownership is outside this ticket\'s scope to discover or assert.')
 param publicHostname string
