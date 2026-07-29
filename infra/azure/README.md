@@ -220,14 +220,14 @@ The access probe is `git ls-remote` against the specific repo, **not**
 `ssh -T git@github.com` — the latter reports a cheerful "successfully
 authenticated" for a key registered against any repo at all.
 
-**Both directions were exercised on the live VM.** The negative case was run
-first, before the public key was registered, and failed with
-`Permission denied (publickey)` at the probe. That run also caught a real
-bug: `sudo` inherits the caller's cwd, and `az vm run-command` runs from a
-root-only directory, so every `sudo -u traycer git ...` died with
-`failed to stat ... Permission denied` *before contacting GitHub* — which
-reads exactly like an auth failure and is not one. Hence the `cd /` at the
-top of the script.
+**The negative case was exercised on the live VM first**, before the public
+key was registered: the probe failed with `Permission denied (publickey)`,
+so the gate is known to be capable of failing rather than merely observed
+passing. That run also caught a real bug — `sudo` inherits the caller's
+cwd, and `az vm run-command` runs from a root-only directory, so every
+`sudo -u traycer git ...` died with `failed to stat ... Permission denied`
+*before contacting GitHub*, which reads exactly like an auth failure and is
+not one. Hence the `cd /` at the top of the script.
 
 ## What's not done yet
 
