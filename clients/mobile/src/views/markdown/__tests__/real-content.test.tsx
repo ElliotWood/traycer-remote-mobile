@@ -2,26 +2,34 @@
 /**
  * Contract requirement (Sprint 1, negotiated with the Evaluator): the
  * renderer must survive arbitrary REAL artifact markdown, not just a
- * hand-tuned sample that could be shaped to pass. Reads this epic's own
- * tech-plan artifact — which contains a real `graph TD` mermaid block and a
- * real table — and asserts it renders without throwing.
+ * hand-tuned sample that could be shaped to pass — a subgraph-heavy mermaid
+ * `graph TD` with punctuation inside node labels, and a GFM table mixing
+ * inline code, hex values, and plain text in one cell.
  *
- * The path is absolute and machine-local to this autobuild run by design
- * (the Evaluator specified this exact artifact). `readFileSync` fails loudly
- * if it's missing rather than silently skipping — a green run here must mean
- * it actually exercised real content.
+ * Originally read a real epic artifact via an absolute, machine-local path
+ * (`C:\Users\...\9c9ddaf0-...\tech-plan\index.md`) — reasoned as "fails
+ * loudly rather than silently skips", which is right, but the loud failure
+ * fired on every machine that wasn't the one that wrote it, including CI —
+ * the first time this package ever ran there. `fixtures/real-content-sample.md`
+ * is committed alongside this test instead: authored to exercise the exact
+ * same constructs the original artifact was chosen for (established by
+ * reading it before replacing it — see the mermaid subgraph and the icon
+ * table below), so it's real-shaped content, not a hand-tuned one-liner,
+ * while working on every machine. `readFileSync` still fails loudly if the
+ * fixture goes missing — a green run here still means it actually rendered
+ * real content, just content this repo owns.
  */
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { render } from "@/test-utils/dom";
 import { MobileMarkdown } from "@/views/markdown/mobile-markdown";
 
-const TECH_PLAN_PATH =
-  "C:\\Users\\gigaf\\.traycer\\epics\\9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef\\artifacts\\traycer-remote-mobile\\v2-desktop-companion\\tech-plan\\index.md";
+const FIXTURE_PATH = join(import.meta.dirname, "fixtures", "real-content-sample.md");
 
 describe("MobileMarkdown — real artifact content", () => {
-  it("renders the epic's own tech-plan doc without throwing", () => {
-    const markdown = readFileSync(TECH_PLAN_PATH, "utf8");
+  it("renders a real-shaped artifact doc (subgraph mermaid + mixed-content table) without throwing", () => {
+    const markdown = readFileSync(FIXTURE_PATH, "utf8");
     expect(markdown).toContain("```mermaid");
     expect(markdown.toLowerCase()).toContain("graph td");
 
