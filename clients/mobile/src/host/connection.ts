@@ -149,7 +149,7 @@ const NOOP_INVALIDATOR: IHostQueryInvalidator = {
  */
 export function createHostConnection(
   auth: HostConnectionAuth,
-  deps: HostConnectionDeps = {},
+  deps: HostConnectionDeps,
 ): HostConnection | null {
   // Explicit-null must survive: `deps.hostWsUrl = null` means "no host", so only
   // an absent field falls back to config (a `??` would swallow the null).

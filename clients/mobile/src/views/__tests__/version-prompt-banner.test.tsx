@@ -4,7 +4,7 @@
  * mocked (vitest doesn't run through the `VitePWA` plugin, so the real
  * virtual module never resolves under test — this is the deliberate seam).
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { fireEvent, render, screen } from "@/test-utils/dom";
 
 const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
@@ -80,7 +80,7 @@ describe("VersionPromptBanner", () => {
     const listeners = new Map<string, Set<(...args: any[]) => void>>();
     const originalNavigator = globalThis.navigator;
     const originalReload = window.location.reload;
-    let reload: ReturnType<typeof vi.fn>;
+    let reload: Mock;
 
     beforeEach(() => {
       listeners.clear();

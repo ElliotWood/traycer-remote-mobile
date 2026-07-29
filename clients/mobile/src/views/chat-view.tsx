@@ -56,7 +56,7 @@ import {
   type BlockedState,
 } from "@/host/notifications";
 import { NotificationPermissionButton } from "./notification-permission-button";
-import { markSeen } from "@/host/read-tracking-store";
+import { defaultStorage, markSeen } from "@/host/read-tracking-store";
 import { radius, theme, type } from "./design-tokens";
 import { ConnectionPill } from "./epic-tree/connection-pill";
 import { BranchChip } from "./chat/branch-chip";
@@ -97,7 +97,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   // it reads as seen — clears any `done-unread`/`failed` ladder tier the
   // Agents-tree row was showing for it. See `read-tracking-store.ts`.
   useEffect(() => {
-    markSeen(epicId, chatId);
+    markSeen(epicId, chatId, Date.now(), defaultStorage());
   }, [epicId, chatId]);
 
   const hasPending =

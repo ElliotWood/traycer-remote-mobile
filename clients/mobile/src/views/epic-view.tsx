@@ -32,7 +32,7 @@ import { useArtifactNav } from "@/host/artifact-nav-context";
 import { useChatBadges, type ChatBadgeState } from "@/host/use-chat-badges";
 import { DEFAULT_THRESHOLD_MS, useSettledConnectionState } from "@/host/use-settled-connection-state";
 import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
-import { seedUnseen } from "@/host/read-tracking-store";
+import { defaultStorage, seedUnseen } from "@/host/read-tracking-store";
 import { DEFAULT_SORT_MODE, describeSortMode, nextSortMode, type SortMode } from "@/host/tree-sort";
 import { AuthorView } from "./author-view";
 import { CreateArtifactView } from "./create-artifact-view";
@@ -94,12 +94,12 @@ export function EpicView({
   useEffect(() => {
     const updatedAtById: Record<string, number> = {};
     for (const c of chats) updatedAtById[c.chatId] = c.updatedAt;
-    seedUnseen(epicId, updatedAtById);
+    seedUnseen(epicId, updatedAtById, defaultStorage());
   }, [epicId, chats]);
   useEffect(() => {
     const updatedAtById: Record<string, number> = {};
     for (const a of artifacts) updatedAtById[a.id] = a.updatedAt;
-    seedUnseen(epicId, updatedAtById);
+    seedUnseen(epicId, updatedAtById, defaultStorage());
   }, [epicId, artifacts]);
 
   const [drill, setDrill] = useState<Drill>(null);

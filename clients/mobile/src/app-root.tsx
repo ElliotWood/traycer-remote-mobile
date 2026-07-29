@@ -131,7 +131,7 @@ export function AppRoot(): ReactElement {
           key: QUERY_CACHE_STORAGE_KEY,
         }),
   );
-  const [connection] = useState(() => createHostConnection(auth));
+  const [connection] = useState(() => createHostConnection(auth, {}));
   // T5 stands up the streaming stack (T3) the unary wiring never reached: one
   // `HostStreamConnection` for the session's `epic.subscribe` / `chat.subscribe`
   // streams, off the SAME auth. Gated on a configured host (like `connection`)
