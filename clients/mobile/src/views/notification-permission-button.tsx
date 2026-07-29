@@ -35,7 +35,7 @@ type ButtonState =
 
 export function NotificationPermissionButton({
   compact = false,
-}: NotificationPermissionButtonProps = {}): ReactElement | null {
+}: NotificationPermissionButtonProps): ReactElement | null {
   const auth = useAuthServiceOrNull();
   const [state, setState] = useState<ButtonState>(() =>
     initialStateFor(getNotificationPermission()),

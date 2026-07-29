@@ -18,6 +18,7 @@ import type { ReactElement } from "react";
 import {
   formatEpicMeta,
   useEpicList,
+  type EpicListResult,
   type FleetEpic,
 } from "@/host/use-epic-list";
 import type { MobileHostClient } from "@/host/host-client-context";
@@ -44,7 +45,7 @@ export function FleetView({
   onOpenEpic,
   onSignOut,
 }: FleetViewProps): ReactElement {
-  const list = useEpicList(client);
+  const list = useEpicList(client, {});
 
   return (
     <main style={screen}>
@@ -80,7 +81,7 @@ function FleetBody({
   list,
   onOpenEpic,
 }: {
-  readonly list: ReturnType<typeof useEpicList>;
+  readonly list: EpicListResult;
   readonly onOpenEpic: (epicId: string, epicTitle: string) => void;
 }): ReactElement {
   // UX fix: `isError` flips true on the FIRST failed attempt, before

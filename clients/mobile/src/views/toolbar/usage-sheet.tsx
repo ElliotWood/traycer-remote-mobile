@@ -6,7 +6,7 @@
  */
 import type { ReactElement } from "react";
 import type { ProviderCliState } from "@traycer/protocol/host/provider-schemas";
-import { useHostClientOrNull } from "@/host/host-client-context";
+import { useHostClientOrNull, type MobileHostClient } from "@/host/host-client-context";
 import { useProviders, useRateLimitUsage, extractUsageWindows, type UsageWindowRow } from "@/host/use-provider-usage";
 import { PROVIDER_DISPLAY_NAMES } from "@traycer/protocol/host/provider-schemas";
 import { radius, theme, type } from "@/views/design-tokens";
@@ -40,7 +40,7 @@ function ProviderUsageCard({
   client,
   provider,
 }: {
-  readonly client: ReturnType<typeof useHostClientOrNull>;
+  readonly client: MobileHostClient | null;
   readonly provider: ProviderCliState;
 }): ReactElement {
   const activeProfile = provider.profiles[0] ?? null;

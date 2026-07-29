@@ -49,7 +49,7 @@ import type {
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { InterviewAnswer, InterviewQuestion } from "@traycer/protocol/persistence/epic/content-blocks";
 import { TranscriptView } from "./chat/transcript-view";
-import { useSettledConnectionState } from "@/host/use-settled-connection-state";
+import { DEFAULT_THRESHOLD_MS, useSettledConnectionState } from "@/host/use-settled-connection-state";
 import {
   detectBlockedTransitions,
   notifyBlocked,
@@ -90,7 +90,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   }, [chatId, liveTitle, onTitleChange]);
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
-  const displayConnection = useSettledConnectionState(chat.connection);
+  const displayConnection = useSettledConnectionState(chat.connection, DEFAULT_THRESHOLD_MS);
   const connectionLive = displayConnection === "live";
 
   // P1 (Epic tree unread markers): the moment this chat is actually opened,

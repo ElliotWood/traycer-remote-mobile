@@ -5,7 +5,7 @@
  * / signOut) plus a `setStatus` to drive transitions; the host fake wraps a
  * caller-supplied `request` implementation in a spy.
  */
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
 import type { MobileAuthService, MobileAuthStatus } from "@/host/auth-service";
@@ -18,9 +18,9 @@ import {
 export interface FakeAuth {
   /** Cast to the `MobileAuthService` prop `App` expects (uses only this surface). */
   readonly service: MobileAuthService;
-  readonly signIn: ReturnType<typeof vi.fn>;
-  readonly cancelSignIn: ReturnType<typeof vi.fn>;
-  readonly signOut: ReturnType<typeof vi.fn>;
+  readonly signIn: Mock;
+  readonly cancelSignIn: Mock;
+  readonly signOut: Mock;
   /** Push a new status and notify subscribers (drives gate transitions). */
   setStatus(status: MobileAuthStatus): void;
 }
@@ -65,20 +65,20 @@ export interface FakeHostClient {
    * fake exposes both.
    */
   readonly client: MobileHostClient;
-  readonly request: ReturnType<typeof vi.fn>;
-  readonly getRequestContextUserId: ReturnType<typeof vi.fn>;
+  readonly request: Mock;
+  readonly getRequestContextUserId: Mock;
 }
 
 export function createFakeHostClient(
   requestImpl: (method: string, params: unknown) => Promise<unknown>,
-  options: { readonly userId?: string | null } = {},
 ): FakeHostClient {
   const request = vi.fn(requestImpl);
-  // Explicit `null` must survive (tests the signed-out branch); only an absent
-  // option falls back to a default id.
-  const getRequestContextUserId = vi.fn((): string | null =>
-    options.userId === undefined ? "user-1" : options.userId,
-  );
+  // Defaults to a signed-in user; no caller currently needs a different id
+  // or the signed-out (`null`) case — a test that does can override it
+  // directly (`fake.getRequestContextUserId.mockReturnValue(...)`), same as
+  // any other vitest mock, rather than threading it through a constructor
+  // option nothing uses.
+  const getRequestContextUserId = vi.fn((): string | null => "user-1");
   return {
     request,
     getRequestContextUserId,
@@ -96,7 +96,7 @@ export interface FakeEpicSession {
   readonly epicId: string;
   readonly callbacks: EpicStreamCallbacks;
   readonly connection: StreamConnectionStateStore;
-  readonly close: ReturnType<typeof vi.fn>;
+  readonly close: Mock;
 }
 
 /** Per-chat counterpart of {@link FakeEpicSession}. */
@@ -105,9 +105,9 @@ export interface FakeChatSession {
   readonly chatId: string;
   readonly callbacks: ChatStreamCallbacks;
   readonly connection: StreamConnectionStateStore;
-  readonly close: ReturnType<typeof vi.fn>;
+  readonly close: Mock;
   /** Records every client frame the view dispatches (T6 reply frames). */
-  readonly sendAction: ReturnType<typeof vi.fn>;
+  readonly sendAction: Mock;
 }
 
 export interface FakeStreamConnection {
@@ -116,7 +116,7 @@ export interface FakeStreamConnection {
   readonly epicSessions: FakeEpicSession[];
   readonly chatSessions: FakeChatSession[];
   /** S5: records every `reconnectAll(reason)` call the liveness-recovery wiring makes. */
-  readonly reconnectAll: ReturnType<typeof vi.fn>;
+  readonly reconnectAll: Mock;
 }
 
 /**

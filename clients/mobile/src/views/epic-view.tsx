@@ -30,7 +30,7 @@ import { useHostClientOrNull } from "@/host/host-client-context";
 import { useCurrentEpicDoc } from "@/host/current-epic-context";
 import { useArtifactNav } from "@/host/artifact-nav-context";
 import { useChatBadges, type ChatBadgeState } from "@/host/use-chat-badges";
-import { useSettledConnectionState } from "@/host/use-settled-connection-state";
+import { DEFAULT_THRESHOLD_MS, useSettledConnectionState } from "@/host/use-settled-connection-state";
 import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
 import { seedUnseen } from "@/host/read-tracking-store";
 import { DEFAULT_SORT_MODE, describeSortMode, nextSortMode, type SortMode } from "@/host/tree-sort";
@@ -67,7 +67,7 @@ export function EpicView({
   const { openArtifact } = useArtifactNav();
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
-  const connection = useSettledConnectionState(rawConnection);
+  const connection = useSettledConnectionState(rawConnection, DEFAULT_THRESHOLD_MS);
   const connectionLive = connection === "live";
 
   // The badge streams follow the exact chat-id set the doc reports.

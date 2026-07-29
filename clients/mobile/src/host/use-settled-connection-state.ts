@@ -13,33 +13,36 @@
 import { useEffect, useRef, useState } from "react";
 import type { StreamConnectionState } from "./stream-connection";
 
-const DEFAULT_THRESHOLD_MS = 1_500;
+export const DEFAULT_THRESHOLD_MS = 1_500;
 
 export function useSettledConnectionState(
   raw: StreamConnectionState,
-  thresholdMs: number = DEFAULT_THRESHOLD_MS,
+  thresholdMs: number,
 ): StreamConnectionState {
   const [settled, setSettled] = useState<StreamConnectionState>(raw);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Browser-only (this module never runs under Node) — `number`, not
+  // `ReturnType<typeof setTimeout>`, which resolves to Node's ambient
+  // `Timeout` type when `@types/node` is also in scope.
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (raw === "live") {
       if (timerRef.current !== null) {
-        clearTimeout(timerRef.current);
+        window.clearTimeout(timerRef.current);
         timerRef.current = null;
       }
       setSettled("live");
       return;
     }
 
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       timerRef.current = null;
       setSettled(raw);
     }, thresholdMs);
     timerRef.current = timer;
 
     return () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       if (timerRef.current === timer) {
         timerRef.current = null;
       }

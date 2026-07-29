@@ -71,13 +71,15 @@ export const EPIC_LIST_REQUEST: Omit<ListTasksRequest, "cursor"> = buildBaseRequ
 /** Shared prefix every fleet-list query key starts with, regardless of search/sort — TanStack's partial-key matching lets `use-epic-set-pinned-mutation.ts` invalidate every variant with one call. */
 export const EPIC_LIST_QUERY_KEY_PREFIX = ["mobile", "epic.listTasks", "fleet"] as const;
 
-function epicListQueryKey(options: EpicListOptions) {
-  return [...EPIC_LIST_QUERY_KEY_PREFIX, options.query ?? "", options.sort ?? DEFAULT_FLEET_SORT] as const;
+type EpicListQueryKey = readonly [...typeof EPIC_LIST_QUERY_KEY_PREFIX, string, FleetSort];
+
+function epicListQueryKey(options: EpicListOptions): EpicListQueryKey {
+  return [...EPIC_LIST_QUERY_KEY_PREFIX, options.query ?? "", options.sort ?? DEFAULT_FLEET_SORT];
 }
 
 export function buildEpicListRequest(
   cursor: string | undefined,
-  options: EpicListOptions = {},
+  options: EpicListOptions,
 ): ListTasksRequest {
   const base = buildBaseRequest(options);
   return cursor === undefined ? { ...base } : { ...base, cursor };
@@ -86,7 +88,7 @@ export function buildEpicListRequest(
 export function fetchEpicListPage(
   client: EpicListClient,
   cursor: string | undefined,
-  options: EpicListOptions = {},
+  options: EpicListOptions,
 ): Promise<ListTasksResponse> {
   return client.request("epic.listTasks", buildEpicListRequest(cursor, options));
 }
@@ -162,7 +164,7 @@ export function toFleetEpics(
   return [...epics.filter((e) => e.pinned), ...epics.filter((e) => !e.pinned)];
 }
 
-function pluralize(n: number, singular: string, plural?: string): string {
+function pluralize(n: number, singular: string, plural: string | null): string {
   return `${n} ${n === 1 ? singular : (plural ?? `${singular}s`)}`;
 }
 
@@ -173,11 +175,11 @@ function pluralize(n: number, singular: string, plural?: string): string {
  */
 export function formatEpicMeta(epic: FleetEpic): string {
   const parts: string[] = [];
-  if (epic.ticketCount > 0) parts.push(pluralize(epic.ticketCount, "ticket"));
-  if (epic.specCount > 0) parts.push(pluralize(epic.specCount, "spec"));
+  if (epic.ticketCount > 0) parts.push(pluralize(epic.ticketCount, "ticket", null));
+  if (epic.specCount > 0) parts.push(pluralize(epic.specCount, "spec", null));
   if (epic.storyCount > 0)
     parts.push(pluralize(epic.storyCount, "story", "stories"));
-  if (epic.reviewCount > 0) parts.push(pluralize(epic.reviewCount, "review"));
+  if (epic.reviewCount > 0) parts.push(pluralize(epic.reviewCount, "review", null));
   const status = epic.status.trim();
   if (status.length > 0) parts.push(status);
   return parts.join(" · ");
@@ -216,12 +218,12 @@ export interface EpicListResult {
  */
 const FLEET_REFETCH_INTERVAL_MS = 20_000;
 
-export function useEpicList(client: EpicListClient, options: EpicListOptions = {}): EpicListResult {
+export function useEpicList(client: EpicListClient, options: EpicListOptions): EpicListResult {
   const query = useInfiniteQuery<
     ListTasksResponse,
     Error,
     InfiniteData<ListTasksResponse, string | undefined>,
-    ReturnType<typeof epicListQueryKey>,
+    EpicListQueryKey,
     string | undefined
   >({
     queryKey: epicListQueryKey(options),

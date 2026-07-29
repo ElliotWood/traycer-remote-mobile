@@ -18,7 +18,7 @@ import {
   writeWakeLockPreference,
   type WakeLockPreference,
 } from "@/host/use-screen-wake-lock";
-import { useHostClientOrNull } from "@/host/host-client-context";
+import { useHostClientOrNull, type MobileHostClient } from "@/host/host-client-context";
 import { useProviders, useRateLimitUsage, extractUsageWindows } from "@/host/use-provider-usage";
 import { useNotificationConfig } from "@/host/use-notification-config";
 import {
@@ -75,7 +75,7 @@ function SectionHeading({ children }: { readonly children: string }): ReactEleme
   );
 }
 
-function ProvidersSection({ client }: { readonly client: ReturnType<typeof useHostClientOrNull> }): ReactElement {
+function ProvidersSection({ client }: { readonly client: MobileHostClient | null }): ReactElement {
   const { providers, loading } = useProviders(client);
 
   return (
@@ -96,7 +96,7 @@ function ProviderRow({
   client,
   provider,
 }: {
-  readonly client: ReturnType<typeof useHostClientOrNull>;
+  readonly client: MobileHostClient | null;
   readonly provider: ProviderCliState;
 }): ReactElement {
   const [expanded, setExpanded] = useState(false);
@@ -175,7 +175,7 @@ function ProviderRow({
   );
 }
 
-function NotificationsSection({ client }: { readonly client: ReturnType<typeof useHostClientOrNull> }): ReactElement {
+function NotificationsSection({ client }: { readonly client: MobileHostClient | null }): ReactElement {
   const { config, loading, setRendererSeverity } = useNotificationConfig(client);
   const [permission, setPermission] = useState(getNotificationPermission);
   const secureBlocked = isNotificationsSecureContextBlocked();
@@ -311,7 +311,7 @@ function AboutSection({
   client,
   onSignOut,
 }: {
-  readonly client: ReturnType<typeof useHostClientOrNull>;
+  readonly client: MobileHostClient | null;
   readonly onSignOut: () => void;
 }): ReactElement {
   const { status } = useHostStatus(client);
