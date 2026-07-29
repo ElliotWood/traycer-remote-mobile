@@ -2,13 +2,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createHttpApiServer } from "../http-api";
 import { SubscriptionStore } from "../subscription-store";
 
 let dir: string;
 let store: SubscriptionStore;
-let server: ReturnType<typeof createHttpApiServer>;
+let server: Server;
 let baseUrl: string;
 
 const VALID_TOKEN = "valid-token";

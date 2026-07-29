@@ -134,13 +134,19 @@ describe("ActionableDetector edge trigger", () => {
       setTimer: timer.setTimer,
     });
 
-    const futureKindEntry = {
+    // `kind` deliberately widened to `string` — this constructs a value
+    // OUTSIDE the real enum on purpose (proves the filter is severity-only,
+    // not kind-aware), so it can never structurally satisfy
+    // `HostNotificationEntry` as-is. A single assertion between two
+    // genuinely-overlapping types (every other field matches; `kind` only
+    // widens) needs no `unknown` bridge.
+    const futureKindEntry: Omit<HostNotificationEntry, "kind"> & { readonly kind: string } = {
       ...APPROVAL_ENTRY,
       kind: "some.future.kind",
       severity: "needs_action",
-    } as unknown as HostNotificationEntry;
+    };
 
-    await detector.handleUpserted(futureKindEntry);
+    await detector.handleUpserted(futureKindEntry as HostNotificationEntry);
     timer.flushOne();
     await vi.waitFor(() => expect(batches).toHaveLength(1));
     expect(batches[0]).toHaveLength(1);
