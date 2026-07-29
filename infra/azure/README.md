@@ -123,6 +123,112 @@ Run: `curl -s -w '\nHTTP %{http_code}\n' https://<publicHostname>/<path>`.
 All rows above were run against the live deployment, independently, not
 just pasted from a prior report.
 
+## Private-repo access on the VM (deploy key + shared clone)
+
+Agents on this VM need a working checkout of a **private** GitHub repo. Two
+scripts, run in that order, with a deliberate human step between them:
+
+```sh
+# 1. On the VM, as root. Idempotent - re-running never regenerates the key.
+infra/azure/scripts/ensure-repo-deploy-key.sh <key-name>
+#    -> prints a PUBLIC key and pins github.com's host keys.
+
+# 2. On a machine with `gh` and admin on the repo. NOT on the VM.
+gh repo deploy-key add <pubkey-file> --title traycer-azure-vm \
+  --allow-write --repo <owner>/<repo>
+
+# 3. Back on the VM, as root.
+infra/azure/scripts/provision-repo-clone.sh <owner> <repo> <branch> <key-name>
+```
+
+### Why a deploy key rather than a PAT
+
+| | Deploy key | Fine-grained PAT |
+|---|---|---|
+| Secret transport | **None** - private half generated on the VM, never leaves | Minted elsewhere, must be carried to the VM |
+| Scope | Exactly one repository | A *user*, plus a repo list that can drift |
+| Expiry | None | 1 year max - access dies on a date nobody wrote down |
+| Cost | **Per-repo**: repo #2 needs key #2 | One token can cover many repos |
+
+The transport row is the deciding one. Anything handed to the VM via
+`az vm run-command` is written by the guest agent under
+`/var/lib/waagent/run-command/` — a PAT would be sitting in that payload.
+The deploy key's private half has no transport step to expose. The per-repo
+cost is the accepted trade at one or two repos; past a handful, move to a
+GitHub App installation token rather than accumulating keys.
+
+**Step 2 is not a gap waiting to be automated.** It is the authorization
+boundary: the VM holds no GitHub credential and must not be given one just
+so it can grant itself repository access.
+
+### Where the secret lives, and what that does and does not protect
+
+`/srv/traycer/secrets/<key-name>`, mode `0600`, owned by the shared OS user
+— **not** root. A root-owned `0600` file would be unreadable by the process
+that actually needs it (every tenant's host process runs as that shared
+user), so root ownership would be security theatre that also doesn't work.
+
+Stated plainly because `0600` reads stronger than it is here: under this
+deployment's accepted one-OS-user architecture, **a co-tenant agent can read
+this key**, exactly as it can already read any other tenant's
+`~/.traycer/cli/credentials`. This adds no new class of risk and closes
+none. What it does buy: the key is outside every repo working tree, so no
+agent running `git add -A` can commit it.
+
+### Host keys are pinned, not trusted on first use
+
+`ensure-repo-deploy-key.sh` writes `/srv/traycer/secrets/known_hosts` from
+`https://api.github.com/meta` — fetched over TLS, so the CA chain is the
+trust anchor. It *then* runs `ssh-keyscan` and requires every key port 22
+offers to be a subset of what the API published. `ssh-keyscan` alone is
+trust-on-first-use over an unauthenticated handshake and would record an
+attacker's key without complaint; this inverts it into a MITM **detector**.
+Disagreement is a hard failure, not a warning. That is what lets the clone
+run `StrictHostKeyChecking=yes` rather than `accept-new`.
+
+### Clone location — A4's decision, not this script's
+
+`/srv/traycer/repo/<owner>/<repo>`. One clone, shared by every identity,
+deliberately **not** under any tenant's `HOME`: per-identity isolation
+already comes free from each host process's own `HOME` →
+`~/.traycer/worktrees/`. See `docs/deployment/azure-repo-worktree-layout.md`
+(branch `traycer-azure-repo-layout`) for the full rationale, including the
+part that matters most operationally: **the path is immovable once worktrees
+exist**, because every linked worktree stores it as an absolute path in its
+own `.git` admin file.
+
+`provision-repo-clone.sh` persists the SSH wiring into the clone's own
+`core.sshCommand`, so a later `fetch`/`push` — including from a worktree a
+Traycer host process creates — works with no environment set up by the
+caller.
+
+### What the verification actually proves
+
+The rubric this epic keeps failing is "checks that report success while
+measuring nothing", so each check reads a value back off disk:
+
+| Check | Why it can't pass vacuously |
+|---|---|
+| `HEAD` == the remote's sha for that branch | The remote sha comes from a pre-clone `ls-remote`, compared to a post-clone `rev-parse` |
+| Branch name | Read via `rev-parse --abbrev-ref HEAD`, not inferred from the `clone --branch` flag |
+| Tracked file count > 0 | An empty or shallow-broken clone fails |
+| Zero paths not owned by the OS user | `find ! -user` — a root-owned stray makes the tree unwritable where it matters |
+| Write probe | `touch` + `rm` **executed as that user**, not inferred from mode bits |
+| Zero uncommitted files | `status --porcelain \| wc -l` |
+
+The access probe is `git ls-remote` against the specific repo, **not**
+`ssh -T git@github.com` — the latter reports a cheerful "successfully
+authenticated" for a key registered against any repo at all.
+
+**Both directions were exercised on the live VM.** The negative case was run
+first, before the public key was registered, and failed with
+`Permission denied (publickey)` at the probe. That run also caught a real
+bug: `sudo` inherits the caller's cwd, and `az vm run-command` runs from a
+root-only directory, so every `sudo -u traycer git ...` died with
+`failed to stat ... Permission denied` *before contacting GitHub* — which
+reads exactly like an auth failure and is not one. Hence the `cd /` at the
+top of the script.
+
 ## What's not done yet
 
 - **The static frontend bundle is not deployed.** `bootstrap.sh` creates

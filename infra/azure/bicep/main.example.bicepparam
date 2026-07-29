@@ -14,6 +14,9 @@ param publicHostname = 'traycer.example.com'
 param acmeContactEmail = 'ops@example.com'
 param sshAllowedCidrs = []
 param tenantIds = []
+// `<owner>/<repo>@<branch>` per entry. Placeholder shape only - the live
+// deployment's real value goes in the gitignored main.bicepparam.
+param repoSpecs = [] // e.g. ['example-org/example-repo@main']
 param dnsZoneName = ''
 param enableMonitoring = true
 param alertEmailAddress = 'ops@example.com'

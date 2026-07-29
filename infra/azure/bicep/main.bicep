@@ -52,6 +52,9 @@ param dnsZoneName string = ''
 @description('List of tenant identifiers this deployment provisions a host-supervision systemd unit for. Each must be a valid POSIX username fragment (lowercase, digits, hyphen) - validated in the `host-supervision` module, not just documented here. Empty by default so a first deploy can stand up ingress/networking before any tenant is onboarded (A3 is the per-person onboarding procedure, sequenced after this ticket).')
 param tenantIds array = []
 
+@description('Private GitHub repos agents on this VM need a checkout of, as `<owner>/<repo>@<branch>` strings. Not a secret - a repo name is not a credential; the credential is a deploy key minted ON the VM at first boot, whose PUBLIC half is printed to the cloud-init log for a human to register. Empty by default: a deployment that provisions no source checkouts is a valid, common configuration. See vm.bicep\'s `repoSpecs` and infra/azure/README.md.')
+param repoSpecs array = []
+
 @description('Enable A6 monitoring/alerting (Log Analytics workspace, Azure Monitor Agent, and the alert rule). Defaults true - unattended operation is foundational, not optional, once a VM exists. Set false only to stand up ingress/networking without the monitoring resources (e.g. for a throwaway what-if run).')
 param enableMonitoring bool = true
 
@@ -85,6 +88,7 @@ module vm 'modules/vm.bicep' = {
     tenantIds: tenantIds
     publicHostname: publicHostname
     acmeContactEmail: acmeContactEmail
+    repoSpecs: repoSpecs
   }
 }
 

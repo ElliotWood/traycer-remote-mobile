@@ -39,6 +39,9 @@ param publicHostname string
 @description('ACME contact email for certbot.')
 param acmeContactEmail string
 
+@description('Private repos agents on this VM need checked out, as `<owner>/<repo>@<branch>` strings. First boot mints a deploy key per repo and prints its PUBLIC key into the cloud-init log; the clone only succeeds once a human registers that key on the repo (`gh repo deploy-key add --allow-write`). See bootstrap.sh\'s repo-checkout phase for why that step is deliberately not automated, and infra/azure/README.md for the deploy-key-vs-PAT reasoning.')
+param repoSpecs array = []
+
 var namePrefix = 'altra'
 var vmName = '${namePrefix}-vm-${workload}-${regionAbbrev}'
 var nicName = '${namePrefix}-nic-${workload}-${regionAbbrev}'
@@ -48,6 +51,7 @@ var dnsLabel = '${namePrefix}-${workload}-${regionAbbrev}'
 var osUser = 'traycer'
 var homeRoot = '/srv/traycer/tenants'
 var tenantIdsSpaceSeparated = join(tenantIds, ' ')
+var repoSpecsSpaceSeparated = join(repoSpecs, ' ')
 
 var guardScript = loadTextContent('../../scripts/traycer-host-guard.sh')
 var unitTemplate = loadTextContent('../../systemd/traycer-host@.service')
@@ -63,6 +67,13 @@ var healthProbeScript = loadTextContent('../../scripts/traycer-health-probe.sh')
 var hostAlertUnitTemplate = loadTextContent('../../systemd/traycer-host-alert@.service')
 var healthProbeUnitTemplate = loadTextContent('../../systemd/traycer-health-probe@.service')
 var healthProbeTimerTemplate = loadTextContent('../../systemd/traycer-health-probe@.timer')
+
+// Private-repo access: deploy-key minting + the shared clone. Embedded the
+// same way as everything above, so a rebuilt VM has both scripts on disk
+// even when `repoSpecs` is empty and bootstrap.sh's repo phase is a no-op -
+// the operator can then run them by hand without fetching anything.
+var ensureDeployKeyScript = loadTextContent('../../scripts/ensure-repo-deploy-key.sh')
+var provisionRepoCloneScript = loadTextContent('../../scripts/provision-repo-clone.sh')
 
 // Tenant id format (lowercase, digits, hyphen - a safe systemd instance
 // name / POSIX directory-name fragment) is validated at VM-boot time in
@@ -87,7 +98,7 @@ var healthProbeTimerTemplate = loadTextContent('../../systemd/traycer-health-pro
 // strings only allow `\n` for newlines, not literal ones - hence the
 // unusual single-line-with-escapes shape below; it is correctness-tested
 // via `az bicep build`'s compiled output, not just visually reviewed.
-var customDataScript = '#!/bin/bash\nset -euo pipefail\nexport TRAYCER_OS_USER="${osUser}"\nexport TRAYCER_HOME_ROOT="${homeRoot}"\nexport TRAYCER_TENANT_IDS="${tenantIdsSpaceSeparated}"\nexport TRAYCER_PUBLIC_HOSTNAME="${publicHostname}"\nexport TRAYCER_ACME_EMAIL="${acmeContactEmail}"\n\nmkdir -p /usr/local/bin\ncat > /usr/local/bin/traycer-host-guard.sh <<\'TRAYCER_GUARD_EOF\'\n${guardScript}\nTRAYCER_GUARD_EOF\ncat > /usr/local/bin/traycer-alert.sh <<\'TRAYCER_ALERT_EOF\'\n${alertScript}\nTRAYCER_ALERT_EOF\ncat > /usr/local/bin/traycer-host-failure-alert.sh <<\'TRAYCER_HOSTFAIL_EOF\'\n${hostFailureAlertScript}\nTRAYCER_HOSTFAIL_EOF\ncat > /usr/local/bin/traycer-worktree-rescue.sh <<\'TRAYCER_RESCUE_EOF\'\n${worktreeRescueScript}\nTRAYCER_RESCUE_EOF\ncat > /usr/local/bin/traycer-health-probe.sh <<\'TRAYCER_PROBE_EOF\'\n${healthProbeScript}\nTRAYCER_PROBE_EOF\nchmod +x /usr/local/bin/traycer-host-guard.sh /usr/local/bin/traycer-alert.sh /usr/local/bin/traycer-host-failure-alert.sh /usr/local/bin/traycer-worktree-rescue.sh /usr/local/bin/traycer-health-probe.sh\n\nmkdir -p /etc/systemd/system\ncat > /etc/systemd/system/traycer-host@.service <<\'TRAYCER_UNIT_EOF\'\n${unitTemplate}\nTRAYCER_UNIT_EOF\ncat > /etc/systemd/system/traycer-host-alert@.service <<\'TRAYCER_HOSTALERT_UNIT_EOF\'\n${hostAlertUnitTemplate}\nTRAYCER_HOSTALERT_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.service <<\'TRAYCER_PROBE_UNIT_EOF\'\n${healthProbeUnitTemplate}\nTRAYCER_PROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.timer <<\'TRAYCER_PROBE_TIMER_EOF\'\n${healthProbeTimerTemplate}\nTRAYCER_PROBE_TIMER_EOF\nsed -i "s|__TRAYCER_OS_USER__|${osUser}|g; s|__TRAYCER_HOME_ROOT__|${homeRoot}|g" /etc/systemd/system/traycer-host@.service /etc/systemd/system/traycer-host-alert@.service /etc/systemd/system/traycer-health-probe@.service\n\n${bootstrapScript}\n'
+var customDataScript = '#!/bin/bash\nset -euo pipefail\nexport TRAYCER_OS_USER="${osUser}"\nexport TRAYCER_HOME_ROOT="${homeRoot}"\nexport TRAYCER_TENANT_IDS="${tenantIdsSpaceSeparated}"\nexport TRAYCER_PUBLIC_HOSTNAME="${publicHostname}"\nexport TRAYCER_ACME_EMAIL="${acmeContactEmail}"\nexport TRAYCER_REPOS="${repoSpecsSpaceSeparated}"\n\nmkdir -p /usr/local/bin\ncat > /usr/local/bin/traycer-host-guard.sh <<\'TRAYCER_GUARD_EOF\'\n${guardScript}\nTRAYCER_GUARD_EOF\ncat > /usr/local/bin/traycer-alert.sh <<\'TRAYCER_ALERT_EOF\'\n${alertScript}\nTRAYCER_ALERT_EOF\ncat > /usr/local/bin/traycer-host-failure-alert.sh <<\'TRAYCER_HOSTFAIL_EOF\'\n${hostFailureAlertScript}\nTRAYCER_HOSTFAIL_EOF\ncat > /usr/local/bin/traycer-worktree-rescue.sh <<\'TRAYCER_RESCUE_EOF\'\n${worktreeRescueScript}\nTRAYCER_RESCUE_EOF\ncat > /usr/local/bin/traycer-health-probe.sh <<\'TRAYCER_PROBE_EOF\'\n${healthProbeScript}\nTRAYCER_PROBE_EOF\ncat > /usr/local/bin/ensure-repo-deploy-key.sh <<\'TRAYCER_DEPLOYKEY_EOF\'\n${ensureDeployKeyScript}\nTRAYCER_DEPLOYKEY_EOF\ncat > /usr/local/bin/provision-repo-clone.sh <<\'TRAYCER_REPOCLONE_EOF\'\n${provisionRepoCloneScript}\nTRAYCER_REPOCLONE_EOF\nchmod +x /usr/local/bin/traycer-host-guard.sh /usr/local/bin/traycer-alert.sh /usr/local/bin/traycer-host-failure-alert.sh /usr/local/bin/traycer-worktree-rescue.sh /usr/local/bin/traycer-health-probe.sh /usr/local/bin/ensure-repo-deploy-key.sh /usr/local/bin/provision-repo-clone.sh\n\nmkdir -p /etc/systemd/system\ncat > /etc/systemd/system/traycer-host@.service <<\'TRAYCER_UNIT_EOF\'\n${unitTemplate}\nTRAYCER_UNIT_EOF\ncat > /etc/systemd/system/traycer-host-alert@.service <<\'TRAYCER_HOSTALERT_UNIT_EOF\'\n${hostAlertUnitTemplate}\nTRAYCER_HOSTALERT_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.service <<\'TRAYCER_PROBE_UNIT_EOF\'\n${healthProbeUnitTemplate}\nTRAYCER_PROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.timer <<\'TRAYCER_PROBE_TIMER_EOF\'\n${healthProbeTimerTemplate}\nTRAYCER_PROBE_TIMER_EOF\nsed -i "s|__TRAYCER_OS_USER__|${osUser}|g; s|__TRAYCER_HOME_ROOT__|${homeRoot}|g" /etc/systemd/system/traycer-host@.service /etc/systemd/system/traycer-host-alert@.service /etc/systemd/system/traycer-health-probe@.service\n\n${bootstrapScript}\n'
 
 resource pip 'Microsoft.Network/publicIPAddresses@2023-11-01' = {
   name: pipName

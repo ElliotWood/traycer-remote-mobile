@@ -24,6 +24,9 @@ set -euo pipefail
 : "${TRAYCER_TENANT_IDS:=}"
 : "${TRAYCER_PUBLIC_HOSTNAME:?TRAYCER_PUBLIC_HOSTNAME must be exported by the caller}"
 : "${TRAYCER_ACME_EMAIL:?TRAYCER_ACME_EMAIL must be exported by the caller}"
+# Space-separated `<owner>/<repo>@<branch>` specs for private repos agents
+# on this box need checked out. Empty is a valid, common configuration.
+: "${TRAYCER_REPOS:=}"
 
 echo "bootstrap: installing packages"
 export DEBIAN_FRONTEND=noninteractive
@@ -268,6 +271,52 @@ TRAYCER_NGINX_TLS_EOF
   fi
 else
   echo "bootstrap: certbot did not obtain a certificate - DNS likely isn't pointed at this VM yet. nginx is serving HTTP-only on :80. Re-run certbot manually once DNS resolves, then re-run this script to apply phase 2; see infra/azure/README.md." >&2
+fi
+
+# --- private repo checkouts ----------------------------------------------
+#
+# WHAT A REBUILT VM GETS AUTOMATICALLY, AND WHAT IT DOES NOT. Stated up
+# front because "captured as IaC" invites the reading that a rebuild is
+# hands-off, and for this piece it deliberately is not:
+#
+#   automatic: the two scripts are on the box, a fresh deploy key is minted,
+#             github.com's host keys are pinned, and the clone is attempted.
+#   NOT automatic: a rebuilt VM mints a NEW keypair, and that new public key
+#             is not registered on GitHub. The clone WILL fail until a human
+#             registers it. The public key is printed into the cloud-init
+#             log below precisely so that step is a copy-paste, not an
+#             investigation.
+#
+# The alternative - a private key in Key Vault pulled via the VM's managed
+# identity - would make rebuilds genuinely hands-off, at the cost of a Key
+# Vault, a managed identity, an access policy, and a key that now has a
+# transport path again. Not built: at one repo it is more moving parts than
+# the manual step it removes. Revisit if rebuild frequency makes the manual
+# registration actually hurt.
+#
+# NON-FATAL BY CONSTRUCTION. This whole phase is `|| true`-guarded: an
+# unregistered deploy key on a fresh VM is the EXPECTED first-boot state,
+# and `set -e` aborting cloud-init over it would take down ingress and
+# systemd scaffolding that have nothing to do with source checkouts.
+if [ -n "${TRAYCER_REPOS}" ]; then
+  for spec in ${TRAYCER_REPOS}; do
+    repo_part="${spec%@*}"
+    branch_part="${spec##*@}"
+    owner_part="${repo_part%%/*}"
+    name_part="${repo_part##*/}"
+    if [ "$repo_part" = "$spec" ] || [ -z "$owner_part" ] || [ -z "$name_part" ] || [ -z "$branch_part" ] || [ "$owner_part" = "$repo_part" ]; then
+      echo "bootstrap: skipping malformed repo spec '${spec}' - expected <owner>/<repo>@<branch>" >&2
+      continue
+    fi
+    echo "bootstrap: provisioning deploy key for ${owner_part}/${name_part}"
+    /usr/local/bin/ensure-repo-deploy-key.sh "$name_part" || {
+      echo "bootstrap: deploy-key setup failed for ${name_part}; continuing" >&2
+      continue
+    }
+    echo "bootstrap: attempting clone of ${owner_part}/${name_part}@${branch_part}"
+    /usr/local/bin/provision-repo-clone.sh "$owner_part" "$name_part" "$branch_part" "$name_part" || \
+      echo "bootstrap: clone of ${owner_part}/${name_part} not completed - register the public key printed above, then re-run: /usr/local/bin/provision-repo-clone.sh ${owner_part} ${name_part} ${branch_part} ${name_part}" >&2
+  done
 fi
 
 echo "bootstrap: done"
