@@ -124,6 +124,10 @@ for tenant_id in ${TRAYCER_TENANT_IDS}; do
   # it early costs nothing and means A3 onboarding a tenant later needs no
   # separate step to turn monitoring on for them.
   systemctl enable --now "traycer-health-probe@${tenant_id}.timer"
+  # A6: same reasoning as the health probe - enabled for every tenant up front
+  # so A3 onboarding needs no separate "turn monitoring on" step. Structural
+  # mode only; see traycer-agent-probe.sh on why --spawn is not scheduled.
+  systemctl enable --now "traycer-agent-probe@${tenant_id}.timer"
 done
 
 echo "bootstrap: configuring nginx ingress (HTTP-only, pre-certificate)"

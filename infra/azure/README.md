@@ -342,6 +342,60 @@ just to open.
   relay (epic loading broken) and no probe to notice. Both are now wired
   into `customData` + `bootstrap.sh`.
 
+### Agent-execution surface (`traycer-agent-probe.sh`)
+
+Watches the thing the VM exists for: the `claude` binary, the per-tenant
+credential, and the repo checkout agents work in. Two modes, and the split
+is the design:
+
+| Mode | Cost | Catches |
+|---|---|---|
+| structural (on the timer) | free | missing/broken binary, **credential with no auth material**, repo unreadable by the owning user |
+| `--spawn` (**not** scheduled) | one real Claude call | a credential that is present and well-formed but **dead** — expired, revoked, or quota-exhausted |
+
+`--spawn` is deliberately not on a timer. The deployment shares one Claude
+Max account across N people (A7), so a probe that spawned an agent every
+few minutes would consume the quota it exists to protect — monitoring that
+causes the outage it watches for. Enabling it is an explicit, costed
+decision, not one this repo makes for the operator.
+
+**This probe found a live defect on its first run, and then found a defect
+in itself.** `--spawn` against the real tenant returned `Not logged in ·
+Please run /login`. Investigating (keys only, never values) showed
+`.claude.json` contained *nothing but* telemetry and migration fields —
+`machineID`, `userID`, `cachedExperimentData`, `migrationVersion` — with no
+token of any kind, and no `.claude/.credentials.json` at all. Claude Code
+writes that file on first run whether or not anyone has authenticated.
+
+So the structural check as first written (`[ -s ~/.claude.json ]`) was
+itself a false-green for the one condition that matters: file present,
+0600, 389 bytes, valid JSON, zero credentials. It now requires an
+auth-bearing key and **fails on the real box**, at zero quota cost.
+Verified both directions — fails against the live unauthenticated state,
+passes against a synthetic credential carrying `oauthAccount`.
+
+This check is coupled to Claude Code's on-disk layout, which is an
+internal detail. If it starts failing on a box that genuinely works,
+check the layout before trusting the alert.
+
+### A note on `az vm run-command` and probe provenance
+
+`az vm run-command` is single-flight per VM, and concurrent agents have
+seen it return *another* agent's stdout under a successful exit code — a
+false-green generator.
+
+**The probes themselves are structurally immune**: every one runs on-box
+under a systemd timer or `OnFailure=`, and none shells out through
+`run-command`. That is a property of where they run, not luck.
+
+What *is* exposed is verification done from a workstation. Every A6 claim
+in this README was gathered with a sentinel-tagged script (`echo
+"<unique>-BEGIN"` … `-END`) and the output discarded unless both markers
+were present. Anyone adding an off-box watchdog that drives the VM through
+`run-command` must do the same, or assert on strings unique to their own
+script — asserting on generic output like `active` is exactly how one
+agent's state gets read as another's.
+
 ### Known limits, stated rather than implied
 
 - The relay probe asserts the path carries a *connection*, not that a real
