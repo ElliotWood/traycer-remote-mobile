@@ -229,6 +229,46 @@ cwd, and `az vm run-command` runs from a root-only directory, so every
 *before contacting GitHub*, which reads exactly like an auth failure and is
 not one. Hence the `cd /` at the top of the script.
 
+### Live state (measured, not asserted)
+
+Read back off the VM in a separate invocation from the one that created it:
+
+| | |
+|---|---|
+| Path | `/srv/traycer/repo/AltraCloud/sensormine-v4-self-host` |
+| Branch | `feature/ew/auto_labelling`, tracking `origin/feature/ew/auto_labelling` |
+| HEAD | `0381a1cb07c5aacae63dff0106337de90936e357` |
+| Tracked files | 7337, working tree clean |
+| Ownership | `traycer:traycer`, zero paths owned by anyone else; write probe passed |
+| Deploy key | `/srv/traycer/secrets/sensormine-v4-self-host`, `traycer:traycer`, `0600` |
+
+Write access was probed with `git push --dry-run` to a throwaway ref name;
+`ls-remote` afterward confirmed **0** branches matching it, so the probe
+left nothing behind. Treat the dry-run as corroboration, not proof — the
+authoritative check that the key is read-write is
+`gh repo deploy-key list` on the repo.
+
+### Running these over `az vm run-command`: tag your output
+
+`az vm run-command` is **single-flight per VM**. With several agents driving
+one box, an invocation can return *another* agent's stdout under a
+successful exit code — observed on this deployment, where one agent's probe
+read this repo's deploy-key error as its own result. An automated check that
+trusts such output can report a confident, entirely false pass.
+
+So: emit a freshly generated unique marker at the start, middle and end of
+the script, and **assert on it** before believing any of the output.
+
+One trap worth naming, because it produced exactly the failure mode the
+sentinel exists to prevent. In PowerShell, `"...$sentinel:exit=..."` does
+not interpolate `$sentinel` — `$name:` is parsed as a *scope qualifier*, so
+the whole thing silently becomes empty. The first sentinel here was written
+that way in both the emitting script and the asserting regex, so the two
+matched each other perfectly while carrying no unique value at all: a
+provenance check that would have accepted any agent's output. Use
+`${sentinel}`, and verify the marker you asserted on is actually present in
+the raw text.
+
 ## A6 — unattended operation + alerting
 
 Three layers, because the interesting failures are the ones the cheap
