@@ -61,10 +61,16 @@ check_pattern() {
 # name.
 check_pattern "no literal tailnet hostname (*.ts.net)" '[A-Za-z0-9-]+\.ts\.net' '*'
 
-# Tailscale's CGNAT address range is 100.64.0.0/10 (100.64.x.x-100.127.x.x) -
-# a structural fact about Tailscale's addressing scheme, not a specific
-# project's IP. Matches the whole /10, not one project's observed prefix.
-check_pattern "no literal Tailscale CGNAT-range IP (100.64.0.0/10)" \
+# Tailscale's CGNAT address range is the 100.64/10 block - a structural fact
+# about Tailscale's addressing scheme, not a specific project's IP. Matches
+# the whole /10, not one project's observed prefix. Written here as a bare
+# CIDR prefix rather than a full dotted-quad literal deliberately: the
+# repo-wide scripts/oss-hygiene.sh gate flags any real 100.64-127.x.x-shaped
+# address anywhere in the tree (this file included, since scripts/azure is in
+# its OWNED scope) - a fully-written-out example range in this comment/
+# description would trip that gate on sight, which is exactly what happened
+# once already (fixed, not exempted, per that gate's own stated rule).
+check_pattern "no literal Tailscale CGNAT-range IP (100.64/10 block)" \
   '100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+' '*'
 
 # Windows user path shape - any drive-lettered \Users\<name>, not a
