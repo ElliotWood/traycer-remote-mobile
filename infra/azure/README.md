@@ -397,3 +397,91 @@ The resource group is tagged `purpose=traycer-remote`,
 ```sh
 az group delete --name altra-rg-traycer-aue --yes
 ```
+
+---
+
+## A2 — identity-routed ingress (the tenant router)
+
+Until this landed, the VM ran N host processes but was **effectively
+single-tenant**: `traycer-ws-deflate.service` was hardcoded to
+`/srv/traycer/tenants/elliot/.traycer/host/pid.json`, so every inbound
+connection reached that one tenant's host regardless of who sent it. The
+multi-identity architecture existed on paper only.
+
+`traycer-tenant-router.service` replaces it. Same port (`45080`), same
+`upstream traycer_host` in nginx, same permessage-deflate on the
+internet-facing leg — plus the thing that makes the VM genuinely
+multi-tenant: it decides **which** tenant's host each connection reaches.
+
+### The routing key, and why the decision happens where it does
+
+The bearer is **not an HTTP header**. `ClientOpenFrame` is
+`{ kind: "open", token, manifest }` — the token arrives as the **first
+WebSocket message**, after the upgrade, because browsers cannot set headers on
+a WebSocket. So nginx *cannot* route on identity; it has no visibility past the
+upgrade. The router must accept the socket, buffer until the open frame lands,
+and only then choose an upstream. That ordering is forced by the protocol.
+
+The identity is **not read out of the token**. The token is presented to
+Traycer's own authn (`GET /api/v3/user`, access-only — it can never spend a
+refresh token) and the user id in the **answer** is the routing key. A client
+presents a token; it cannot present an identity. Nothing else — path, query,
+header, cookie, Origin, conversation id — influences tenant selection.
+
+Resolution goes through the same `IdentityRegistry` the rest of the epic uses,
+bundled in rather than reimplemented. A second implementation of the security
+control living in a deploy script is exactly the divergence that hands one
+engineer another engineer's credentials.
+
+### Routing is not authorization
+
+This is what makes the live-authn dependency acceptable inside the security
+control. The host independently validates the same bearer and enforces its
+owner binding, so a stale routing decision sends a user to **their own** host,
+which then applies its own check. It cannot send anyone to a *different*
+tenant's host, because the id routed on came from the issuer. Every failure is
+closed: bad frame, rejected token, **authn unreachable**, verified-but-unmapped
+identity, or a tenant whose host is down all close the socket. There is no
+default tenant and no first-configured-tenant fallback.
+
+### The registry is generated, never committed
+
+`traycer-registry-generate.sh` derives `/srv/traycer/identity-registry.json`
+from each tenant's own credentials file — the same file the host reads to pin
+its owner — so "the registry says X" and "X's host is pinned to X" are the same
+fact rather than two facts that can disagree. Real user ids are therefore never
+in git. A tenant with no credentials is **skipped, not defaulted**: nobody is
+signed in as them, so there is no identity to route.
+
+### Build and deploy
+
+```bash
+infra/azure/router/build.sh          # -> infra/azure/router/dist/tenant-router.mjs
+# self-contained (zod + ws bundled); the VM needs no npm install
+```
+
+### Proof, not configuration review
+
+Two harnesses, both runnable on the VM against the **deployed artifact**:
+
+- `verify-routing.mjs` — stands up two real host listeners on different ports,
+  two tenant homes, and a stand-in authn, then drives real connections through
+  the real router and asserts *which listener each one physically arrived at*.
+  12 checks: A→A, B→B (kills "always the first tenant" — the mutation that
+  passes every single-tenant test ever written), unmapped refused, rejected
+  token refused, authn-down refused, open frame forwarded verbatim, and the
+  upstream `Origin` being `http://` rather than `ws://` (that one cost a live
+  outage; see `traycer-ws-deflate-proxy.mjs`'s note).
+- `smoke-real-token.mjs` — drives a **real** tenant's **real** token through
+  **production** authn to their **real** host. Takes a loopback port or a full
+  `wss://` URL, so it exercises either the router alone or the whole public
+  chain. Prints only a hash prefix of the user id, never the token.
+
+Neither subsumes the other: the first proves the routing decision, the second
+proves the decision is being made from a genuine production credential.
+
+### Rollback
+
+`traycer-ws-deflate.service`'s unit file is left in place (stopped and
+disabled). `systemctl disable --now traycer-tenant-router && systemctl enable
+--now traycer-ws-deflate` restores the previous single-tenant behaviour.

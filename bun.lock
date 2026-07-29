@@ -30,6 +30,7 @@
         "typescript-eslint": "catalog:",
         "vitest": "^4.1.10",
         "wait-on": "^9.1.0",
+        "ws": "catalog:",
       },
     },
     "clients/desktop": {
