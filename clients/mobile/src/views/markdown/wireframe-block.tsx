@@ -54,10 +54,17 @@ export interface WireframeBlockProps {
 export function WireframeBlock({ code }: WireframeBlockProps): ReactElement {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [height, setHeight] = useState(MIN_HEIGHT_PX);
+  // Reset to the minimum the moment `code` changes — adjusted during render
+  // so the OLD frame's height is never held over into the new frame's first
+  // paint. The message listener (genuinely async — waits on the new
+  // iframe's own resize report) stays in the effect below.
+  const [lastCode, setLastCode] = useState(code);
+  if (code !== lastCode) {
+    setLastCode(code);
+    setHeight(MIN_HEIGHT_PX);
+  }
 
   useEffect(() => {
-    setHeight(MIN_HEIGHT_PX);
-
     function onMessage(event: MessageEvent<unknown>): void {
       if (event.source !== frameRef.current?.contentWindow) return;
       const data = event.data;

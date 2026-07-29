@@ -18,10 +18,18 @@ export interface MermaidBlockProps {
 
 export function MermaidBlock({ code }: MermaidBlockProps): ReactElement {
   const [state, setState] = useState<MermaidState>({ status: "loading" });
+  // Reset to "loading" the moment `code` changes — adjusted during render
+  // (not the effect's first line) so there's no frame where a NEW code's
+  // diagram still shows the OLD one's stale `state`. The actual async
+  // render stays in the effect below; only this synchronous reset moves.
+  const [lastCode, setLastCode] = useState(code);
+  if (code !== lastCode) {
+    setLastCode(code);
+    setState({ status: "loading" });
+  }
 
   useEffect(() => {
     let cancelled = false;
-    setState({ status: "loading" });
     renderMermaidSvg(code).then(
       (svg) => {
         if (!cancelled) setState({ status: "ready", svg });

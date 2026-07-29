@@ -928,6 +928,13 @@ export function useChat(
     setTimeout(() => {
       if (disposedRef.current) return;
       if (connectionRef.current !== "live") {
+        // Self-reference is safe: this callback only runs once the
+        // `setTimeout` fires, strictly after the `const` assignment below
+        // has completed — the closure captures the BINDING, not a
+        // snapshot, so it's never actually read before it's declared at
+        // runtime. Flagged only because static analysis can't see the
+        // async boundary that guarantees the ordering.
+        // eslint-disable-next-line react-hooks/immutability
         scheduleReplyTimeout(key, clientActionId);
         return;
       }
@@ -940,6 +947,8 @@ export function useChat(
     setTimeout(() => {
       if (disposedRef.current) return;
       if (connectionRef.current !== "live") {
+        // Same self-reference reasoning as `scheduleReplyTimeout` above.
+        // eslint-disable-next-line react-hooks/immutability
         scheduleSendTimeout(messageId);
         return;
       }

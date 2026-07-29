@@ -44,4 +44,24 @@ describe("MermaidBlock", () => {
     expect(screen.getByText(/bad syntax/)).toBeTruthy();
     expect(screen.queryByTestId("mermaid-diagram")).toBeNull();
   });
+
+  it("resets to loading immediately when `code` changes, not the stale previous diagram", async () => {
+    renderMock.mockResolvedValueOnce({ svg: '<svg data-mock="A"></svg>' });
+    const { rerender } = render(<MermaidBlock code="graph TD; A-->B;" />);
+    await waitFor(() => expect(screen.getByTestId("mermaid-diagram")).toBeTruthy());
+    expect(screen.getByTestId("mermaid-diagram").querySelector('[data-mock="A"]')).toBeTruthy();
+
+    let resolveSecond: (value: { svg: string }) => void = () => {};
+    renderMock.mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
+    rerender(<MermaidBlock code="graph TD; C-->D;" />);
+
+    // Loading shown right away, on the SAME render — not a stale "A" diagram
+    // held over for a frame while an effect catches up.
+    expect(screen.getByTestId("mermaid-loading")).toBeTruthy();
+    expect(screen.queryByTestId("mermaid-diagram")).toBeNull();
+
+    resolveSecond({ svg: '<svg data-mock="B"></svg>' });
+    await waitFor(() => expect(screen.getByTestId("mermaid-diagram")).toBeTruthy());
+    expect(screen.getByTestId("mermaid-diagram").querySelector('[data-mock="B"]')).toBeTruthy();
+  });
 });
