@@ -26,9 +26,9 @@ echo "=== oss-clean.test.sh (scanning: ${scan_paths[*]}) ==="
 
 failures=0
 
-# Bash-native line-prefixing (avoids an external `sed 's/^/    /'` per
-# shellcheck SC2001's suggestion - a plain `${var//search/replace}` doesn't
-# work here since these are anchored per-line, not a single substring).
+# Bash-native line-prefixing (avoids an external `sed 's/^/    /'`, per the
+# SC2001 lint suggestion - a plain `${var//search/replace}` doesn't work
+# here since these are anchored per-line, not a single substring).
 indent() {
   local line
   while IFS= read -r line; do
