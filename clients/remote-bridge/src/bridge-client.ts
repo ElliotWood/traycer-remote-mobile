@@ -18,7 +18,11 @@ import {
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
 import { ChatSession } from "./chat-session";
 import { HostEndpointPoller } from "./host-endpoint";
-import { resolveHostAuth, type HostAuth } from "./host-auth";
+import {
+  resolveHostAuth,
+  isHostAuthUnavailable,
+  type HostAuth,
+} from "./host-auth";
 import type { ILogger } from "./logger";
 import type {
   ActionOutcome,
@@ -136,12 +140,21 @@ export class BridgeClient implements RemoteBridgeActions {
     readonly senderAgentId: string;
     readonly logger: ILogger;
   }): Promise<BridgeClient> {
-    const auth = await resolveHostAuth();
-    if (auth === null) {
+    const resolved = await resolveHostAuth();
+    if (isHostAuthUnavailable(resolved)) {
+      // Self-diagnosing: names the exact path that came up empty, so a
+      // `HOME` misconfiguration (the single most likely failure on a
+      // multi-tenant deployment) is not indistinguishable from a genuinely
+      // signed-out user telling an operator to `traycer login` when the
+      // real problem is that `HOME` resolved somewhere with no credentials
+      // file at all.
       throw new Error(
-        "remote-bridge: not signed in - run `traycer login` to authenticate.",
+        `remote-bridge: no credentials at ${resolved.credentialsPath} - ` +
+          "run `traycer login` to authenticate, or check that HOME resolved " +
+          "to the intended identity's directory.",
       );
     }
+    const auth = resolved;
     // Greppable identity record, per docs/multi-tenant-deployment.md §3(b):
     // on a deployment where every bridge process shares one OS user
     // (separate HOMEs only), this is the process's own attestation of which

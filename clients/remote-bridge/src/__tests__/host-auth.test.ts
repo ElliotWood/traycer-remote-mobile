@@ -1,5 +1,13 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { requireHomeEnv } from "../host-auth";
+import {
+  isHostAuthUnavailable,
+  requireHomeEnv,
+  resolveHostAuth,
+} from "../host-auth";
+import { readHostPidMetadata } from "../host-endpoint";
 
 /**
  * Regression coverage for the unset-`HOME` identity-collapse finding: on a
@@ -71,5 +79,58 @@ describe("requireHomeEnv", () => {
     delete process.env.USERPROFILE;
     delete process.env.HOME;
     expect(() => requireHomeEnv()).toThrow(/HOME is not set/);
+  });
+});
+
+describe("readHostPidMetadata - the identity gate applies here too, not just to credentials", () => {
+  // F1 regression: `readHostPidMetadata` decides which tenant's HOST process
+  // the bridge connects to. Before this fix, its path resolution went
+  // through `os.homedir()` directly with no gate of its own - safe only
+  // because `resolveHostAuth()` happened to run first in `BridgeClient.start()`.
+  // This pins that the gate now lives IN this module, so a caller that
+  // reaches it without going through auth first still fails loudly instead
+  // of silently resolving another tenant's host.
+  it("rejects (does not silently resolve null) when HOME is unset - the throw must not be swallowed by the ENOENT catch", async () => {
+    setPlatform("linux");
+    delete process.env.HOME;
+    delete process.env.USERPROFILE;
+    // If `requireHomeEnv()`'s throw were caught by the same try/catch that
+    // handles a legitimately-missing pid file, this would resolve `null`
+    // instead of rejecting - indistinguishable from "no host running",
+    // which is exactly the silent-failure shape this fix exists to close.
+    await expect(readHostPidMetadata()).rejects.toThrow(/HOME is not set/);
+  });
+});
+
+describe("resolveHostAuth - self-diagnosing 'no credentials' path (F3)", () => {
+  // F3 regression: a missing/empty credentials file used to be indistinguishable
+  // from a genuinely signed-out user - the caller only saw `null` and always
+  // said "not signed in, run traycer login", even when the real cause was a
+  // wrong/misconfigured HOME pointing at a directory with no credentials file
+  // at all. `resolveHostAuth()` now returns the exact path it checked so the
+  // caller can name it.
+  it("returns HostAuthUnavailable naming the exact credentials path checked, when HOME points at an empty directory", async () => {
+    // Deliberately does NOT spoof `process.platform`: `requireHomeEnv()`
+    // reads `process.env.HOME`/`USERPROFILE` directly and honors a spoofed
+    // platform, but `cliConfigDir()` resolves through the real
+    // `node:os.homedir()`, which is a native call keyed to the ACTUAL OS
+    // (on real Windows it reads `USERPROFILE` only, never `HOME`, no
+    // matter what `process.platform` is set to). Setting both env vars to
+    // the same empty temp dir makes the test correct on every real
+    // platform this suite runs on, rather than only the one it happens to
+    // be authored on.
+    const emptyHome = await mkdtemp(join(tmpdir(), "traycer-no-creds-"));
+    process.env.HOME = emptyHome;
+    process.env.USERPROFILE = emptyHome;
+    try {
+      const result = await resolveHostAuth();
+      expect(isHostAuthUnavailable(result)).toBe(true);
+      if (isHostAuthUnavailable(result)) {
+        expect(result.credentialsPath).toContain(emptyHome);
+        expect(result.credentialsPath).toContain("credentials");
+      }
+    } finally {
+      await rm(emptyHome, { recursive: true, force: true });
+    }
   });
 });

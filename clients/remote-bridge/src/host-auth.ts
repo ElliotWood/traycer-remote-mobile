@@ -95,10 +95,32 @@ export function requireHomeEnv(): string {
   return home;
 }
 
-export async function resolveHostAuth(): Promise<HostAuth | null> {
+/**
+ * `resolveHostAuth()`'s "no usable credentials" case carries the exact path
+ * it checked, so the caller can produce a self-diagnosing error instead of
+ * a generic "not signed in" message that is indistinguishable from a
+ * genuinely signed-out user - on a multi-tenant deployment, the more likely
+ * cause is `HOME` resolving to the wrong (or an empty) directory entirely,
+ * and an operator needs the resolved path to tell the two apart.
+ */
+export interface HostAuthUnavailable {
+  readonly credentialsPath: string;
+}
+
+/** `HostAuth` has no `credentialsPath` field, so this discriminates the two arms of `resolveHostAuth()`'s return type without a wrapper/discriminant tag on the success case. */
+export function isHostAuthUnavailable(
+  value: HostAuth | HostAuthUnavailable,
+): value is HostAuthUnavailable {
+  return "credentialsPath" in value;
+}
+
+export async function resolveHostAuth(): Promise<HostAuth | HostAuthUnavailable> {
   const home = requireHomeEnv();
-  const stored = await readCredentialsFile(cliCredentialsPath("production"));
-  if (stored === null || stored.token.length === 0) return null;
+  const credentialsPath = cliCredentialsPath("production");
+  const stored = await readCredentialsFile(credentialsPath);
+  if (stored === null || stored.token.length === 0) {
+    return { credentialsPath };
+  }
   const lease = new MutableBearerLease(stored.token, stored.user.id);
   const store: CredentialsMutationStore = createHostCredentialsStore();
   const revalidator: HostRevalidator = createStoreBackedRevalidator({

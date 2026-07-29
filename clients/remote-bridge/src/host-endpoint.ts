@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { HostTransportEndpoint } from "@traycer-clients/shared/host-transport/ws-rpc-client";
 import type { ILogger } from "./logger";
+import { requireHomeEnv } from "./host-auth";
 
 /**
  * `~/.traycer/host/pid.json` — mirrors `clients/traycer-cli/src/host/pid-metadata.ts`
@@ -10,6 +10,23 @@ import type { ILogger } from "./logger";
  * module is CLI-private (no `exports` for library consumption), and this
  * package must not depend on `clients/traycer-cli` (see `host-auth.ts`'s
  * docblock for why the same boundary applies there).
+ *
+ * This is the module that decides which tenant's host process the bridge
+ * connects to — resolving it against the wrong identity is exactly the
+ * cross-tenant failure `requireHomeEnv()` exists to prevent. That gate is
+ * currently only called from `resolveHostAuth()`, so today's single call
+ * order (`BridgeClient.start()` awaits `resolveHostAuth()` before ever
+ * touching the endpoint) happens to make this safe — but `readHostPidMetadata`
+ * and `isValidLocalHostWebsocketUrl` are exported, and nothing in THIS file
+ * enforces the ordering that protects them. A future second entry point
+ * (a health check, a `bridge doctor`) calling into this module before auth
+ * would silently fall through to `os.homedir()`'s OS-user fallback and
+ * resolve another tenant's host. `requireHomeEnv()` is a fail-fast GATE, not
+ * a path-resolution replacement — credentials still resolve through
+ * `cliCredentialsPath()` → `cliConfigDir()` → `join(homedir(), …)`
+ * unmodified; the safety comes entirely from the gate running first. Calling
+ * it here, locally, makes that true by construction instead of by caller
+ * discipline.
  */
 interface HostPidMetadata {
   readonly pid: number;
@@ -18,13 +35,23 @@ interface HostPidMetadata {
 }
 
 function hostPidMetadataPath(): string {
-  return join(homedir(), ".traycer", "host", "pid.json");
+  const home = requireHomeEnv();
+  return join(home, ".traycer", "host", "pid.json");
 }
 
 export async function readHostPidMetadata(): Promise<HostPidMetadata | null> {
+  // `hostPidMetadataPath()` is deliberately called OUTSIDE the try block
+  // below: it can throw `requireHomeEnv()`'s fail-fast error, and that must
+  // propagate, not collapse into this function's `catch { return null }`
+  // (which exists for ENOENT/read errors on a legitimately-missing pid
+  // file, not for "we don't know whose pid file to look for"). Catching it
+  // here would silently turn a loud identity-safety failure into the same
+  // "no host running" outcome a genuinely-absent file produces — exactly
+  // the kind of ordering-dependent safety this fix exists to remove.
+  const path = hostPidMetadataPath();
   let raw: string;
   try {
-    raw = await readFile(hostPidMetadataPath(), "utf8");
+    raw = await readFile(path, "utf8");
   } catch {
     return null;
   }
@@ -139,6 +166,20 @@ export class HostEndpointPoller {
           this.endpoint = next;
           this.logger.info("host endpoint refreshed", { hostId: next.hostId });
         }
+      })
+      .catch((err: unknown) => {
+        // `hostPidMetadataPath()` can now throw `requireHomeEnv()`'s
+        // fail-fast error (F1) — HOME is documented as set-before-spawn and
+        // never mutated, so this should not fire in correct operation, but
+        // an uncaught throw on a 2s-interval timer would otherwise become
+        // an unhandled promise rejection on every tick. Surface it loudly
+        // (this is exactly the identity-safety condition that must never
+        // be silent) without crashing the poll loop itself.
+        this.logger.error(
+          "host endpoint poll failed",
+          {},
+          err instanceof Error ? err : new Error(String(err)),
+        );
       })
       .finally(() => {
         this.pollInFlight = false;
