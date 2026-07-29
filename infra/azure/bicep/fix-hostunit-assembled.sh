@@ -1,3 +1,4 @@
+cat > /etc/systemd/system/traycer-host@.service <<'TRAYCER_UNIT_EOF'
 [Unit]
 Description=Traycer host process for tenant %i
 # `traycer-host-guard.sh` is the enforcement point for A1's two non-negotiable
@@ -77,3 +78,8 @@ WorkingDirectory=__TRAYCER_HOME_ROOT__/%i
 # done per-tenant by bootstrap.sh - this unit file does not enable itself.
 [Install]
 WantedBy=multi-user.target
+
+TRAYCER_UNIT_EOF
+sed -i "s|__TRAYCER_OS_USER__|traycer|g; s|__TRAYCER_HOME_ROOT__|/srv/traycer/tenants|g" /etc/systemd/system/traycer-host@.service
+systemctl daemon-reload
+echo "fix-hostunit: applied"

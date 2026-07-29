@@ -33,9 +33,6 @@ param nsgId string
 @description('Tenant ids to provision systemd instances and HOME directories for. See this module\'s customData assembly for the scope boundary on what "provisioned" means here (scaffolding only - see bootstrap.sh).')
 param tenantIds array
 
-@description('Log Analytics workspace resource id. Empty string skips the monitoring extension entirely.')
-param logAnalyticsWorkspaceId string
-
 @description('Public hostname the ingress terminates TLS for - passed through to bootstrap.sh for the nginx/certbot phase.')
 param publicHostname string
 
@@ -55,6 +52,17 @@ var tenantIdsSpaceSeparated = join(tenantIds, ' ')
 var guardScript = loadTextContent('../../scripts/traycer-host-guard.sh')
 var unitTemplate = loadTextContent('../../systemd/traycer-host@.service')
 var bootstrapScript = loadTextContent('../../scripts/bootstrap.sh')
+
+// A6 - alerting/probe scripts and the units that call them. See each
+// file's own module doc; embedded the same way as the three above
+// (loadTextContent + heredoc in customData), not a separate mechanism.
+var alertScript = loadTextContent('../../scripts/traycer-alert.sh')
+var hostFailureAlertScript = loadTextContent('../../scripts/traycer-host-failure-alert.sh')
+var worktreeRescueScript = loadTextContent('../../scripts/traycer-worktree-rescue.sh')
+var healthProbeScript = loadTextContent('../../scripts/traycer-health-probe.sh')
+var hostAlertUnitTemplate = loadTextContent('../../systemd/traycer-host-alert@.service')
+var healthProbeUnitTemplate = loadTextContent('../../systemd/traycer-health-probe@.service')
+var healthProbeTimerTemplate = loadTextContent('../../systemd/traycer-health-probe@.timer')
 
 // Tenant id format (lowercase, digits, hyphen - a safe systemd instance
 // name / POSIX directory-name fragment) is validated at VM-boot time in
@@ -79,7 +87,7 @@ var bootstrapScript = loadTextContent('../../scripts/bootstrap.sh')
 // strings only allow `\n` for newlines, not literal ones - hence the
 // unusual single-line-with-escapes shape below; it is correctness-tested
 // via `az bicep build`'s compiled output, not just visually reviewed.
-var customDataScript = '#!/bin/bash\nset -euo pipefail\nexport TRAYCER_OS_USER="${osUser}"\nexport TRAYCER_HOME_ROOT="${homeRoot}"\nexport TRAYCER_TENANT_IDS="${tenantIdsSpaceSeparated}"\nexport TRAYCER_PUBLIC_HOSTNAME="${publicHostname}"\nexport TRAYCER_ACME_EMAIL="${acmeContactEmail}"\n\nmkdir -p /usr/local/bin\ncat > /usr/local/bin/traycer-host-guard.sh <<\'TRAYCER_GUARD_EOF\'\n${guardScript}\nTRAYCER_GUARD_EOF\nchmod +x /usr/local/bin/traycer-host-guard.sh\n\nmkdir -p /etc/systemd/system\ncat > /etc/systemd/system/traycer-host@.service <<\'TRAYCER_UNIT_EOF\'\n${unitTemplate}\nTRAYCER_UNIT_EOF\nsed -i "s|__TRAYCER_OS_USER__|${osUser}|g; s|__TRAYCER_HOME_ROOT__|${homeRoot}|g" /etc/systemd/system/traycer-host@.service\n\n${bootstrapScript}\n'
+var customDataScript = '#!/bin/bash\nset -euo pipefail\nexport TRAYCER_OS_USER="${osUser}"\nexport TRAYCER_HOME_ROOT="${homeRoot}"\nexport TRAYCER_TENANT_IDS="${tenantIdsSpaceSeparated}"\nexport TRAYCER_PUBLIC_HOSTNAME="${publicHostname}"\nexport TRAYCER_ACME_EMAIL="${acmeContactEmail}"\n\nmkdir -p /usr/local/bin\ncat > /usr/local/bin/traycer-host-guard.sh <<\'TRAYCER_GUARD_EOF\'\n${guardScript}\nTRAYCER_GUARD_EOF\ncat > /usr/local/bin/traycer-alert.sh <<\'TRAYCER_ALERT_EOF\'\n${alertScript}\nTRAYCER_ALERT_EOF\ncat > /usr/local/bin/traycer-host-failure-alert.sh <<\'TRAYCER_HOSTFAIL_EOF\'\n${hostFailureAlertScript}\nTRAYCER_HOSTFAIL_EOF\ncat > /usr/local/bin/traycer-worktree-rescue.sh <<\'TRAYCER_RESCUE_EOF\'\n${worktreeRescueScript}\nTRAYCER_RESCUE_EOF\ncat > /usr/local/bin/traycer-health-probe.sh <<\'TRAYCER_PROBE_EOF\'\n${healthProbeScript}\nTRAYCER_PROBE_EOF\nchmod +x /usr/local/bin/traycer-host-guard.sh /usr/local/bin/traycer-alert.sh /usr/local/bin/traycer-host-failure-alert.sh /usr/local/bin/traycer-worktree-rescue.sh /usr/local/bin/traycer-health-probe.sh\n\nmkdir -p /etc/systemd/system\ncat > /etc/systemd/system/traycer-host@.service <<\'TRAYCER_UNIT_EOF\'\n${unitTemplate}\nTRAYCER_UNIT_EOF\ncat > /etc/systemd/system/traycer-host-alert@.service <<\'TRAYCER_HOSTALERT_UNIT_EOF\'\n${hostAlertUnitTemplate}\nTRAYCER_HOSTALERT_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.service <<\'TRAYCER_PROBE_UNIT_EOF\'\n${healthProbeUnitTemplate}\nTRAYCER_PROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.timer <<\'TRAYCER_PROBE_TIMER_EOF\'\n${healthProbeTimerTemplate}\nTRAYCER_PROBE_TIMER_EOF\nsed -i "s|__TRAYCER_OS_USER__|${osUser}|g; s|__TRAYCER_HOME_ROOT__|${homeRoot}|g" /etc/systemd/system/traycer-host@.service /etc/systemd/system/traycer-host-alert@.service /etc/systemd/system/traycer-health-probe@.service\n\n${bootstrapScript}\n'
 
 resource pip 'Microsoft.Network/publicIPAddresses@2023-11-01' = {
   name: pipName
@@ -122,6 +130,18 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-11-01' = {
 resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   name: vmName
   location: location
+  // System-assigned identity: required for the Azure Monitor Agent
+  // (monitoring.bicep) to authenticate its uploads at all - found live,
+  // not assumed. AMA requests a token from IMDS using this identity;
+  // without it, IMDS returns "Identity not found" and AMA retries
+  // forever, silently shipping nothing (Heartbeat/Syslog both stayed
+  // empty in Log Analytics with no error surfaced anywhere except AMA's
+  // own on-box log) - a monitoring pipeline that looks deployed but ships
+  // no data is exactly the "up, responding, reporting nothing" shape A6
+  // exists to catch, this time in A6's own infrastructure.
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     hardwareProfile: {
       vmSize: vmSize
@@ -166,18 +186,6 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   }
 }
 
-resource monitorAgent 'Microsoft.Compute/virtualMachines/extensions@2024-03-01' = if (!empty(logAnalyticsWorkspaceId)) {
-  parent: vm
-  name: 'AzureMonitorLinuxAgent'
-  location: location
-  properties: {
-    publisher: 'Microsoft.Azure.Monitor'
-    type: 'AzureMonitorLinuxAgent'
-    typeHandlerVersion: '1.30'
-    autoUpgradeMinorVersion: true
-  }
-}
-
 @description('Public IP resource id.')
 output publicIpId string = pip.id
 
@@ -189,3 +197,6 @@ output publicFqdn string = pip.properties.dnsSettings.fqdn
 
 @description('VM resource id.')
 output vmResourceId string = vm.id
+
+@description('System-assigned managed identity principal id - consumed by monitoring.bicep for the AMA role assignment.')
+output vmPrincipalId string = vm.identity.principalId

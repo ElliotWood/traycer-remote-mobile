@@ -15,4 +15,6 @@ param acmeContactEmail = 'ops@example.com'
 param sshAllowedCidrs = []
 param tenantIds = []
 param dnsZoneName = ''
-param logAnalyticsWorkspaceId = ''
+param enableMonitoring = true
+param alertEmailAddress = 'ops@example.com'
+param monitoringDailyQuotaGb = 1

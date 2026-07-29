@@ -1,0 +1,7 @@
+[Unit]
+Description=A6 functional health probe for tenant %i
+
+[Service]
+Type=oneshot
+Environment=TRAYCER_HOME_ROOT=__TRAYCER_HOME_ROOT__
+ExecStart=/usr/local/bin/traycer-health-probe.sh %i

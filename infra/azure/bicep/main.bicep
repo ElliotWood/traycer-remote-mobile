@@ -52,8 +52,14 @@ param dnsZoneName string = ''
 @description('List of tenant identifiers this deployment provisions a host-supervision systemd unit for. Each must be a valid POSIX username fragment (lowercase, digits, hyphen) - validated in the `host-supervision` module, not just documented here. Empty by default so a first deploy can stand up ingress/networking before any tenant is onboarded (A3 is the per-person onboarding procedure, sequenced after this ticket).')
 param tenantIds array = []
 
-@description('Log Analytics workspace resource id to ship VM/systemd logs to, for A6 (observability, a later ticket) to consume. Optional: omitting it stands up the VM without a monitoring sink rather than forcing this ticket to also design A6\'s alerting.')
-param logAnalyticsWorkspaceId string = ''
+@description('Enable A6 monitoring/alerting (Log Analytics workspace, Azure Monitor Agent, and the alert rule). Defaults true - unattended operation is foundational, not optional, once a VM exists. Set false only to stand up ingress/networking without the monitoring resources (e.g. for a throwaway what-if run).')
+param enableMonitoring bool = true
+
+@description('Email address that receives A6 alerts. Required when `enableMonitoring` is true - there is no silent-default recipient, matching `adminSshPublicKey`\'s "no guessable default" stance.')
+param alertEmailAddress string = ''
+
+@description('Daily Log Analytics ingestion cap in GB - see monitoring.bicep\'s param doc and infra/azure/README.md for why this is a required cost bound, not a nice-to-have.')
+param monitoringDailyQuotaGb int = 1
 
 module network 'modules/network.bicep' = {
   name: 'network'
@@ -77,7 +83,6 @@ module vm 'modules/vm.bicep' = {
     subnetId: network.outputs.subnetId
     nsgId: network.outputs.nsgId
     tenantIds: tenantIds
-    logAnalyticsWorkspaceId: logAnalyticsWorkspaceId
     publicHostname: publicHostname
     acmeContactEmail: acmeContactEmail
   }
@@ -92,6 +97,19 @@ module ingress 'modules/ingress.bicep' = {
   }
 }
 
+module monitoring 'modules/monitoring.bicep' = if (enableMonitoring) {
+  name: 'monitoring'
+  params: {
+    location: location
+    workload: workload
+    regionAbbrev: regionAbbrev
+    vmResourceId: vm.outputs.vmResourceId
+    vmPrincipalId: vm.outputs.vmPrincipalId
+    alertEmailAddress: alertEmailAddress
+    dailyQuotaGb: monitoringDailyQuotaGb
+  }
+}
+
 @description('Public IP address to point the DNS A/AAAA record at (created by the `network` module, attached to the VM by the `vm` module).')
 output publicIpAddress string = vm.outputs.publicIpAddress
 
@@ -103,3 +121,12 @@ output vmResourceId string = vm.outputs.vmResourceId
 
 @description('True if `dnsZoneName` was supplied and a matching A record was created. False means the operator must point DNS at `publicIpAddress` manually before certbot can obtain a certificate (see bootstrap.sh\'s two-phase nginx/certbot comment).')
 output dnsRecordCreated bool = ingress.outputs.dnsRecordCreated
+
+@description('A6 Log Analytics workspace resource id, or empty if `enableMonitoring` was false.')
+// BCP318 (module output may be null) is a known linter false-positive for
+// this exact idiom - the ternary's condition matches the module's own
+// `if (enableMonitoring)`, so ARM never evaluates the true-branch when the
+// module didn't deploy. Verified against `az deployment group validate`
+// with enableMonitoring=true (real run, in infra/azure/README.md), not
+// just assumed from the pattern being common elsewhere.
+output monitoringWorkspaceId string = enableMonitoring ? monitoring.outputs.workspaceId : ''

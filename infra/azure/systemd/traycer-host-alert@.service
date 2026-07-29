@@ -1,0 +1,26 @@
+[Unit]
+Description=A6 failure alert for traycer-host@%i
+
+[Service]
+Type=oneshot
+# Runs as root - reading `journalctl -u <unit>` (needed to tell a genuine
+# restart loop from a single failure, see traycer-host-failure-alert.sh)
+# requires it: the shared tenant OS user has no `systemd-journal` group
+# membership, and journald refuses non-members outright ("No journal
+# files were opened due to insufficient permissions" - found live, not
+# assumed, when an earlier draft ran this whole unit as that user).
+#
+# The worktree-touching step is NOT done here, deliberately: an EARLIER
+# root-run draft called traycer-worktree-rescue.sh directly from this
+# root context and hit git's "detected dubious ownership" refusal the
+# instant it touched a tenant-owned worktree from a different UID - a
+# real bug that would have silently defeated the rescue safety net (git
+# refuses rather than corrupting a read, so it failed loudly in the
+# journal, but still failed). traycer-host-failure-alert.sh hands that
+# one step off to the correct user via `runuser`, so root never touches
+# tenant files and the rescue script never runs as an unprivileged user
+# that can't read the journal - each half runs as whichever identity
+# actually has the access it needs.
+Environment=TRAYCER_HOME_ROOT=__TRAYCER_HOME_ROOT__
+Environment=TRAYCER_OS_USER=__TRAYCER_OS_USER__
+ExecStart=/usr/local/bin/traycer-host-failure-alert.sh %i
