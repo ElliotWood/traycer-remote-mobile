@@ -1,0 +1,42 @@
+{
+  "name": "@traycer-clients/mobile-push-service",
+  "version": "0.1.0",
+  "description": "Companion service delivering background Web Push for Traycer Remote (mobile) — subscribes to the host's notification feed and pushes to registered browsers via VAPID.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "traycer-mobile-push-service": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/traycerai/traycer.git",
+    "directory": "clients/mobile-push-service"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "compile": "tsc --noEmit",
+    "format": "bun x prettier --write .",
+    "lint": "eslint . --cache --fix --max-warnings 0",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@traycer/protocol": "workspace:*",
+    "@traycer-clients/shared": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/web-push": "^3.6.4",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

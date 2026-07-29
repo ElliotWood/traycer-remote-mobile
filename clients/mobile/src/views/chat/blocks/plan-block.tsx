@@ -2,7 +2,7 @@
  * `plan` block (Sprint 2). Card always shows `markdownPreview` + a few
  * steps; "View full plan" lazy-fetches `agent.gui.getPlan` on expand.
  */
-import { useState, type ReactElement } from "react";
+import { memo, useState, type ReactElement } from "react";
 import type { PlanBlock as PlanBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { useAgentPlan } from "@/host/use-agent-plan";
 import { MobileMarkdown } from "../../markdown/mobile-markdown";
@@ -11,7 +11,8 @@ import { StaticCard } from "../collapsible-card";
 
 const STEP_PREVIEW_LIMIT = 5;
 
-export function PlanBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const PlanBlock = memo(function PlanBlock({
   block,
   epicId,
   chatId,
@@ -42,7 +43,7 @@ export function PlanBlock({
       {expanded && <PlanFullContent planId={block.planId} epicId={epicId} chatId={chatId} fallback={block.markdownPreview} />}
     </StaticCard>
   );
-}
+});
 
 function PlanFullContent({
   planId,

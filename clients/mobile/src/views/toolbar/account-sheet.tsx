@@ -2,10 +2,11 @@
  * The avatar → account sheet: identity, App settings (opens the Settings
  * screen), Manage subscription (external link), Sign out.
  */
-import { ChevronRight, ExternalLink, LogOut, Settings } from "lucide-react";
-import type { ReactElement } from "react";
+import { ChevronRight, ExternalLink, LogOut, Settings, Trash2 } from "lucide-react";
+import { useState, type ReactElement } from "react";
 import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import { AUTHN_BASE_URL } from "@/config";
+import { clearLocalData } from "@/host/clear-local-data";
 import { resolveManageSubscriptionUrl } from "@/host/manage-subscription-url";
 import { radius, theme, type } from "@/views/design-tokens";
 import { BottomSheet } from "./bottom-sheet";
@@ -80,8 +81,83 @@ export function AccountSheet({ user, onClose, onOpenSettings, onSignOut }: Accou
       >
         <AccountMenuRow icon={ExternalLink} label="Manage subscription" />
       </a>
+      <ClearDataRow />
       <AccountMenuRow icon={LogOut} label="Sign out" onClick={onSignOut} destructive />
     </BottomSheet>
+  );
+}
+
+/**
+ * Two-step because it is destructive and sits one row above "Sign out" —
+ * a mis-tap should not silently wipe every cached chat. Not a modal: a
+ * bottom sheet inside a bottom sheet is worse on a phone than an inline
+ * confirm.
+ */
+function ClearDataRow(): ReactElement {
+  const [phase, setPhase] = useState<"idle" | "confirm" | "clearing">("idle");
+
+  const run = (): void => {
+    setPhase("clearing");
+    void clearLocalData().finally(() => {
+      // Reload unconditionally, even if some layer reported an error.
+      // Unregistering a service worker does NOT release the page it already
+      // controls — only a fresh navigation does — so skipping the reload on
+      // partial failure would leave the user on exactly the stale bundle
+      // they pressed this to escape. A reload is safe regardless: everything
+      // cleared here is a cache that rebuilds from the host.
+      window.location.reload();
+    });
+  };
+
+  if (phase === "idle") {
+    return <AccountMenuRow icon={Trash2} label="Clear cached data" onClick={() => setPhase("confirm")} />;
+  }
+
+  return (
+    <div style={{ borderTop: `1px solid ${theme.borderHairline}`, padding: "10px 4px" }}>
+      <div style={{ ...type.bodyXs, color: theme.mutedText, marginBottom: 8 }}>
+        Clears locally cached chats, artifacts and the offline copy of the app, then reloads.{" "}
+        <strong style={{ color: theme.text }}>You stay signed in.</strong> Nothing on the host is affected.
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          onClick={run}
+          disabled={phase === "clearing"}
+          style={{
+            minHeight: 40,
+            flex: 1,
+            border: `1px solid ${theme.danger}`,
+            borderRadius: radius.sm,
+            background: "transparent",
+            color: theme.danger,
+            fontSize: 14,
+            fontFamily: "inherit",
+            cursor: phase === "clearing" ? "default" : "pointer",
+          }}
+        >
+          {phase === "clearing" ? "Clearing…" : "Clear and reload"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setPhase("idle")}
+          disabled={phase === "clearing"}
+          style={{
+            minHeight: 40,
+            flex: 1,
+            border: `1px solid ${theme.borderHairline}`,
+            borderRadius: radius.sm,
+            background: "transparent",
+            color: theme.text,
+            fontSize: 14,
+            fontFamily: "inherit",
+            cursor: phase === "clearing" ? "default" : "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

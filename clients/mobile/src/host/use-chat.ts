@@ -51,7 +51,6 @@ import {
 } from "./image-attachment";
 import type { HostStreamConnection } from "./stream-connection";
 import type { StreamConnectionState } from "./stream-connection";
-import { startLivenessRecovery } from "./liveness-recovery";
 import {
   interviewBlockFor,
   latestActivityText,
@@ -118,6 +117,10 @@ export interface UseChatResult {
   /** Live reply status for a pending key (see the `*Key` helpers), or undefined. */
   readonly replyStatusFor: (key: string) => ReplyStatus | undefined;
   readonly sendReply: (arg: SendReplyArg) => void;
+  /** Delivery status for an optimistically-sent message, keyed by `messageId` — `undefined` for anything not our own in-flight/failed send. */
+  readonly sendStatusFor: (messageId: string) => "pending" | "failed" | undefined;
+  /** Re-sends a `"failed"` message unchanged (same `messageId`) — see `retrySend`'s docblock. No-op for an unknown/already-resolved `messageId`. */
+  readonly retrySend: (messageId: string) => void;
   /** Snapshot messages + any user rows accepted since (Sprint 2 transcript). */
   readonly transcriptMessages: readonly ChatMessage[];
   /** The current in-progress turn's blocks, folded live from `blockDelta` (Sprint 2). */
@@ -192,6 +195,14 @@ interface ChatState {
   readonly replies: Readonly<Record<string, ReplyStatus>>;
   // clientActionId → pending key, so an `actionAck` can find the item it acks.
   readonly ackIndex: Readonly<Record<string, string>>;
+  /**
+   * Delivery status of an OPTIMISTICALLY-added `sendMessage`, keyed by
+   * `messageId`. Absent = either not our own optimistic send (a message
+   * loaded normally from a snapshot) or already confirmed — "pending"/
+   * "failed" are the only two tracked states, so most messages carry no
+   * entry at all. See `optimisticSend`/`sendTimedOut`/`sendRetried`.
+   */
+  readonly sendStatus: Readonly<Record<string, "pending" | "failed">>;
   /** S5 (C, F1 fix): true once the first `snapshot` frame has landed. */
   readonly hasSnapshot: boolean;
   // P2 additions — all sourced from fields the wire already carries.
@@ -219,6 +230,7 @@ const INITIAL_STATE: ChatState = {
   pendingInterviews: [],
   replies: {},
   ackIndex: {},
+  sendStatus: {},
   hasSnapshot: false,
   queue: INITIAL_QUEUE,
   backgroundItems: undefined,
@@ -252,6 +264,9 @@ interface ChatCacheSlice {
 }
 
 const CHAT_CACHE_MAX_MESSAGES = 50;
+
+/** How long a reply (approval/interview decision) waits for a real `actionAck` before `replyTimedOut` surfaces a retry instead of hanging on "Submitting…" — see `sendReply`. */
+const REPLY_TIMEOUT_MS = 20_000;
 
 export function chatCacheStorageKey(epicId: string, chatId: string): string {
   return `chat-cache:v${CACHE_SCHEMA_VERSION}:${epicId}:${chatId}`;
@@ -388,7 +403,51 @@ type ChatEvent =
       readonly status: "accepted" | "rejected";
       readonly reason: string | null;
     }
+  | {
+      /**
+       * Fires from a self-rescheduling timeout armed alongside
+       * `replySubmitting` (see `scheduleReplyTimeout`). NOT a transport-level
+       * retry — the frame itself is never replayed (a replayed decision
+       * frame the host has already processed is not provably safe; see the
+       * `sendReply`/`sendMessage` docblocks for the full reasoning). This
+       * only bounds how long the UI waits before surfacing a manual retry:
+       * the timer re-checks the connection at fire time and reschedules
+       * itself rather than firing while there's no live transport to have
+       * even carried the frame in the first place — a flaky connection
+       * should never produce a wall of spurious "tap to retry"s for actions
+       * that were never actually sent. Guarded so a legitimate late
+       * `actionAck` always wins: a no-op unless this `clientActionId` is
+       * STILL the pending entry for `key` and it's STILL `"submitting"`.
+       */
+      readonly type: "replyTimedOut";
+      readonly key: string;
+      readonly clientActionId: string;
+    }
   | { readonly type: "messageAccepted"; readonly message: ChatMessage }
+  | {
+      /**
+       * Fires synchronously from `sendMessage`, before the frame is even
+       * handed to the transport — the composer clears its draft immediately
+       * on send, so without this a dropped/slow-to-ack frame used to
+       * silently destroy what the user just typed with nothing left on
+       * screen to prove it was ever sent. Dedupes for free against the
+       * REAL `messageAccepted` once it lands: both share the exact same
+       * `messageId`, and `messageAccepted`'s existing `alreadyKnown` check
+       * already treats a repeat as a no-op.
+       */
+      readonly type: "optimisticSend";
+      readonly message: ChatMessage;
+    }
+  | {
+      /** Same self-rescheduling timeout shape as `replyTimedOut`, for a `sendMessage` that never got a `messageAccepted`. See `scheduleSendTimeout`. */
+      readonly type: "sendTimedOut";
+      readonly messageId: string;
+    }
+  | {
+      /** User tapped "retry" on a `"failed"` bubble — flips it back to `"pending"` so a fresh timeout can be armed. The retry itself re-sends the ORIGINAL frame unchanged (same `messageId`/`clientActionId`) — see `retrySend`'s docblock for why reusing the id, not minting a new one, is the whole safety argument here. */
+      readonly type: "sendRetried";
+      readonly messageId: string;
+    }
   | { readonly type: "blockDelta"; readonly event: RuntimeEvent };
 
 /** Drops a keyed entry from a record without mutating the input. */
@@ -425,21 +484,41 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
       for (const [id, key] of Object.entries(state.ackIndex)) {
         if (liveKeys.has(key)) ackIndex[id] = key;
       }
+      // Preserve our OWN still-unconfirmed optimistic sends across the
+      // reset below — otherwise an unrelated snapshot (a reconnect, not
+      // this send's own confirmation) would wipe a just-typed message off
+      // the screen before the host ever got a chance to confirm it, which
+      // is the exact "message vanishes with no trace" bug `optimisticSend`
+      // exists to prevent. Anything the snapshot's own `chat.messages`
+      // already carries is confirmed — drop it here (its `sendStatus` is
+      // cleared) since `messages` below is now its authoritative home.
+      const snapshotMessageIds = new Set(snap.chat.messages.map((m) => m.messageId));
+      const survivingOptimistic = state.trailingMessages.filter(
+        (m) => Object.hasOwn(state.sendStatus, m.messageId) && !snapshotMessageIds.has(m.messageId),
+      );
+      const sendStatus: Record<string, "pending" | "failed"> = {};
+      for (const m of survivingOptimistic) {
+        sendStatus[m.messageId] = state.sendStatus[m.messageId];
+      }
       return {
         runStatus: snap.runStatus,
         title: snap.chat.title,
         messages: snap.chat.messages,
-        // The snapshot is always fully authoritative — both overlays reset
-        // to empty BEFORE its content becomes the render source, so nothing
-        // from a stale live turn can survive alongside it (no-duplication
-        // guarantee; see `use-chat.test.ts`'s snapshot-transition test).
-        trailingMessages: [],
+        // The snapshot is always fully authoritative for CONFIRMED content —
+        // both overlays reset before it becomes the render source, so
+        // nothing from a stale live turn can survive alongside it
+        // (no-duplication guarantee; see `use-chat.test.ts`'s
+        // snapshot-transition test) — except our own not-yet-confirmed
+        // optimistic sends, explicitly re-applied above, not "surviving"
+        // a reset that skipped them.
+        trailingMessages: survivingOptimistic,
         liveTurn: EMPTY_LIVE_TURN,
         pendingApprovals: snap.pendingApprovals,
         pendingFileEditApprovals: snap.pendingFileEditApprovals,
         pendingInterviews: snap.pendingInterviews,
         replies,
         ackIndex,
+        sendStatus,
         hasSnapshot: true,
         queue: snap.queue,
         backgroundItems: snap.backgroundItems,
@@ -466,11 +545,54 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
       const alreadyKnown =
         state.messages.some((m) => m.messageId === event.message.messageId) ||
         state.trailingMessages.some((m) => m.messageId === event.message.messageId);
-      if (alreadyKnown) return state;
+      // Confirms delivery regardless of which branch below runs — the
+      // optimistic bubble (if any) almost always arrives first, making
+      // `alreadyKnown` true on the COMMON path, so clearing `sendStatus`
+      // must NOT live only in the `!alreadyKnown` branch (that would only
+      // ever fire for a message authored elsewhere, never our own sends).
+      const sendStatus = Object.hasOwn(state.sendStatus, event.message.messageId)
+        ? without(state.sendStatus, event.message.messageId)
+        : state.sendStatus;
+      if (alreadyKnown) {
+        return sendStatus === state.sendStatus ? state : { ...state, sendStatus };
+      }
       return {
         ...state,
         trailingMessages: [...state.trailingMessages, event.message],
         liveTurn: EMPTY_LIVE_TURN,
+        sendStatus,
+      };
+    }
+    case "optimisticSend": {
+      // Same dedupe shape as `messageAccepted` (same field, same check) —
+      // the real ack landing later is a no-op against this, not the other
+      // way around, since whichever arrives FIRST wins and the second is
+      // recognized as already-known.
+      const alreadyKnown =
+        state.messages.some((m) => m.messageId === event.message.messageId) ||
+        state.trailingMessages.some((m) => m.messageId === event.message.messageId);
+      if (alreadyKnown) return state;
+      return {
+        ...state,
+        trailingMessages: [...state.trailingMessages, event.message],
+        sendStatus: { ...state.sendStatus, [event.message.messageId]: "pending" },
+      };
+    }
+    case "sendTimedOut": {
+      // Stale/superseded fire: already confirmed (cleared by `messageAccepted`)
+      // or already retried (back to "pending" via a fresh timer) — either
+      // way, only a STILL-"pending" entry should flip to "failed".
+      if (state.sendStatus[event.messageId] !== "pending") return state;
+      return {
+        ...state,
+        sendStatus: { ...state.sendStatus, [event.messageId]: "failed" },
+      };
+    }
+    case "sendRetried": {
+      if (state.sendStatus[event.messageId] !== "failed") return state;
+      return {
+        ...state,
+        sendStatus: { ...state.sendStatus, [event.messageId]: "pending" },
       };
     }
     case "blockDelta":
@@ -562,6 +684,24 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
           [key]: {
             phase: "rejected",
             message: event.reason ?? "The host rejected this reply.",
+          },
+        },
+      };
+    }
+    case "replyTimedOut": {
+      // Stale/superseded fire: a real ack already resolved this
+      // clientActionId (cleared from ackIndex), or a NEWER submit for the
+      // same key overwrote it — either way, do nothing.
+      if (state.ackIndex[event.clientActionId] !== event.key) return state;
+      if (state.replies[event.key]?.phase !== "submitting") return state;
+      return {
+        ...state,
+        ackIndex: without(state.ackIndex, event.clientActionId),
+        replies: {
+          ...state.replies,
+          [event.key]: {
+            phase: "rejected",
+            message: "No response from the host — tap to retry.",
           },
         },
       };
@@ -666,9 +806,30 @@ export function useChat(
   // Dedupes the cache write against a burst of live frames (S1) — only
   // re-serializes/writes when the persisted slice actually changed.
   const lastWrittenChatCacheRef = useRef<string | null>(null);
+  // Mirrors `connection` for `scheduleReplyTimeout`/`scheduleSendTimeout`'s
+  // self-rescheduling checks — those run from a bare `setTimeout`, outside
+  // any render, so they need a ref (not the `connection` state value
+  // itself, which would go stale the instant it's captured).
+  const connectionRef = useRef<StreamConnectionState>(connection);
+  // Stops a timeout chain from rescheduling itself forever after this hook
+  // has torn down (chat switched, component unmounted) — a self-rescheduling
+  // `setTimeout` has no natural cancellation point otherwise.
+  const disposedRef = useRef(false);
+  // key (approvalKey/fileEditKey/interviewKey) → the clientActionId of the
+  // LAST attempt for that key. A manual retry (the user tapping the same
+  // decision again after a timeout) reuses it rather than minting a new
+  // one — see `sendReply`'s docblock for why that matters for interview
+  // answers specifically.
+  const lastReplyAttemptRef = useRef<Map<string, string>>(new Map());
+  // messageId → the exact frame `sendMessage` sent, so `retrySend` can
+  // re-send the IDENTICAL frame (same `messageId`/`clientActionId`/content)
+  // rather than reconstructing a new one — see `retrySend`'s docblock.
+  const sentFramesRef = useRef<Map<string, ChatSubscribeClientFrame>>(new Map());
 
   useEffect(() => {
+    disposedRef.current = false;
     if (streamConnection === null) {
+      connectionRef.current = "disconnected";
       setConnection("disconnected");
       return;
     }
@@ -687,21 +848,30 @@ export function useChat(
     streamRef.current = handle.stream;
 
     let currentState = handle.connection.getState();
+    connectionRef.current = currentState;
     setConnection(currentState);
     const unsubscribe = handle.connection.subscribe(() => {
       currentState = handle.connection.getState();
+      connectionRef.current = currentState;
       setConnection(currentState);
     });
 
-    // S5 (A): force a fast reconnect on wake signals instead of waiting out
-    // the raw backoff ceiling. One instance per mounted chat view.
-    const stopLivenessRecovery = startLivenessRecovery({
-      reconnect: (reason) => streamConnection.reconnectAll(reason),
-      isLive: () => currentState === "live",
-    });
+    // S5 (A): liveness recovery is intentionally NOT started here. `ChatView`
+    // is only ever reached inside `CurrentEpicProvider` (app-shell.tsx),
+    // whose `useEpicDoc` already owns exactly one `startLivenessRecovery`
+    // instance covering this same `streamConnection.reconnectAll` — a
+    // second instance here had its OWN independent 5s cooldown clock, so a
+    // single wake burst (`focus` + `visibilitychange` firing together, the
+    // common case) fired `reconnectAll` TWICE: the second call tore down
+    // the socket the first call had just started dialing, before its
+    // handshake could complete, producing the observed reconnect-storm
+    // (STREAM_SUBSCRIBE_TIMEOUT bursts on the host). `reconnectAll` already
+    // reconnects every open session on the shared client in one call, so
+    // one instance per open epic is sufficient — see
+    // `liveness-recovery.ts`'s module doc.
 
     return () => {
-      stopLivenessRecovery();
+      disposedRef.current = true;
       unsubscribe();
       handle.stream.close();
       streamRef.current = null;
@@ -712,19 +882,120 @@ export function useChat(
   // ever persist live-confirmed data, never overwrite a good cache with the
   // still-loading/cache-seeded state a reconnect window can otherwise leave
   // `state` in.
+  //
+  // Perf fix: deps used to be `[state, ...]` — a NEW `state` identity on
+  // every dispatch, including a streaming turn's `blockDelta` (which only
+  // touches `state.liveTurn`, never anything `serializeChatCache` reads).
+  // That re-ran `JSON.stringify(serializeChatCache(state))` on every delta
+  // (~50/sec while streaming) only to discard the result via the
+  // already-in-place equality guard below — the guard prevented the WASTED
+  // WRITE, not the wasted serialize. Depending on exactly the slices
+  // `serializeChatCache` reads (mirrors the `transcriptMessages`/
+  // `liveTurnBlocksMemo` memoization pattern below) means this effect only
+  // re-runs when something persistable actually changed.
   useEffect(() => {
     if (!state.hasSnapshot) return;
     const serialized = serializeChatCache(state);
     if (serialized === lastWrittenChatCacheRef.current) return;
     lastWrittenChatCacheRef.current = serialized;
     writeCachedChatState(epicId, chatId, serialized);
-  }, [state, epicId, chatId]);
+  }, [
+    state.hasSnapshot,
+    state.title,
+    state.messages,
+    state.trailingMessages,
+    state.runStatus,
+    state.pendingApprovals,
+    state.pendingFileEditApprovals,
+    state.pendingInterviews,
+    epicId,
+    chatId,
+  ]);
 
+  /**
+   * Self-rescheduling: re-checks the connection at fire time and reschedules
+   * rather than firing while there's no live transport. "No ack in 20s"
+   * isn't evidence an action was lost if the socket has been down the whole
+   * time — it's evidence there was never a transport to carry it, and firing
+   * anyway would wall a user on a flaky connection with spurious "tap to
+   * retry"s on actions that never had a chance to be sent yet.
+   */
+  const scheduleReplyTimeout = useCallback((key: string, clientActionId: string): void => {
+    setTimeout(() => {
+      if (disposedRef.current) return;
+      if (connectionRef.current !== "live") {
+        scheduleReplyTimeout(key, clientActionId);
+        return;
+      }
+      dispatch({ type: "replyTimedOut", key, clientActionId });
+    }, REPLY_TIMEOUT_MS);
+  }, []);
+
+  /** Same shape as `scheduleReplyTimeout`, for `sendMessage`. */
+  const scheduleSendTimeout = useCallback((messageId: string): void => {
+    setTimeout(() => {
+      if (disposedRef.current) return;
+      if (connectionRef.current !== "live") {
+        scheduleSendTimeout(messageId);
+        return;
+      }
+      dispatch({ type: "sendTimedOut", messageId });
+    }, REPLY_TIMEOUT_MS);
+  }, []);
+
+  /**
+   * Dispatches an approval/fileEdit/interview decision.
+   *
+   * Does NOT rely on the transport to replay a frame it couldn't send —
+   * that was the original (rejected) design for this fix: buffering and
+   * blind-replaying a dropped frame at the `WsStreamClient` layer risked
+   * the host processing the SAME decision twice, silently, with no user
+   * action behind the retry. Instead: the existing snapshot-reconcile (the
+   * `"snapshot"` reducer case's `liveKeys` filter) already clears a
+   * resolved reply's status for free once a fresh snapshot confirms the
+   * item is gone. What that alone can't do is distinguish "still pending
+   * because the host hasn't gotten to it yet" from "still pending because
+   * our frame never arrived" — both look identical from here.
+   * `scheduleReplyTimeout` is the bounded, connection-aware answer to that
+   * ambiguity: after a fair, live-connected wait, surface a manual retry
+   * rather than hang forever.
+   *
+   * A manual retry (the user tapping the same decision again) reuses the
+   * SAME `clientActionId` via `lastReplyAttemptRef`, not a fresh one.
+   * MEASURED against the real host (not assumed): `fileEditApprovalDecision`
+   * is deduped on `clientActionId` in host-persisted state — a duplicate
+   * frame always gets `actionAck: "accepted"` back (never `"rejected"`,
+   * never absent), confirmed same-session. Retrying `fileEditApproval` with
+   * the reused id is therefore genuinely idempotent, not merely defensible.
+   * The generic `approvalDecision` kind's dedupe behavior is UNESTABLISHED
+   * — the probe that confirmed the above didn't happen to exercise it — so
+   * treat that one as still only defensible: if the host doesn't dedupe it,
+   * a reused-id retry is at worst a second, harmless-if-rejected decision
+   * on an item the host should already treat as resolved, surfaced as one
+   * visible user-initiated tap rather than an invisible automatic replay.
+   * Interview answers were never measured either way.
+   *
+   * Important asymmetry either measurement leaves open: `actionAck:
+   * "accepted"` on a duplicate proves the host PROCESSED the frame, not
+   * that it did anything — the wire has no "no-op" ack distinct from a
+   * genuine first application. Never treat an ack as proof of effect
+   * elsewhere in this file; `pendingApprovals`/`pendingFileEditApprovals`/
+   * `pendingInterviews` shrinking on the next snapshot is what's actually
+   * authoritative for whether an item resolved, exactly what the
+   * snapshot-reconcile above already relies on.
+   */
   const sendReply = useCallback(
     (arg: SendReplyArg): void => {
       const stream = streamRef.current;
       if (stream === null) return;
-      const clientActionId = uuidv4();
+      const key =
+        arg.kind === "approval"
+          ? approvalKey(arg.approvalId)
+          : arg.kind === "fileEditApproval"
+            ? fileEditKey(arg.approvalId)
+            : interviewKey(arg.blockId);
+      const clientActionId = lastReplyAttemptRef.current.get(key) ?? uuidv4();
+      lastReplyAttemptRef.current.set(key, clientActionId);
       const base = {
         hasBinaryPayload: false as const,
         epicId,
@@ -732,7 +1003,6 @@ export function useChat(
         clientActionId,
       };
       let frame: ChatSubscribeClientFrame;
-      let key: string;
       switch (arg.kind) {
         case "approval":
           frame = {
@@ -741,7 +1011,6 @@ export function useChat(
             approvalId: arg.approvalId,
             decision: { approved: arg.approved, reason: arg.reason },
           };
-          key = approvalKey(arg.approvalId);
           break;
         case "fileEditApproval":
           frame = {
@@ -750,7 +1019,6 @@ export function useChat(
             approvalId: arg.approvalId,
             decision: { approved: arg.approved, reason: arg.reason },
           };
-          key = fileEditKey(arg.approvalId);
           break;
         case "interview":
           frame = {
@@ -759,15 +1027,41 @@ export function useChat(
             blockId: arg.blockId,
             answers: [...arg.answers],
           };
-          key = interviewKey(arg.blockId);
           break;
       }
       dispatch({ type: "replySubmitting", key, clientActionId });
       stream.sendAction(frame);
+      scheduleReplyTimeout(key, clientActionId);
     },
-    [epicId, chatId],
+    [epicId, chatId, scheduleReplyTimeout],
   );
 
+  /**
+   * Sends a new user message. Same reasoning as `sendReply` on why this
+   * does NOT rely on transport-level replay — for `send` specifically the
+   * stakes were higher than an approval: a replayed `send` risked the host
+   * starting a SECOND live agent turn on the same instruction, not just a
+   * cosmetic duplicate bubble. MEASURED against the real host (not
+   * assumed): `send` is deduped on `messageId` in host-persisted chat
+   * state — two identical frames produce two `actionAck: "accepted"`
+   * responses but exactly ONE `messageAccepted`/turn-start, confirmed
+   * ACROSS a fresh reconnect (a third identical send after a full
+   * close+resubscribe still acked `accepted` with no new message, no new
+   * turn). `retrySend`'s reused-`messageId` retry is therefore genuinely
+   * idempotent for this action, not merely defensible — see `retrySend`'s
+   * docblock for the one asymmetry that measurement doesn't resolve
+   * (an "accepted" ack proves the frame was processed, not that it did
+   * anything the first time).
+   *
+   * The optimistic bubble (`optimisticSend`) is dispatched BEFORE the frame
+   * reaches the transport, since the composer clears its draft immediately
+   * regardless — without it, a slow-to-ack or never-delivered send used to
+   * destroy the typed text with nothing left on screen to prove it was ever
+   * sent. `sendStatus` tracks that bubble's delivery ("pending" until a real
+   * `messageAccepted` confirms it, "failed" if `scheduleSendTimeout` fires
+   * first) so the UI can show an honest "didn't send" state instead of a
+   * confirmed-looking bubble that quietly never reached the agent.
+   */
   const sendMessage = useCallback(
     (args: SendMessageArgs): void => {
       const stream = streamRef.current;
@@ -778,24 +1072,79 @@ export function useChat(
       // rewrites the persisted b64content to a hash — see the docblock on
       // `rememberSentAttachments`.
       rememberSentAttachments(attachments);
+      const messageId = uuidv4();
+      const content =
+        attachments.length === 0 ? plainTextContent(text) : messageContentWithAttachments(text, attachments);
+      dispatch({
+        type: "optimisticSend",
+        message: {
+          role: "user",
+          messageId,
+          sender: { type: "user", userId },
+          message: { kind: "user", content },
+          timestamp: Date.now(),
+          sessionAnchor: null,
+        },
+      });
       const frame: ChatSubscribeClientFrame = {
         hasBinaryPayload: false,
         epicId,
         chatId,
         clientActionId: uuidv4(),
         kind: "send",
-        messageId: uuidv4(),
-        content:
-          attachments.length === 0 ? plainTextContent(text) : messageContentWithAttachments(text, attachments),
+        messageId,
+        content,
         sender: { type: "user", userId },
         settings: args.settings,
         accountContext: DEFAULT_ACCOUNT_CONTEXT,
         deliveryPolicy: "auto",
         worktreeIntent: null,
       };
+      // Retained for `retrySend` — a retry re-sends this EXACT frame, same
+      // `messageId`/`clientActionId`/content, never a freshly-built one.
+      sentFramesRef.current.set(messageId, frame);
       stream.sendAction(frame);
+      scheduleSendTimeout(messageId);
     },
-    [epicId, chatId, userId],
+    [epicId, chatId, userId, scheduleSendTimeout],
+  );
+
+  /**
+   * User-initiated retry for a `"failed"` send — re-sends the ORIGINAL frame
+   * unchanged (via `sentFramesRef`), never rebuilds one with a fresh
+   * `messageId`. Reusing the id is genuinely idempotent for this action —
+   * MEASURED against the real host, not just defensible (see `sendMessage`'s
+   * docblock for the full measurement): a duplicate `send` is absorbed via
+   * the host's persisted-state dedupe, surviving even a full reconnect,
+   * with `messageAccepted`'s existing `messageId` dedupe (line ~530) then
+   * absorbing it client-side too if it somehow arrived twice.
+   *
+   * One thing the measurement does NOT resolve, so this still degrades
+   * safely if it's ever wrong: a duplicate always acks `"accepted"`, never
+   * `"rejected"` or absent, so a retry can't hang on a missing/negative
+   * ack — but `"accepted"` only proves the host processed the frame, not
+   * that the retry did anything the original send hadn't already done.
+   * That's fine here specifically because nothing in this file acts on the
+   * ack at all: `sendStatus` clears on the `messageAccepted` EVENT (the
+   * `"messageAccepted"` reducer case), not on `actionAck` — the same
+   * reconcile-against-real-confirmation path `sendMessage`'s optimistic
+   * bubble already uses, not a shortcut this retry takes on its own.
+   */
+  const retrySend = useCallback(
+    (messageId: string): void => {
+      const stream = streamRef.current;
+      const frame = sentFramesRef.current.get(messageId);
+      if (stream === null || frame === undefined) return;
+      dispatch({ type: "sendRetried", messageId });
+      stream.sendAction(frame);
+      scheduleSendTimeout(messageId);
+    },
+    [scheduleSendTimeout],
+  );
+
+  const sendStatusFor = useCallback(
+    (messageId: string): "pending" | "failed" | undefined => state.sendStatus[messageId],
+    [state.sendStatus],
   );
 
   const stopTurn = useCallback((): void => {
@@ -883,6 +1232,8 @@ export function useChat(
     resolveInterview,
     replyStatusFor,
     sendReply,
+    sendStatusFor,
+    retrySend,
     transcriptMessages,
     liveTurnBlocks: liveTurnBlocksMemo,
     hasSnapshot: state.hasSnapshot,

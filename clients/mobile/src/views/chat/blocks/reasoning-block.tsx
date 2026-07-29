@@ -2,7 +2,7 @@
  * `reasoning` block (Sprint 2) — mandatory collapsed-by-default (rubric §2:
  * a real chat can carry hundreds of these).
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { ReasoningBlock as ReasoningBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { MobileMarkdown } from "../../markdown/mobile-markdown";
 import { colors } from "../../ui";
@@ -17,7 +17,8 @@ function headerLabel(block: ReasoningBlockType): string {
   return "Thought";
 }
 
-export function ReasoningBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const ReasoningBlock = memo(function ReasoningBlock({
   block,
 }: {
   readonly block: ReasoningBlockType;
@@ -27,4 +28,4 @@ export function ReasoningBlock({
       <MobileMarkdown>{block.content}</MobileMarkdown>
     </CollapsibleCard>
   );
-}
+});

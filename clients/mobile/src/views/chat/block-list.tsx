@@ -4,7 +4,7 @@
  * never reaches here (routed to a user bubble upstream); an unrecognized
  * shape renders a labeled fallback rather than throwing (rubric §4).
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { RenderableBlock } from "./transcript-model";
 import { ErrorBoundary } from "../error-boundary";
 import { colors } from "../ui";
@@ -29,7 +29,8 @@ export interface BlockListProps {
   readonly chatId: string;
 }
 
-export function BlockList({ nodes, epicId, chatId }: BlockListProps): ReactElement {
+/** Perf batch 2 (B2-3): memoized so a caller passing STABLE `nodes`/`epicId`/`chatId` (see `transcript-view.tsx`'s `useMemo`) skips this whole subtree on an unrelated re-render. */
+export const BlockList = memo(function BlockList({ nodes, epicId, chatId }: BlockListProps): ReactElement {
   return (
     <>
       {nodes.map((node) => (
@@ -41,9 +42,9 @@ export function BlockList({ nodes, epicId, chatId }: BlockListProps): ReactEleme
       ))}
     </>
   );
-}
+});
 
-function BlockNode({
+const BlockNode = memo(function BlockNode({
   node,
   epicId,
   chatId,
@@ -93,7 +94,7 @@ function BlockNode({
       return <UnsupportedBlock typeName={unknownBlock.type} />;
     }
   }
-}
+});
 
 function UnsupportedBlock({ typeName }: { readonly typeName: string }): ReactElement {
   return (

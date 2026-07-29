@@ -17,7 +17,7 @@
  * `inputDetail.entries`.
  */
 import { Bot, Send } from "lucide-react";
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { ToolCallBlock as ToolCallBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { theme } from "@/views/design-tokens";
 import { colors } from "../../ui";
@@ -55,7 +55,8 @@ function shortAgentId(id: string): string {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
-export function ToolCallBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const ToolCallBlock = memo(function ToolCallBlock({
   block,
 }: {
   readonly block: ToolCallBlockType;
@@ -110,7 +111,7 @@ export function ToolCallBlock({
       )}
     </CollapsibleCard>
   );
-}
+});
 
 function A2ASendMessageCard({
   block,

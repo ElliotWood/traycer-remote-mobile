@@ -4,7 +4,7 @@
  * running to hundreds of activity blocks, collapsed-by-default is what keeps
  * the transcript scannable (rubric §2), not an optional per-block style.
  */
-import { useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { memo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { colors } from "../ui";
 
 export interface CollapsibleCardProps {
@@ -21,7 +21,8 @@ export interface CollapsibleCardProps {
 
 const MIN_TOUCH_TARGET = 44;
 
-export function CollapsibleCard({
+/** Perf batch 2 (B2-3): memoized — a caller passing a STABLE `header`/`children` (built once via `useMemo`, not fresh JSX per render) skips this entirely on an unrelated re-render. Requires the caller's own memoization to actually pay off; see each block component's `header`/`children` `useMemo`. */
+export const CollapsibleCard = memo(function CollapsibleCard({
   header,
   children,
   defaultOpen = false,
@@ -67,7 +68,7 @@ export function CollapsibleCard({
       )}
     </div>
   );
-}
+});
 
 export function StaticCard({
   children,

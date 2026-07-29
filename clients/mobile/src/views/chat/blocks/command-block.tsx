@@ -3,13 +3,14 @@
  * comment: "the load-bearing signal" is command+cwd+exitCode+status) — the
  * body just re-shows the command, there is nothing else to lazy-fetch.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { CommandBlock as CommandBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { colors } from "../../ui";
 import { CollapsibleCard } from "../collapsible-card";
 import { StatusBadge } from "../status-badge";
 
-export function CommandBlock({
+/** Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note. */
+export const CommandBlock = memo(function CommandBlock({
   block,
 }: {
   readonly block: CommandBlockType;
@@ -54,4 +55,4 @@ export function CommandBlock({
       )}
     </CollapsibleCard>
   );
-}
+});

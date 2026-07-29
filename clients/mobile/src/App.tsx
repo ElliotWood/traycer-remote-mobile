@@ -10,16 +10,41 @@
  * `auth` is injected (not constructed here) so this component is renderable in a
  * test with a fake auth + a fake host client provided through
  * `HostClientProvider`. The composition root that wires the real services is
- * `AppRoot`.
+ * `AppRoot` — which is also where the config-validity gate lives
+ * (`config-diagnostics.ts`'s `ConfigErrorScreen`): a check reading real
+ * build-time env constants belongs ahead of this component, not inside it,
+ * so this component stays renderable in tests with an injected fake client
+ * regardless of what `VITE_*` happens to be at test time.
  */
 import type { ReactElement } from "react";
 import { selectAppScreen } from "@/app-screen";
 import type { MobileAuthService } from "@/host/auth-service";
 import { useAuthStatus } from "@/host/use-auth-status";
 import { useHostClientOrNull } from "@/host/host-client-context";
+import { unsubscribeFromPush } from "@/host/push-subscription";
 import { AppShell } from "@/app-shell";
 import { SignInView } from "@/views/sign-in-view";
 import { colors, screen } from "@/views/ui";
+
+/**
+ * Push sprint: deregister the push subscription before the credential is
+ * cleared — `unsubscribeFromPush` needs the CURRENT bearer to authenticate
+ * the server-side `/unsubscribe` call, so this must run before
+ * `auth.signOut()`, not after.
+ */
+function signOut(auth: MobileAuthService): void {
+  const bearer = currentBearerOrNull(auth);
+  void unsubscribeFromPush(bearer);
+  auth.signOut();
+}
+
+function currentBearerOrNull(auth: MobileAuthService): string | null {
+  try {
+    return auth.bearerSource()?.getBearerToken() ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function App({ auth }: { readonly auth: MobileAuthService }): ReactElement {
   const status = useAuthStatus(auth);
@@ -46,7 +71,7 @@ export function App({ auth }: { readonly auth: MobileAuthService }): ReactElemen
         <AppShell
           client={client}
           user={status.kind === "signed-in" ? status.user : null}
-          onSignOut={() => auth.signOut()}
+          onSignOut={() => signOut(auth)}
         />
       );
   }

@@ -11,6 +11,7 @@
  */
 import {
   isValidElement,
+  memo,
   useState,
   type CSSProperties,
   type ComponentPropsWithoutRef,
@@ -240,7 +241,14 @@ export interface MobileMarkdownProps {
   readonly children: string;
 }
 
-export function MobileMarkdown({ children }: MobileMarkdownProps): ReactElement {
+/**
+ * Perf batch 2 (B2-3): memoized — the transcript's `TextBlock`/`ReasoningBlock`/etc.
+ * pass a stable `children: string` once their own props are stable, so this bails
+ * out instead of re-running `react-markdown`'s full parse+render on every re-render.
+ * `COMPONENTS` above stays module-scope (not recreated here) — `AnchorRenderer`
+ * calls hooks, so it must stay a plain component reference, not a per-render object.
+ */
+export const MobileMarkdown = memo(function MobileMarkdown({ children }: MobileMarkdownProps): ReactElement {
   return (
     <div
       data-testid="mobile-markdown"
@@ -259,4 +267,4 @@ export function MobileMarkdown({ children }: MobileMarkdownProps): ReactElement 
       </Markdown>
     </div>
   );
-}
+});

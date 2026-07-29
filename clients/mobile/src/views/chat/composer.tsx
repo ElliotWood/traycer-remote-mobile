@@ -217,7 +217,17 @@ export function Composer({
             onChange={(e) => setDraftText(e.target.value)}
             placeholder="Message this agent…"
             rows={2}
-            disabled={!connectionLive}
+            // Gated on ACCESS, not on connection. Disabling a focused
+            // textarea mid-typing is what the user experienced as the input
+            // "locking up": a host/client hiccup flips `connectionLive`
+            // false (after `use-settled-connection-state`'s 1500ms delay),
+            // the browser drops focus, the on-screen keyboard dismisses, and
+            // any in-progress IME composition is discarded. Losing what
+            // you're typing because the socket blinked is never the right
+            // trade — the transport recovers on its own in a second or two.
+            // Sending is still correctly gated: `canSubmit` requires
+            // `connectionLive`, and `sendDisabledHint` explains why.
+            disabled={!canType}
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -272,8 +282,12 @@ export function Composer({
               disabled={!connectionLive || attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE}
               onClick={() => libraryInputRef.current?.click()}
             />
-            <PermissionModeToggle value={permissionMode} onChange={setPermissionMode} disabled={!connectionLive} />
-            <AgentModeToggle value={agentMode} onChange={setAgentMode} disabled={!connectionLive} />
+            {/* Pure local draft state, applied only when the message is
+                actually sent — there is nothing for a live connection to
+                gate here, and greying them out during a blip just makes the
+                composer feel broken alongside the textarea. */}
+            <PermissionModeToggle value={permissionMode} onChange={setPermissionMode} disabled={!canType} />
+            <AgentModeToggle value={agentMode} onChange={setAgentMode} disabled={!canType} />
             <ModelChip
               models={models}
               value={resolvedModel}

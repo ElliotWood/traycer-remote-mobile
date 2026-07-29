@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/verify-precache-manifest.mjs && node scripts/verify-authn-not-baked.mjs",
+    "build:tailnet": "vite build --config vite.tailnet.config.ts && node scripts/verify-precache-manifest.mjs && node scripts/verify-authn-not-baked.mjs",
     "compile": "tsc -b",
     "preview": "vite preview",
     "test": "vitest run"
@@ -40,7 +41,6 @@
     "rehype-raw": "catalog:",
     "rehype-sanitize": "catalog:",
     "remark-gfm": "catalog:",
-    "shiki": "catalog:",
     "tailwind-merge": "catalog:",
     "unified": "catalog:",
     "uuid": "catalog:",

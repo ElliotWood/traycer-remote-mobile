@@ -65,7 +65,14 @@ export const screen: CSSProperties = {
     "'Figtree Variable', Figtree, ui-sans-serif, system-ui, -apple-system, sans-serif",
   maxWidth: 480,
   margin: "0 auto",
-  minHeight: "100vh",
+  // `100dvh`, not `100vh` — plain `100vh` overshoots the visible viewport on
+  // mobile browsers (it's sized with the URL bar collapsed), causing the
+  // page to scroll behind the app's fixed-height layout. Unlike a stylesheet
+  // rule, an inline style object can't express a fallback-then-override
+  // cascade for one property, so this only sets the modern value — matches
+  // `#root`'s existing `min-height: 100dvh` in global.css, which also has no
+  // `vh` fallback.
+  minHeight: "100dvh",
   boxSizing: "border-box",
   padding: 16,
   background: theme.background,

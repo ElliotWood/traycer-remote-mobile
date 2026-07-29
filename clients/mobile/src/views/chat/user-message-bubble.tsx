@@ -20,12 +20,30 @@ export interface UserMessageBubbleProps {
   readonly content: JsonContent;
   readonly sender: UserMessageSender | null;
   readonly steered?: boolean;
+  /** Optimistic-send delivery status (batch 1 #4/#5) — `undefined`/`"pending"` render normally; `"failed"` shows the retry affordance. Absent for a `steer` block, which isn't a tracked send. */
+  readonly sendStatus?: "pending" | "failed" | undefined;
+  /**
+   * Perf batch 2 (B2-3): the STABLE top-level `chat.retrySend` function
+   * itself, plus the `messageId` to call it with — NOT a pre-bound
+   * `onRetry: () => void`. The caller (`transcript-view.tsx`) used to build
+   * `onRetry={() => onRetrySend(messageId)}` inline on every render, a
+   * fresh closure every time that defeated THIS component's own
+   * `React.memo` regardless of `content`/`sender` being unchanged. The
+   * closure is built here instead, inside the leaf that actually renders
+   * the button — harmless there since it's a native DOM handler, not a
+   * prop threaded to another memoized child.
+   */
+  readonly messageId?: string;
+  readonly onRetrySend?: (messageId: string) => void;
 }
 
 function UserMessageBubbleImpl({
   content,
   sender,
   steered = false,
+  sendStatus,
+  messageId,
+  onRetrySend,
 }: UserMessageBubbleProps): ReactElement {
   const markdown = userContentToMarkdown(content);
   const provenance = sender !== null ? userSenderProvenance(sender) : null;
@@ -128,10 +146,36 @@ function UserMessageBubbleImpl({
               background: "#1f2b3a",
               borderRadius: 12,
               padding: "8px 12px",
+              // A "failed" send is still shown (never silently disappears —
+              // that was the original bug) but visually dimmed so it doesn't
+              // read as a normal, successfully-delivered message.
+              opacity: sendStatus === "failed" ? 0.6 : 1,
             }}
           >
             <MobileMarkdown>{markdown}</MobileMarkdown>
           </div>
+        )}
+        {sendStatus === "failed" && (
+          <button
+            type="button"
+            data-testid="retry-send"
+            onClick={() => {
+              if (messageId !== undefined) onRetrySend?.(messageId);
+            }}
+            style={{
+              display: "block",
+              marginLeft: "auto",
+              marginTop: 4,
+              border: "none",
+              background: "transparent",
+              color: colors.danger,
+              fontSize: 12,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            Didn't send — tap to retry
+          </button>
         )}
       </div>
       {lightboxSrc !== null && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}

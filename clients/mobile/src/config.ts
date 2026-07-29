@@ -29,7 +29,33 @@ export const CONFIGURED_HOST_ID: string | null =
 // `process.env`.
 const rawAuthn: unknown = import.meta.env.VITE_AUTHN_BASE_URL;
 
-export const AUTHN_BASE_URL: string =
-  typeof rawAuthn === "string" && rawAuthn.length > 0
-    ? rawAuthn
-    : "https://authn.traycer.ai";
+/**
+ * Whether `VITE_AUTHN_BASE_URL` was actually supplied at build time, as
+ * opposed to `AUTHN_BASE_URL` having fallen back to the production default
+ * below. `config-diagnostics.ts` needs this distinction: the default is only
+ * SAFE when this build is served from the real production origin (authn's
+ * CORS allowlist is that one origin, see the docblock below) — everywhere
+ * else, a defaulted value is a guaranteed CORS failure on sign-in, not a
+ * degraded-but-working state.
+ */
+export const AUTHN_CONFIGURED: boolean =
+  typeof rawAuthn === "string" && rawAuthn.length > 0;
+
+export const AUTHN_BASE_URL: string = AUTHN_CONFIGURED
+  ? (rawAuthn as string)
+  : "https://authn.traycer.ai";
+
+// The mobile-push-service HTTP API base — `null` means background push isn't
+// configured for this build, and the alerts affordance degrades to
+// "unsupported" rather than a dead subscribe attempt.
+//
+// This is the FULL, prefixed origin the client calls (e.g. `<origin>/push`).
+// Note the deployment asymmetry: a reverse proxy mounting the service under a
+// path prefix typically STRIPS that prefix before forwarding, so the service
+// itself is mounted prefix-free and only the client carries the prefix.
+// Verify the received path against a real request rather than assuming — this
+// exact mismatch has bitten on this rig before.
+const rawPushBase: unknown = import.meta.env.VITE_PUSH_BASE_URL;
+
+export const PUSH_BASE_URL: string | null =
+  typeof rawPushBase === "string" && rawPushBase.length > 0 ? rawPushBase : null;

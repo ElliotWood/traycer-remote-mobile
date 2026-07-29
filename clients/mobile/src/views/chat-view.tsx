@@ -66,6 +66,8 @@ import { ElapsedFooter } from "./chat/elapsed-footer";
 import { ScrollToBottomChip } from "./chat/scroll-to-bottom-chip";
 import { LowerDock } from "./chat/lower-dock";
 import { Composer } from "./chat/composer";
+import { NextStepsProvider, type NextStepsValue } from "./chat/next-steps-context";
+import { useScreenWakeLock, useWakeLockPreference } from "@/host/use-screen-wake-lock";
 
 interface ChatViewProps {
   readonly epicId: string;
@@ -174,6 +176,20 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
     chat.sendMessage({ text, settings, attachments });
   };
 
+  // Next-step options push into the SAME composer prefill channel as
+  // "edit a queued item" — deliberately reusing it rather than adding a
+  // second path into the composer's draft. Memoized on nothing but the
+  // stable setter so the provider value doesn't change identity per render
+  // (which would defeat B2-3's memoized transcript below it).
+  const nextStepsValue = useMemo<NextStepsValue>(
+    () => ({
+      insertPrompt: (prompt: string) => {
+        setPrefill((prev) => ({ text: prompt, nonce: (prev?.nonce ?? 0) + 1 }));
+      },
+    }),
+    [],
+  );
+
   const handleEditQueueItem = (item: ChatQueuedItem, text: string): void => {
     chat.dispatchAction((base) => ({ ...base, kind: "queueCancel", queueItemId: item.queueItemId }));
     setPrefill((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -196,6 +212,9 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
 
   const canMutate = hostClient !== null && connectionLive && chat.accessRole === "owner";
   const isRunning = chat.runStatus === "running" || chat.runStatus === "stopping";
+  // The "while-running" preference — hold the screen awake only while a turn
+  // is actually in flight. "always" is handled once, app-wide, in AppShell.
+  useScreenWakeLock(useWakeLockPreference() === "while-running" && isRunning);
   const turn = useMemo(() => lastAssistantTurn(chat.transcriptMessages), [chat.transcriptMessages]);
   const todoSnapshot = useMemo(
     () => pinnedTodoSnapshot(chat.transcriptMessages, chat.liveTurnBlocks),
@@ -246,6 +265,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   };
 
   return (
+    <NextStepsProvider value={nextStepsValue}>
     <div style={chatLayoutStyle}>
       <header style={headerStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -274,6 +294,8 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
             liveBlocks={chat.liveTurnBlocks}
             epicId={epicId}
             chatId={chatId}
+            sendStatusFor={chat.sendStatusFor}
+            onRetrySend={chat.retrySend}
           />
         )}
         {isRunning && (
@@ -350,6 +372,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
         />
       </footer>
     </div>
+    </NextStepsProvider>
   );
 }
 
@@ -404,6 +427,11 @@ function TranscriptSkeleton(): ReactElement {
 const footerStyle: CSSProperties = {
   flexShrink: 0,
   padding: "8px 16px 12px",
+  // `max()` so the home-indicator inset only adds space when it's actually
+  // bigger than the existing 12px — a notched phone gets real clearance
+  // instead of the composer sitting under the home indicator; a
+  // non-notched device (env() unsupported or zero) just keeps the 12px.
+  paddingBottom: "max(12px, env(safe-area-inset-bottom))",
   borderTop: `1px solid ${theme.borderHairline}`,
   background: theme.background,
 };

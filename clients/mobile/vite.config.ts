@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { assetsNotFoundPlugin } from "./vite/assets-not-found-plugin";
+import { collectEntryCriticalUrls } from "./vite/collect-entry-critical-urls";
 
 // Standalone Vite app for the phone client. `@traycer/protocol` and
 // `@traycer-clients/shared` resolve as workspace packages (their exports point
@@ -13,6 +16,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    assetsNotFoundPlugin(),
     // S5 (B): installable PWA + "new version" prompt. `injectManifest` (not
     // `generateSW`) because `src/sw.ts` needs to own the `notificationclick`
     // handler (§C) — a `generateSW`-produced opaque SW couldn't host it, so
@@ -37,9 +41,22 @@ export default defineConfig({
         display: "standalone",
         background_color: "#111111",
         theme_color: "#111111",
+        // `any` + `maskable` are BOTH required. Android applies its own
+        // adaptive-icon mask (circle/squircle/etc) and, given only `any`
+        // icons, crops the artwork to fit — clipping the logo's edges. The
+        // `maskable` variant is the same artwork inset into a 14% safe zone
+        // on the brand background, so the mask lands on padding instead.
+        // Keep the `any` entries too: `maskable` alone renders padded and
+        // undersized in contexts that don't mask (favicon, task switcher).
         icons: [
-          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          {
+            src: "icons/icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
       },
       injectManifest: {
@@ -55,6 +72,30 @@ export default defineConfig({
           "assets/index-*.js",
           "manifest.webmanifest",
           "icons/*.png",
+        ],
+        // Staleness incident (2026-07-28): globPatterns above missed
+        // rolldown-runtime-*.js/kind-tokens-*.js/index-*.css entirely — see
+        // `vite/collect-entry-critical-urls.ts`'s docblock. This transform
+        // derives the real boot-critical list from the built index.html and
+        // tops up anything globPatterns didn't catch, so a future bundler
+        // chunk-naming change can't silently reopen the same gap.
+        manifestTransforms: [
+          async (entries) => {
+            const html = readFileSync(resolve(__dirname, "dist", "index.html"), "utf8");
+            const required = collectEntryCriticalUrls(html);
+            const known = new Set(entries.map((entry) => entry.url));
+            const added: string[] = [];
+            for (const url of required) {
+              if (known.has(url)) continue;
+              entries.push({ url, revision: null });
+              added.push(url);
+            }
+            if (added.length > 0) {
+              // eslint-disable-next-line no-console
+              console.log(`[pwa] precached ${added.length} entry-critical asset(s) globPatterns missed: ${added.join(", ")}`);
+            }
+            return { manifest: entries, warnings: [] };
+          },
         ],
       },
     }),

@@ -4,12 +4,13 @@
  * `PendingSection`, untouched. This only shows a decided approval as a
  * historical record.
  */
-import type { ReactElement } from "react";
+import { memo, type ReactElement } from "react";
 import type { ApprovalBlock as ApprovalBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { colors } from "../../ui";
 import { CollapsibleCard } from "../collapsible-card";
 
-export function ApprovalBlock({
+/** Perf batch 2 (B2-3): memoized — a stable `block` reference (guaranteed once `AssistantTurnImpl`'s tree is memoized, see `transcript-view.tsx`) lets this bail out entirely. */
+export const ApprovalBlock = memo(function ApprovalBlock({
   block,
 }: {
   readonly block: ApprovalBlockType;
@@ -56,4 +57,4 @@ export function ApprovalBlock({
       )}
     </CollapsibleCard>
   );
-}
+});

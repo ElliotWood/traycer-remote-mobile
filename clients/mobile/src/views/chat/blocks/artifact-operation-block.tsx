@@ -5,7 +5,7 @@
  * (e.g. "Spec") — never a blank card. Live epic-doc title resolution is
  * S3's job.
  */
-import { useState, type ReactElement } from "react";
+import { memo, useState, type ReactElement } from "react";
 import type { ArtifactOperationBlock as ArtifactOperationBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { useSnapshotDiff } from "@/host/use-snapshot-diff";
 import { useArtifactNav } from "@/host/artifact-nav-context";
@@ -19,8 +19,11 @@ const OPERATION_LABEL: Readonly<Record<ArtifactOperationBlockType["operation"], 
   delete: "−",
 };
 
-/** U1 fix: the card already carries `artifactId` (its own field, not a link href), so opening it needs no RPC resolve — a direct in-app nav, same as every other artifact-opening surface. */
-export function ArtifactOperationBlock({
+/**
+ * U1 fix: the card already carries `artifactId` (its own field, not a link href), so opening it needs no RPC resolve — a direct in-app nav, same as every other artifact-opening surface.
+ * Perf batch 2 (B2-3): memoized — see `approval-block.tsx`'s note.
+ */
+export const ArtifactOperationBlock = memo(function ArtifactOperationBlock({
   block,
   epicId,
 }: {
@@ -80,7 +83,7 @@ export function ArtifactOperationBlock({
       )}
     </div>
   );
-}
+});
 
 function ArtifactDiffPanel({
   beforeHash,
