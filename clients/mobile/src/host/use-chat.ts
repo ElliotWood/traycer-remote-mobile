@@ -899,6 +899,10 @@ export function useChat(
     if (serialized === lastWrittenChatCacheRef.current) return;
     lastWrittenChatCacheRef.current = serialized;
     writeCachedChatState(epicId, chatId, serialized);
+    // Deliberately narrower than `state` itself — see the comment above:
+    // only the slices `serializeChatCache` actually reads, so a streaming
+    // turn's `blockDelta` (touches only `state.liveTurn`) doesn't re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     state.hasSnapshot,
     state.title,

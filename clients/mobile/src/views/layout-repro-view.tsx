@@ -15,7 +15,7 @@
  * `window` for a headless Playwright driver (`tests/layout/measure.mjs`) to
  * push snapshots and read real, browser-computed bounding boxes.
  */
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
 import type { ChatSubscribeServerFrame } from "@traycer/protocol/host/agent/gui/subscribe";
 import { HostStreamConnection, StreamConnectionStateStore } from "@/host/stream-connection";
@@ -149,22 +149,17 @@ declare global {
 }
 
 export function LayoutReproView(): ReactElement {
-  // `callbacks` is captured synchronously during render (via the `useState`
-  // lazy initializer below, when `ChatView`'s own effect calls `openChat`),
-  // but registering `window.__layoutRepro` and pushing the first snapshot
-  // are real side effects on a value OUTSIDE this component — those belong
-  // in an effect, not the render body. Child effects (ChatView's `useChat`)
-  // commit before this component's own effect, so `callbacksRef.current` is
-  // already populated by the time it runs.
-  const callbacksRef = useRef<ChatStreamCallbacks | null>(null);
-  const [connection] = useState<HostStreamConnection>(() =>
-    createFakeConnection((callbacks) => {
-      callbacksRef.current = callbacks;
-    }),
-  );
+  // `openChat` is called from `ChatView`'s own `useChat` effect (a CHILD
+  // effect, committed before this component's), which is where the fake
+  // connection actually hands back its callbacks — asynchronous relative to
+  // this component's render, so captured via a state setter (safe to call
+  // from anywhere) rather than a ref (flagged as accessed-during-render by
+  // static analysis, since the closure that calls it is itself created
+  // inside the `useState` lazy initializer, which runs during render).
+  const [callbacks, setCallbacks] = useState<ChatStreamCallbacks | null>(null);
+  const [connection] = useState<HostStreamConnection>(() => createFakeConnection(setCallbacks));
 
   useEffect(() => {
-    const callbacks = callbacksRef.current;
     if (callbacks === null) return;
     window.__layoutRepro = {
       ready: true,
@@ -174,7 +169,7 @@ export function LayoutReproView(): ReactElement {
     return () => {
       delete window.__layoutRepro;
     };
-  }, []);
+  }, [callbacks]);
 
   return (
     <StreamConnectionProvider connection={connection}>
