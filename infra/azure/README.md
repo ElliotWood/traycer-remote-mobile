@@ -313,6 +313,124 @@ just to open.
 - Ingestion lag between `logger` and a queryable Log Analytics row is
   minutes. The alert rule's floor is `PT5M`. A6 is not a real-time pager.
 
+## Agent execution — the thing the VM exists for
+
+Everything above makes the box *serve* Traycer. None of it makes the box
+*run an agent*, and for a long time it could not: there was no agent harness
+installed on the VM at all. `command -v claude` returned nothing.
+
+**Every check in this README passed the whole time.** `systemctl is-active`
+said `active`, the health probe was green, `/rpc` and `/stream` answered,
+the mobile client listed epics, and the host's own
+`agent.listHarnessModels` returned a full Claude catalogue
+(`default`/`opus[1m]`/`sonnet`/`haiku`) — because that catalogue is a static
+list the host ships, **not a probe of anything installed**. It is the same
+shape of defect as the catch-all `200` recorded above: a check that passes
+while measuring nothing.
+
+`infra/azure/scripts/provision-agent-runtime.sh` closes it, is wired into
+`bootstrap.sh`'s last phase (so a rebuild gets it), and is re-runnable
+standalone (so an existing box recovers without one).
+
+### What is automatic on a rebuild, and what is not
+
+| Piece | Rebuild gets it? |
+|---|---|
+| Claude Code harness installed to `/usr/local` | yes — `provision-agent-runtime.sh` |
+| Harness on the **host process's** PATH | yes — `/usr/local/bin` is in it |
+| Node 22 (see below) | yes — `bootstrap.sh` |
+| Per-tenant agent work root (`$HOME/work`) | yes |
+| **Claude subscription credential** | **no — a human must approve an OAuth grant** |
+
+The credential is the one thing that cannot be captured here, and it is not
+an oversight: it is an OAuth grant against a Claude subscription. **No token,
+credential, or `.credentials.json` belongs in this repo**, and none is
+committed. Supply it out of band using the procedure the script prints on
+failure (reproduced under "Authenticating the harness" below).
+
+### Install to `/usr/local`, and why the PATH that matters is the host's
+
+npm's default prefix on this image is `/usr` (apt's territory), so the
+harness is installed with `--prefix /usr/local`. The reason that works is
+read from the live host process rather than assumed —
+`/proc/<host-pid>/environ` gives:
+
+```
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
+HOME=/srv/traycer/tenants/elliot
+USER=traycer
+```
+
+The harness is spawned *by that process*, so that is the only PATH that
+decides whether it is found. A login-shell PATH would prove nothing here:
+the `traycer` user's shell is `/usr/sbin/nologin` and it never gets one.
+
+### Node 22, not 20 — a fixed bug, not a version bump
+
+`bootstrap.sh` used to install Node 20 with the justification "matches the
+CLI's documented floor". The CLI does declare 20 — and then breaks on it.
+Every CLI command that talks to the host over its WebSocket RPC failed:
+
+```
+$ traycer agent list-harnesses
+error: No global `WebSocket` available for the host transport on this runtime. [code=E_UNEXPECTED]
+```
+
+Node 20 keeps the global `WebSocket` behind `--experimental-websocket`.
+Moving to 22 fixed it; the same commands were re-run unflagged afterwards to
+confirm. `NODE_OPTIONS=--experimental-websocket` was the alternative and was
+rejected — that flag is removed in later Node majors, which would convert a
+fixed bug into one that silently returns on the next upgrade.
+
+The guard tests the **major version**, not presence: `command -v node` is
+satisfied by exactly the Node 20 that is broken, so a presence check would
+skip the fix on every already-deployed box.
+
+Neither the Traycer host nor the Claude harness is affected by the system
+Node version — both ship self-contained binaries, which is precisely why the
+host ran fine on Node 20 while the CLI could not. System Node serves the
+npm-installed `traycer` CLI, the ws-deflate relay, and its probe.
+
+### Authenticating the harness (out of band, needs a human)
+
+There is no SSH to this VM and no browser on it, so the flow is driven
+through a tmux pty that survives between `az vm run-command` invocations:
+
+```sh
+tmux new-session -d -s claudeauth \
+  "sudo -u traycer env HOME=/srv/traycer/tenants/elliot TERM=xterm-256color \
+     /usr/local/bin/claude setup-token; sleep 3600"
+tmux capture-pane -p -J -t claudeauth     # read the sign-in URL out of the pane
+# a human opens that URL, signs in as the account whose capacity this box
+# should consume, approves, and reads back the code:
+tmux send-keys -t claudeauth '<code>' Enter
+tmux capture-pane -p -J -t claudeauth     # confirm it took
+```
+
+Whichever account authorises here becomes the VM's capacity — this is a
+deliberate choice, not a detail. Re-run `provision-agent-runtime.sh`
+afterwards to verify.
+
+### What the verification actually proves
+
+The script's check is deliberately **not** "is the binary present" and
+**not** "what version does it print" — a version string proves a file
+downloaded. It runs a real inference round-trip, as the real OS user, with
+the real per-tenant HOME:
+
+```sh
+sudo -u traycer env HOME=/srv/traycer/tenants/elliot \
+  /usr/local/bin/claude -p 'Reply with the single word: ready'
+```
+
+`sudo -u` is not decoration: root can run the binary while the `traycer`
+user may not, and root is not who runs agents.
+
+**The negative case was run first.** With the harness installed but not yet
+authenticated, the check fails and prints the recovery procedure — confirmed
+live before the credential existed, so the passing case is worth something.
+That ordering is the point: a gate never observed failing is not evidence.
+
 ## What's not done yet
 
 - **The static frontend bundle is not deployed.** `bootstrap.sh` creates

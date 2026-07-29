@@ -38,9 +38,42 @@ apt-get install -y --no-install-recommends \
 # HOME (A3's job, not this script's - see the module doc above). Installed
 # system-wide via NodeSource rather than per-tenant so every tenant's
 # installer finds the same runtime without re-downloading it N times.
-if ! command -v node >/dev/null 2>&1; then
-  echo "bootstrap: installing Node.js 20.x (matches the CLI's documented floor - see clients/traycer-cli/package.json's engines.node)"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+#
+# 22, NOT 20, and the difference is load-bearing rather than a version bump
+# for its own sake. This line used to install 20.x, with the justification
+# "matches the CLI's documented floor (clients/traycer-cli/package.json's
+# engines.node)". The CLI does declare 20 - and then breaks on it. Every
+# CLI command that talks to the host over its WebSocket RPC fails on Node 20
+# with:
+#
+#   error: No global `WebSocket` available for the host transport on this
+#   runtime. [code=E_UNEXPECTED]
+#
+# because Node 20 keeps the global `WebSocket` behind
+# `--experimental-websocket`. Observed live on this VM (`traycer agent
+# list-harnesses`, `agent list`, `agent create` - all of it), fixed by moving
+# to 22, where the global is on by default. Confirmed by re-running the same
+# commands unflagged afterwards.
+#
+# `--experimental-websocket` via NODE_OPTIONS was the alternative and was
+# rejected: the flag is removed in later Node majors, so it converts a fixed
+# bug into one that returns silently on the next upgrade.
+#
+# The HOST process is unaffected either way - it ships its own bundled
+# runtime (.traycer/host/install/host-runtime/traycer-host, a self-contained
+# binary), which is why the host ran fine on Node 20 while the CLI could not.
+# So is the Claude harness: also a self-contained native binary. System Node
+# here serves the npm-installed `traycer` CLI, the ws-deflate relay, and its
+# probe.
+#
+# The guard tests the MAJOR VERSION, not mere presence. `command -v node`
+# alone would have been satisfied by exactly the Node 20 that is broken here
+# - so on the already-deployed box (and on any image that ships an older
+# node) a presence check silently skips the fix and leaves the CLI dead.
+node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "${node_major}" -lt 22 ]; then
+  echo "bootstrap: installing Node.js 22.x (found major '${node_major}')"
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y --no-install-recommends nodejs
 fi
 
@@ -344,5 +377,20 @@ systemctl enable --now traycer-ws-deflate.service || \
 # health probe: a probe that only runs once someone remembers to enable it
 # is not monitoring.
 systemctl enable --now traycer-relay-probe.timer
+
+echo "bootstrap: provisioning the agent runtime"
+# The phase that makes this box able to RUN agents rather than only to serve
+# the host and the mobile client - see provision-agent-runtime.sh's own
+# header for what was actually missing and why none of the existing checks
+# noticed. Ordered last because it is the only phase that makes a real
+# outbound API call, so it should not sit in front of ingress and TLS.
+#
+# `|| true`-guarded for the same reason the deploy-key phase is: a rebuilt VM
+# has no Claude credential yet (it cannot - the credential is an OAuth grant
+# a human must approve), the script reports that loudly on stderr, and
+# aborting cloud-init over an expected first-boot state would take down
+# everything provisioned above it.
+/usr/local/bin/provision-agent-runtime.sh || \
+  echo "bootstrap: agent runtime not fully provisioned - see the message above; the box will serve the mobile client but cannot execute an agent turn until it is resolved" >&2
 
 echo "bootstrap: done"
