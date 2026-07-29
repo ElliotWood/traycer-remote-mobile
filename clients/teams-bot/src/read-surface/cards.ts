@@ -167,3 +167,34 @@ export function buildBridgeUnavailableCard(
     textBlock("Try again in a moment.", { isSubtle: true }),
   ]);
 }
+
+export function buildHelpCard(): Attachment {
+  return card([
+    textBlock("Traycer Remote", { weight: "bolder" }),
+    textBlock("epics — list your epics", {}),
+    textBlock("epic <id> — select an epic for this chat", {}),
+    textBlock("fleet — list agents in the selected epic", {}),
+    textBlock("chat <id> — show one chat's status", {}),
+  ]);
+}
+
+export function buildEpicBoundCard(epicId: string): Attachment {
+  return card([
+    textBlock("Epic selected.", { weight: "bolder" }),
+    textBlock(`${epicId} — reply "fleet" to see its agents.`, {
+      isSubtle: true,
+    }),
+  ]);
+}
+
+/**
+ * Shown when no verified principal could be obtained for the turn. This is
+ * a REFUSAL, not a degraded mode — see `principal-source.ts` for why an
+ * unverified identity is never substituted here.
+ */
+export function buildIdentityUnavailableCard(reason: string): Attachment {
+  return card([
+    textBlock("Couldn't verify who you are.", { weight: "bolder" }),
+    textBlock(reason, { isSubtle: true }),
+  ]);
+}
