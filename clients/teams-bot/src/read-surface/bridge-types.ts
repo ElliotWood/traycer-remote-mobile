@@ -41,7 +41,11 @@ export type PendingInterview = z.infer<typeof pendingInterviewSchema>;
 export const chatStatusSchema = z.object({
   chatId: z.string(),
   title: z.string().nullable(),
-  runStatus: z.union([z.literal("idle"), z.literal("running"), z.literal("stopping")]),
+  runStatus: z.union([
+    z.literal("idle"),
+    z.literal("running"),
+    z.literal("stopping"),
+  ]),
   pendingApprovals: z.array(pendingApprovalSchema),
   pendingInterviews: z.array(pendingInterviewSchema),
   connected: z.boolean(),

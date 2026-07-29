@@ -1,6 +1,9 @@
 import type { IdentityRegistry } from "@traycer-clients/shared/identity-registry/registry";
 import { buildTenantEnvironment } from "@traycer-clients/shared/identity-registry/tenant-environment";
-import type { RefusalReason, VerifiedPrincipal } from "@traycer-clients/shared/identity-registry/types";
+import type {
+  RefusalReason,
+  VerifiedPrincipal,
+} from "@traycer-clients/shared/identity-registry/types";
 import {
   getChatStatus,
   listAgents,
@@ -34,8 +37,7 @@ export type FleetResult =
   | ReadSurfaceFailure;
 
 export type ChatResult =
-  | { readonly kind: "ok"; readonly status: ChatStatus }
-  | ReadSurfaceFailure;
+  { readonly kind: "ok"; readonly status: ChatStatus } | ReadSurfaceFailure;
 
 export type EpicListResult =
   | { readonly kind: "ok"; readonly epics: readonly EpicSummary[] }
@@ -73,10 +75,16 @@ function buildBridgeEnv(
   });
 }
 
-function toReadSurfaceFailure(
-  result: { readonly kind: "failed"; readonly reason: BridgeCliFailureReason; readonly detail: string },
-): ReadSurfaceFailure {
-  return { kind: "bridge_unavailable", reason: result.reason, detail: result.detail };
+function toReadSurfaceFailure(result: {
+  readonly kind: "failed";
+  readonly reason: BridgeCliFailureReason;
+  readonly detail: string;
+}): ReadSurfaceFailure {
+  return {
+    kind: "bridge_unavailable",
+    reason: result.reason,
+    detail: result.detail,
+  };
 }
 
 export async function fetchFleet(

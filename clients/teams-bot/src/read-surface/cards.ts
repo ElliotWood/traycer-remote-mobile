@@ -12,7 +12,8 @@ import type { BridgeCliFailureReason } from "./bridge-cli";
  * actions at all — T3's scope).
  */
 
-const ADAPTIVE_CARD_SCHEMA = "http://adaptivecards.io/schemas/adaptive-card.json";
+const ADAPTIVE_CARD_SCHEMA =
+  "http://adaptivecards.io/schemas/adaptive-card.json";
 const ADAPTIVE_CARD_VERSION = "1.5";
 
 function card(body: readonly unknown[]): Attachment {
@@ -24,22 +25,38 @@ function card(body: readonly unknown[]): Attachment {
   });
 }
 
-function textBlock(
-  text: string,
-  options: { readonly weight?: "bolder" | "default"; readonly wrap?: boolean; readonly isSubtle?: boolean } = {},
-): unknown {
+interface TextBlockOptions {
+  readonly weight: "bolder" | "default";
+  readonly wrap: boolean;
+  readonly isSubtle: boolean;
+}
+
+const DEFAULT_TEXT_BLOCK_OPTIONS: TextBlockOptions = {
+  weight: "default",
+  wrap: true,
+  isSubtle: false,
+};
+
+function textBlock(text: string, options: Partial<TextBlockOptions>): unknown {
+  const resolved: TextBlockOptions = {
+    ...DEFAULT_TEXT_BLOCK_OPTIONS,
+    ...options,
+  };
   return {
     type: "TextBlock",
     text,
-    wrap: options.wrap ?? true,
-    weight: options.weight ?? "default",
-    isSubtle: options.isSubtle ?? false,
+    wrap: resolved.wrap,
+    weight: resolved.weight,
+    isSubtle: resolved.isSubtle,
   };
 }
 
 export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
   if (agents.length === 0) {
-    return card([textBlock("Fleet", { weight: "bolder" }), textBlock("No agents in this epic yet.", { isSubtle: true })]);
+    return card([
+      textBlock("Fleet", { weight: "bolder" }),
+      textBlock("No agents in this epic yet.", { isSubtle: true }),
+    ]);
   }
   const rows = agents.map((agent) => ({
     type: "ColumnSet",
@@ -79,13 +96,21 @@ export function buildChatCard(status: ChatStatus): Attachment {
   }
 
   const summaryLine = `${status.runStatus} · ${status.pendingApprovals.length} pending approval(s) · ${status.pendingInterviews.length} pending interview(s)`;
-  const body: unknown[] = [textBlock(status.title ?? status.chatId, { weight: "bolder" }), textBlock(summaryLine, { isSubtle: true })];
+  const body: unknown[] = [
+    textBlock(status.title ?? status.chatId, { weight: "bolder" }),
+    textBlock(summaryLine, { isSubtle: true }),
+  ];
 
   for (const approval of status.pendingApprovals) {
-    body.push(textBlock(`Pending approval: ${approval.toolName} — ${approval.description}`));
+    body.push(
+      textBlock(
+        `Pending approval: ${approval.toolName} — ${approval.description}`,
+        {},
+      ),
+    );
   }
   for (const interview of status.pendingInterviews) {
-    body.push(textBlock(`Pending interview (block ${interview.blockId})`));
+    body.push(textBlock(`Pending interview (block ${interview.blockId})`, {}));
   }
   return card(body);
 }
@@ -97,29 +122,45 @@ export function buildChatCard(status: ChatStatus): Attachment {
  */
 export function buildEpicPickerCard(epics: readonly EpicSummary[]): Attachment {
   if (epics.length === 0) {
-    return card([textBlock("No epics found for your account.", { isSubtle: true })]);
+    return card([
+      textBlock("No epics found for your account.", { isSubtle: true }),
+    ]);
   }
-  const lines = epics.map((epic) => textBlock(`${epic.title ?? epic.epicId} — reply "epic ${epic.epicId}" to select`));
+  const lines = epics.map((epic) =>
+    textBlock(
+      `${epic.title ?? epic.epicId} — reply "epic ${epic.epicId}" to select`,
+      {},
+    ),
+  );
   return card([textBlock("Pick an epic", { weight: "bolder" }), ...lines]);
 }
 
 export function buildEpicNotBoundCard(): Attachment {
   return card([
     textBlock("No epic selected for this chat yet.", { weight: "bolder" }),
-    textBlock('Reply "epics" to see your epics, then "epic <id>" to select one.', { isSubtle: true }),
+    textBlock(
+      'Reply "epics" to see your epics, then "epic <id>" to select one.',
+      { isSubtle: true },
+    ),
   ]);
 }
 
 export function buildPrincipalRefusedCard(reason: RefusalReason): Attachment {
   return card([
     textBlock("Access denied.", { weight: "bolder" }),
-    textBlock(`Your account isn't mapped to a Traycer host (${reason}). Contact your administrator.`, {
-      isSubtle: true,
-    }),
+    textBlock(
+      `Your account isn't mapped to a Traycer host (${reason}). Contact your administrator.`,
+      {
+        isSubtle: true,
+      },
+    ),
   ]);
 }
 
-export function buildBridgeUnavailableCard(reason: BridgeCliFailureReason, detail: string): Attachment {
+export function buildBridgeUnavailableCard(
+  reason: BridgeCliFailureReason,
+  detail: string,
+): Attachment {
   return card([
     textBlock("Couldn't reach your Traycer host.", { weight: "bolder" }),
     textBlock(`${reason}: ${detail}`, { isSubtle: true }),

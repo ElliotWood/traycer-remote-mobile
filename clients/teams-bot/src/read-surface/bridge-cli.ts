@@ -20,9 +20,7 @@ import { nodeOneShotSpawnFn, type OneShotSpawnFn } from "./one-shot-spawn";
  */
 
 export type BridgeCliFailureReason =
-  | "spawn_timed_out"
-  | "nonzero_exit"
-  | "malformed_output";
+  "spawn_timed_out" | "nonzero_exit" | "malformed_output";
 
 export type BridgeCliResult<T> =
   | { readonly kind: "ok"; readonly value: T }

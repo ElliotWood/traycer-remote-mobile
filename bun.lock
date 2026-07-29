@@ -296,6 +296,7 @@
         "traycer-teams-bot": "./src/index.ts",
       },
       "dependencies": {
+        "@microsoft/agents-activity": "^1.7.1",
         "@microsoft/agents-hosting": "^1.7.1",
         "jsonwebtoken": "^9.0.3",
         "zod": "catalog:",
