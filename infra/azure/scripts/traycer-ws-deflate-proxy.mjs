@@ -29,13 +29,19 @@ import { WebSocketServer, WebSocket } from "ws";
 const LISTEN_PORT = Number(process.argv[2] ?? 45080);
 const PID_FILE = process.argv[3] ?? "/srv/traycer/tenants/elliot/.traycer/host/pid.json";
 
-function hostOrigin() {
+function hostPort() {
   // Per-connection, not cached: the host binds a fresh ephemeral port on every
   // start, and a cached value is correct only until the next restart.
   const raw = JSON.parse(readFileSync(PID_FILE, "utf8"));
-  const u = new URL(raw.websocketUrl);
-  return `ws://127.0.0.1:${u.port}`;
+  return new URL(raw.websocketUrl).port;
 }
+
+// The host enforces a loopback Origin and rejects anything else with 403.
+// It must be the HTTP origin, not the ws:// URL — sending `ws://127.0.0.1:port`
+// here 403'd every connection and broke epic loading entirely. The working
+// nginx config used `http://127.0.0.1`, and this mirrors it deliberately.
+const httpOrigin = (port) => `http://127.0.0.1:${port}`;
+const wsUrl = (port, path) => `ws://127.0.0.1:${port}${path}`;
 
 const server = createServer((_req, res) => {
   res.writeHead(426, { "content-type": "text/plain" });
@@ -56,10 +62,11 @@ const wss = new WebSocketServer({
 wss.on("connection", (client, req) => {
   let upstream;
   try {
-    upstream = new WebSocket(`${hostOrigin()}${req.url}`, {
+    const port = hostPort();
+    upstream = new WebSocket(wsUrl(port, req.url), {
       // Loopback leg: compression here would cost CPU and save nothing.
       perMessageDeflate: false,
-      headers: { origin: hostOrigin() },
+      headers: { origin: httpOrigin(port) },
     });
   } catch (err) {
     console.error(`[ws-deflate] cannot resolve host: ${String(err)}`);
