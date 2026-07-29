@@ -141,8 +141,25 @@ rm -f /etc/nginx/sites-enabled/default
 # limit_req_zone must live at the http{} block level, not inside server{} -
 # a conf.d drop-in loaded before sites-enabled (nginx.conf's default
 # `include /etc/nginx/conf.d/*.conf;` sits above the sites-enabled include).
+#
+# NOTE for anyone adding a file here: `conf.d/*.conf` is globbed, exactly like
+# `sites-enabled/*`. A backup left beside this file (`*.bak`, `*.orig`) is
+# LOADED, and a duplicated `limit_req_zone` fails the config with a message
+# that names neither the duplicate nor the backup. Put backups outside the
+# globbed directory. This trap has already cost one repair cycle on the
+# sites-enabled side.
 cat > /etc/nginx/conf.d/traycer-limits.conf <<'TRAYCER_NGINX_LIMITS_EOF'
 limit_req_zone $binary_remote_addr zone=traycer_ingress:10m rate=10r/s;
+
+# Separate, tighter budget for the authn proxy. Deliberately NOT sharing
+# `traycer_ingress`: that zone sizes for a browser loading an app (many asset
+# requests in a burst), whereas the authn path's real traffic is a device-code
+# poll every ~5s plus an occasional /user or /refresh — call it 0.2 r/s per
+# client. 5 r/s is ~25x real usage per source address, so it cannot inconvenience
+# a genuine signer-in (or several behind one NAT) while halving the relay budget
+# an abuser gets. The endpoint allowlist below is the primary control; this is
+# the second layer.
+limit_req_zone $binary_remote_addr zone=traycer_authn:10m rate=5r/s;
 TRAYCER_NGINX_LIMITS_EOF
 
 # client_max_body_size and limit_req live INSIDE this server block (not the
@@ -199,11 +216,21 @@ if certbot --nginx -d "${TRAYCER_PUBLIC_HOSTNAME}" -m "${TRAYCER_ACME_EMAIL}" \
   # nothing else is quietly succeeding.
   #
   # Post-deploy acceptance test (infra/azure/README.md carries this too):
-  #   /                     200 text/html   (once a bundle is deployed)
-  #   /assets/<real>.js     200 application/javascript
-  #   /authn/api/v3/user    401 JSON        <- proves server-side proxying
-  #   /rpc                  502 + reason    <- honest until A1/A3 land
-  #   /nonexistent-xyz      404             <- proves the catch-all is gone
+  #   /                        200 text/html   (once a bundle is deployed)
+  #   /assets/<real>.js        200 application/javascript
+  #   /authn/api/v3/user       401 JSON        <- proves server-side proxying
+  #   /rpc                     502 + reason    <- honest until A1/A3 land
+  #   /nonexistent-xyz         404             <- proves the catch-all is gone
+  #   /authn/api/v3/auth/me    404             <- proves /authn is an ALLOWLIST,
+  #                                               not a relay. Same reasoning as
+  #                                               the row above: the positive
+  #                                               authn row proves the route
+  #                                               exists, and only this negative
+  #                                               one proves every OTHER authn
+  #                                               path is refused. A real authn
+  #                                               path is used deliberately -
+  #                                               a nonsense one would 404 even
+  #                                               through an open relay.
   cat > /etc/nginx/sites-available/traycer <<'TRAYCER_NGINX_TLS_EOF'
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 
@@ -235,7 +262,27 @@ server {
     # and stayed down, taking the whole site with it. A variable defers
     # resolution to request time, so a DNS blip degrades one request instead
     # of bricking the server across a reboot.
-    location ~ ^/authn/(.*)$ {
+    # ENDPOINT ALLOWLIST, not a pass-through. This was `^/authn/(.*)$`, which
+    # made the VM an open relay: anyone on the internet could reach ANY
+    # authn.traycer.ai path through our address. That is the same shape as a
+    # vector already closed one layer down (unauthenticated input becoming
+    # uncapped outbound load on a third party), and it is our IP that gets
+    # blocked if abused.
+    #
+    # These four are exactly what the PWA needs, verified against the client
+    # rather than guessed:
+    #   api/v3/auth/device/authorize   startDeviceAuthorization  (device-auth.ts)
+    #   api/v3/auth/device/token       pollDeviceToken           (device-auth.ts)
+    #   api/v3/user                    validateAuthTokenIdentity (auth-validation.ts)
+    #   api/v3/auth/refresh            refreshOnceAbortable      (auth-validation.ts)
+    # `api/v3/auth/exchange-code` is deliberately ABSENT: it is the desktop
+    # shell's PKCE callback and the mobile client never calls it.
+    #
+    # Anchored with `$` so no suffix can be appended, and the alternatives are
+    # exact — `api/v3/user` will not match `api/v3/users` or `api/v3/user/../x`.
+    location ~ ^/authn/(api/v3/user|api/v3/auth/refresh|api/v3/auth/device/authorize|api/v3/auth/device/token)$ {
+        limit_req zone=traycer_authn burst=10 nodelay;
+        limit_req_status 429;
         set $authn_host "authn.traycer.ai";
         proxy_pass https://$authn_host/$1$is_args$args;
         proxy_set_header Host $authn_host;
@@ -247,6 +294,17 @@ server {
         proxy_hide_header Access-Control-Allow-Headers;
         proxy_hide_header Access-Control-Expose-Headers;
         proxy_hide_header Access-Control-Max-Age;
+    }
+
+    # Everything else under /authn/ is refused rather than relayed.
+    #
+    # A PLAIN PREFIX, not `^~`. This is load-bearing and easy to "tidy" into a
+    # bug: nginx checks regex locations BEFORE a plain prefix match, but a
+    # prefix marked `^~` SUPPRESSES regex checking entirely. Writing
+    # `location ^~ /authn/` here would therefore win over the allowlist above
+    # and 404 every legitimate sign-in.
+    location /authn/ {
+        return 404;
     }
 
     # `traycer_host` is generated by traycer-nginx-upstream.sh from the
