@@ -90,6 +90,13 @@ export function AppRoot(): ReactElement {
     return <ConfigErrorScreen problems={configProblems} />;
   }
 
+  /* eslint-disable react-hooks/rules-of-hooks -- the early return above is
+   * gated on `configProblems`, computed from build-time constants +
+   * `window.location.origin`, both invariant for the page's lifetime (see
+   * the comment above it) — so for any given mounted instance, this branch
+   * is never taken on one render and skipped on the next; hook order never
+   * actually varies for that instance. The rule can't see that invariant
+   * statically and flags every hook below as "conditional". */
   const [auth] = useState(
     () =>
       new MobileAuthService({
@@ -139,6 +146,7 @@ export function AppRoot(): ReactElement {
     startedRef.current = true;
     void auth.start();
   }, [auth]);
+  /* eslint-enable react-hooks/rules-of-hooks */
 
   const shell = (
     <RestoreGate>

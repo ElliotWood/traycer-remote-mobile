@@ -15,7 +15,7 @@
  * `window` for a headless Playwright driver (`tests/layout/measure.mjs`) to
  * push snapshots and read real, browser-computed bounding boxes.
  */
-import { useEffect, useRef, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
 import type { ChatSubscribeServerFrame } from "@traycer/protocol/host/agent/gui/subscribe";
 import { HostStreamConnection, StreamConnectionStateStore } from "@/host/stream-connection";
@@ -149,25 +149,35 @@ declare global {
 }
 
 export function LayoutReproView(): ReactElement {
-  const connectionRef = useRef<HostStreamConnection | null>(null);
-  if (connectionRef.current === null) {
-    connectionRef.current = createFakeConnection((callbacks) => {
-      window.__layoutRepro = {
-        ready: true,
-        setScenario: (scenario: ReproScenario) => callbacks.onSnapshot(snapshotFrame(scenario)),
-      };
-      callbacks.onSnapshot(snapshotFrame({ interviews: [2] }));
-    });
-  }
+  // `callbacks` is captured synchronously during render (via the `useState`
+  // lazy initializer below, when `ChatView`'s own effect calls `openChat`),
+  // but registering `window.__layoutRepro` and pushing the first snapshot
+  // are real side effects on a value OUTSIDE this component — those belong
+  // in an effect, not the render body. Child effects (ChatView's `useChat`)
+  // commit before this component's own effect, so `callbacksRef.current` is
+  // already populated by the time it runs.
+  const callbacksRef = useRef<ChatStreamCallbacks | null>(null);
+  const [connection] = useState<HostStreamConnection>(() =>
+    createFakeConnection((callbacks) => {
+      callbacksRef.current = callbacks;
+    }),
+  );
 
   useEffect(() => {
+    const callbacks = callbacksRef.current;
+    if (callbacks === null) return;
+    window.__layoutRepro = {
+      ready: true,
+      setScenario: (scenario: ReproScenario) => callbacks.onSnapshot(snapshotFrame(scenario)),
+    };
+    callbacks.onSnapshot(snapshotFrame({ interviews: [2] }));
     return () => {
       delete window.__layoutRepro;
     };
   }, []);
 
   return (
-    <StreamConnectionProvider connection={connectionRef.current}>
+    <StreamConnectionProvider connection={connection}>
       <ChatView epicId={EPIC_ID} chatId={CHAT_ID} initialTitle={null} onTitleChange={() => {}} />
     </StreamConnectionProvider>
   );
