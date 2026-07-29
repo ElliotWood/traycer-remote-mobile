@@ -19,8 +19,18 @@ function threeTenantRegistry(): IdentityRegistry {
   return IdentityRegistry.fromConfig(
     {
       tenants: [
-        { home: "/srv/traycer/alice", hostId: "host-alice", entraOid: ALICE_OID },
-        { home: "/srv/traycer/bob", hostId: "host-bob", entraOid: BOB_OID },
+        {
+          home: "/srv/traycer/alice",
+          hostId: "host-alice",
+          entraOid: ALICE_OID,
+          traycerUserId: "traycer-user-alice",
+        },
+        {
+          home: "/srv/traycer/bob",
+          hostId: "host-bob",
+          entraOid: BOB_OID,
+          traycerUserId: "traycer-user-bob",
+        },
         {
           home: "/srv/traycer/carol",
           hostId: "host-carol",
@@ -80,30 +90,78 @@ describe("IdentityRegistry.resolveTenant — forward resolution", () => {
   });
 });
 
-describe("IdentityRegistry.resolveTenant — kind: traycer refuses unconditionally", () => {
-  it("refuses a traycer principal even when a matching traycerUserId is configured", () => {
-    const registry = threeTenantRegistry();
-    const principal: VerifiedPrincipal = {
-      kind: "traycer",
-      userId: "traycer-user-carol" as VerifiedTraycerUserId,
-    };
-    const result = registry.resolveTenant(principal);
-    expect(result).toEqual({
-      kind: "refused",
-      reason: "principal_kind_unsupported",
-    });
+function traycerPrincipal(userId: string): VerifiedPrincipal {
+  return { kind: "traycer", userId: userId as VerifiedTraycerUserId };
+}
+
+describe("IdentityRegistry.resolveTenant — kind: traycer (browser/PWA routing path)", () => {
+  // Mirrors the entra matrix exactly. This kind previously refused
+  // unconditionally; it resolves now that `verifyTraycerPrincipal` exists as
+  // a real mint point. The same anti-first-entry / anti-last-entry
+  // discipline applies — a router that always returns entries[0] must fail
+  // here too, not just on the entra path.
+  it("resolves traycer user A to host A", () => {
+    const result = threeTenantRegistry().resolveTenant(
+      traycerPrincipal("traycer-user-alice"),
+    );
+    expect(result.kind).toBe("resolved");
+    if (result.kind !== "resolved") return;
+    expect(result.tenant.hostId).toBe("host-alice");
   });
 
-  it("refuses a traycer principal with an unmapped userId too — same refusal reason either way", () => {
+  it("resolves traycer user B to host B, not host A — kills `return entries[0]`", () => {
+    const result = threeTenantRegistry().resolveTenant(
+      traycerPrincipal("traycer-user-bob"),
+    );
+    expect(result.kind).toBe("resolved");
+    if (result.kind !== "resolved") return;
+    expect(result.tenant.hostId).toBe("host-bob");
+    expect(result.tenant.hostId).not.toBe("host-alice");
+  });
+
+  it("resolves traycer user C to host C — with A above, kills `return entries[last]`", () => {
+    const result = threeTenantRegistry().resolveTenant(
+      traycerPrincipal("traycer-user-carol"),
+    );
+    expect(result.kind).toBe("resolved");
+    if (result.kind !== "resolved") return;
+    expect(result.tenant.hostId).toBe("host-carol");
+  });
+
+  it("two distinct traycer identities resolve to distinct homes AND distinct hosts", () => {
     const registry = threeTenantRegistry();
-    const principal: VerifiedPrincipal = {
-      kind: "traycer",
-      userId: "traycer-user-nobody" as VerifiedTraycerUserId,
-    };
-    const result = registry.resolveTenant(principal);
-    expect(result.kind).toBe("refused");
-    if (result.kind !== "refused") return;
-    expect(result.reason).toBe("principal_kind_unsupported");
+    const a = registry.resolveTenant(traycerPrincipal("traycer-user-alice"));
+    const b = registry.resolveTenant(traycerPrincipal("traycer-user-bob"));
+    if (a.kind !== "resolved" || b.kind !== "resolved") throw new Error("expected resolved");
+    expect(a.tenant.home).not.toBe(b.tenant.home);
+    expect(a.tenant.hostId).not.toBe(b.tenant.hostId);
+  });
+
+  it("refuses a well-formed but unmapped traycer userId — no default, no fallback", () => {
+    const result = threeTenantRegistry().resolveTenant(
+      traycerPrincipal("traycer-user-nobody"),
+    );
+    expect(result).toEqual({ kind: "refused", reason: "unmapped_principal" });
+  });
+
+  it("refuses an empty traycer userId forced through by a cast", () => {
+    const result = threeTenantRegistry().resolveTenant(traycerPrincipal(""));
+    expect(result).toEqual({ kind: "refused", reason: "malformed_principal" });
+  });
+
+  it("prototype-pollution-shaped traycer userIds refuse, not a spurious hit", () => {
+    const registry = threeTenantRegistry();
+    for (const shape of ["__proto__", "constructor", "toString"]) {
+      const result = registry.resolveTenant(traycerPrincipal(shape));
+      expect(result).toEqual({ kind: "refused", reason: "unmapped_principal" });
+    }
+  });
+
+  it("an entra oid presented as a traycer userId does not resolve — the two alias namespaces are separate", () => {
+    // Cross-namespace confusion probe: alice's entra oid must not resolve
+    // through the traycer lookup, or the two alias tables are effectively one.
+    const result = threeTenantRegistry().resolveTenant(traycerPrincipal(ALICE_OID));
+    expect(result).toEqual({ kind: "refused", reason: "unmapped_principal" });
   });
 });
 

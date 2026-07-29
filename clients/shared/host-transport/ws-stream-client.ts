@@ -241,7 +241,19 @@ export class WsStreamClient<Registry extends VersionedStreamRpcRegistry> {
     }
     this.closed = true;
     this.closedReason = reason;
-    console.info(
+    // `console.info`/`console.debug`/`console.log` all write to Node's
+    // stdout (Node's `Console` implementation, unlike browsers, does not
+    // route `info`/`debug` to a separate stream). `console.error` used
+    // here instead: this file is shared with `clients/remote-bridge`,
+    // which reserves stdout for command payloads only (every diagnostic
+    // goes to stderr, so a channel adapter parsing stdout as JSON never
+    // hits a non-JSON line) - `console.info` on this line broke that
+    // contract on every `close()` call, in every command. gui-app and the
+    // CLI have no such stdout contract, so routing to stderr is a
+    // severity/stream change only for them, not a behavior change (this
+    // was already a Console-API log line, not read by anything downstream
+    // of stdout in either).
+    console.error(
       `[stream] WsStreamClient closed (client=${this.instanceId}, reason=${reason}, sessions=${this.ownedSessions.size})`,
     );
     for (const session of Array.from(this.ownedSessions)) {
@@ -348,7 +360,11 @@ export class WsStreamClient<Registry extends VersionedStreamRpcRegistry> {
     }
     // Wake-recovery trace (piped to the desktop log via the renderer-console
     // bridge): proves the wake signal arrived and how many sessions re-dialed.
-    console.debug(
+    // `console.error` not `.debug`/`.info`/`.log`: this file is shared with
+    // `clients/remote-bridge`, whose stdout is reserved for command payloads
+    // only - `console.debug` writes to stdout in Node (unlike a browser),
+    // which broke that contract on every wake-recovery cycle.
+    console.error(
       `[stream] reconnectAll reason=${reason} sessions=${this.ownedSessions.size}`,
     );
     for (const session of Array.from(this.ownedSessions)) {
@@ -632,7 +648,7 @@ class StreamSession<
     const selected = this.config.endpoint();
     if (selected === null || selected.websocketUrl === null) {
       this.transitionTo("reconnecting", null);
-      this.scheduleReconnect();
+      this.scheduleReconnect(false);
       return;
     }
 
@@ -646,7 +662,7 @@ class StreamSession<
     } catch (cause) {
       if (cause instanceof MissingBearerTokenForOpenFrameError) {
         this.transitionTo("reconnecting", null);
-        this.scheduleReconnect();
+        this.scheduleReconnect(false);
         return;
       }
       throw cause;
@@ -665,7 +681,10 @@ class StreamSession<
     const auth = this.config.auth;
     const expiresAtMs = readAccessTokenExpiryMs(token);
     if (auth !== null && expiresAtMs !== null && expiresAtMs <= Date.now()) {
-      console.debug(
+      // `console.error` not `.debug`: see the `reconnectAll` comment above -
+      // `console.debug` writes to Node's stdout, which the bridge reserves
+      // for command payloads only.
+      console.error(
         `[stream] pre-dial bearer already expired; revalidating before dial method=${String(this.config.method)}`,
       );
       this.transitionTo("reconnecting", null);
@@ -1052,7 +1071,10 @@ class StreamSession<
     }
     // Wake-recovery trace: which way the overnight-expired-bearer revalidation
     // resolved, so an on-device wake shows whether the fresh bearer landed.
-    console.debug(
+    // `console.error` not `.debug`: see the `reconnectAll` comment above -
+    // `console.debug` writes to Node's stdout, which the bridge reserves
+    // for command payloads only.
+    console.error(
       `[stream] UNAUTHORIZED revalidate outcome=${outcome} method=${String(
         this.config.method,
       )}`,
@@ -1070,7 +1092,7 @@ class StreamSession<
       // in reconnect backoff; the next cycle revalidates again once
       // connectivity returns.
       this.noProgressUnauthorizedReconnects = 0;
-      this.scheduleReconnect();
+      this.scheduleReconnect(false);
       return;
     }
     // outcome === "rotated": authn accepts the credential. If the bearer the
@@ -1098,7 +1120,7 @@ class StreamSession<
     } else {
       this.noProgressUnauthorizedReconnects = 0;
     }
-    this.scheduleReconnect();
+    this.scheduleReconnect(false);
   }
 
   /**
@@ -1223,7 +1245,7 @@ class StreamSession<
     }
     this.lastCloseWasSlowClient = false;
     this.resetForReconnect();
-    this.scheduleReconnect();
+    this.scheduleReconnect(false);
   }
 
   /**
@@ -1258,7 +1280,7 @@ class StreamSession<
    * fails resumes normal exponential escalation from there, same as any
    * other drop.
    */
-  private scheduleReconnect(immediate = false): void {
+  private scheduleReconnect(immediate: boolean): void {
     if (this.disposed) {
       return;
     }

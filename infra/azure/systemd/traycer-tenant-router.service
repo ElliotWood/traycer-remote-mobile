@@ -1,0 +1,34 @@
+[Unit]
+# Replaces traycer-ws-deflate.service, which did the same permessage-deflate
+# job but was hardcoded to a single tenant's pid.json and so made the whole VM
+# effectively single-tenant no matter how many host processes ran on it.
+Description=Traycer tenant-routing WebSocket relay (identity-routed, deflate on the internet leg)
+After=network.target
+# Deliberately NOT After=traycer-host@*.service: the router resolves each
+# tenant's port from pid.json PER CONNECTION, so it neither needs a host to be
+# up at start nor breaks when one restarts on a new ephemeral port.
+
+[Service]
+Type=simple
+User=traycer
+Group=traycer
+# TRAYCER_AUTHN_BASE_URL has no default in the router - an unset value is a
+# startup failure rather than a silently-assumed identity provider, because
+# "which service vouches for inbound bearers" is exactly the thing that must
+# never be guessed.
+Environment=TRAYCER_AUTHN_BASE_URL=https://authn.traycer.ai
+ExecStart=/usr/bin/node /usr/local/lib/traycer/tenant-router.mjs 45080 /srv/traycer/identity-registry.json
+Restart=always
+RestartSec=3
+SyslogIdentifier=traycer-tenant-router
+
+# The registry is the security control; the relay must not be able to rewrite
+# it, and should not be able to reach anything else on the box.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+ReadOnlyPaths=/srv/traycer/identity-registry.json
+
+[Install]
+WantedBy=multi-user.target

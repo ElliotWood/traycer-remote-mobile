@@ -58,20 +58,32 @@ jobs:
           - project: "@traycer-clients/traycer-cli"
             name: "test (@traycer-clients/traycer-cli)"
             test_args: ""
-          # Added after an audit found these two projects own a `test` script
-          # and were absent from this list — 61 and 6 test files respectively
-          # that had never run in CI. The first run caught a real failure: a
-          # test reading an absolute path outside the repository, which could
-          # not have passed on any machine but its author's.
+          # Added after an audit found these projects own a `test` script
+          # and were absent from this list — test files that had never run in
+          # CI. The first run caught a real failure: a test reading an
+          # absolute path outside the repository, which could not have passed
+          # on any machine but its author's.
           #
           # This list is hand-maintained and had silently drifted from the
           # command in the comment above. If it drifts again, prefer deriving
           # it over re-syncing by hand.
+          #
+          # Merge note: both this branch and `traycer-remote-bridge` appended
+          # here independently, so the union is the correct resolution — not
+          # either side alone. `teams-bot` was missing from BOTH and is added
+          # here for the same reason the others were: it owns a `test` script
+          # (76 tests) and had never run in CI.
           - project: traycer-clients-mobile
             name: "test (traycer-clients-mobile)"
             test_args: ""
           - project: "@traycer-clients/mobile-push-service"
             name: "test (@traycer-clients/mobile-push-service)"
+            test_args: ""
+          - project: "@traycer-clients/remote-bridge"
+            name: "test (@traycer-clients/remote-bridge)"
+            test_args: ""
+          - project: "@traycer-clients/teams-bot"
+            name: "test (@traycer-clients/teams-bot)"
             test_args: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

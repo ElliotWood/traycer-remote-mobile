@@ -48,16 +48,26 @@ export type { TenantMapping, VerifiedPrincipal } from "./types";
  * separate onboarding runs. A3 (per-person onboarding) must check whether
  * a human is already registered under a different alias before adding one.
  *
- * `kind: "traycer"` REFUSES rather than resolves. No verifier in this
- * delivery mints a `VerifiedTraycerUserId` (a live per-request call to
- * Traycer's own authn was considered and rejected — it would add an
- * availability dependency and an unresolved cache-vs-revocation question
- * inside this file's blast radius, for a benefit that doesn't materialize:
- * any test of it would be exactly as synthetic as `aad-id-token.ts`'s
- * local-JWKS-server test). Config entries may still carry a `traycerUserId`
- * so a future verifier's rollout is additive, but until one ships, the only
- * way a `traycer` principal ever reaches this file is a forged cast — and a
- * resolvable-but-unmintable kind would be exactly that convenience path.
+ * BOTH principal kinds resolve. `kind: "entra"` is minted by
+ * `validateAadIdToken`; `kind: "traycer"` by `verifyTraycerPrincipal`
+ * (`traycer-principal.ts`). The `traycer` kind originally refused
+ * unconditionally because no verifier existed and a
+ * resolvable-but-unmintable kind is a forged-cast convenience path. That
+ * reasoning was right while it held; it stopped holding when the live
+ * ingress needed to route a browser that carries a Traycer token and
+ * nothing else (Entra in front of the PWA is A0, unstarted).
+ *
+ * The objection originally conceded — a live authn dependency plus
+ * cache-vs-revocation inside the security control — is answered by a
+ * distinction that wasn't drawn at the time: **routing is not
+ * authorization.** The host independently validates the bearer and
+ * enforces its owner binding, so a stale routing decision for user X sends
+ * X to X's own host, which then applies its own check. A routing cache can
+ * therefore make a revoked token reach the host that will reject it; it
+ * cannot make any token reach a DIFFERENT tenant's host, because the id
+ * routed on comes from the issuer, never from the client. The availability
+ * dependency is real and handled by failing closed: authn unreachable
+ * means the connection is refused, never routed somewhere plausible.
  *
  * RUNTIME BRAND ERASURE: `VerifiedPrincipal`'s brands are TypeScript-only.
  * `resolveTenant({ kind: "entra", oid: "<any string>" as VerifiedAadObjectId })`
@@ -120,11 +130,24 @@ export class IdentityRegistry {
    */
   resolveTenant(principal: VerifiedPrincipal): TenantResolution {
     if (principal.kind === "traycer") {
-      // No verifier mints this kind in this delivery — see module doc.
-      // Resolving it anyway would be exactly the convenience path a forged
-      // cast is waiting for.
-      this.audit("forward", "refused", "principal_kind_unsupported", principal.userId);
-      return { kind: "refused", reason: "principal_kind_unsupported" };
+      // Resolvable as of the live-ingress wiring, because a real mint point
+      // now exists: `verifyTraycerPrincipal` (`traycer-principal.ts`). While
+      // no verifier shipped, this branch refused unconditionally — a
+      // resolvable-but-unmintable kind is a forged-cast convenience path,
+      // and that reasoning was correct for as long as it held. It no longer
+      // holds, so the refusal is lifted rather than worked around.
+      const userId = principal.userId;
+      if (userId.length === 0) {
+        this.audit("forward", "refused", "malformed_principal", userId);
+        return { kind: "refused", reason: "malformed_principal" };
+      }
+      const tenant = this.byTraycerUserId.get(userId);
+      if (tenant === undefined) {
+        this.audit("forward", "refused", "unmapped_principal", userId);
+        return { kind: "refused", reason: "unmapped_principal" };
+      }
+      this.audit("forward", "resolved", null, userId);
+      return { kind: "resolved", tenant };
     }
 
     const oid = principal.oid;

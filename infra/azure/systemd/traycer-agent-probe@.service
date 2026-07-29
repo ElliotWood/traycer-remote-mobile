@@ -1,0 +1,13 @@
+[Unit]
+Description=A6 agent-execution probe for tenant %i (structural)
+
+[Service]
+Type=oneshot
+Environment=TRAYCER_HOME_ROOT=__TRAYCER_HOME_ROOT__
+Environment=TRAYCER_OS_USER=__TRAYCER_OS_USER__
+# Structural mode only. The quota-consuming --spawn mode is deliberately
+# NOT wired to a timer - see traycer-agent-probe.sh's header for why
+# monitoring that burns the shared Claude quota would cause the outage it
+# watches for. Run it by hand, or add a slow timer as an explicit,
+# costed decision.
+ExecStart=/bin/bash -c '/usr/local/bin/traycer-agent-probe.sh %i || /usr/local/bin/traycer-alert.sh %i agent_surface_unhealthy "agent-execution probe failed - see journalctl -u traycer-agent-probe@%i"'
