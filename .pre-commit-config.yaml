@@ -39,6 +39,19 @@ repos:
         language: script
         stages: [commit-msg]
 
+  # OSS hygiene — no machine-identifying strings in a public repo.
+  # Repo-wide by design: every agent previously ran this scoped to its own
+  # package and reported clean, while real hits accumulated elsewhere. A rule
+  # each contributor must remember to run tree-wide is not a gate.
+  - repo: local
+    hooks:
+      - id: oss-hygiene
+        name: oss hygiene (no machine/user/tailnet identifiers)
+        entry: scripts/oss-hygiene.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+
   # Project checks — build / compile / lint / format (nx affected for speed).
   # Tests run in their own workflow (.github/workflows/test.yml).
   - repo: local
