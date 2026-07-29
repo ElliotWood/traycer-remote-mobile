@@ -321,8 +321,17 @@ by or exposed this asymmetry, and is flagged rather than silently ported.
 ## Distance from the shipping branch
 
 `traycer-azure-repo-layout` branched from `traycer/traycer-remote-mobile-electric-stork`
-at `a6d9bb3d` (0/0 at that point). This sprint added 2 commits on top (the
-A4 deliverable, then an executable-bit fix) - **2 ahead, 0 behind** at
-hand-off. Re-verify before merging; this is the actual number, not the
-pre-commit "0 ahead" this section stated in an earlier draft, which was true
-only because none of the sprint's work was in git yet.
+at `a6d9bb3d`. A committed doc asserting a live git distance as a fixed
+number rots the moment either branch moves - this section already needed
+correcting once (round 1 stated "0 ahead" because none of the sprint's work
+was committed yet; a later revision stated "2 ahead, 0 behind" and was
+stale within the same sprint once the base branch advanced). Don't trust a
+number here: run the command.
+
+```
+git rev-list --left-right --count traycer-azure-repo-layout...traycer/traycer-remote-mobile-electric-stork
+```
+
+The output is `<ahead> <behind>`. This branch is rebased onto
+`electric-stork` as of the commit that lands this correction - see that
+commit's message for the exact base SHA at rebase time.
