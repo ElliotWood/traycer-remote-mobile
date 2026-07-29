@@ -85,11 +85,33 @@ wss.on("connection", (client, req) => {
     if (client.readyState === WebSocket.OPEN) client.send(data, { binary: isBinary });
   });
 
+  // Byte accounting, logged once per connection.
+  //
+  // A synthetic subscribe measured nothing useful: it errored before any
+  // payload arrived, then divided two handshake-sized numbers and produced a
+  // plausible ratio close enough to the expected figure to be believed. That
+  // is the hollow-green pattern this epic keeps finding, appearing in its own
+  // verification. Counting the REAL session is the honest instrument:
+  // `bytesWritten` to the browser is post-compression, `bytesRead` from the
+  // host is pre-compression, so the ratio is measured rather than assumed.
+  const report = () => {
+    const toClient = client._socket ? client._socket.bytesWritten : 0;
+    const fromHost = upstream._socket ? upstream._socket.bytesRead : 0;
+    // Below 64 KB the ratio is dominated by framing overhead and means
+    // nothing - which is precisely how the bogus measurement arose.
+    if (fromHost < 65536) return;
+    const ratio = toClient > 0 ? (fromHost / toClient).toFixed(2) : "n/a";
+    console.error(
+      `[ws-deflate] ${req.url} host->relay ${(fromHost / 1048576).toFixed(2)} MB, ` +
+        `relay->browser ${(toClient / 1048576).toFixed(2)} MB, ratio ${ratio}x`,
+    );
+  };
+
   const bye = (code, reason) => {
     try { client.close(code, reason); } catch {}
     try { upstream.close(); } catch {}
   };
-  client.on("close", () => { try { upstream.close(); } catch {} });
+  client.on("close", () => { report(); try { upstream.close(); } catch {} });
   upstream.on("close", (code, reason) => bye(code >= 1000 && code <= 4999 ? code : 1011, reason));
   upstream.on("error", (err) => { console.error(`[ws-deflate] upstream: ${String(err)}`); bye(1011, "upstream error"); });
   client.on("error", () => { try { upstream.close(); } catch {} });
