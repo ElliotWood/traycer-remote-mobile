@@ -229,6 +229,90 @@ cwd, and `az vm run-command` runs from a root-only directory, so every
 *before contacting GitHub*, which reads exactly like an auth failure and is
 not one. Hence the `cd /` at the top of the script.
 
+## A6 — unattended operation + alerting
+
+Three layers, because the interesting failures are the ones the cheap
+layer cannot see.
+
+| Layer | Watches | Catches | Cannot catch |
+|---|---|---|---|
+| systemd `Restart=`/`StartLimitBurst` | process exit | crashes, restart loops | a process that is up but doing nothing |
+| `traycer-health-probe@<tenant>.timer` (60s) | TCP-connect to the tenant host's own `pid.json` port, **only while systemd says the unit is `active`** | a wedged host: `active` but not serving | a component *between* the browser and the host |
+| `traycer-relay-probe.timer` (120s) | full path through the deflate relay to the host | a relay that accepts connections but passes no traffic | — |
+
+Alert path: every source calls one script, `traycer-alert.sh`, which
+writes a single message shape via `logger -p local0.crit`. AMA ships
+facility `local0` to Log Analytics; one Scheduled Query Alert matches
+`ProcessName == "traycer-alert"` and an Action Group emails the operator.
+One shape end to end is deliberate — two differently-shaped alert paths is
+how a query covers one and silently misses the other.
+
+### Proof each gate can fail — run, not asserted
+
+Per the epic rubric ("prove a gate can fail before trusting that it
+passes"), every row below was executed against the live VM:
+
+| Gate | Negative test | Result |
+|---|---|---|
+| Restart-loop detection | started a tenant unit with no CLI binary, let systemd exhaust `StartLimitBurst` untouched | early failures alerted `reason=unit_failed`; the burst-exhausting one alerted `reason=restart_loop` |
+| Worktree rescue | killed the unit with a dirty worktree, then ran `git gc --prune=now --aggressive` | rescue ref survived byte-identical, containing **both** the tracked modification and the untracked file |
+| Relay end-to-end | reintroduced the exact `ws://`-Origin bug and restarted the relay | **see below** |
+| Azure alert rule | — | genuinely `Fired` (11:33:22Z) and `Resolved` in Azure Monitor's alert history, not merely deployed |
+
+**The relay negative test is the one that matters**, because it reproduces
+the real outage:
+
+```
+systemctl is-active traycer-ws-deflate  -> active     <- green
+systemctl is-active nginx               -> active     <- green
+GET /authn/api/v3/user                  -> 401        <- acceptance row passes
+GET /nonexistent-xyz                    -> 404        <- acceptance row passes
+node traycer-relay-probe.mjs            -> FAIL exit 1
+   "relay closed 1011 (upstream unreachable/refused - the Origin-403 signature)"
+```
+
+Every pre-existing check was green while the relay could not pass a single
+byte to the host. After restoring the fix the same probe returns
+`OK connection held open through the relay for 4000ms`.
+
+Why a handshake check would not have caught it: the relay accepts the
+browser connection **first**, then dials the host. An upstream 403 yields
+a successful `101` followed by a `1011` close a moment later, so the probe
+has to require the connection to *survive* a settle window rather than
+just to open.
+
+### Bugs this work surfaced (all found by running it, not by review)
+
+- `traycer-host@.service` never set `TRAYCER_HOME_ROOT`, which
+  `traycer-host-guard.sh` requires — so the A1 guard rail refused **every**
+  start before `ExecStart` was ever reached, on every deployment.
+- `git stash create --include-untracked` silently ignores that flag
+  (`create` does not implement it; the text was folded into the stash
+  message). Untracked files — a brand-new source file an agent never
+  `git add`ed, exactly the state worth rescuing — were captured by
+  nothing. Replaced with a scratch-index `git add -A` + `commit-tree`.
+- The VM had **no managed identity**, so AMA could not authenticate to
+  Azure Monitor at all: IMDS returned `Identity not found`, AMA retried
+  forever, and both `Heartbeat` and `Syslog` stayed empty with no error
+  anywhere except AMA's own on-box log. A monitoring pipeline that looks
+  deployed and ships nothing — the hollow-green pattern inside A6 itself.
+- Neither the relay **nor** this probe was referenced by `vm.bicep` or
+  `bootstrap.sh`. Both were committed and both were running on the live
+  box, so everything looked done; a rebuilt VM would have come up with no
+  relay (epic loading broken) and no probe to notice. Both are now wired
+  into `customData` + `bootstrap.sh`.
+
+### Known limits, stated rather than implied
+
+- The relay probe asserts the path carries a *connection*, not that a real
+  `epic.subscribe` returns correct data. A host that accepts WebSockets
+  but serves corrupt payloads would still pass.
+- `traycer-health-probe` deliberately no-ops when systemd reports the unit
+  inactive — that case belongs to `OnFailure=`, and alerting twice for one
+  root cause makes the stream noisier, not more informative.
+- Ingestion lag between `logger` and a queryable Log Analytics row is
+  minutes. The alert rule's floor is `PT5M`. A6 is not a real-time pager.
+
 ## What's not done yet
 
 - **The static frontend bundle is not deployed.** `bootstrap.sh` creates

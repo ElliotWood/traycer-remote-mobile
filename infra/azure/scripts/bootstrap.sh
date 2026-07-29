@@ -319,4 +319,30 @@ if [ -n "${TRAYCER_REPOS}" ]; then
   done
 fi
 
+echo "bootstrap: installing the WebSocket deflate relay and its A6 probe"
+# Both scripts are already written to /usr/local/lib/traycer by customData
+# (see vm.bicep) - this phase installs their one dependency and starts
+# them. `ws` is installed HERE rather than baked into customData because
+# it is a real npm fetch, not a file copy.
+#
+# Why this phase exists at all: the relay and probe were both committed
+# and both running on the live VM while NOTHING in the IaC installed
+# them, so a rebuild would have produced a box with no relay (epic
+# loading broken) and no probe to notice. Wiring is not optional just
+# because the live box already happens to have it.
+mkdir -p /usr/local/lib/traycer
+if [ ! -d /usr/local/lib/traycer/node_modules/ws ]; then
+  ( cd /usr/local/lib/traycer && npm install --no-save --no-audit --no-fund ws ) || \
+    echo "bootstrap: npm install ws failed - the relay and its probe will not start; re-run 'cd /usr/local/lib/traycer && npm install ws'" >&2
+fi
+chown -R "${TRAYCER_OS_USER}:${TRAYCER_OS_USER}" /usr/local/lib/traycer
+
+systemctl daemon-reload
+systemctl enable --now traycer-ws-deflate.service || \
+  echo "bootstrap: traycer-ws-deflate did not start - expected until a tenant host exists (it reads that tenant's pid.json); the A6 relay probe will alert if it stays down" >&2
+# The probe timer is enabled unconditionally, exactly like the per-tenant
+# health probe: a probe that only runs once someone remembers to enable it
+# is not monitoring.
+systemctl enable --now traycer-relay-probe.timer
+
 echo "bootstrap: done"
