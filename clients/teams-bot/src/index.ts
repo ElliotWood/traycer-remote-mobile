@@ -7,8 +7,12 @@ import { defaultAuditSink } from "@traycer-clients/shared/identity-registry/audi
 import { loadBotFrameworkAuthConfigFromEnv } from "./auth/bot-framework-jwt";
 import { loadServerConfigFromEnv } from "./config";
 import { createHttpServer } from "./http-server";
-import { logError, logInfo } from "./logger";
+import { logError, logInfo, logWarn } from "./logger";
 import { defaultBridgeCliConfig } from "./read-surface/bridge-cli";
+import {
+  createDemoPrincipalSource,
+  DEMO_IDENTITY_ENV_FLAG,
+} from "./read-surface/demo-principal-source";
 import { InMemoryEpicBindingStore } from "./read-surface/epic-binding-store";
 import { createReadSurfaceHandler } from "./read-surface/read-surface-handler";
 import type { ResolvePrincipal } from "./read-surface/principal-source";
@@ -30,6 +34,33 @@ const refuseUntilSsoLands: ResolvePrincipal = async () => ({
   reason:
     "Teams SSO sign-in isn't configured yet (T1b), so this bot can't yet confirm which Traycer host is yours.",
 });
+
+/**
+ * Selects the identity source. Default is the refusal above. The demo
+ * source activates ONLY on an explicit env flag and is deleted when T1b
+ * lands — see `read-surface/demo-principal-source.ts` for the full terms
+ * this was approved under.
+ *
+ * A misconfigured demo flag is FATAL, never a fallback: silently dropping
+ * back to the refusal (or worse, to some other identity) when the operator
+ * clearly intended demo mode is exactly the fail-quietly shape this epic
+ * keeps finding.
+ */
+function selectPrincipalSource(env: NodeJS.ProcessEnv): ResolvePrincipal {
+  const demo = createDemoPrincipalSource(env);
+  switch (demo.kind) {
+    case "misconfigured":
+      throw new Error(`demo identity misconfigured: ${demo.reason}`);
+    case "active":
+      logWarn(
+        "starting with DEMO IDENTITY enabled — single config-asserted principal, not multi-user",
+        { flag: DEMO_IDENTITY_ENV_FLAG },
+      );
+      return demo.resolve;
+    case "inactive":
+      return refuseUntilSsoLands;
+  }
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -65,7 +96,7 @@ async function main(): Promise<void> {
     ),
     senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
     parentEnv: process.env,
-    resolvePrincipal: refuseUntilSsoLands,
+    resolvePrincipal: selectPrincipalSource(process.env),
   });
 
   const server = createHttpServer({
