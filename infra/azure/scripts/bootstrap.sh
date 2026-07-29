@@ -134,9 +134,90 @@ echo "bootstrap: requesting TLS certificate"
 # forever by this script.
 if certbot --nginx -d "${TRAYCER_PUBLIC_HOSTNAME}" -m "${TRAYCER_ACME_EMAIL}" \
     --agree-tos --non-interactive --redirect; then
-  echo "bootstrap: certificate obtained, full TLS config active"
+  echo "bootstrap: certificate obtained"
+
+  # PHASE 2 - the routing config.
+  #
+  # This block exists because its absence shipped once. Certbot's --nginx
+  # plugin adds TLS to whatever server block it finds; it does NOT add
+  # routing. So after certbot succeeded, the phase-1 catch-all
+  # (`location / { return 200 "awaiting certificate"; }`) survived intact and
+  # every path - `/`, `/authn`, `/rpc`, `/assets/*.js`, and any nonexistent
+  # path - returned the same 38-byte placeholder over a valid certificate.
+  #
+  # That failure was nearly recorded as success: the agreed check was
+  # `/authn` -> 401 means working, 404/CORS means broken. A catch-all 200 is
+  # neither, and 200 reads as healthy. The acceptance test below therefore
+  # includes a NEGATIVE row - a nonexistent path must 404 - because the
+  # positive rows prove the routes exist while only the negative one proves
+  # nothing else is quietly succeeding.
+  #
+  # Post-deploy acceptance test (infra/azure/README.md carries this too):
+  #   /                     200 text/html   (once a bundle is deployed)
+  #   /assets/<real>.js     200 application/javascript
+  #   /authn/api/v3/user    401 JSON        <- proves server-side proxying
+  #   /rpc                  502 + reason    <- honest until A1/A3 land
+  #   /nonexistent-xyz      404             <- proves the catch-all is gone
+  cat > /etc/nginx/sites-available/traycer <<'TRAYCER_NGINX_TLS_EOF'
+server {
+    listen 443 ssl;
+    server_name __TRAYCER_PUBLIC_HOSTNAME__;
+    client_max_body_size 64m;
+    limit_req zone=traycer_ingress burst=20 nodelay;
+
+    ssl_certificate /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Same-origin authn proxy. Production authn's CORS allowlist contains
+    # exactly ONE origin, so a browser on any other origin cannot call it
+    # directly - every sign-in fails with an opaque CORS error. Forwarding
+    # server-side is not a nicety; it is the only thing that works.
+    # Origin/Referer are stripped outbound and CORS headers hidden inbound,
+    # mirroring clients/mobile/authn-proxy.mjs.
+    location /authn/ {
+        proxy_pass https://authn.traycer.ai/;
+        proxy_set_header Host authn.traycer.ai;
+        proxy_set_header Origin "";
+        proxy_set_header Referer "";
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Credentials;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+    }
+
+    # No Traycer host process exists until A1 (supervision) and A3
+    # (onboarding) are applied. Fail honestly and name the missing upstream:
+    # a 200 here would read as healthy to every check we have.
+    location /rpc    { return 502 "traycer ingress: no host process on this VM (A1/A3 not applied)\n"; }
+    location /stream { return 502 "traycer ingress: no host process on this VM (A1/A3 not applied)\n"; }
+
+    # `=404` rather than a SPA fallback: a fallback would resurrect the
+    # catch-all this block exists to remove, and an asset URL typo would
+    # silently serve HTML that fails as a parse error somewhere unrelated.
+    location / {
+        root /var/www/traycer;
+        try_files $uri $uri/ =404;
+    }
+}
+server {
+    listen 80;
+    server_name __TRAYCER_PUBLIC_HOSTNAME__;
+    location /.well-known/acme-challenge/ { root /var/www/html; }
+    location / { return 301 https://$host$request_uri; }
+}
+TRAYCER_NGINX_TLS_EOF
+  sed -i "s|__TRAYCER_PUBLIC_HOSTNAME__|${TRAYCER_PUBLIC_HOSTNAME}|g" /etc/nginx/sites-available/traycer
+  mkdir -p /var/www/traycer
+  if nginx -t; then
+    systemctl reload nginx
+    echo "bootstrap: phase 2 applied - ingress routing active"
+  else
+    echo "bootstrap: phase-2 nginx config failed validation; leaving certbot's config in place" >&2
+  fi
 else
-  echo "bootstrap: certbot did not obtain a certificate - DNS likely isn't pointed at this VM yet. nginx is serving HTTP-only on :80. Re-run certbot manually once DNS resolves; see infra/azure/README.md." >&2
+  echo "bootstrap: certbot did not obtain a certificate - DNS likely isn't pointed at this VM yet. nginx is serving HTTP-only on :80. Re-run certbot manually once DNS resolves, then re-run this script to apply phase 2; see infra/azure/README.md." >&2
 fi
 
 echo "bootstrap: done"
