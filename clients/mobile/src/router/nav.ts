@@ -73,10 +73,12 @@ export function navReducer(stack: NavStack, action: NavAction): NavStack {
       ];
     case "back":
       // The Fleet root is never popped: backing out of it is a no-op (there is
-      // nowhere above home to go).
-      return stack.length > 1
-        ? (stack.slice(0, -1) as unknown as NavStack)
-        : stack;
+      // nowhere above home to go). Rebuilt as `[first, ...rest]` (not
+      // `.slice()`, which forgets the non-empty-tuple shape `NavStack`
+      // requires) so it satisfies `NavStack` on its own — `stack.length > 1`
+      // is exactly what guarantees `rest` still has room to drop its own
+      // last element.
+      return stack.length > 1 ? [stack[0], ...stack.slice(1, -1)] : stack;
     case "goto-chat":
       return [
         { name: "fleet" },

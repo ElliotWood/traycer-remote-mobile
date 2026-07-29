@@ -58,11 +58,13 @@ export interface LivenessRecoveryOptions {
 }
 
 /**
- * Opaque interval handle. Browsers return `number`; Node's ambient types (
- * pulled in transitively by this workspace's tsconfig) return a `Timeout`
- * object — this module only ever runs in a browser, so the globals are cast
- * to this shape at the default-value site rather than threading the
- * environment-specific type through the whole module.
+ * Opaque interval handle. Browsers return `number`; Node's ambient types
+ * (pulled in transitively by this workspace's tsconfig) return a `Timeout`
+ * object for the bare global `setInterval`/`clearInterval` — this module
+ * only ever runs in a browser, so the default values below go through
+ * `window.setInterval`/`window.clearInterval` instead of the ambiguous
+ * globals: `Window`'s own DOM-lib signature is unambiguously `number`,
+ * with no cast needed to say so.
  */
 export type IntervalHandle = number;
 
@@ -84,11 +86,8 @@ export function startLivenessRecovery(options: LivenessRecoveryOptions): () => v
     windowTarget = window,
     documentTarget = document,
     now = Date.now,
-    setIntervalFn = setInterval as unknown as (
-      handler: () => void,
-      ms: number,
-    ) => IntervalHandle,
-    clearIntervalFn = clearInterval as unknown as (handle: IntervalHandle) => void,
+    setIntervalFn = window.setInterval.bind(window),
+    clearIntervalFn = window.clearInterval.bind(window),
   } = options;
 
   let lastTriggeredAt = -Infinity;
