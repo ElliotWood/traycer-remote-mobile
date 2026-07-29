@@ -56,6 +56,17 @@ export class ChatSession {
   private knownMessageIds = new Set<string>();
   private connected = false;
   private firstSnapshotWaiters: Array<() => void> = [];
+  /**
+   * Set on a fatal close this class does not know how to recover from (any
+   * fatal code other than `UNAUTHORIZED` — e.g. `INCOMPATIBLE`; matches
+   * `traycer monitor`'s "any non-UNAUTHORIZED fatal is terminal"). Once set,
+   * every action/status call fails immediately instead of waiting out
+   * `waitForFirstSnapshot`'s timeout or an `ActionTracker` entry's
+   * unconfirmed-timeout for a session that will never send another frame -
+   * "fail fast" rather than "fail eventually, after making the caller wait
+   * for a snapshot that provably cannot arrive."
+   */
+  private terminated: string | null = null;
 
   constructor(opts: {
     readonly epicId: string;
@@ -101,25 +112,46 @@ export class ChatSession {
         // Do NOT keep reporting connected/pending-state as current.
         this.connected = false;
       }
-      if (
-        status === "closed" &&
-        reason !== null &&
-        reason.kind === "fatalError" &&
-        reason.details.code === "UNAUTHORIZED"
-      ) {
-        void this.recoverFromUnauthorized();
+      if (status === "closed" && reason !== null && reason.kind === "fatalError") {
+        if (reason.details.code === "UNAUTHORIZED") {
+          void this.recoverFromUnauthorized();
+        } else {
+          // Non-UNAUTHORIZED fatal (e.g. INCOMPATIBLE): this class has no
+          // recovery for it and none will be attempted - the session is
+          // permanently dead. Fail fast rather than let callers discover
+          // that the slow way, one timeout at a time.
+          this.terminate(
+            `chat.subscribe closed fatally (${reason.details.code}): ${reason.details.reason}`,
+          );
+        }
       }
     });
     return session;
+  }
+
+  /** Fails every outstanding tracked action immediately and marks the session dead so future calls fail fast instead of waiting out a timeout that can never resolve favorably. */
+  private terminate(reason: string): void {
+    if (this.terminated !== null) return;
+    this.terminated = reason;
+    this.onDiagnostic(`chat ${this.chatId}: terminated - ${reason}`);
+    this.tracker.failAllPending(`chat session is disconnected: ${reason}`);
+    if (this.firstSnapshotWaiters.length > 0) {
+      const waiters = this.firstSnapshotWaiters;
+      this.firstSnapshotWaiters = [];
+      for (const waiter of waiters) waiter();
+    }
   }
 
   private async recoverFromUnauthorized(): Promise<void> {
     if (this.disposed) return;
     const outcome = await this.auth.revalidate();
     if (this.disposed) return;
-    if (outcome === "signed-out") {
+    if (outcome === "rejected") {
+      // Terminal per the locked store's own mapping: the file is gone
+      // (concurrent logout), a sign-out stands, or the refresh token is
+      // dead. No amount of retrying recovers this without a fresh login.
       this.onDiagnostic(
-        `chat ${this.chatId}: credentials no longer available - run \`traycer login\``,
+        `chat ${this.chatId}: credentials rejected - run \`traycer login\``,
       );
       return;
     }
@@ -129,11 +161,11 @@ export class ChatSession {
       this.session = this.openSubscription();
       return;
     }
-    // "unchanged": this process cannot self-refresh (see host-auth.ts). Retry
-    // later on the chance another Traycer surface on this machine rotates
-    // the shared credentials file in the meantime, rather than giving up.
+    // "network-error": a transient refresh transport blip or a lock held past
+    // the wait budget by a concurrent Desktop/CLI mutation - neither is a
+    // dead credential. Retry after a delay rather than giving up.
     this.onDiagnostic(
-      `chat ${this.chatId}: still unauthorized after re-reading credentials - retrying in ${String(AUTH_RETRY_DELAY_MS)}ms`,
+      `chat ${this.chatId}: still unauthorized after a refresh attempt - retrying in ${String(AUTH_RETRY_DELAY_MS)}ms`,
     );
     setTimeout(() => {
       if (this.disposed) return;
@@ -212,7 +244,13 @@ export class ChatSession {
     approvalId: string,
     decision: { readonly approved: boolean; readonly reason?: string },
   ): Promise<ActionOutcome> {
+    if (this.terminated !== null) {
+      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+    }
     await this.waitForFirstSnapshot();
+    if (this.terminated !== null) {
+      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+    }
     if (this.snapshot === null) {
       return { kind: "failed", reason: "not connected yet - no snapshot observed" };
     }
@@ -249,7 +287,13 @@ export class ChatSession {
     blockId: string,
     answers: readonly InterviewAnswer[],
   ): Promise<ActionOutcome> {
+    if (this.terminated !== null) {
+      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+    }
     await this.waitForFirstSnapshot();
+    if (this.terminated !== null) {
+      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+    }
     if (this.snapshot === null) {
       return { kind: "failed", reason: "not connected yet - no snapshot observed" };
     }
@@ -276,7 +320,13 @@ export class ChatSession {
   }
 
   async sendMessage(text: string): Promise<ActionOutcome> {
+    if (this.terminated !== null) {
+      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+    }
     await this.waitForFirstSnapshot();
+    if (this.terminated !== null) {
+      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+    }
     if (this.snapshot === null) {
       return { kind: "failed", reason: "not connected yet - no snapshot observed" };
     }

@@ -6,6 +6,7 @@ import {
 import { hostNotificationsSubscribeServerFrameSchema } from "@traycer/protocol/host/notifications/host-notifications";
 import { WsRpcClient } from "@traycer-clients/shared/host-transport/ws-rpc-client";
 import { WsStreamClient } from "@traycer-clients/shared/host-transport/ws-stream-client";
+import { withTransientRetry } from "./transient-retry";
 import { createNodeWebSocketFactory } from "@traycer-clients/shared/host-transport/node-ws-factory";
 import { createNodeStreamWebSocketFactory } from "@traycer-clients/shared/host-transport/node-ws-stream-factory";
 import { DEFAULT_DIAL_TIMEOUT_MS } from "@traycer-clients/shared/host-transport/transport-config";
@@ -35,6 +36,8 @@ const RPC_FRAME_TIMEOUT_MS = 15_000;
 const NOTIFICATIONS_INITIAL_LIMIT = 50;
 const FIND_APPROVAL_TIMEOUT_MS = 8_000;
 const FIND_APPROVAL_POLL_MS = 250;
+/** Delay before the one bounded retry of a host-classified-transient unary RPC failure (see `requestWithTransientRetry`). */
+const TRANSIENT_RETRY_DELAY_MS = 1_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -113,10 +116,8 @@ export class BridgeClient implements RemoteBridgeActions {
         const outcome = await this.auth.revalidate();
         if (outcome === "rotated") {
           this.streamClient.notifyBearerRotated();
-          return "rotated";
         }
-        if (outcome === "signed-out") return "rejected";
-        return "network-error";
+        return outcome;
       },
       now: () => Date.now(),
       setTimer: (handler, ms) => setTimeout(handler, ms),
@@ -141,6 +142,14 @@ export class BridgeClient implements RemoteBridgeActions {
         "remote-bridge: not signed in - run `traycer login` to authenticate.",
       );
     }
+    // Greppable identity record, per docs/multi-tenant-deployment.md §3(b):
+    // on a deployment where every bridge process shares one OS user
+    // (separate HOMEs only), this is the process's own attestation of which
+    // tenant it resolved as, logged before any host/RPC work begins.
+    opts.logger.info("identity resolved", {
+      userId: auth.userId,
+      home: auth.home,
+    });
     const endpointPoller = await HostEndpointPoller.start(opts.logger);
     return new BridgeClient({
       epicId: opts.epicId,
@@ -156,11 +165,17 @@ export class BridgeClient implements RemoteBridgeActions {
     if (endpoint === null) {
       throw new Error("remote-bridge: no host endpoint available yet");
     }
-    const response = await this.rpcClient.request(
-      "agent.list",
-      { epicId: this.epicId, senderAgentId: this.senderAgentId, scope: "user" },
-      { endpoint, bearer: this.auth.lease, abortSignal: new AbortController().signal },
-    );
+    const response = await withTransientRetry({
+      label: "agent.list",
+      call: () =>
+        this.rpcClient.request(
+          "agent.list",
+          { epicId: this.epicId, senderAgentId: this.senderAgentId, scope: "user" },
+          { endpoint, bearer: this.auth.lease, abortSignal: new AbortController().signal },
+        ),
+      onDiagnostic: (message) => this.logger.warn(message),
+      delayMs: TRANSIENT_RETRY_DELAY_MS,
+    });
     return response.agents.map((a) => ({
       agentId: a.id,
       title: a.title,
@@ -236,6 +251,10 @@ export class BridgeClient implements RemoteBridgeActions {
     this.chatSessions.clear();
     this.notificationsSession?.close();
     this.streamClient.close("bridge-shutdown");
+    // Stops the credentials store's background commit-failed continuation
+    // timer - without this a disposed bridge could still hold the process
+    // open (or attempt a mutation after shutdown began).
+    this.auth.dispose();
   }
 
   private ensureChatSession(chatId: string): ChatSession {
@@ -311,7 +330,7 @@ export class BridgeClient implements RemoteBridgeActions {
     if (outcome === "rotated") {
       this.streamClient.notifyBearerRotated();
     }
-    if (outcome !== "signed-out") {
+    if (outcome !== "rejected") {
       this.openNotificationsFeed();
     }
   }

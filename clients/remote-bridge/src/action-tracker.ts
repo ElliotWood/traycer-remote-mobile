@@ -222,9 +222,21 @@ export class ActionTracker {
   /** Resolves every still-outstanding action as `failed` — called on bridge shutdown so nothing hangs past process exit. */
   dispose(): void {
     this.disposed = true;
+    this.failAllPending("bridge is shutting down");
+  }
+
+  /**
+   * Resolves every still-outstanding action as `failed` with a specific
+   * reason, WITHOUT marking the tracker disposed (unlike `dispose()`) — for
+   * a caller (e.g. `ChatSession` on a non-recoverable fatal close) that
+   * wants outstanding actions to fail fast with an accurate cause rather
+   * than waiting out their unconfirmed-timeout, while still controlling
+   * whether future `issue()` calls are rejected itself.
+   */
+  failAllPending(reason: string): void {
     for (const entry of this.pending.values()) {
       if (entry.settled) continue;
-      this.settle(entry, { kind: "failed", reason: "bridge is shutting down" });
+      this.settle(entry, { kind: "failed", reason });
     }
   }
 

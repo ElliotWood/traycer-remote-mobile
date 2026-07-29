@@ -61,20 +61,25 @@ export interface RemoteBridgeActions {
  *   - on a FIRST attempt, `applied`/`rejected` come straight from the
  *     correlated `actionAck` — a first accepted/rejected ack for a
  *     genuinely-pending action is itself sufficient evidence.
- *   - on a RESEND after a reconnect raced the original ack, `applied`
- *     instead comes from the pending item's absence in a fresh
- *     `chat.subscribe` snapshot (`ActionTracker.handleReconnectSnapshot`) —
- *     NOT from the resend's own ack. This distinction exists because of a
+ *   - on a RESEND after a reconnect raced the original ack, `applied` can
+ *     come from either the resend's own ack OR the pending item's absence
+ *     in a fresh `chat.subscribe` snapshot — both are safe here specifically
+ *     because `ActionTracker` only ever resends a frame whose target
+ *     `isSettled` check just came back false (still genuinely pending), so
+ *     a resend's ack is meaningful evidence, not a no-op absorb signal. The
+ *     snapshot check is what makes this safe in the first place: a
  *     measurement against a real host (throwaway agents, `send` and
  *     `fileEditApprovalDecision`, both dedupe-tested including across a
- *     fresh reconnect - not just re-verified on the same session): a
+ *     fresh reconnect - not just re-verified on the same session) found a
  *     duplicate/retried frame ALWAYS comes back `actionAck.status ===
- *     "accepted"`, even when the host silently absorbed it as a no-op. So
- *     `"accepted"` on the wire proves the host *processed* the frame, never
- *     that a RESEND *did* anything new - only the snapshot can prove that.
- *     (Generic, non-file-edit `approvalDecision` dedup was not verified the
- *     same way and remains unconfirmed - see `action-tracker.ts`'s
- *     docblock.)
+ *     "accepted"`, even when the host silently absorbed it as a no-op — so
+ *     `"accepted"` on the wire alone proves the host *processed* a frame,
+ *     never that any GIVEN attempt *did* anything new. Reconciling against
+ *     the snapshot before ever resending is what closes that gap; a bare ack
+ *     from an attempt that was never gated on `isSettled` would not be
+ *     enough. (Generic, non-file-edit `approvalDecision` dedup was not
+ *     verified the same way and remains unconfirmed - see
+ *     `action-tracker.ts`'s docblock.)
  *
  * Treating a bare `"accepted"` ack as proof of effect is the exact bug this
  * surface exists to avoid (see `ws-stream-client.ts`'s `phase !==

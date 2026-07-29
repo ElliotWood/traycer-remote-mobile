@@ -74,7 +74,10 @@ function completeHandshake(socket: StubStreamWebSocket): void {
 function makeHostAuth(): HostAuth {
   return {
     lease: new MutableBearerLease("token-abc", "user-1"),
-    revalidate: async () => "unchanged",
+    userId: "user-1",
+    home: "/fake/home",
+    revalidate: async () => "network-error",
+    dispose: () => {},
   };
 }
 
@@ -262,6 +265,57 @@ describe("ChatSession.getStatus", () => {
       kind: "failed",
       reason: "approval unknown-id is not currently pending on this chat",
     });
+
+    client.close("test-done");
+  });
+
+  it("fails fast on a non-UNAUTHORIZED fatal close instead of waiting out a timeout for a session that will never recover", async () => {
+    const { factory, sockets } = makeFactory();
+    const { session, client } = makeSession(factory);
+    await flush();
+    completeHandshake(sockets[0]);
+    sockets[0].fireText(
+      snapshotFrame({
+        pendingApprovals: [
+          {
+            approvalId: "appr-inflight",
+            toolName: "Bash",
+            description: "run a command",
+            input: null,
+            requestedAt: 2000,
+          },
+        ],
+      }),
+    );
+    await session.getStatus();
+
+    // A pending action is in flight when the fatal close arrives - the
+    // frame was sent but no ack (and no reconnect snapshot) will ever come.
+    const pending = session.approve("appr-inflight");
+
+    sockets[0].fireText({
+      kind: "fatalError",
+      details: {
+        code: "INCOMPATIBLE",
+        reason: "host/client protocol mismatch",
+        incompatibleMethods: null,
+        upgradeGuidance: null,
+      },
+    });
+
+    // The in-flight action fails immediately - it does not wait out
+    // ActionTracker's unconfirmed-timeout for a session that can never send
+    // another frame.
+    const pendingOutcome = await pending;
+    expect(pendingOutcome.kind).toBe("failed");
+
+    // A call issued AFTER termination also fails immediately, not after
+    // waiting out `waitForFirstSnapshot`'s timeout.
+    const afterOutcome = await session.sendMessage("hello");
+    expect(afterOutcome).toMatchObject({ kind: "failed" });
+    expect((afterOutcome as { reason: string }).reason).toContain(
+      "chat session is disconnected",
+    );
 
     client.close("test-done");
   });
