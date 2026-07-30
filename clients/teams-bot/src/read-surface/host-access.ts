@@ -16,6 +16,7 @@ import {
   type BridgeCliFailureReason,
 } from "./bridge-cli";
 import type { EpicBindingStore } from "./epic-binding-store";
+import { logWarn } from "../logger";
 import type {
   ActionOutcome,
   AgentSummary,
@@ -92,11 +93,26 @@ function buildBridgeEnv(
   });
 }
 
+/**
+ * The single funnel every bridge failure passes through — and therefore the
+ * right place to log the diagnostic detail.
+ *
+ * It is logged HERE precisely because it must not travel any further towards
+ * the user. `detail` is raw subprocess stderr: it has carried a JSON log
+ * line, an internal stream-client message, a tenant filesystem path and a
+ * user id. That once reached a card verbatim, which was both ugly and a
+ * disclosure. The card now selects wording from it and never prints it; this
+ * log line is what makes the failure diagnosable instead.
+ */
 function toReadSurfaceFailure(result: {
   readonly kind: "failed";
   readonly reason: BridgeCliFailureReason;
   readonly detail: string;
 }): ReadSurfaceFailure {
+  logWarn("bridge call failed", {
+    reason: result.reason,
+    detail: result.detail,
+  });
   return {
     kind: "bridge_unavailable",
     reason: result.reason,

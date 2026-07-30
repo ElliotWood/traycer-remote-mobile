@@ -1388,27 +1388,127 @@ export function buildPrincipalRefusedCard(reason: RefusalReason): Attachment {
   ]);
 }
 
+/**
+ * Recognised failures, in the user's language.
+ *
+ * Matching on subprocess text is fragile, so it is used ONLY to improve the
+ * message — never to decide anything, and never as a reason to show the text
+ * itself. An unrecognised failure falls back to the generic sentence for its
+ * `reason`, which is always correct if less specific.
+ */
+const KNOWN_FAILURES: readonly {
+  readonly match: RegExp;
+  readonly headline: string;
+  readonly guidance: string;
+}[] = [
+  {
+    // The one Elliot hit: the bridge's cached credential had expired.
+    match: /"exp" claim|jwt expired|token (is )?expired/i,
+    headline: "Your host sign-in expired",
+    guidance: "Try the same command again — it refreshes automatically.",
+  },
+  {
+    match: /not provisioned|UNAUTHORIZED|not signed in/i,
+    headline: "Your host isn't signed in",
+    guidance: "Run `traycer login` on the machine running your host.",
+  },
+  {
+    match: /ECONNREFUSED|ENOTFOUND|socket hang up|network/i,
+    headline: "Couldn't reach your Traycer host",
+    guidance: "It may be asleep or offline. Try again shortly.",
+  },
+  {
+    match: /was not found|no such chat|unknown chat/i,
+    headline: "That chat isn't available",
+    guidance: 'Run "fleet" to see the chats you can open.',
+  },
+];
+
+const GENERIC_FAILURE: Record<
+  BridgeCliFailureReason,
+  { readonly headline: string; readonly guidance: string }
+> = {
+  spawn_timed_out: {
+    headline: "Your host took too long to answer",
+    guidance: "Nothing was changed. Try again shortly.",
+  },
+  nonzero_exit: {
+    headline: "Couldn't reach your Traycer host",
+    guidance: "Nothing was changed. Try again shortly.",
+  },
+  malformed_output: {
+    headline: "Your host sent something unexpected",
+    guidance: "Nothing was changed. This has been logged.",
+  },
+};
+
+/**
+ * NEVER renders `detail`.
+ *
+ * It used to, and the result was a card containing a JSON log line, an
+ * internal stream-client message, a filesystem path and a user id — a stack
+ * trace in a product surface, and a data leak to anyone looking at the
+ * screen. Subprocess output is diagnostic material: it belongs in the server
+ * log, which is where `toReadSurfaceFailure` now puts it.
+ *
+ * `detail` is still a PARAMETER because it selects the wording — a
+ * recognised failure gets a specific, actionable sentence. It is read, never
+ * shown.
+ */
 export function buildBridgeUnavailableCard(
   reason: BridgeCliFailureReason,
   detail: string,
 ): Attachment {
+  const known = KNOWN_FAILURES.find((f) => f.match.test(detail));
+  const { headline, guidance } = known ?? GENERIC_FAILURE[reason];
   return card([
     container(
       [
-        text("Couldn't reach your Traycer host", {
+        text(headline, {
           weight: "bolder",
           color: "warning",
           spacing: "none",
         }),
-        text("Nothing was changed. Try again shortly.", {
+        text(guidance, { isSubtle: true, spacing: "small" }),
+      ],
+      { style: "warning" },
+    ),
+  ]);
+}
+
+/**
+ * The id you named isn't a chat we can reach.
+ *
+ * Exists because `say hi` rendered a composer headed "Reply to hi", bound to
+ * nothing. The lesson is worth keeping: the design deliberately refuses to
+ * invent a destination, and then a validation gap invented one anyway.
+ *
+ * Names the id back so the mistake is obvious — someone who typed `say hi`
+ * meaning "say hi" needs to SEE that "hi" was read as a destination, or the
+ * message won't land.
+ */
+export function buildUnknownChatCard(chatId: string): Attachment {
+  return card([
+    container(
+      [
+        text("That doesn't look like a chat", {
+          weight: "bolder",
+          color: "warning",
+          spacing: "none",
+        }),
+        text(`No reachable chat matched “${shortId(chatId)}”.`, {
           isSubtle: true,
           spacing: "small",
         }),
       ],
       { style: "warning" },
     ),
-    facts([["Reason", reason]]),
-    text(detail, { isSubtle: true, size: "small", wrap: true }),
+    // Short labels: a FactSet's title column is narrow, and "To message an
+    // agent" wrapped onto two lines at 320px while its value wrapped too.
+    facts([
+      ["Message", "say <chat-id> <message>"],
+      ["Find ids", "fleet"],
+    ]),
   ]);
 }
 

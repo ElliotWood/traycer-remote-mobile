@@ -164,11 +164,38 @@ add("06-epic-not-bound", () => C.buildEpicNotBoundCard());
 add("07-access-denied", () =>
   C.buildPrincipalRefusedCard("unmapped_principal"),
 );
+/**
+ * The error card had NEVER been rendered with real subprocess output in it —
+ * every fixture was a tidy one-liner. The shipped card printed `detail`
+ * verbatim, so what a user actually saw was a JSON log line, an internal
+ * stream-client message, a tenant path and a user id. These fixtures carry
+ * the real garbage, trimmed, so the card is judged against what it receives.
+ */
+const REAL_BRIDGE_STDERR = [
+  '{"timestamp":"2026-07-30T10:50:51.185Z","level":"info","message":"identity resolved",',
+  '"fields":"{"userId":"3e3d1309-0000-4000-8000-000000000000","home":"/srv/traycer/tenants/somebody"}"}',
+  "[stream] WsStreamClient closed (client=stream-client-1, reason=bridge-shutdown, sessions=0)",
+  '[bridge] fatal: "exp" claim timestamp check failed',
+].join(" ");
+
 add("08-bridge-unavailable", () =>
+  C.buildBridgeUnavailableCard("nonzero_exit", REAL_BRIDGE_STDERR),
+);
+add("08b-bridge-timeout", () =>
   C.buildBridgeUnavailableCard(
     "spawn_timed_out",
     "traycer-remote-bridge list did not exit within 20000ms",
   ),
+);
+add("08c-bridge-signed-out", () =>
+  C.buildBridgeUnavailableCard(
+    "nonzero_exit",
+    "exit code 1: [bridge] UNAUTHORIZED: Host is not provisioned - sign in on this machine",
+  ),
+);
+add("08d-unknown-chat", () => C.buildUnknownChatCard("hi"));
+add("08e-unknown-chat-uuidish", () =>
+  C.buildUnknownChatCard("a1000000-0000-4000-8000-00000000dead"),
 );
 add("09-epic-picker", () =>
   C.buildEpicPickerCard([

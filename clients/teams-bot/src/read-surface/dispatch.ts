@@ -6,6 +6,7 @@ import {
   buildComposeCard,
   buildContextStripCard,
   buildTranscriptCard,
+  buildUnknownChatCard,
   CONTEXT_STRIP_SIZE,
   TRANSCRIPT_PAGE_SIZE,
   buildInterviewCard,
@@ -188,9 +189,6 @@ export async function dispatchCommand(
       return [buildTranscriptCard(result.transcript, deps.now())];
     }
     case "compose": {
-      // Reads status first rather than composing blind: it resolves the
-      // chat's title for the card, and it refuses a chat id that does not
-      // exist instead of accepting a message bound for nowhere.
       const result = await fetchChatStatus(
         principal,
         conversationId,
@@ -200,6 +198,19 @@ export async function dispatchCommand(
       if (result.kind !== "ok") {
         return [failureCard(result)];
       }
+      // `connected` is the ONLY evidence the chat is real.
+      //
+      // A `kind: "ok"` status is not: the bridge opens a subscription for
+      // whatever id it is handed and reports `connected: false` when no
+      // snapshot ever arrives, so a nonexistent id comes back as a
+      // plausible-looking status with a null title. That is how `say hi`
+      // rendered a composer headed "Reply to hi" — a card that looks
+      // actionable and points nowhere, which is exactly the failure the
+      // card-input design was chosen to prevent. It got in through
+      // validation rather than through the design.
+      if (!result.status.connected) {
+        return [buildUnknownChatCard(command.chatId)];
+      }
       return [
         buildComposeCard(
           { chatId: result.status.chatId, title: result.status.title },
@@ -208,6 +219,24 @@ export async function dispatchCommand(
       ];
     }
     case "say": {
+      // Validate the destination BEFORE sending, for the same reason the
+      // composer does: `say hi there` would otherwise deliver "there" to a
+      // chat named "hi", failing somewhere in the bridge with a message the
+      // user cannot act on. One extra status read is cheap next to a
+      // message that cannot be unsent going somewhere unintended.
+      const target = await fetchChatStatus(
+        principal,
+        conversationId,
+        command.chatId,
+        deps,
+      );
+      if (target.kind !== "ok") {
+        return [failureCard(target)];
+      }
+      if (!target.status.connected) {
+        return [buildUnknownChatCard(command.chatId)];
+      }
+
       const result = await submitChatMessage(
         principal,
         conversationId,
@@ -221,7 +250,7 @@ export async function dispatchCommand(
       return [
         buildMessageOutcomeCard(result.outcome, {
           chatId: command.chatId,
-          title: null,
+          title: target.status.title,
         }),
       ];
     }

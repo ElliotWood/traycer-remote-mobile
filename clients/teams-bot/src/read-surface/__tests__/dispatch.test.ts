@@ -258,8 +258,55 @@ describe("read-surface/dispatch — routing and identity gating", () => {
     const card = await dispatchCommand({ kind: "fleet" }, "conv-1", deps);
 
     const body = bodyOf(card);
-    expect(body).toContain("Couldn't reach your Traycer host");
+    // Recognised failure, so the card names it specifically rather than
+    // falling back to the generic "couldn't reach your host".
+    expect(body).toContain("isn't signed in");
     expect(body).not.toContain("No agents in this epic yet");
+  });
+
+  it("CONTRACT: a failure card NEVER contains raw subprocess output", async () => {
+    // This shipped. `fleet` rendered a card containing a JSON log line, an
+    // internal stream-client message, a tenant filesystem path and a user
+    // id — a stack trace in a product surface, and a disclosure to anyone
+    // looking at the screen. The fixture below is the real thing, trimmed.
+    const realGarbage = [
+      '{"timestamp":"2026-07-30T10:50:51.185Z","level":"info",',
+      '"message":"identity resolved","fields":"{"userId":"3e3d1309-0000-4000-8000-000000000000",',
+      '"home":"/srv/traycer/tenants/somebody"}"}',
+      "[stream] WsStreamClient closed (client=stream-client-1, reason=bridge-shutdown, sessions=0)",
+      '[bridge] fatal: "exp" claim timestamp check failed',
+    ].join(" ");
+
+    const epicBindings = new InMemoryEpicBindingStore();
+    await epicBindings.set("conv-1", "epic-1");
+    const deps = makeDeps({
+      resolvePrincipal: resolvesTo(aliceP),
+      spawnFn: async () => ({
+        code: 1,
+        stdout: "",
+        stderr: realGarbage,
+        timedOut: false,
+      }),
+      epicBindings,
+    });
+
+    const body = bodyOf(
+      await dispatchCommand({ kind: "fleet" }, "conv-1", deps),
+    );
+
+    // Nothing from the subprocess, by any route.
+    expect(body).not.toContain("WsStreamClient");
+    expect(body).not.toContain("/srv/traycer");
+    expect(body).not.toContain("3e3d1309");
+    expect(body).not.toContain("stream-client");
+    // Scoped to the actual leaked token, not the bare word: `"exp"` alone
+    // also matches the legitimate word "expired" in the new copy, which is
+    // the same over-broad-assertion mistake made once already on UUIDs.
+    expect(body).not.toContain('"exp" claim');
+    expect(body).not.toContain("2026-07-30T10:50");
+    expect(body).not.toContain("nonzero_exit");
+    // And it still says something useful — the expiry is recognised.
+    expect(body).toContain("expired");
   });
 });
 

@@ -10,7 +10,7 @@ import type {
 import { parseCommand } from "./commands";
 import { dispatchCommand, type DispatchDeps } from "./dispatch";
 import { dispatchActionInvoke } from "./dispatch-action";
-import { logWarn } from "../logger";
+import { logInfo, logWarn } from "../logger";
 
 /**
  * The activity handler — messages and card actions.
@@ -45,6 +45,18 @@ class ReadSurfaceHandler extends ActivityHandler {
     }
 
     const cards = await dispatchCommand(command, conversationId, this.deps);
+    // Logs the PARSED command kind and the reply size, never the message
+    // text — the text can contain anything a user typed, including things
+    // meant for an agent rather than for a log file.
+    //
+    // Added because a report of "one command produced two cards" could not
+    // be confirmed or dismissed: nothing recorded which activities had
+    // arrived, so there was no way to tell one command returning two cards
+    // from two commands returning one each.
+    logInfo("dispatched command", {
+      command: command.kind,
+      cards: cards.length,
+    });
     for (const card of cards) {
       await context.sendActivity(MessageFactory.attachment(card));
     }

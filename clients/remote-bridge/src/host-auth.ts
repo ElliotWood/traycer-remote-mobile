@@ -114,6 +114,37 @@ export function isHostAuthUnavailable(
   return "credentialsPath" in value;
 }
 
+/**
+ * Seconds before actual expiry at which a token is already treated as
+ * expired. A one-shot command that starts with 3 seconds left would spend
+ * them connecting and then fail anyway.
+ */
+const EXPIRY_SKEW_SECONDS = 60;
+
+/**
+ * Reads `exp` out of the stored bearer WITHOUT verifying it.
+ *
+ * Verification is the host's job and this is our own token — the only
+ * question here is "is it worth sending", which needs no signature check.
+ * Anything unparseable returns `null`, meaning "cannot tell", and the caller
+ * proceeds exactly as before; a bad guess must not lock anyone out of their
+ * own host.
+ */
+function bearerExpirySeconds(token: string): number | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload: unknown = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf8"),
+    );
+    if (typeof payload !== "object" || payload === null) return null;
+    const exp = (payload as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveHostAuth(): Promise<HostAuth | HostAuthUnavailable> {
   const home = requireHomeEnv();
   const credentialsPath = cliCredentialsPath("production");
@@ -127,6 +158,32 @@ export async function resolveHostAuth(): Promise<HostAuth | HostAuthUnavailable>
     store,
     lease,
   });
+
+  /**
+   * Refresh BEFORE the first call, not after it fails.
+   *
+   * Reactive revalidation alone is enough for a long-running client, which
+   * reconnects and carries on. It is not enough for a ONE-SHOT command: the
+   * refresh lands after the call has already returned an error, so the token
+   * on disk is valid ten seconds later and the user has been shown a
+   * failure. Observed exactly that way — a user's first command of the
+   * session failed, and the credential file's mtime was ten seconds after
+   * the failure.
+   *
+   * The effect was that every few hours the first thing anyone typed failed
+   * and everything afterwards worked, which reads as an unreliable product
+   * rather than an expired token.
+   *
+   * Best-effort by design: an unparseable token or a failed refresh falls
+   * through to the call, which may still succeed and, if it doesn't, still
+   * has the reactive path behind it. This can make a working command fail
+   * only if it never worked anyway.
+   */
+  const exp = bearerExpirySeconds(stored.token);
+  if (exp !== null && exp - EXPIRY_SKEW_SECONDS <= Date.now() / 1000) {
+    await revalidator.revalidateCurrentContext();
+  }
+
   return {
     lease,
     userId: stored.user.id,
