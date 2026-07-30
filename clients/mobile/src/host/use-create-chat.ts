@@ -34,7 +34,9 @@ import type {
   CreateChatRequest,
 } from "@traycer/protocol/host/epic/unary-schemas";
 import type { MobileHostClient } from "@/host/host-client-context";
-import { MOBILE_HOST_ID } from "@/host/connection";
+// HA-1: `MOBILE_HOST_ID` is deliberately NOT imported here any more. It stays a
+// valid local UI label in `connection.ts`, but nothing in this module may reach
+// for it as a durable `hostId` — the absence of the import is the guardrail.
 import { CONFIGURED_HOST_ID } from "@/config";
 
 /**
@@ -44,7 +46,7 @@ import { CONFIGURED_HOST_ID } from "@/config";
  * matches the project's Claude default. Verified against
  * `protocol/src/persistence/epic/foundation.ts` + `protocol/src/host/agent/shared.ts`.
  */
-const AUTHOR_HARNESS_ID = "claude";
+export const AUTHOR_HARNESS_ID = "claude";
 
 /**
  * `supervised` is the `permissionModeSchema` member that routes tool/file-edit
@@ -55,6 +57,104 @@ const AUTHOR_PERMISSION_MODE = "supervised";
 
 /** Cap for a title derived from the instruction's first line. */
 const MAX_TITLE_LENGTH = 80;
+
+/** The one unary surface the authoring flows need; kept narrow so tests inject a fake. */
+export type AuthoringClient = Pick<MobileHostClient, "request">;
+
+/**
+ * Resolves a concrete model for the default harness (R2): the host's first
+ * listed model, never a hardcoded slug. `null` when the host lists none — the
+ * callers surface that inline instead of guessing a slug.
+ *
+ * `epicId` is `null` for the create-epic flow, where no epic exists yet:
+ * `listHarnessModelsRequestSchemaV20` made both `epicId` and `senderAgentId`
+ * nullable precisely so a caller can ask the HOST what it can run before any
+ * epic is bound.
+ */
+export async function resolveAuthorModel(
+  client: AuthoringClient,
+  epicId: string | null,
+): Promise<string | null> {
+  const harnessModels = await client.request("agent.listHarnessModels", {
+    epicId,
+    senderAgentId: null,
+    harnessId: AUTHOR_HARNESS_ID,
+  });
+  const model = harnessModels.models[0]?.id;
+  return model === undefined || model.length === 0 ? null : model;
+}
+
+export interface BuildInitialMessageArgs {
+  readonly messageId: string;
+  readonly clientActionId: string;
+  readonly userId: string;
+  readonly model: string;
+  readonly instruction: string;
+}
+
+/**
+ * The folded first message, shared by `epic.createChat` and `epic.create`'s
+ * chat seed — both carry the identical required `createChatInitialMessageSchema`
+ * tuple, so "how a phone-authored turn is configured" is answered here once.
+ */
+export function buildInitialMessage(
+  args: BuildInitialMessageArgs,
+): CreateChatInitialMessage {
+  return {
+    messageId: args.messageId,
+    clientActionId: args.clientActionId,
+    content: plainTextContent(args.instruction),
+    sender: { type: "user", userId: args.userId },
+    settings: {
+      harnessId: AUTHOR_HARNESS_ID,
+      model: args.model,
+      permissionMode: AUTHOR_PERMISSION_MODE,
+      reasoningEffort: null,
+      serviceTier: null,
+      agentMode: "regular",
+      profileId: null,
+    },
+    accountContext: DEFAULT_ACCOUNT_CONTEXT,
+  };
+}
+
+/**
+ * The `hostId` to stamp on a phone-created chat, or `null` to REFUSE (HA-1).
+ *
+ * H1: this is a durable, for-life binding (`chatSchema.hostId`,
+ * `protocol/src/persistence/epic/chat.ts:34-52`) — NOT the connection's own
+ * `HostDirectoryEntry.hostId` label (`MOBILE_HOST_ID`, which exists only so
+ * `HostClient.bind()` has something to key on). The real value is unreachable
+ * over the wire protocol itself (checked exhaustively — no handshake field, no
+ * bootstrap-safe RPC), so it can only arrive via this out-of-band config value.
+ *
+ * It used to fall back to `MOBILE_HOST_ID`. That is now a refusal, for two
+ * reasons:
+ *
+ * 1. A chat stamped that way renders on desktop as a dead
+ *    `Host "mobile-host" is unreachable` tile — permanently, and visibly to
+ *    everyone on the account.
+ * 2. `MOBILE_HOST_ID` is a SINGLE SHARED CONSTANT across every mobile client and
+ *    every user. Substituting any such constant — this one or a new one — is
+ *    strictly worse than refusing: one id owned by many people collides with the
+ *    per-owner uniqueness the routing design depends on. A replacement must be
+ *    unique per installed client or stay deliberately unroutable. So this
+ *    returns the real per-machine id or nothing at all; it never invents one.
+ *
+ * `MOBILE_HOST_ID` itself stays — it remains a legitimate LOCAL UI label for the
+ * connection (`connection.ts`). The defect was only ever using it as a durable id.
+ */
+export function authoredChatHostId(): string | null {
+  return CONFIGURED_HOST_ID;
+}
+
+/**
+ * Shown when `VITE_HOST_ID` was not supplied to this build. Lives here (the
+ * lower-level authoring module) rather than in `use-create-epic.ts` so the chat
+ * and epic flows share one wording without a circular import.
+ */
+export const MISSING_HOST_ID_ERROR =
+  "This build doesn't know the host's real ID (VITE_HOST_ID is unset), so anything created here would be permanently unreachable from the desktop app. Rebuild with VITE_HOST_ID set, or create it from the desktop app instead.";
 
 /**
  * A minimal ProseMirror-style `doc` carrying the instruction as one paragraph.
@@ -95,6 +195,13 @@ export interface BuildCreateChatRequestArgs {
   readonly userId: string;
   readonly model: string;
   readonly instruction: string;
+  /**
+   * HA-1: the host's REAL, durable id. An explicit argument rather than a
+   * config read inside the builder, so no code path can silently substitute a
+   * shared placeholder — the caller must have obtained a real one from
+   * `authoredChatHostId()` or refused.
+   */
+  readonly hostId: string;
   /** P1: the Agents-row "+" add-child action passes the parent chat's id; the root "+ New agent here" flow omits it (defaults to a top-level chat). */
   readonly parentId?: string | null;
 }
@@ -108,36 +215,17 @@ export interface BuildCreateChatRequestArgs {
 export function buildCreateChatRequest(
   args: BuildCreateChatRequestArgs,
 ): CreateChatRequest {
-  const initialMessage: CreateChatInitialMessage = {
+  const initialMessage: CreateChatInitialMessage = buildInitialMessage({
     messageId: args.messageId,
     clientActionId: args.clientActionId,
-    content: plainTextContent(args.instruction),
-    sender: { type: "user", userId: args.userId },
-    settings: {
-      harnessId: AUTHOR_HARNESS_ID,
-      model: args.model,
-      permissionMode: AUTHOR_PERMISSION_MODE,
-      reasoningEffort: null,
-      serviceTier: null,
-      agentMode: "regular",
-      profileId: null,
-    },
-    accountContext: DEFAULT_ACCOUNT_CONTEXT,
-  };
+    userId: args.userId,
+    model: args.model,
+    instruction: args.instruction,
+  });
   return {
     epicId: args.epicId,
     parentId: args.parentId ?? null,
-    // H1: `hostId` is a durable, for-life binding (`chatSchema.hostId`,
-    // `protocol/src/persistence/epic/chat.ts:34-52`) — NOT the connection's
-    // own `HostDirectoryEntry.hostId` label (`MOBILE_HOST_ID`, which exists
-    // only so `HostClient.bind()` has something to key on). The real value
-    // is unreachable over the wire protocol itself (checked exhaustively —
-    // no handshake field, no bootstrap-safe RPC), so it can only arrive via
-    // this out-of-band config value. `MOBILE_HOST_ID` remains the fallback
-    // for a host that hasn't supplied one — a chat created that way renders
-    // as an unreachable host on desktop, a real protocol gap tracked
-    // separately, not something faked here.
-    hostId: CONFIGURED_HOST_ID ?? MOBILE_HOST_ID,
+    hostId: args.hostId,
     title: deriveChatTitle(args.instruction),
     chatId: args.chatId,
     initialMessage,
@@ -189,16 +277,21 @@ export function useCreateChat({
             return;
           }
 
+          // HA-1: refuse rather than stamp the shared synthetic placeholder —
+          // the binding is for life, and a chat carrying it is a permanently
+          // unreachable tile on desktop.
+          const hostId = authoredChatHostId();
+          if (hostId === null) {
+            setPhase("error");
+            setError(MISSING_HOST_ID_ERROR);
+            return;
+          }
+
           // Resolve a concrete model (R2): first listed model for the default
           // harness — never a hardcoded slug. An empty list is a dead end, not
           // a fallback-to-guess.
-          const harnessModels = await client.request("agent.listHarnessModels", {
-            epicId,
-            senderAgentId: null,
-            harnessId: AUTHOR_HARNESS_ID,
-          });
-          const model = harnessModels.models[0]?.id;
-          if (model === undefined || model.length === 0) {
+          const model = await resolveAuthorModel(client, epicId);
+          if (model === null) {
             setPhase("error");
             setError("Couldn't resolve a model for this host.");
             return;
@@ -213,6 +306,7 @@ export function useCreateChat({
             userId,
             model,
             instruction: text,
+            hostId,
             parentId,
           });
 
