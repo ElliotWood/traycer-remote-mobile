@@ -14,6 +14,8 @@ import { useEffect, useState, type ReactElement } from "react";
 import {
   FluentProvider,
   makeStyles,
+  MessageBar,
+  MessageBarBody,
   Subtitle1,
   Text,
   tokens,
@@ -136,6 +138,25 @@ export function App(): ReactElement {
   return (
     <FluentProvider theme={themeFor(themeName)}>
       <div className={styles.page}>
+        {/*
+          UNMISSABLE, and deliberately not a footnote.
+
+          The previous marker only rendered when Teams was ABSENT — which is
+          exactly backwards. Inside Teams `app.initialize()` succeeds, the
+          marker disappears, and the user sees eight plausible agents with
+          real-looking titles and nothing saying they are invented. That is a
+          surface stating something false, and no line of code in it is
+          dishonest — the same shape as a fleet reporting 53 agents idle.
+
+          This is removed in the commit that wires real data, not before.
+        */}
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            <strong>Sample data.</strong> This fleet is a fixture — these
+            agents are not real and nothing here reflects your host yet.
+          </MessageBarBody>
+        </MessageBar>
+
         <div className={styles.header}>
           <Subtitle1>Fleet</Subtitle1>
           <Text size={200} className={styles.subtle}>
@@ -162,7 +183,7 @@ export function App(): ReactElement {
           // appeared beneath a dark-themed screenshot, which is exactly the
           // kind of caption that gets quoted back as fact.
           <Text size={200} className={styles.subtle}>
-            Running outside Teams — {themeName} theme, fixture data.
+            Running outside Teams — {themeName} theme.
           </Text>
         ) : null}
       </div>

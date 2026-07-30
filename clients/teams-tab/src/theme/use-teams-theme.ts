@@ -39,6 +39,30 @@ function themeFromLocation(): TeamsThemeName {
   return normaliseThemeName(raw ?? undefined);
 }
 
+/**
+ * How long to wait for the Teams host to answer before giving up on it.
+ *
+ * MEASURED, and the reason this exists at all: `app.initialize()` does NOT
+ * reliably reject when Teams is absent. Standalone it rejects promptly — but
+ * inside an IFRAME it postMessages its parent and waits, and a parent that
+ * is not Teams simply never answers. The promise then neither resolves nor
+ * rejects.
+ *
+ * The deployed tab was verified doing exactly that: standalone it renders
+ * the sign-in screen; framed under a non-Teams parent it rendered an empty
+ * document, no errors, forever. `ready` stayed false and the app painted
+ * `<FluentProvider/>` with nothing inside.
+ *
+ * That is the blank-screen failure this project has already fixed once in
+ * the PWA, reintroduced here by code whose own docblock claimed to prevent
+ * it — the catch path handles "no parent", not "a parent that never
+ * replies".
+ *
+ * 4s is generous for a postMessage handshake to a host that IS listening,
+ * and short enough that a user is not staring at nothing.
+ */
+const INITIALIZE_TIMEOUT_MS = 4000;
+
 export function useTeamsTheme(): TeamsThemeState {
   const [state, setState] = useState<TeamsThemeState>({
     themeName: "default",
@@ -49,9 +73,32 @@ export function useTeamsTheme(): TeamsThemeState {
   useEffect(() => {
     let cancelled = false;
 
-    app
-      .initialize()
-      .then(async () => {
+    // Races the handshake against a timeout, because `initialize()` can hang
+    // rather than reject — see INITIALIZE_TIMEOUT_MS. `Promise.race` and not
+    // a flag check afterwards: a hung promise never runs its `.then`, so
+    // nothing downstream of it would ever execute.
+    const timedOut = Symbol("teams-initialize-timeout");
+    const timeout = new Promise<typeof timedOut>((resolve) =>
+      setTimeout(() => {
+        resolve(timedOut);
+      }, INITIALIZE_TIMEOUT_MS),
+    );
+
+    Promise.race([app.initialize().then(() => "ok" as const), timeout])
+      .then(async (outcome) => {
+        if (outcome === timedOut) {
+          // A parent that never answered. Not an error — the tab is simply
+          // not running under Teams, or Teams is not responding, and either
+          // way rendering something beats rendering nothing.
+          if (!cancelled) {
+            setState({
+              themeName: themeFromLocation(),
+              inTeams: false,
+              ready: true,
+            });
+          }
+          return;
+        }
         const context = await app.getContext();
         if (cancelled) return;
         setState({
