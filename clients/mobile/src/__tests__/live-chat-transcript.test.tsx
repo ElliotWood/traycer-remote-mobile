@@ -25,7 +25,7 @@ import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport
 import type { ChatSnapshot } from "@traycer/protocol/host/agent/gui/subscribe";
 import { hostStreamRpcRegistry } from "@traycer/protocol/host/registry";
 import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
-import { MobileAuthService, type StorageLike } from "@/host/auth-service";
+import { MobileAuthService, type StorageLike } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { openChatStream, createStreamAuthRevalidator } from "@/host/stream-connection";
 import { partitionBlocks } from "@/views/chat/transcript-model";
 import { TranscriptView } from "@/views/chat/transcript-view";

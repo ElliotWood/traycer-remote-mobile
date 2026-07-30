@@ -23,7 +23,7 @@ import type {
 import type {
   DeviceFlowProgress,
   MobileAuthStatus,
-} from "@/host/auth-service";
+} from "@traycer-clients/shared/auth/browser-device-auth-service";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { screen } from "@/test-utils/dom";
 import { createFakeAuth, createFakeHostClient } from "@/test-utils/fakes";

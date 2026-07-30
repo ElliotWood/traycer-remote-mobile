@@ -9,7 +9,7 @@
  * holds no state of its own; `App` re-renders it as `auth.status()` transitions.
  */
 import type { ReactElement } from "react";
-import type { DeviceFlowProgress, MobileAuthError } from "@/host/auth-service";
+import type { DeviceFlowProgress, MobileAuthError } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import type { SignInScreen } from "@/app-screen";
 import { isStorageDurable } from "@traycer-clients/shared/platform/safe-storage";
 import { colors, primaryButton, screen, secondaryButton } from "./ui";

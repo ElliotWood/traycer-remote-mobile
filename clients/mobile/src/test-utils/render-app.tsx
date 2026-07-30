@@ -4,7 +4,7 @@
  * composition seam T5/T6/T7 render tests build on.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { MobileAuthService } from "@/host/auth-service";
+import type { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { HostClientProvider, type MobileHostClient } from "@/host/host-client-context";
 import { App } from "@/App";
 import { render } from "./dom";

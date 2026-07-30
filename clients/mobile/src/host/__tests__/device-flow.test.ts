@@ -9,7 +9,7 @@
  * synchronously with no real timers.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runDeviceAuthorization } from "../auth-service";
+import { runDeviceAuthorization } from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 const AUTHN_BASE_URL = "https://authn.example.test";
 

@@ -37,7 +37,7 @@ import {
 } from "@traycer-clients/shared/platform/safe-storage";
 import { AUTHN_BASE_URL, AUTHN_CONFIGURED, HOST_WS_URL } from "@/config";
 import { computeConfigProblems } from "@/config-diagnostics";
-import { MobileAuthService } from "@/host/auth-service";
+import { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { AuthServiceProvider } from "@/host/auth-service-context";
 import { CACHE_MAX_AGE_MS, CACHE_SCHEMA_VERSION } from "@/host/cache-config";
 import { createHostConnection } from "@/host/connection";

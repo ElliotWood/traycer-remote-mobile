@@ -46,7 +46,7 @@ import {
   type HostStreamRpcRegistry,
 } from "@traycer/protocol/host/registry";
 import { HOST_WS_URL } from "@/config";
-import type { MobileAuthService } from "./auth-service";
+import type { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 /**
  * Per-session dial / handshake / heartbeat timings. Copied verbatim from

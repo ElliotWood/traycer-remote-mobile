@@ -8,7 +8,7 @@
 import { vi } from "vitest";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
-import type { MobileAuthService, MobileAuthStatus } from "@/host/auth-service";
+import type { MobileAuthService, MobileAuthStatus } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import type { MobileHostClient } from "@/host/host-client-context";
 import {
   HostStreamConnection,

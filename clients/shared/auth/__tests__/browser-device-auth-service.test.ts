@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   MobileAuthService,
   type StorageLike,
-} from "../auth-service";
+} from "../browser-device-auth-service";
 
 const AUTHN_BASE_URL = "https://authn.example.test";
 const STORAGE_KEY = "traycer.mobile.auth";

@@ -16,7 +16,7 @@ import type {
   DeviceFlowProgress,
   MobileAuthError,
   MobileAuthStatus,
-} from "@/host/auth-service";
+} from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 export type AppScreen =
   | { readonly kind: "sign-in"; readonly error: MobileAuthError | null }

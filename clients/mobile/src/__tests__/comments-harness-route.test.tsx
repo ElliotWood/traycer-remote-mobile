@@ -8,7 +8,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import type { AuthenticatedUser } from "@traycer/protocol/auth";
-import type { MobileAuthStatus } from "@/host/auth-service";
+import type { MobileAuthStatus } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { createFakeAuth, createFakeHostClient } from "@/test-utils/fakes";
 import { renderApp } from "@/test-utils/render-app";
 import { screen } from "@/test-utils/dom";

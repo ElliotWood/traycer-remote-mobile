@@ -45,24 +45,24 @@ import {
   startDeviceAuthorization,
   type DeviceClientId,
   type DevicePollSchedule,
-} from "@traycer-clients/shared/auth/device-auth";
+} from "./device-auth";
 import {
   refreshOnceAbortable,
   validateAuthTokenIdentityAccessOnly,
   type AuthIdentityValidationResult,
-} from "@traycer-clients/shared/auth/auth-validation";
-import { safeStorage } from "@traycer-clients/shared/platform/safe-storage";
-import type { AuthTokenRefreshResult } from "@traycer-clients/shared/platform/runner-host";
+} from "./auth-validation";
+import { safeStorage } from "../platform/safe-storage";
+import type { AuthTokenRefreshResult } from "../platform/runner-host";
 import {
   DefaultRequestContextProvider,
   type RequestContextListener,
   type RequestContextSubscription,
-} from "@traycer-clients/shared/auth/request-context-provider";
+} from "./request-context-provider";
 import type {
   BearerSourceProvider,
   OpenFrameBearerSource,
-} from "@traycer-clients/shared/auth/bearer-source";
-import type { RevalidateOutcome } from "@traycer-clients/shared/auth/bearer-revalidator";
+} from "./bearer-source";
+import type { RevalidateOutcome } from "./bearer-revalidator";
 import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import type { RequestContext } from "@traycer/protocol/auth/request-context";
 

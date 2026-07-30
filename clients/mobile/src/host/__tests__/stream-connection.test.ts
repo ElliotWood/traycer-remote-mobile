@@ -26,7 +26,7 @@ import {
   StreamConnectionStateStore,
   toConnectionState,
 } from "../stream-connection";
-import type { MobileAuthService } from "../auth-service";
+import type { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 /** A minimal `IStreamSession` that just records handlers and lets a test emit. */
 class MockStreamSession implements IStreamSession {

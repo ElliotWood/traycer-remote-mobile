@@ -11,7 +11,7 @@ import type { AuthenticatedUser } from "@traycer/protocol/auth";
 import type {
   DeviceFlowProgress,
   MobileAuthStatus,
-} from "../host/auth-service";
+} from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { selectAppScreen } from "../app-screen";
 import {
   INITIAL_NAV_STACK,
