@@ -17,6 +17,8 @@
  * `updatedAt` (not `Date.now()`), so only activity that happens AFTER the
  * seed reads as unread.
  */
+import { safeStorage } from "./safe-storage";
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -28,8 +30,9 @@ function storageKey(epicId: string, nodeId: string): string {
   return `${KEY_PREFIX}.${epicId}.${nodeId}`;
 }
 
+/** Never a bare `globalThis.localStorage` — the access itself throws when storage is denied. */
 function defaultStorage(): StorageLike {
-  return globalThis.localStorage;
+  return safeStorage();
 }
 
 /** The stored last-seen timestamp for one node, or `null` if never recorded. */

@@ -11,6 +11,7 @@
 import type { ReactElement } from "react";
 import type { DeviceFlowProgress, MobileAuthError } from "@/host/auth-service";
 import type { SignInScreen } from "@/app-screen";
+import { isStorageDurable } from "@/host/safe-storage";
 import { colors, primaryButton, screen, secondaryButton } from "./ui";
 
 interface SignInViewProps {
@@ -46,12 +47,46 @@ export function SignInView({
         Watch your fleet and answer blocked agents from your phone.
       </p>
 
+      <StorageWarning />
+
       {state.kind === "sign-in" ? (
         <SignInPrompt error={state.error} onSignIn={onSignIn} />
       ) : (
         <SigningIn progress={state.progress} onCancel={onCancel} />
       )}
     </main>
+  );
+}
+
+/**
+ * Shown only when the browser is denying us persistent storage, in which case
+ * the session lives in memory and dies on reload.
+ *
+ * It exists because the alternative is silent: the user signs in, it works,
+ * they reload, and they are signed out again with no explanation — which
+ * reads as a broken product rather than as a browser setting. Saying so costs
+ * one line and turns an inexplicable loop into an understood limitation.
+ *
+ * Deliberately NOT an error: nothing has failed, and everything works for as
+ * long as the tab is open.
+ */
+function StorageWarning(): ReactElement | null {
+  if (isStorageDurable()) return null;
+  return (
+    <p
+      role="status"
+      style={{
+        color: colors.muted,
+        border: `1px solid ${colors.muted}`,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 13,
+      }}
+    >
+      This browser is blocking storage for Traycer Remote, so you&rsquo;ll stay
+      signed in only until you close or reload this tab. Everything else works
+      normally.
+    </p>
   );
 }
 

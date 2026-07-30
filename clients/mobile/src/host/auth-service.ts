@@ -51,6 +51,7 @@ import {
   validateAuthTokenIdentityAccessOnly,
   type AuthIdentityValidationResult,
 } from "@traycer-clients/shared/auth/auth-validation";
+import { safeStorage } from "./safe-storage";
 import type { AuthTokenRefreshResult } from "@traycer-clients/shared/platform/runner-host";
 import {
   DefaultRequestContextProvider,
@@ -107,7 +108,10 @@ export interface DeviceFlowProgress {
  */
 export type MobileAuthStatus =
   | { readonly kind: "signed-out"; readonly error: MobileAuthError | null }
-  | { readonly kind: "signing-in"; readonly progress: DeviceFlowProgress | null }
+  | {
+      readonly kind: "signing-in";
+      readonly progress: DeviceFlowProgress | null;
+    }
   | { readonly kind: "signed-in"; readonly user: AuthenticatedUser };
 
 export type MobileAuthStatusListener = (status: MobileAuthStatus) => void;
@@ -123,7 +127,10 @@ export interface MobileAuthServiceOptions {
   /** Injectable clock (tests). Defaults to `Date.now`. */
   readonly now?: () => number;
   /** Injectable inter-poll delay (tests). Defaults to an abortable timer. */
-  readonly sleep?: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
+  readonly sleep?: (
+    ms: number,
+    signal: AbortSignal | undefined,
+  ) => Promise<void>;
 }
 
 /** `localStorage` key holding the `{ token, refreshToken }` JSON blob. */
@@ -138,7 +145,11 @@ type StoredTokens = { readonly token: string; readonly refreshToken: string };
  * `MobileAuthError` (or, for `cancelled`, silently drops).
  */
 export type DeviceFlowOutcome =
-  | { readonly kind: "authorized"; readonly token: string; readonly refreshToken: string }
+  | {
+      readonly kind: "authorized";
+      readonly token: string;
+      readonly refreshToken: string;
+    }
   | { readonly kind: "denied" }
   | { readonly kind: "expired" }
   | { readonly kind: "invalid" }
@@ -150,7 +161,10 @@ export interface RunDeviceAuthorizationDeps {
   readonly clientId: DeviceClientId;
   readonly hostLabel: string;
   readonly now: () => number;
-  readonly sleep: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
+  readonly sleep: (
+    ms: number,
+    signal: AbortSignal | undefined,
+  ) => Promise<void>;
   readonly signal: AbortSignal | undefined;
   readonly onProgress: (progress: DeviceFlowProgress) => void;
 }
@@ -791,7 +805,10 @@ export class MobileAuthService {
 }
 
 function deviceOutcomeError(
-  outcome: Exclude<DeviceFlowOutcome, { kind: "authorized" } | { kind: "cancelled" }>,
+  outcome: Exclude<
+    DeviceFlowOutcome,
+    { kind: "authorized" } | { kind: "cancelled" }
+  >,
 ): MobileAuthError {
   switch (outcome.kind) {
     case "denied":
@@ -805,8 +822,14 @@ function deviceOutcomeError(
   }
 }
 
+/**
+ * The property ACCESS is what throws when storage is denied — not
+ * `getItem`. `persist`/`readStored` below each wrap their calls in
+ * try/catch and it made no difference: obtaining the object threw first,
+ * during construction, before any of them ran.
+ */
 function defaultLocalStorage(): StorageLike {
-  return globalThis.localStorage;
+  return safeStorage();
 }
 
 /**
