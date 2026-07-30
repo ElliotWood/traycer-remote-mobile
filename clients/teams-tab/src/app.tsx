@@ -25,6 +25,9 @@ import {
   LARGE_FLEET_FIXTURE,
 } from "./fleet/fleet-fixture";
 import { themeFor } from "./theme/teams-theme";
+import { configProblems } from "./config";
+import { SignIn } from "./auth/sign-in";
+import { useAuthService, useAuthStatus } from "./auth/use-auth";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
 const useStyles = makeStyles({
@@ -70,10 +73,46 @@ export function App(): ReactElement {
   const styles = useStyles();
   const { themeName, inTeams, ready } = useTeamsTheme();
   const width = useViewportWidth();
+  const auth = useAuthService();
+  const status = useAuthStatus(auth);
 
   // Nothing paints until initialize settles either way — a flash of the light
   // theme before switching to dark is the sort of thing that reads as cheap.
   if (!ready) return <FluentProvider theme={themeFor("default")} />;
+
+  // Config problems are reported BEFORE anything is attempted. A tab that
+  // starts and then fails on its first RPC is far harder to diagnose from
+  // inside Teams than one that names the missing build variable — there is
+  // no address bar and no easy console in there.
+  const problems = configProblems();
+  if (problems.length > 0) {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <Subtitle1>Traycer isn&rsquo;t configured</Subtitle1>
+          {problems.map((p) => (
+            <Text key={p.key} className={styles.subtle}>
+              <strong>{p.key}</strong> — {p.detail}
+            </Text>
+          ))}
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  if (status.kind !== "signed-in") {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <SignIn
+          status={status}
+          onSignIn={() => void auth.signIn()}
+          onCancel={() => {
+            auth.cancelSignIn();
+          }}
+        />
+      </FluentProvider>
+    );
+  }
 
   // `?fleet=large` and `?view=grid|list` are the same out-of-Teams preview
   // affordance as `?theme`: they let the 55-agent case and the grid-vs-list
