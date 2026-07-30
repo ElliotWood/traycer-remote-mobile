@@ -16,20 +16,23 @@
 # is deliberately not "is the binary present" and not "what version does it
 # print" - it is a real inference round-trip through the real OS user with
 # the real HOME. A version string proves the file downloaded; only a
-# completed turn proves the box can run an agent.
+# completed call proves the box can run an agent.
 #
 # Idempotent and safe to re-run on a live VM - it is the recovery path for an
 # already-deployed box, not only a first-boot phase.
 #
 # Expects TRAYCER_OS_USER and TRAYCER_HOME_ROOT exported by the caller
 # (bootstrap.sh does this; supply them by hand when re-running standalone).
-# TRAYCER_TENANT_IDS is optional - when set, each tenant's HOME is verified
-# individually, because authentication is per-HOME (see below).
 set -euo pipefail
 
 : "${TRAYCER_OS_USER:?TRAYCER_OS_USER must be exported by the caller}"
 : "${TRAYCER_HOME_ROOT:?TRAYCER_HOME_ROOT must be exported by the caller}"
 : "${TRAYCER_TENANT_IDS:=}"
+# Kept overridable AND kept in sync with traycer-agent-probe.sh's own
+# `TRAYCER_CLAUDE_ENV` default (A6 owns the monitoring, this script owns the
+# wiring). If this path ever moves, both must move together or the probe goes
+# false-red on a healthy box - which is exactly what happened once already.
+: "${TRAYCER_CLAUDE_ENV:=/etc/traycer/claude.env}"
 
 # --- the harness binary ---------------------------------------------------
 #
@@ -45,22 +48,42 @@ set -euo pipefail
 #   2. It keeps an npm-managed tree out of /usr, which apt owns.
 #
 # @anthropic-ai/claude-code ships a self-contained native ELF binary (checked
-# with `file -L`: "ELF 64-bit LSB executable, dynamically linked"), so the
-# harness itself has no dependency on the system Node version - only npm is
-# used, as a delivery mechanism.
+# with `file -L`), so the harness has no dependency on the system Node
+# version - npm is only a delivery mechanism.
+#
+# THE HARNESS SELF-UPDATES. Installed 2.1.197 and observed 2.1.220 running
+# within the hour, without this script re-running. So the version this script
+# installs is a floor, not a pin: do not treat a version mismatch against
+# this line as evidence that provisioning did not run.
 echo "agent-runtime: installing the Claude Code harness system-wide"
 npm install -g --prefix /usr/local @anthropic-ai/claude-code
 
-# --- per-tenant scaffolding ----------------------------------------------
+# --- which tenants to cover ----------------------------------------------
 #
-# An agent needs a real directory to work in. A child agent created without
-# an explicit `--cwd` inherits its PARENT's working directory - and when the
-# parent is a desktop agent, that is a Windows path which does not exist
-# here. Giving every tenant a real, writable, git-initialised work root means
-# an agent authored from the phone has somewhere valid to land.
-for tenant_id in ${TRAYCER_TENANT_IDS}; do
+# The union of the caller's list AND whatever HOMEs actually exist on the box
+# - NOT the caller's list alone. A tenant onboarded by hand (outside
+# bootstrap.sh's `TRAYCER_TENANT_IDS` loop) is invisible to that variable, so
+# a list-only loop silently skips the one tenant the box is actually running.
+# That is not hypothetical: `traycer-health-probe@elliot.timer` was found
+# disabled for exactly this reason - the only real tenant on this VM was
+# onboarded outside the loop, so nothing had ever enabled its probe.
+discovered=""
+if [ -d "${TRAYCER_HOME_ROOT}" ]; then
+  for home_dir in "${TRAYCER_HOME_ROOT}"/*; do
+    [ -d "${home_dir}/.traycer" ] || continue
+    discovered="${discovered} $(basename "${home_dir}")"
+  done
+fi
+tenants="$(printf '%s\n' ${TRAYCER_TENANT_IDS} ${discovered} | sort -u | tr '\n' ' ')"
+echo "agent-runtime: covering tenants:${tenants:- (none found)}"
+
+for tenant_id in ${tenants}; do
   tenant_home="${TRAYCER_HOME_ROOT}/${tenant_id}"
   [ -d "$tenant_home" ] || continue
+  # An agent needs a real directory to work in. A child agent created without
+  # an explicit `--cwd` inherits its PARENT's working directory - and when the
+  # parent is a desktop agent that is a Windows path which does not exist
+  # here, so a phone-authored agent has nowhere valid to land without this.
   install -d -o "${TRAYCER_OS_USER}" -g "${TRAYCER_OS_USER}" -m 700 "${tenant_home}/work"
 done
 
@@ -69,8 +92,23 @@ done
 # Runs as the real OS user with the real HOME. `sudo -u` is not decoration:
 # root can run the binary while the `traycer` user cannot (permissions, or a
 # HOME that was never initialised), and root is not who runs agents.
+#
+# THE CREDENTIAL IS AN ENVIRONMENT VARIABLE, NOT A FILE. `claude setup-token`
+# prints a long-lived OAuth token and persists NOTHING - it reports
+# "✓ Long-lived authentication token created successfully!" and leaves no
+# `~/.claude/.credentials.json` behind, so `claude -p` still fails with
+# "Not logged in" immediately afterwards. Authentication is therefore
+# `CLAUDE_CODE_OAUTH_TOKEN` in the environment, sourced here from
+# ${TRAYCER_CLAUDE_ENV}. An earlier revision of THIS script ran the check
+# without it and reported NOT AUTHENTICATED against a perfectly healthy box.
 echo "agent-runtime: verifying the harness executes as ${TRAYCER_OS_USER}"
-for tenant_id in ${TRAYCER_TENANT_IDS}; do
+
+claude_token=""
+if [ -r "${TRAYCER_CLAUDE_ENV}" ]; then
+  claude_token="$(sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p' "${TRAYCER_CLAUDE_ENV}" | head -1)"
+fi
+
+for tenant_id in ${tenants}; do
   tenant_home="${TRAYCER_HOME_ROOT}/${tenant_id}"
   [ -d "$tenant_home" ] || continue
 
@@ -80,37 +118,63 @@ for tenant_id in ${TRAYCER_TENANT_IDS}; do
     exit 1
   fi
 
-  # THE check. A trivial prompt, but a real one: it authenticates, reaches
-  # the API, and returns a completion. This is what distinguishes "installed"
-  # from "able to run an agent", and it is the only step that can detect the
-  # out-of-band auth (below) having never been done.
+  # THE check: a trivial prompt, but a real one - it authenticates, reaches
+  # the API, and returns a completion. This is what separates "installed"
+  # from "able to run an agent".
   #
-  # NON-FATAL by construction, exactly like the deploy-key phase in
-  # bootstrap.sh: an unauthenticated harness on a freshly rebuilt VM is the
-  # EXPECTED first-boot state, and aborting cloud-init over it would take
-  # down ingress and host supervision that have nothing to do with it. It
-  # warns loudly instead - and the warning names the exact command to fix it.
-  if sudo -u "${TRAYCER_OS_USER}" env HOME="${tenant_home}" \
+  # Verified to DISCRIMINATE, in one run, same binary/user/HOME, differing
+  # only in the credential:
+  #   with the token:    `ready`
+  #   without the token: `Not logged in · Please run /login`
+  # A verifier that passes in both states measures nothing, so this was
+  # checked both ways rather than assumed from a single green.
+  #
+  # NON-FATAL by construction, exactly like bootstrap.sh's deploy-key phase:
+  # a rebuilt VM has no credential yet (it cannot - a human must approve an
+  # OAuth grant), and aborting cloud-init over an expected first-boot state
+  # would take down ingress and host supervision that have nothing to do
+  # with it.
+  if [ -n "${claude_token}" ] && sudo -u "${TRAYCER_OS_USER}" \
+       env HOME="${tenant_home}" CLAUDE_CODE_OAUTH_TOKEN="${claude_token}" \
        /usr/local/bin/claude -p 'Reply with the single word: ready' >/dev/null 2>&1; then
-    echo "agent-runtime: ${tenant_id} - harness authenticated, completed a real turn"
+    echo "agent-runtime: ${tenant_id} - harness authenticated, completed a real call"
+    # Configured is not delivered. A correct env file plus a host that
+    # started BEFORE the file landed is a running harness with no credential.
+    # A6's traycer-agent-probe.sh asserts the delivered half continuously;
+    # this is the one-line reminder at provisioning time.
+    echo "agent-runtime: ${tenant_id} - after ANY edit to ${TRAYCER_CLAUDE_ENV}, run: systemctl restart traycer-host@${tenant_id}"
   else
     cat >&2 <<AGENT_RUNTIME_AUTH_EOF
 agent-runtime: ${tenant_id} - harness installed but NOT AUTHENTICATED.
 
-  This is expected on a rebuilt VM and cannot be automated from here: the
+  Expected on a rebuilt VM, and it cannot be automated from here: the
   credential is an OAuth grant against a Claude subscription, and nothing in
   this repo may hold it (see infra/azure/README.md, "Agent execution").
 
-  There is no browser on this VM and no SSH, so drive the flow through a pty
-  that survives between run-command invocations:
+  No browser on this VM and no SSH, so drive the flow through a pty that
+  survives between run-command invocations:
 
-    tmux new-session -d -s claudeauth \\
+    tmux new-session -d -s claudeauth -x 400 -y 50 \\
       "sudo -u ${TRAYCER_OS_USER} env HOME=${tenant_home} TERM=xterm-256color \\
          /usr/local/bin/claude setup-token; sleep 3600"
     tmux capture-pane -p -J -t claudeauth        # read the sign-in URL
-    # ... a human opens that URL and approves, then:
-    tmux send-keys -t claudeauth '<code>' Enter
-    tmux capture-pane -p -J -t claudeauth        # confirm it took
+
+  A human opens that URL - SIGNED IN AS THE ACCOUNT WHOSE QUOTA THIS BOX
+  SHOULD CONSUME, in a private window; an already-signed-in browser approves
+  silently against the wrong account without ever showing a chooser - then:
+
+    tmux send-keys -t claudeauth '<code>'        # the code, on its own
+    tmux send-keys -t claudeauth Enter           # Enter SEPARATELY - batched
+                                                 # with the text it is swallowed
+    tmux capture-pane -p -J -t claudeauth        # read the printed token
+
+  setup-token PRINTS the token and stores nothing, so install it yourself:
+
+    umask 077 && install -d -m 700 /etc/traycer
+    printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\\n' '<token>' > ${TRAYCER_CLAUDE_ENV}
+    chmod 600 ${TRAYCER_CLAUDE_ENV} && chown root:root ${TRAYCER_CLAUDE_ENV}
+    systemctl restart traycer-host@${tenant_id}   # REQUIRED - the host only
+                                                  # picks the value up on start
 
   Then re-run this script to verify. Until it passes, the box serves the
   mobile client and lists epics but cannot execute an agent turn.
