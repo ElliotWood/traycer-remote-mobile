@@ -1378,15 +1378,27 @@ export function buildPrincipalRefusedCard(reason: RefusalReason): Attachment {
           color: "attention",
           spacing: "none",
         }),
-        text("Your account isn't mapped to a Traycer host.", {
-          spacing: "small",
-        }),
+        text(REFUSAL_COPY[reason], { spacing: "small" }),
       ],
       { style: "attention" },
     ),
-    facts([["Reason", reason]]),
+    // The machine-readable reason is kept as a short CODE, not as the
+    // explanation. Someone reporting this needs something exact to quote,
+    // but "unmapped_principal" is not an explanation — it is internal
+    // vocabulary, and showing it as the reason is the same mistake as
+    // printing subprocess output, just smaller.
+    facts([["Code", reason]]),
   ]);
 }
+
+const REFUSAL_COPY: Record<RefusalReason, string> = {
+  unmapped_principal:
+    "Your account isn't linked to a Traycer host yet. Ask whoever set this up to add you.",
+  unmapped_host_id:
+    "The host this conversation points at isn't one we can reach.",
+  malformed_principal:
+    "Your sign-in didn't carry the details we need. Try signing out of Teams and back in.",
+};
 
 /**
  * Recognised failures, in the user's language.
