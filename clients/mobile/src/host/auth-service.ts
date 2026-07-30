@@ -51,7 +51,7 @@ import {
   validateAuthTokenIdentityAccessOnly,
   type AuthIdentityValidationResult,
 } from "@traycer-clients/shared/auth/auth-validation";
-import { safeStorage } from "./safe-storage";
+import { safeStorage } from "@traycer-clients/shared/platform/safe-storage";
 import type { AuthTokenRefreshResult } from "@traycer-clients/shared/platform/runner-host";
 import {
   DefaultRequestContextProvider,

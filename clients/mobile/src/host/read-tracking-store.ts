@@ -17,7 +17,7 @@
  * `updatedAt` (not `Date.now()`), so only activity that happens AFTER the
  * seed reads as unread.
  */
-import { safeStorage } from "./safe-storage";
+import { safeStorage } from "@traycer-clients/shared/platform/safe-storage";
 
 export interface StorageLike {
   getItem(key: string): string | null;

@@ -31,7 +31,10 @@ import {
 } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { isStorageDurable, safeStorage } from "./host/safe-storage";
+import {
+  isStorageDurable,
+  safeStorage,
+} from "@traycer-clients/shared/platform/safe-storage";
 import { AUTHN_BASE_URL, AUTHN_CONFIGURED, HOST_WS_URL } from "@/config";
 import { computeConfigProblems } from "@/config-diagnostics";
 import { MobileAuthService } from "@/host/auth-service";

@@ -11,7 +11,7 @@
 import type { ReactElement } from "react";
 import type { DeviceFlowProgress, MobileAuthError } from "@/host/auth-service";
 import type { SignInScreen } from "@/app-screen";
-import { isStorageDurable } from "@/host/safe-storage";
+import { isStorageDurable } from "@traycer-clients/shared/platform/safe-storage";
 import { colors, primaryButton, screen, secondaryButton } from "./ui";
 
 interface SignInViewProps {
