@@ -210,6 +210,14 @@ export class BridgeClient implements RemoteBridgeActions {
       // rather than just flagged.
       isLocal: a.isLocal,
       hostId: a.hostId,
+      // Carried for the same reason as `isLocal`: without it a caller cannot
+      // tell "this host cannot SEE that agent" from "this host cannot REACH
+      // it". Those are different facts and only one of them makes a row
+      // useless.
+      capabilities: {
+        readTranscript: a.capabilities.readTranscript,
+        sendMessage: a.capabilities.sendMessage,
+      },
     }));
   }
 

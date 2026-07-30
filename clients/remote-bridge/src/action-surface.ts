@@ -142,6 +142,16 @@ export interface AgentSummary {
   readonly isLocal: boolean;
   /** The host the agent runs on, so a caller can say WHICH rather than just "elsewhere". */
   readonly hostId: string;
+  /**
+   * What this host can actually DO with the agent, which is a different
+   * question from whether it can see the agent executing. A row can be
+   * invisible (`isLocal: false`, so `active` is meaningless) and still be
+   * fully readable and messageable.
+   */
+  readonly capabilities: {
+    readonly readTranscript: boolean;
+    readonly sendMessage: boolean;
+  };
 }
 
 export interface ChatStatus {
