@@ -7,9 +7,18 @@ import {
   buildBridgeUnavailableCard,
   buildEpicNotBoundCard,
   buildUsageCard,
+  buildMessageOutcomeCard,
+  MAX_MESSAGE_LENGTH,
+  MESSAGE_INPUT_ID,
   REJECT_VERB,
+  SEND_VERB,
+  type ChatRef,
 } from "./cards";
-import { submitApprovalDecision, type ApprovalDecision } from "./host-access";
+import {
+  submitApprovalDecision,
+  submitChatMessage,
+  type ApprovalDecision,
+} from "./host-access";
 import type { DispatchDeps } from "./dispatch";
 
 /**
@@ -46,10 +55,98 @@ function readString(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/**
+ * The send path. Same identity ordering as a decision — resolve, then act.
+ *
+ * The empty-message guard is not defensive padding: `Action.Submit` fires
+ * whether or not the user typed anything, so an accidental tap on an
+ * untouched composer would otherwise deliver an empty message into a running
+ * agent's queue. That is unsendable once away, so it is refused here rather
+ * than reported afterwards.
+ */
+async function dispatchSend(
+  request: ActionInvokeRequest,
+  deps: DispatchDeps,
+): Promise<ActionInvokeResult> {
+  const chatId = readString(request.data, "chatId");
+  if (chatId === null) {
+    return {
+      card: buildUsageCard("That composer was missing its chat id."),
+      acted: false,
+    };
+  }
+
+  // Trimmed for the emptiness test AND for what is sent: a message that is
+  // nothing but a stray newline is the same accident as an empty one.
+  const text = (readString(request.data, MESSAGE_INPUT_ID) ?? "").trim();
+  if (text.length === 0) {
+    return {
+      card: buildUsageCard(
+        "Nothing to send — type a message before pressing Send.",
+      ),
+      acted: false,
+    };
+  }
+  if (text.length > MAX_MESSAGE_LENGTH) {
+    return {
+      card: buildUsageCard(
+        `That message is ${String(text.length)} characters; the limit is ${String(MAX_MESSAGE_LENGTH)}.`,
+      ),
+      acted: false,
+    };
+  }
+
+  // Identity first — before the message is issued, never after.
+  const identity = await deps.resolvePrincipal();
+  if (identity.kind === "unavailable") {
+    return {
+      card: buildIdentityUnavailableCard(identity.reason),
+      acted: false,
+    };
+  }
+
+  const chat: ChatRef = {
+    chatId,
+    // The composer knows the title it was rendered with; carrying it back
+    // means the outcome card can name the chat without a second host read.
+    title: readString(request.data, "chatTitle"),
+  };
+
+  const result = await submitChatMessage(
+    identity.principal,
+    request.conversationId,
+    chatId,
+    text,
+    deps,
+  );
+
+  switch (result.kind) {
+    case "ok":
+      return {
+        card: buildMessageOutcomeCard(result.outcome, chat),
+        acted: true,
+      };
+    case "principal_refused":
+      return { card: buildPrincipalRefusedCard(result.reason), acted: false };
+    case "epic_not_bound":
+      return { card: buildEpicNotBoundCard(), acted: false };
+    case "bridge_unavailable":
+      // NOT "nothing happened": the bridge may have delivered the message
+      // before failing. `acted` reports only whether we know an outcome.
+      return {
+        card: buildBridgeUnavailableCard(result.reason, result.detail),
+        acted: false,
+      };
+  }
+}
+
 export async function dispatchActionInvoke(
   request: ActionInvokeRequest,
   deps: DispatchDeps,
 ): Promise<ActionInvokeResult> {
+  if (request.verb === SEND_VERB) {
+    return dispatchSend(request, deps);
+  }
   if (request.verb !== APPROVE_VERB && request.verb !== REJECT_VERB) {
     return {
       card: buildUsageCard(`Unknown card action "${request.verb}".`),

@@ -12,6 +12,7 @@ import {
   runApprove,
   runList,
   runReject,
+  runSend,
   runStatus,
   runWatch,
 } from "./adapters/cli-adapter";
@@ -132,6 +133,27 @@ program
       // `| null` throughout (this repo bans optional parameters).
       await withBridge(opts, (bridge) =>
         runReject(bridge, approvalId, reason ?? null, logger),
+      );
+    },
+  );
+
+program
+  .command("send <chatId> <text>")
+  .description("Send a message to a chat")
+  .option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)")
+  .option(
+    "--sender-agent-id <id>",
+    "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
+  )
+  .action(
+    async (
+      chatId: string,
+      text: string,
+      opts: { epicId?: string; senderAgentId?: string },
+    ) => {
+      const logger = createLogger("info");
+      await withBridge(opts, (bridge) =>
+        runSend(bridge, chatId, text, logger),
       );
     },
   );

@@ -12,6 +12,17 @@ export type Command =
   | { readonly kind: "epics" }
   | { readonly kind: "bind_epic"; readonly epicId: string }
   | { readonly kind: "chat"; readonly chatId: string }
+  /**
+   * The EXPLICIT typed send path. There is deliberately no implicit one:
+   * unrecognised text falls through to `help` below, so if bare text meant
+   * "send to the agent", every mistyped command would be delivered to a
+   * running agent and could not be unsent. See `buildComposeCard`.
+   *
+   * It also has to name its chat, because a conversation is bound to an
+   * EPIC, which holds many chats — there is no "current agent" to infer.
+   */
+  | { readonly kind: "say"; readonly chatId: string; readonly text: string }
+  | { readonly kind: "compose"; readonly chatId: string }
   | { readonly kind: "help" }
   /**
    * A recognised command word used wrongly (e.g. bare `epic` with no id).
@@ -56,6 +67,27 @@ export function parseCommand(rawText: string): Command {
     return {
       kind: "usage",
       usage: `${lower} <id> — show one chat's status (get ids from "fleet")`,
+    };
+  }
+
+  // `say <chatId> <text>` — note the text is taken from the ORIGINAL string,
+  // not the lowercased one, and its internal spacing is whatever survived
+  // the whitespace normalisation above. Matching on `text` keeps the
+  // message's own capitalisation, which a lowercased match would destroy.
+  const sayMatch = /^(?:say|reply|send)\s+(\S+)\s+([\s\S]+)$/i.exec(text);
+  if (sayMatch) {
+    return { kind: "say", chatId: sayMatch[1], text: sayMatch[2] };
+  }
+  // `say <chatId>` with no text opens the composer rather than erroring:
+  // the user has named a destination and clearly intends to write to it.
+  const composeMatch = /^(?:say|reply|send)\s+(\S+)$/i.exec(text);
+  if (composeMatch) {
+    return { kind: "compose", chatId: composeMatch[1] };
+  }
+  if (lower === "say" || lower === "reply" || lower === "send") {
+    return {
+      kind: "usage",
+      usage: `${lower} <chat-id> [message] — message an agent (omit the message for a compose box)`,
     };
   }
 

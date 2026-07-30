@@ -12,6 +12,8 @@ import {
   type TestJwksServer,
 } from "../../auth/__tests__/test-jwks-server";
 import { dispatchCommand, type DispatchDeps } from "../dispatch";
+import { dispatchActionInvoke } from "../dispatch-action";
+import { SEND_VERB } from "../cards";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
 import type { OneShotSpawnFn } from "../one-shot-spawn";
 import type { ResolvePrincipal } from "../principal-source";
@@ -258,5 +260,273 @@ describe("read-surface/dispatch — routing and identity gating", () => {
     const body = bodyOf(card);
     expect(body).toContain("Couldn't reach your Traycer host");
     expect(body).not.toContain("No agents in this epic yet");
+  });
+});
+
+describe("read-surface/dispatch-action — the send path", () => {
+  const CHAT_ID = "a1000000-0000-4000-8000-000000000004";
+
+  function sendDeps(opts: {
+    readonly resolvePrincipal: ResolvePrincipal;
+    readonly spawnFn: OneShotSpawnFn;
+    readonly bound?: boolean;
+  }): DispatchDeps {
+    const epicBindings = new InMemoryEpicBindingStore();
+    if (opts.bound !== false) void epicBindings.set("conv-1", "epic-a");
+    return {
+      registry: sendRegistry,
+      epicBindings,
+      bridgeCliConfig: {
+        command: "/absolute/traycer-remote-bridge",
+        timeoutMs: 5000,
+        spawnFn: opts.spawnFn,
+      },
+      senderAgentId: "teams-bot",
+      parentEnv: {},
+      resolvePrincipal: opts.resolvePrincipal,
+      now: () => 0,
+    };
+  }
+
+  let sendRegistry: IdentityRegistry;
+  let alice: VerifiedPrincipal;
+  let jwks2: TestJwksServer;
+
+  beforeAll(async () => {
+    jwks2 = await startTestJwksServer();
+    const config: AadIdTokenConfig = {
+      issuer: "https://login.microsoftonline.com/test-tenant/v2.0",
+      openIdMetadataUrl: jwks2.openIdMetadataUrl,
+      audience: AUDIENCE,
+      clockSkewSeconds: 300,
+      jwksCacheMaxAgeMs: 24 * 60 * 60 * 1000,
+      fetchTimeoutMs: 5000,
+    };
+    const now = Math.floor(Date.now() / 1000);
+    const token = jwt.sign(
+      {
+        iss: config.issuer,
+        aud: AUDIENCE,
+        oid: ALICE_OID,
+        iat: now,
+        exp: now + 600,
+      },
+      jwks2.privateKeyPem,
+      { algorithm: "RS256", keyid: jwks2.kid },
+    );
+    alice = {
+      kind: "entra",
+      oid: await validateAadIdToken({ token, config, now: Date.now }),
+    };
+    sendRegistry = IdentityRegistry.fromConfig(
+      {
+        tenants: [
+          {
+            home: "/tenants/alice",
+            hostId: "alice-host",
+            entraOid: ALICE_OID,
+            traycerUserId: null,
+          },
+        ],
+      },
+      () => {},
+    );
+  });
+
+  afterAll(async () => {
+    await jwks2.close();
+  });
+
+  const resolved: ResolvePrincipal = async () => ({
+    kind: "resolved",
+    principal: alice,
+  });
+
+  it("CONTRACT: an empty message never reaches the bridge", async () => {
+    // Action.Submit fires whether or not anything was typed, so an
+    // accidental tap on an untouched composer would otherwise deliver an
+    // empty message into a running agent's queue — unsendable once away.
+    let spawned = false;
+    const deps = sendDeps({
+      resolvePrincipal: resolved,
+      spawnFn: async () => {
+        spawned = true;
+        return { code: 0, stdout: "{}", stderr: "", timedOut: false };
+      },
+    });
+
+    for (const text of ["", "   ", "\n\n", "\t "]) {
+      const result = await dispatchActionInvoke(
+        {
+          verb: SEND_VERB,
+          conversationId: "conv-1",
+          data: { chatId: CHAT_ID, messageText: text },
+        },
+        deps,
+      );
+      expect(result.acted, JSON.stringify(text)).toBe(false);
+      expect(JSON.stringify(result.card.content)).toContain("Nothing to send");
+    }
+    expect(spawned).toBe(false);
+  });
+
+  it("CONTRACT: identity is resolved BEFORE the message is issued", async () => {
+    // Asserts ORDER, not merely "an unavailable identity doesn't spawn" —
+    // that weaker check passes even if the guard is deleted, because
+    // `resolveTenant` would refuse downstream anyway and the spawn still
+    // wouldn't happen. So this runs the SUCCESS path and records the
+    // sequence: if the send were issued first and identity checked after,
+    // an unauthorised message would already have landed on a host by the
+    // time it was refused.
+    const calls: string[] = [];
+    const deps = sendDeps({
+      resolvePrincipal: async () => {
+        calls.push("resolvePrincipal");
+        return { kind: "resolved", principal: alice };
+      },
+      spawnFn: async () => {
+        calls.push("spawn");
+        return {
+          code: 0,
+          stdout: JSON.stringify({ kind: "applied" }),
+          stderr: "",
+          timedOut: false,
+        };
+      },
+    });
+
+    const result = await dispatchActionInvoke(
+      {
+        verb: SEND_VERB,
+        conversationId: "conv-1",
+        data: { chatId: CHAT_ID, messageText: "real text" },
+      },
+      deps,
+    );
+
+    expect(result.acted).toBe(true);
+    expect(calls).toEqual(["resolvePrincipal", "spawn"]);
+  });
+
+  it("an unavailable identity is refused, and nothing is spawned", async () => {
+    let spawned = false;
+    const deps = sendDeps({
+      resolvePrincipal: async () => ({
+        kind: "unavailable",
+        reason: "no_principal",
+      }),
+      spawnFn: async () => {
+        spawned = true;
+        return { code: 0, stdout: "{}", stderr: "", timedOut: false };
+      },
+    });
+
+    const result = await dispatchActionInvoke(
+      {
+        verb: SEND_VERB,
+        conversationId: "conv-1",
+        data: { chatId: CHAT_ID, messageText: "real text" },
+      },
+      deps,
+    );
+
+    expect(result.acted).toBe(false);
+    expect(spawned).toBe(false);
+  });
+
+  it("passes the message as a single argv element, so quotes and newlines are data", async () => {
+    // No shell is involved; this pins that the text is never split or
+    // reinterpreted on its way to the bridge.
+    const nasty = 'a "quoted" thing; rm -rf /\nsecond `line`';
+    let seen: readonly string[] = [];
+    const deps = sendDeps({
+      resolvePrincipal: resolved,
+      spawnFn: async (_cmd, args) => {
+        seen = args;
+        return {
+          code: 0,
+          stdout: JSON.stringify({ kind: "applied" }),
+          stderr: "",
+          timedOut: false,
+        };
+      },
+    });
+
+    const result = await dispatchActionInvoke(
+      {
+        verb: SEND_VERB,
+        conversationId: "conv-1",
+        data: { chatId: CHAT_ID, messageText: nasty },
+      },
+      deps,
+    );
+
+    expect(seen).toEqual(["send", CHAT_ID, nasty]);
+    expect(result.acted).toBe(true);
+  });
+
+  it("a missing chat id is refused rather than guessed at", async () => {
+    const deps = sendDeps({
+      resolvePrincipal: resolved,
+      spawnFn: async () => {
+        throw new Error("must not spawn");
+      },
+    });
+    const result = await dispatchActionInvoke(
+      { verb: SEND_VERB, conversationId: "conv-1", data: { messageText: "x" } },
+      deps,
+    );
+    expect(result.acted).toBe(false);
+    expect(JSON.stringify(result.card.content)).toContain("chat id");
+  });
+
+  it("an over-long message is refused locally, before it costs a spawn", async () => {
+    let spawned = false;
+    const deps = sendDeps({
+      resolvePrincipal: resolved,
+      spawnFn: async () => {
+        spawned = true;
+        return { code: 0, stdout: "{}", stderr: "", timedOut: false };
+      },
+    });
+    const result = await dispatchActionInvoke(
+      {
+        verb: SEND_VERB,
+        conversationId: "conv-1",
+        data: { chatId: CHAT_ID, messageText: "x".repeat(5000) },
+      },
+      deps,
+    );
+    expect(result.acted).toBe(false);
+    expect(spawned).toBe(false);
+  });
+
+  it("an unconfirmed send advises checking, NOT resending — a duplicate is a real second message", async () => {
+    const deps = sendDeps({
+      resolvePrincipal: resolved,
+      spawnFn: async () => ({
+        code: 1,
+        stdout: JSON.stringify({
+          kind: "failed",
+          reason: "reconcile window expired",
+        }),
+        stderr: "",
+        timedOut: false,
+      }),
+    });
+
+    const result = await dispatchActionInvoke(
+      {
+        verb: SEND_VERB,
+        conversationId: "conv-1",
+        data: { chatId: CHAT_ID, messageText: "hello", chatTitle: "My chat" },
+      },
+      deps,
+    );
+
+    const body = JSON.stringify(result.card.content);
+    expect(body).toContain("Couldn't confirm");
+    expect(body).toContain("not a no-op");
+    expect(body).not.toContain("try again");
   });
 });

@@ -66,3 +66,57 @@ describe("read-surface/commands — usage errors are distinct from help", () => 
     expect(parseCommand("wat").kind).toBe("help");
   });
 });
+
+describe("read-surface/commands — the typed send path is always explicit", () => {
+  it("CONTRACT: unrecognised text is NEVER a message to an agent", () => {
+    // The load-bearing safety property. If bare text meant "send", every
+    // mistyped command would be delivered to a running agent and could not
+    // be unsent. Typos must land on help, which does nothing.
+    for (const typo of ["flet", "chta", "staus", "do something weird", "hi"]) {
+      expect(parseCommand(typo).kind, typo).toBe("help");
+    }
+  });
+
+  it("parses 'say <chatId> <text>' and keeps the message intact", () => {
+    const c = parseCommand("say c-1 please rerun the failing test");
+    expect(c).toEqual({
+      kind: "say",
+      chatId: "c-1",
+      text: "please rerun the failing test",
+    });
+  });
+
+  it("preserves the message's own capitalisation and punctuation", () => {
+    // Matching on the lowercased copy would silently destroy the message.
+    const c = parseCommand("say c-1 Use Foo.bar() NOT foo.Bar()");
+    expect(c.kind).toBe("say");
+    if (c.kind !== "say") return;
+    expect(c.text).toBe("Use Foo.bar() NOT foo.Bar()");
+  });
+
+  it("accepts 'reply' and 'send' as the same command", () => {
+    for (const word of ["say", "reply", "send"]) {
+      const c = parseCommand(`${word} c-1 hello`);
+      expect(c.kind, word).toBe("say");
+    }
+  });
+
+  it("'say <chatId>' with no message opens the composer, it does not error", () => {
+    expect(parseCommand("say c-1")).toEqual({ kind: "compose", chatId: "c-1" });
+  });
+
+  it("bare 'say' is a usage error naming the chat id, not help", () => {
+    const c = parseCommand("say");
+    expect(c.kind).toBe("usage");
+    if (c.kind !== "usage") return;
+    expect(c.usage).toContain("<chat-id>");
+  });
+
+  it("a message that looks like another command is still a message", () => {
+    // "say c-1 fleet" must send the word "fleet", not list the fleet.
+    const c = parseCommand("say c-1 fleet");
+    expect(c.kind).toBe("say");
+    if (c.kind !== "say") return;
+    expect(c.text).toBe("fleet");
+  });
+});

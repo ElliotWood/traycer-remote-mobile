@@ -59,6 +59,7 @@ const ADAPTIVE_CARD_VERSION = "1.5";
 export const APPROVE_VERB = "traycer/approve";
 export const REJECT_VERB = "traycer/reject";
 export const OPEN_CHAT_VERB = "traycer/openChat";
+export const SEND_VERB = "traycer/send";
 
 /**
  * Plain Unicode, NOT emoji: no variation selector, no colour font, no image
@@ -69,6 +70,7 @@ export const OPEN_CHAT_VERB = "traycer/openChat";
  */
 export const APPROVE_TITLE = "✓ Approve";
 export const REJECT_TITLE = "✕ Reject";
+export const SEND_TITLE = "➤ Send";
 
 /**
  * `Action.Submit`, NOT `Action.Execute` — deliberate, and the reasoning is
@@ -691,6 +693,83 @@ function chatLabel(chat: ChatRef): string {
   return title.length > 0 ? title : shortId(chat.chatId);
 }
 
+/** Matches the host's own composer cap; a longer body is a paste accident. */
+export const MAX_MESSAGE_LENGTH = 4000;
+
+export const MESSAGE_INPUT_ID = "messageText";
+
+/**
+ * The composer. Deliberately a CARD INPUT rather than "type in the Teams
+ * compose box and we'll forward it", and the reason is addressing, not taste.
+ *
+ * A Teams conversation here is bound to an EPIC, and an epic holds many
+ * chats — the fleet card routinely lists a dozen. So a bare typed message has
+ * no addressee: there is no single agent it could mean. The card input
+ * carries `chatId` in its own `data`, so what you are replying to is whatever
+ * card you are typing into, which is both unambiguous and visible.
+ *
+ * The second reason is that it would be unsafe. `parseCommand` falls through
+ * to the help card for anything it does not recognise; if unrecognised text
+ * instead meant "send to the agent", every mistyped command (`flet`, `chta`)
+ * would be delivered to a running agent, and a message to an agent cannot be
+ * unsent. Making the destructive reading the DEFAULT for typos is the wrong
+ * way round.
+ *
+ * There is still a typed path — `say <chatId> <text>` — for people who would
+ * rather not hunt for a card. It is explicit about its target, which is the
+ * property that matters. What does not exist, on purpose, is an implicit one.
+ */
+export function buildComposeCard(chat: ChatRef, epicId: string): Attachment {
+  return buildCard(
+    [
+      container(
+        [
+          text("Reply to", { isSubtle: true, size: "small", spacing: "none" }),
+          text(chatLabel(chat), {
+            weight: "bolder",
+            size: "medium",
+            spacing: "none",
+          }),
+          // Epic sits in the header, NOT between the input and Send. A fact
+          // row wedged there separates the button from the thing it acts on,
+          // which reads as though it belongs to the button.
+          text(`Epic ${shortId(epicId)}`, {
+            isSubtle: true,
+            size: "small",
+            spacing: "small",
+          }),
+        ],
+        { style: "emphasis" },
+      ),
+      {
+        type: "Input.Text",
+        id: MESSAGE_INPUT_ID,
+        // No `label`: the placeholder already says what this is, and a
+        // "Message" label above an obvious message box is one more line of
+        // height at the width where height is scarcest.
+        placeholder: "Send a message to this agent…",
+        isMultiline: true,
+        maxLength: MAX_MESSAGE_LENGTH,
+      },
+    ],
+    [
+      submitAction(
+        SEND_TITLE,
+        SEND_VERB,
+        // `chatTitle` rides along so the outcome card can name the chat
+        // without a second host read. It is display-only — never an identity
+        // or routing signal, both of which come from `chatId` and the
+        // resolved principal.
+        { chatId: chat.chatId, chatTitle: chat.title ?? "" },
+        // `associateInputs` is REQUIRED here, unlike on Approve: without it
+        // Teams sends the action without the typed text and the message
+        // arrives empty.
+        { associateInputs: true, style: "positive" },
+      ),
+    ],
+  );
+}
+
 /**
  * One pending approval, actionable. `attention`-styled because a blocked
  * agent is the thing the user most needs to see, and the reason the product
@@ -853,6 +932,72 @@ export function buildActionOutcomeCard(
 }
 
 /**
+ * The send equivalent of {@link buildActionOutcomeCard}, and separate from it
+ * because the honest wording differs. `failed` on an approval means "may or
+ * may not have applied — go and look". `failed` on a SEND means the message
+ * may or may not have reached the agent, and the safe advice is the opposite
+ * of retrying: a resend that turns out to be a duplicate is a second message
+ * in the agent's queue, which it will act on.
+ */
+export function buildMessageOutcomeCard(
+  outcome: ActionOutcome,
+  chat: ChatRef,
+): Attachment {
+  switch (outcome.kind) {
+    case "applied":
+      return card([
+        container(
+          [
+            text("Message sent", {
+              weight: "bolder",
+              color: "good",
+              spacing: "none",
+            }),
+            text(`Delivered to ${chatLabel(chat)}.`, {
+              isSubtle: true,
+              spacing: "small",
+            }),
+          ],
+          { style: "good" },
+        ),
+      ]);
+    case "rejected":
+      return card([
+        container(
+          [
+            text("The host declined this message", {
+              weight: "bolder",
+              color: "warning",
+              spacing: "none",
+            }),
+            text(outcome.reason ?? "No reason given.", { spacing: "small" }),
+          ],
+          { style: "warning" },
+        ),
+        ...(outcome.code === null ? [] : [facts([["Code", outcome.code]])]),
+      ]);
+    case "failed":
+      return card([
+        container(
+          [
+            text("Couldn't confirm this message", {
+              weight: "bolder",
+              color: "attention",
+              spacing: "none",
+            }),
+            text(outcome.reason, { spacing: "small" }),
+          ],
+          { style: "attention" },
+        ),
+        text(
+          'It may already have reached the agent. Check with "chat <id>" before sending again — a duplicate is a second message the agent will act on, not a no-op.',
+          { isSubtle: true, size: "small", spacing: "medium" },
+        ),
+      ]);
+  }
+}
+
+/**
  * Deliberately does NOT advertise `epics` — the bridge has no such command,
  * and the user hit "unknown command 'epics'" three times because this card
  * listed it. Re-add the line in the same change that implements it.
@@ -869,7 +1014,8 @@ export function buildHelpCard(): Attachment {
       [
         facts([
           ["fleet", "agents in the current epic"],
-          ["chat <id>", "one chat's status, with any approvals"],
+          ["chat <id>", "status, approvals, and a reply box"],
+          ["say <id> <text>", "message an agent"],
           ["epic <id>", "switch this chat to another epic"],
         ]),
       ],

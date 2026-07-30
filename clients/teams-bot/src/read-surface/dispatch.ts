@@ -3,7 +3,9 @@ import {
   buildApprovalCard,
   buildBridgeUnavailableCard,
   buildChatCard,
+  buildComposeCard,
   buildInterviewCard,
+  buildMessageOutcomeCard,
   buildEpicBoundCard,
   buildEpicNotBoundCard,
   buildEpicPickerCard,
@@ -18,6 +20,7 @@ import {
   fetchChatStatus,
   fetchEpicList,
   fetchFleet,
+  submitChatMessage,
   type HostAccessDeps,
   type ReadSurfaceFailure,
 } from "./host-access";
@@ -138,8 +141,51 @@ export async function dispatchCommand(
         for (const interview of result.status.pendingInterviews) {
           cards.push(buildInterviewCard(chat, epicId, interview, now));
         }
+        // The composer goes LAST, after anything awaiting a decision. A chat
+        // you can watch but not talk to was the functional hole; putting the
+        // reply box above the approvals would bury the thing that is
+        // actually blocking the agent.
+        cards.push(buildComposeCard(chat, epicId));
       }
       return cards;
+    }
+    case "compose": {
+      // Reads status first rather than composing blind: it resolves the
+      // chat's title for the card, and it refuses a chat id that does not
+      // exist instead of accepting a message bound for nowhere.
+      const result = await fetchChatStatus(
+        principal,
+        conversationId,
+        command.chatId,
+        deps,
+      );
+      if (result.kind !== "ok") {
+        return [failureCard(result)];
+      }
+      return [
+        buildComposeCard(
+          { chatId: result.status.chatId, title: result.status.title },
+          result.epicId,
+        ),
+      ];
+    }
+    case "say": {
+      const result = await submitChatMessage(
+        principal,
+        conversationId,
+        command.chatId,
+        command.text,
+        deps,
+      );
+      if (result.kind !== "ok") {
+        return [failureCard(result)];
+      }
+      return [
+        buildMessageOutcomeCard(result.outcome, {
+          chatId: command.chatId,
+          title: null,
+        }),
+      ];
     }
   }
 }

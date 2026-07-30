@@ -198,6 +198,26 @@ export function approveAction(
   return runAction(["approve", approvalId], env, config);
 }
 
+/**
+ * Sends a message to a chat.
+ *
+ * Takes an explicit `chatId` where approve/reject take only an approval id:
+ * an approval id is unique enough for the bridge to find its own chat, but
+ * "send this text" has nothing to search by. The destination has to be named.
+ *
+ * `text` crosses as a single argv element via {@link OneShotSpawnFn}, which
+ * uses no shell — so spaces, quotes, newlines and backticks in a user's
+ * message are argument data, never anything the OS could interpret.
+ */
+export function sendMessageAction(
+  chatId: string,
+  text: string,
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<ActionOutcome>> {
+  return runAction(["send", chatId, text], env, config);
+}
+
 /** `reason` is surfaced to the agent as the denial explanation; omit for none. */
 export function rejectAction(
   approvalId: string,

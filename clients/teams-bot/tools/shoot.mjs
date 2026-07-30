@@ -227,6 +227,33 @@ add("18-chat-idle", () =>
   ),
 );
 
+// P1 send/reply. `21` is the composer as it appears standalone; `22` is the
+// long-title case, since the header carries a chat title of unknown length
+// and 320px is where that first hurts.
+add("21-compose", () => C.buildComposeCard(CHAT_REF, EPIC_ID));
+add("22-compose-long-title", () =>
+  C.buildComposeCard(
+    {
+      chatId: STATUS_LIVE.chatId,
+      title:
+        "Migrate config loader to zod, read surface, approvals and the card quality pass",
+    },
+    EPIC_ID,
+  ),
+);
+add("23-compose-untitled", () =>
+  C.buildComposeCard({ chatId: STATUS_LIVE.chatId, title: null }, EPIC_ID),
+);
+add("24-message-sent", () =>
+  C.buildMessageOutcomeCard({ kind: "applied" }, CHAT_REF),
+);
+add("25-message-unconfirmed", () =>
+  C.buildMessageOutcomeCard(
+    { kind: "failed", reason: "reconcile window expired after 45s" },
+    CHAT_REF,
+  ),
+);
+
 // The two that answer the open question: what does a fenced code block / a
 // markdown table actually LOOK like once Teams card markdown has refused to
 // render it? These are the evidence, not the assertion.

@@ -10,6 +10,7 @@ import {
   listAgents,
   listEpics,
   rejectAction,
+  sendMessageAction,
   type BridgeCliConfig,
   type BridgeCliFailureReason,
 } from "./bridge-cli";
@@ -202,6 +203,59 @@ export async function submitApprovalDecision(
           env,
           deps.bridgeCliConfig,
         );
+
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", outcome: result.value };
+}
+
+/**
+ * Sends a message to a chat, through the SAME identity seam as approvals —
+ * `resolveTenant` before the send, never after, and the bridge runs under
+ * that tenant's own `HOME`.
+ *
+ * Routing this through `resolveTenant` rather than trusting the card's
+ * `chatId` matters for a reason beyond consistency. The chat id arrives in
+ * the action payload, which Bot Service relays and which we do not treat as
+ * an identity signal. A forged payload can therefore name a different chat —
+ * but only ever on the acting user's OWN host, because the host is chosen by
+ * the resolved principal and nothing in the payload can influence it. It can
+ * never send as someone else.
+ *
+ * KNOWN GAP, out of scope today and deliberately not papered over: the
+ * bridge stamps the outbound frame with its own authenticated host user, so
+ * a message sent from Teams is indistinguishable in the transcript from one
+ * typed on the desktop. That is fine while the demo principal is env-gated
+ * and single-user. It stops being fine the moment SSO admits a second person,
+ * at which point their message would be attributed to the host owner. The
+ * send path goes through this seam precisely so that fix is a change of
+ * VALUE, not a change of shape.
+ */
+export async function submitChatMessage(
+  principal: VerifiedPrincipal,
+  conversationId: string,
+  chatId: string,
+  text: string,
+  deps: HostAccessDeps,
+): Promise<ActionResult> {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+
+  const env = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await sendMessageAction(
+    chatId,
+    text,
+    env,
+    deps.bridgeCliConfig,
+  );
 
   if (result.kind === "failed") {
     return toReadSurfaceFailure(result);

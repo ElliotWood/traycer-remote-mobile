@@ -70,6 +70,31 @@ export async function runReject(
   if (outcome.kind !== "applied") process.exitCode = 1;
 }
 
+/**
+ * Sends a message to a chat, addressed by chat id.
+ *
+ * Unlike `approve`/`reject` this takes an EXPLICIT `chatId` rather than
+ * searching for one: an approval id is globally unique so finding its chat is
+ * unambiguous, whereas "send this text" has no id to search by. A caller that
+ * cannot name the destination does not have one.
+ *
+ * Note the asymmetry with approvals in the failure path: a repeated approval
+ * is deduped by the host, so a retry is safe. A repeated SEND is not — it is
+ * a second message the agent will act on. Callers must treat a non-`applied`
+ * outcome as "unknown", not as "retry me".
+ */
+export async function runSend(
+  bridge: BridgeClient,
+  chatId: string,
+  text: string,
+  logger: ILogger,
+): Promise<void> {
+  const outcome = await bridge.sendMessage(chatId, text);
+  logger.info("send outcome", { chatId, outcome });
+  process.stdout.write(`${JSON.stringify(outcome)}\n`);
+  if (outcome.kind !== "applied") process.exitCode = 1;
+}
+
 /** Long-running: prints every currently-pending approval/interview across tracked chats every `WATCH_POLL_MS`, until SIGINT/SIGTERM. */
 export function runWatch(bridge: BridgeClient, logger: ILogger): Promise<void> {
   return new Promise<void>((resolve) => {
