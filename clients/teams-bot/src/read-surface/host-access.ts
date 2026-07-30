@@ -11,6 +11,7 @@ import {
   listEpics,
   rejectAction,
   sendMessageAction,
+  getTranscript,
   type BridgeCliConfig,
   type BridgeCliFailureReason,
 } from "./bridge-cli";
@@ -20,6 +21,7 @@ import type {
   AgentSummary,
   ChatStatus,
   EpicSummary,
+  Transcript,
 } from "./bridge-types";
 
 /**
@@ -261,6 +263,42 @@ export async function submitChatMessage(
     return toReadSurfaceFailure(result);
   }
   return { kind: "ok", outcome: result.value };
+}
+
+export type TranscriptResult =
+  { readonly kind: "ok"; readonly transcript: Transcript } | ReadSurfaceFailure;
+
+/** Identity-gated exactly like every other read. `offset` counts from the newest end. */
+export async function fetchTranscript(
+  principal: VerifiedPrincipal,
+  conversationId: string,
+  chatId: string,
+  offset: number,
+  limit: number,
+  deps: HostAccessDeps,
+): Promise<TranscriptResult> {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+
+  const env = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await getTranscript(
+    chatId,
+    offset,
+    limit,
+    env,
+    deps.bridgeCliConfig,
+  );
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", transcript: result.value };
 }
 
 export async function fetchEpicList(

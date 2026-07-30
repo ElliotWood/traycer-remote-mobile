@@ -12,11 +12,17 @@ import {
   MESSAGE_INPUT_ID,
   REJECT_VERB,
   SEND_VERB,
+  OLDER_VERB,
+  NEWER_VERB,
+  FULL_HISTORY_VERB,
+  TRANSCRIPT_PAGE_SIZE,
+  buildTranscriptCard,
   type ChatRef,
 } from "./cards";
 import {
   submitApprovalDecision,
   submitChatMessage,
+  fetchTranscript,
   type ApprovalDecision,
 } from "./host-access";
 import type { DispatchDeps } from "./dispatch";
@@ -140,12 +146,84 @@ async function dispatchSend(
   }
 }
 
+/**
+ * Paging — the one action here that changes nothing.
+ *
+ * It is still identity-gated, for the same reason the reads are: the offset
+ * and chat id arrive in the card payload, and a resolved principal is what
+ * decides WHICH HOST is read. Without it a relayed payload could name a chat
+ * on a host the presser has no claim to.
+ *
+ * `acted` is `false` on success, unlike every other branch: nothing was
+ * changed. The flag reports mutation, not whether the press worked.
+ */
+async function dispatchPage(
+  request: ActionInvokeRequest,
+  deps: DispatchDeps,
+): Promise<ActionInvokeResult> {
+  const chatId = readString(request.data, "chatId");
+  if (chatId === null) {
+    return {
+      card: buildUsageCard("That button was missing its chat id."),
+      acted: false,
+    };
+  }
+  // A malformed offset pages from a defined place rather than throwing or
+  // silently slicing from the wrong end.
+  const rawOffset = Number.parseInt(
+    readString(request.data, "offset") ?? "",
+    10,
+  );
+  const offset = Number.isInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+
+  const identity = await deps.resolvePrincipal();
+  if (identity.kind === "unavailable") {
+    return {
+      card: buildIdentityUnavailableCard(identity.reason),
+      acted: false,
+    };
+  }
+
+  const result = await fetchTranscript(
+    identity.principal,
+    request.conversationId,
+    chatId,
+    offset,
+    TRANSCRIPT_PAGE_SIZE,
+    deps,
+  );
+
+  switch (result.kind) {
+    case "ok":
+      return {
+        card: buildTranscriptCard(result.transcript, deps.now()),
+        acted: false,
+      };
+    case "principal_refused":
+      return { card: buildPrincipalRefusedCard(result.reason), acted: false };
+    case "epic_not_bound":
+      return { card: buildEpicNotBoundCard(), acted: false };
+    case "bridge_unavailable":
+      return {
+        card: buildBridgeUnavailableCard(result.reason, result.detail),
+        acted: false,
+      };
+  }
+}
+
 export async function dispatchActionInvoke(
   request: ActionInvokeRequest,
   deps: DispatchDeps,
 ): Promise<ActionInvokeResult> {
   if (request.verb === SEND_VERB) {
     return dispatchSend(request, deps);
+  }
+  if (
+    request.verb === OLDER_VERB ||
+    request.verb === NEWER_VERB ||
+    request.verb === FULL_HISTORY_VERB
+  ) {
+    return dispatchPage(request, deps);
   }
   if (request.verb !== APPROVE_VERB && request.verb !== REJECT_VERB) {
     return {

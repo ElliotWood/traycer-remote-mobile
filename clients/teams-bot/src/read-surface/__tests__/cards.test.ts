@@ -11,8 +11,16 @@ import {
   buildFleetCard,
   buildHelpCard,
   buildPrincipalRefusedCard,
+  buildTranscriptCard,
+  buildContextStripCard,
+  CONTEXT_STRIP_SIZE,
 } from "../cards";
-import type { ChatStatus } from "../bridge-types";
+import type {
+  ChatStatus,
+  Transcript,
+  TranscriptMessage,
+  TranscriptPart,
+} from "../bridge-types";
 
 /** Every `TextBlock.text` in the card, i.e. exactly what a user can read. */
 function collectTextBlocks(node: unknown): string[] {
@@ -510,5 +518,162 @@ describe("read-surface/cards — approval and interview cards stand alone", () =
       ),
     );
     expect(body).toContain(LONG_CHAT_ID);
+  });
+});
+
+describe("read-surface/cards — transcript", () => {
+  const msg = (
+    id: string,
+    role: "user" | "assistant",
+    text: string,
+    parts: TranscriptPart[],
+  ): TranscriptMessage => ({
+    messageId: id,
+    role,
+    author: role === "user" ? null : "claude",
+    timestamp: 0,
+    text,
+    parts,
+  });
+
+  const transcript = (over: Partial<Transcript>): Transcript => ({
+    chatId: "a1000000-0000-4000-8000-000000000004",
+    title: "My chat",
+    totalCount: 214,
+    offset: 0,
+    messages: [
+      msg("1", "user", "first", []),
+      msg("2", "assistant", "second", []),
+      msg("3", "user", "third", []),
+    ],
+    ...over,
+  });
+
+  it("renders NEWEST FIRST — you land on the current state, not message #1", () => {
+    const visible = collectTextBlocks(
+      buildTranscriptCard(transcript({}), 0).content,
+    );
+    const third = visible.findIndex((t) => t.includes("third"));
+    const first = visible.findIndex((t) => t.includes("first"));
+    expect(third).toBeGreaterThanOrEqual(0);
+    expect(third).toBeLessThan(first);
+  });
+
+  it("says which slice of the whole history is on screen", () => {
+    const visible = JSON.stringify(
+      collectTextBlocks(buildTranscriptCard(transcript({}), 0).content),
+    );
+    expect(visible).toContain("of 214");
+  });
+
+  it("CONTRACT: no Newer button on the first page — it degrades to the one-way card", () => {
+    // The whole reason this variant was chosen: the second control costs
+    // nothing because it does not exist until you have paged back.
+    const content = buildTranscriptCard(transcript({ offset: 0 }), 0)
+      .content as { actions?: { title: string }[] };
+    const titles = (content.actions ?? []).map((a) => a.title);
+    expect(titles.some((t) => t.includes("Newer"))).toBe(false);
+    expect(titles.some((t) => t.includes("Older"))).toBe(true);
+  });
+
+  it("offers BOTH directions once paged back", () => {
+    const content = buildTranscriptCard(transcript({ offset: 40 }), 0)
+      .content as { actions?: { title: string }[] };
+    const titles = (content.actions ?? []).map((a) => a.title);
+    expect(titles.some((t) => t.includes("Newer"))).toBe(true);
+    expect(titles.some((t) => t.includes("Older"))).toBe(true);
+  });
+
+  it("offers no paging at all when the whole history fits", () => {
+    const content = buildTranscriptCard(
+      transcript({ totalCount: 3, offset: 0 }),
+      0,
+    ).content as { actions?: unknown[] };
+    expect(content.actions ?? []).toHaveLength(0);
+  });
+
+  it("collapses code to a marker rather than reproducing it inline", () => {
+    // A transcript is a scanning surface. Ten monospace blocks is a wall,
+    // which is why this does NOT reuse the approval card's treatment.
+    const visible = collectTextBlocks(
+      buildTranscriptCard(
+        transcript({
+          messages: [
+            msg("1", "assistant", "Here:\n```ts\nconst x = 1;\n```\ndone", [
+              { kind: "code", label: "a.ts", lines: 3 },
+            ]),
+          ],
+        }),
+        0,
+      ).content,
+    );
+    const joined = visible.join(" ");
+    expect(joined).toContain("Here:");
+    expect(joined).toContain("done");
+    expect(joined).not.toContain("const x = 1;");
+    expect(joined).toContain("⟨code · a.ts · 3 lines⟩");
+  });
+
+  it("a parts-only message renders its markers, not an empty bubble", () => {
+    const visible = collectTextBlocks(
+      buildTranscriptCard(
+        transcript({
+          messages: [
+            msg("1", "assistant", "", [
+              { kind: "command", label: "bun test", lines: 0 },
+            ]),
+          ],
+        }),
+        0,
+      ).content,
+    );
+    expect(visible.join(" ")).toContain("⟨command · bun test⟩");
+  });
+
+  it("the context strip truncates HARDER than the full transcript", () => {
+    // It sits above a pending approval; a long agent answer there costs the
+    // decision its place above the fold.
+    const long = "x".repeat(400);
+    const inStrip = collectTextBlocks(
+      buildContextStripCard(
+        transcript({ messages: [msg("1", "assistant", long, [])] }),
+        0,
+      ).content,
+    ).join(" ");
+    const inFull = collectTextBlocks(
+      buildTranscriptCard(
+        transcript({ messages: [msg("1", "assistant", long, [])] }),
+        0,
+      ).content,
+    ).join(" ");
+    expect(inStrip.length).toBeLessThan(inFull.length);
+  });
+
+  it("the context strip shows at most CONTEXT_STRIP_SIZE messages, and the NEWEST ones", () => {
+    // Distinct, non-prefixing bodies: an earlier version of this test used
+    // `message ${i}` and passed for the wrong reason, because "message 1" is
+    // a substring of "message 17".
+    const many = Array.from({ length: 20 }, (_, i) =>
+      msg(String(i), "assistant", `body-${String(i).padStart(2, "0")}-end`, []),
+    );
+    const visible = collectTextBlocks(
+      buildContextStripCard(transcript({ messages: many }), 0).content,
+    ).join(" ");
+    const shown = many.filter((m) =>
+      visible.includes(
+        `body-${(m as { messageId: string }).messageId.padStart(2, "0")}-end`,
+      ),
+    );
+    expect(shown).toHaveLength(CONTEXT_STRIP_SIZE);
+    // The newest three, not the oldest three.
+    expect(visible).toContain("body-19-end");
+    expect(visible).not.toContain("body-00-end");
+  });
+
+  it("the strip's full-history button names how many are hidden", () => {
+    const content = buildContextStripCard(transcript({}), 0).content as {
+      actions?: { title: string }[];
+    };
+    expect((content.actions ?? [])[0]?.title).toContain("211");
   });
 });

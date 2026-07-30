@@ -1,3 +1,4 @@
+import type { Transcript } from "./transcript-projection";
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
 
 /**
@@ -47,6 +48,22 @@ export interface RemoteBridgeActions {
 
   /** Sends a plain-text user message into a chat (starts or continues a turn). */
   sendMessage(chatId: string, text: string): Promise<ActionOutcome>;
+
+  /**
+   * A window of a chat's transcript, projected to prose plus non-prose
+   * markers for card-shaped channels (see `transcript-projection.ts`).
+   *
+   * `offset` counts from the RECENT end — `0` is "now". This is a read, so
+   * unlike the action methods it returns data rather than an
+   * {@link ActionOutcome}, and an empty window means an empty window, not a
+   * failure; use `getStatus().connected` to tell "nothing to show" from
+   * "not connected yet".
+   */
+  getTranscript(
+    chatId: string,
+    offset: number,
+    limit: number,
+  ): Promise<Transcript>;
 }
 
 /**

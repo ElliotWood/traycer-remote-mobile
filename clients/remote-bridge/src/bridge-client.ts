@@ -18,6 +18,7 @@ import {
   DEFAULT_REFRESH_MIN_DELAY_MS,
 } from "@traycer-clients/shared/auth/token-refresh-scheduler";
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
+import type { Transcript } from "./transcript-projection";
 import { ChatSession } from "./chat-session";
 import { HostEndpointPoller } from "./host-endpoint";
 import {
@@ -181,8 +182,16 @@ export class BridgeClient implements RemoteBridgeActions {
       call: () =>
         this.rpcClient.request(
           "agent.list",
-          { epicId: this.epicId, senderAgentId: this.senderAgentId, scope: "user" },
-          { endpoint, bearer: this.auth.lease, abortSignal: new AbortController().signal },
+          {
+            epicId: this.epicId,
+            senderAgentId: this.senderAgentId,
+            scope: "user",
+          },
+          {
+            endpoint,
+            bearer: this.auth.lease,
+            abortSignal: new AbortController().signal,
+          },
         ),
       onDiagnostic: (message) => this.logger.warn(message, null),
       delayMs: TRANSIENT_RETRY_DELAY_MS,
@@ -222,6 +231,14 @@ export class BridgeClient implements RemoteBridgeActions {
 
   async sendMessage(chatId: string, text: string): Promise<ActionOutcome> {
     return this.ensureChatSession(chatId).sendMessage(text);
+  }
+
+  async getTranscript(
+    chatId: string,
+    offset: number,
+    limit: number,
+  ): Promise<Transcript> {
+    return this.ensureChatSession(chatId).getTranscript(offset, limit);
   }
 
   /**
@@ -300,7 +317,8 @@ export class BridgeClient implements RemoteBridgeActions {
     );
     this.notificationsSession = session;
     session.onServerFrame((envelope) => {
-      const parsed = hostNotificationsSubscribeServerFrameSchema.safeParse(envelope);
+      const parsed =
+        hostNotificationsSubscribeServerFrameSchema.safeParse(envelope);
       if (!parsed.success) return;
       const frame = parsed.data;
       const entries =

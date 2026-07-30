@@ -95,6 +95,34 @@ export async function runSend(
   if (outcome.kind !== "applied") process.exitCode = 1;
 }
 
+/**
+ * A window of a chat's transcript as JSON.
+ *
+ * `offset` counts from the RECENT end, so `--offset 0` is the newest page.
+ * Both bounds are validated here rather than trusted: they arrive from a
+ * command line, and a negative or non-numeric offset would silently slice
+ * from the wrong end via `Array.slice`'s negative-index behaviour.
+ */
+export async function runTranscript(
+  bridge: BridgeClient,
+  chatId: string,
+  offset: number,
+  limit: number,
+): Promise<void> {
+  if (!Number.isInteger(offset) || offset < 0) {
+    process.stderr.write(`[bridge] --offset must be a non-negative integer\n`);
+    process.exitCode = 1;
+    return;
+  }
+  if (!Number.isInteger(limit) || limit <= 0) {
+    process.stderr.write(`[bridge] --limit must be a positive integer\n`);
+    process.exitCode = 1;
+    return;
+  }
+  const transcript = await bridge.getTranscript(chatId, offset, limit);
+  process.stdout.write(`${JSON.stringify(transcript, null, 2)}\n`);
+}
+
 /** Long-running: prints every currently-pending approval/interview across tracked chats every `WATCH_POLL_MS`, until SIGINT/SIGTERM. */
 export function runWatch(bridge: BridgeClient, logger: ILogger): Promise<void> {
   return new Promise<void>((resolve) => {

@@ -13,6 +13,7 @@ import {
   runList,
   runReject,
   runSend,
+  runTranscript,
   runStatus,
   runWatch,
 } from "./adapters/cli-adapter";
@@ -108,7 +109,9 @@ program
       opts: { epicId?: string; senderAgentId?: string },
     ) => {
       const logger = createLogger("info");
-      await withBridge(opts, (bridge) => runApprove(bridge, approvalId, logger));
+      await withBridge(opts, (bridge) =>
+        runApprove(bridge, approvalId, logger),
+      );
     },
   );
 
@@ -152,8 +155,41 @@ program
       opts: { epicId?: string; senderAgentId?: string },
     ) => {
       const logger = createLogger("info");
+      await withBridge(opts, (bridge) => runSend(bridge, chatId, text, logger));
+    },
+  );
+
+program
+  .command("transcript <chatId>")
+  .description("Print a window of a chat's transcript (newest first)")
+  .option("--offset <n>", "Messages to skip from the NEWEST end", "0")
+  .option("--limit <n>", "Window size", "5")
+  .option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)")
+  .option(
+    "--sender-agent-id <id>",
+    "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
+  )
+  .action(
+    async (
+      chatId: string,
+      opts: {
+        offset: string;
+        limit: string;
+        epicId?: string;
+        senderAgentId?: string;
+      },
+    ) => {
+      // `Number.parseInt` rather than `Number`: commander hands these over as
+      // strings and `runTranscript` rejects anything that isn't a
+      // non-negative integer, so "abc" becomes NaN and is refused there
+      // rather than silently becoming 0.
       await withBridge(opts, (bridge) =>
-        runSend(bridge, chatId, text, logger),
+        runTranscript(
+          bridge,
+          chatId,
+          Number.parseInt(opts.offset, 10),
+          Number.parseInt(opts.limit, 10),
+        ),
       );
     },
   );

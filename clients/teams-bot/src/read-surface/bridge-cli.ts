@@ -4,6 +4,8 @@ import {
   agentListSchema,
   chatStatusSchema,
   epicListSchema,
+  transcriptSchema,
+  type Transcript,
   type ActionOutcome,
   type AgentSummary,
   type ChatStatus,
@@ -110,6 +112,33 @@ export function getChatStatus(
   config: BridgeCliConfig,
 ): Promise<BridgeCliResult<ChatStatus>> {
   return runAndParse(["status", chatId], env, config, chatStatusSchema);
+}
+
+/**
+ * A window of a chat's transcript. `offset` counts from the NEWEST end, so
+ * `0` is the current page — the bridge's own flag is documented the same way
+ * and both sides now agree, which they briefly did not.
+ */
+export function getTranscript(
+  chatId: string,
+  offset: number,
+  limit: number,
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<Transcript>> {
+  return runAndParse(
+    [
+      "transcript",
+      chatId,
+      "--offset",
+      String(offset),
+      "--limit",
+      String(limit),
+    ],
+    env,
+    config,
+    transcriptSchema,
+  );
 }
 
 /**

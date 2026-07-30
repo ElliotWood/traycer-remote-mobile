@@ -23,6 +23,13 @@ export type Command =
    */
   | { readonly kind: "say"; readonly chatId: string; readonly text: string }
   | { readonly kind: "compose"; readonly chatId: string }
+  /**
+   * The full transcript, paged. Separate from `chat` on purpose: `chat <id>`
+   * has to keep a pending approval above Teams' "see more" fold, and a full
+   * history stacked on top of the status, approvals and composer would push
+   * the blocked agent underneath the history meant to explain it.
+   */
+  | { readonly kind: "log"; readonly chatId: string; readonly offset: number }
   | { readonly kind: "help" }
   /**
    * A recognised command word used wrongly (e.g. bare `epic` with no id).
@@ -67,6 +74,17 @@ export function parseCommand(rawText: string): Command {
     return {
       kind: "usage",
       usage: `${lower} <id> — show one chat's status (get ids from "fleet")`,
+    };
+  }
+
+  const logMatch = /^(?:log|history|transcript)\s+(\S+)$/i.exec(text);
+  if (logMatch) {
+    return { kind: "log", chatId: logMatch[1], offset: 0 };
+  }
+  if (lower === "log" || lower === "history" || lower === "transcript") {
+    return {
+      kind: "usage",
+      usage: `${lower} <chat-id> — read a chat's history (get ids from "fleet")`,
     };
   }
 

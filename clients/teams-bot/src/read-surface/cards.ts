@@ -726,6 +726,8 @@ export const NEWER_VERB = "traycer/newer";
  * One segmentation, two presentations. Deliberately not a second parser.
  */
 const TRANSCRIPT_TEXT_LIMIT = 220;
+/** The `chat <id>` strip's tighter cap — see `transcriptRow`'s `compact`. */
+const CONTEXT_STRIP_TEXT_LIMIT = 100;
 
 export function partMarker(part: TranscriptPart): string {
   const noun =
@@ -750,7 +752,11 @@ export function partMarker(part: TranscriptPart): string {
  * what to show, because "nothing to preview" reads differently depending on
  * whether there are parts to name.
  */
-export function transcriptPreview(message: TranscriptMessage): string {
+export function transcriptPreview(
+  message: TranscriptMessage,
+  compact: boolean,
+): string {
+  const limit = compact ? CONTEXT_STRIP_TEXT_LIMIT : TRANSCRIPT_TEXT_LIMIT;
   const prose = describeApproval(message.text)
     .map((block) => {
       // Only TOP-LEVEL TextBlocks: code and tables live inside containers,
@@ -764,9 +770,7 @@ export function transcriptPreview(message: TranscriptMessage): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  return prose.length > TRANSCRIPT_TEXT_LIMIT
-    ? `${prose.slice(0, TRANSCRIPT_TEXT_LIMIT - 1)}…`
-    : prose;
+  return prose.length > limit ? `${prose.slice(0, limit - 1)}…` : prose;
 }
 
 /**
@@ -778,8 +782,17 @@ export function transcriptPreview(message: TranscriptMessage): string {
  * another and you lose the turn boundary, which is the one thing a
  * transcript has to make obvious.
  */
-function transcriptRow(message: TranscriptMessage, now: number): unknown {
-  const preview = transcriptPreview(message);
+function transcriptRow(
+  message: TranscriptMessage,
+  now: number,
+  /**
+   * The `chat <id>` strip is MORE aggressive than `log <id>`: it has three
+   * messages to work with and a pending decision sitting beneath it, so a
+   * long agent answer there costs the approval its place above the fold.
+   */
+  compact: boolean,
+): unknown {
+  const preview = transcriptPreview(message, compact);
   const items: unknown[] = [
     text(
       `${message.author ?? (message.role === "user" ? "You" : "Agent")} · ${approvalAgeLabel(message.timestamp, now)}`,
@@ -848,50 +861,20 @@ function transcriptHeader(transcript: Transcript, shown: number): unknown {
 }
 
 /**
- * CANDIDATE A — newest-first, one "load older" button.
+ * The full transcript, on `log <id>`. Chosen over the one-way variant for a
+ * reason that turned out to settle it: the second control only renders once
+ * `offset > 0`, so on the first page this IS the one-way card. There is no
+ * cost to pay for a capability that does not appear until it is needed —
+ * and without it, paging back four times leaves re-running the command as
+ * the only route to the present.
  *
- * You land on the card wanting the CURRENT state, not message #1 of 214, so
- * the newest message is at the top and older history is something you
- * explicitly ask for. One control, one direction, no page arithmetic to hold
- * in your head.
+ * Window size is 5 rather than 9. Nine messages measured ~1050px at 320px
+ * wide, which is past where Teams collapses a card behind "see more", and a
+ * transcript you must expand before reading defeats the point. UNVERIFIED
+ * against a real Teams client — the threshold is inferred from the render,
+ * not measured in the product.
  */
-export function buildTranscriptCardA(
-  transcript: Transcript,
-  now: number,
-): Attachment {
-  const shown = newestFirst(transcript.messages);
-  const hasOlder =
-    transcript.offset > 0 ||
-    transcript.totalCount > transcript.messages.length + transcript.offset;
-  return buildCard(
-    [
-      transcriptHeader(transcript, shown.length),
-      ...shown.map((m) => transcriptRow(m, now)),
-    ],
-    hasOlder
-      ? [
-          submitAction(
-            OLDER_TITLE,
-            OLDER_VERB,
-            {
-              chatId: transcript.chatId,
-              offset: String(transcript.offset + transcript.messages.length),
-            },
-            { associateInputs: false },
-          ),
-        ]
-      : [],
-  );
-}
-
-/**
- * CANDIDATE B — a fixed window with both directions.
- *
- * Symmetrical and predictable, and the only candidate that lets you walk
- * BACK toward the present without re-running the command. The cost is two
- * controls and a position you have to track.
- */
-export function buildTranscriptCardB(
+export function buildTranscriptCard(
   transcript: Transcript,
   now: number,
 ): Attachment {
@@ -931,43 +914,66 @@ export function buildTranscriptCardB(
   return buildCard(
     [
       transcriptHeader(transcript, shown.length),
-      ...shown.map((m) => transcriptRow(m, now)),
+      ...shown.map((m) => transcriptRow(m, now, false)),
     ],
     actions,
   );
 }
 
+/** How many messages the `chat <id>` context strip shows. */
+export const CONTEXT_STRIP_SIZE = 3;
 /**
- * CANDIDATE C — a short recent window plus a drill-in.
- *
- * Shows only the last few turns inline and sends everything else to the
- * full-history surface, on the theory that a phone card is for orienting and
- * anything deeper wants a real reader. Shortest card by a wide margin.
- *
- * The drill-in is NOT built — it is P2's URL dialog. Rendered here as a
- * disabled-looking affordance so the comparison is honest about what would
- * still be missing if this candidate won.
+ * `log <id>` window. Five rather than nine: nine measured ~1050px at 320px
+ * wide, past where Teams collapses a card behind "see more", and a
+ * transcript you must expand before reading defeats the point. The
+ * threshold is inferred from the render and UNVERIFIED in the product.
  */
-export function buildTranscriptCardC(
+export const TRANSCRIPT_PAGE_SIZE = 5;
+
+export const FULL_HISTORY_VERB = "traycer/history";
+
+/**
+ * The context strip on `chat <id>` — the last few messages, and nothing else.
+ *
+ * This was candidate C, which was the wrong answer for the transcript and is
+ * the right one HERE. As the whole transcript it just restated the hole
+ * politely ("211 earlier messages, not available"); as a strip above a
+ * composer it is exactly the shape wanted, because compactness is the
+ * requirement rather than a compromise.
+ *
+ * Why it exists at all: `chat <id>` already returns status, approvals,
+ * interviews and a composer, and a full transcript on top would risk pushing
+ * the APPROVAL behind Teams' "see more" collapse — the blocked agent hidden
+ * under the history that was meant to explain it. Three messages says what
+ * the agent was doing when it stopped, without moving the decision below the
+ * fold. The rest is one button away.
+ */
+export function buildContextStripCard(
   transcript: Transcript,
   now: number,
 ): Attachment {
-  const shown = newestFirst(transcript.messages).slice(0, 3);
-  const remaining = transcript.totalCount - shown.length;
+  const shown = newestFirst(transcript.messages).slice(0, CONTEXT_STRIP_SIZE);
+  const remaining = Math.max(0, transcript.totalCount - shown.length);
   return buildCard(
     [
-      transcriptHeader(transcript, shown.length),
-      ...shown.map((m) => transcriptRow(m, now)),
-      ...(remaining > 0
-        ? [
-            text(
-              `${String(remaining)} earlier messages — full history isn't available from Teams yet.`,
-              { isSubtle: true, size: "small", separator: true },
-            ),
-          ]
-        : []),
+      text("Recently", {
+        weight: "bolder",
+        size: "small",
+        isSubtle: true,
+        spacing: "none",
+      }),
+      ...shown.map((m) => transcriptRow(m, now, true)),
     ],
-    [],
+    remaining > 0
+      ? [
+          submitAction(
+            `↑ Full history (${String(remaining)} more)`,
+            FULL_HISTORY_VERB,
+            { chatId: transcript.chatId, offset: "0" },
+            { associateInputs: false },
+          ),
+        ]
+      : [],
   );
 }
 
@@ -1294,6 +1300,7 @@ export function buildHelpCard(): Attachment {
           ["fleet", "agents in the current epic"],
           ["chat <id>", "status, approvals, and a reply box"],
           ["say <id> <text>", "message an agent"],
+          ["log <id>", "read a chat's history"],
           ["epic <id>", "switch this chat to another epic"],
         ]),
       ],

@@ -321,22 +321,22 @@ const TRANSCRIPT = {
   messages: TRANSCRIPT_MESSAGES,
 };
 
-add("30-transcript-A-newest-first", () =>
-  C.buildTranscriptCardA(TRANSCRIPT, Date.now()),
+add("30-transcript-page1", () =>
+  C.buildTranscriptCard(
+    { ...TRANSCRIPT, messages: TRANSCRIPT_MESSAGES.slice(4) },
+    Date.now(),
+  ),
 );
-add("31-transcript-B-window", () =>
-  C.buildTranscriptCardB({ ...TRANSCRIPT, offset: 40 }, Date.now()),
+add("31-transcript-paged-back", () =>
+  C.buildTranscriptCard(
+    { ...TRANSCRIPT, offset: 40, messages: TRANSCRIPT_MESSAGES.slice(0, 5) },
+    Date.now(),
+  ),
 );
-add("32-transcript-C-recent-only", () =>
-  C.buildTranscriptCardC(TRANSCRIPT, Date.now()),
-);
-add("33-transcript-A-short-chat", () =>
-  C.buildTranscriptCardA(
-    {
-      ...TRANSCRIPT,
-      totalCount: TRANSCRIPT_MESSAGES.length,
-      messages: TRANSCRIPT_MESSAGES.slice(0, 4),
-    },
+add("32-context-strip", () => C.buildContextStripCard(TRANSCRIPT, Date.now()));
+add("33-context-strip-short-chat", () =>
+  C.buildContextStripCard(
+    { ...TRANSCRIPT, totalCount: 3, messages: TRANSCRIPT_MESSAGES.slice(0, 3) },
     Date.now(),
   ),
 );

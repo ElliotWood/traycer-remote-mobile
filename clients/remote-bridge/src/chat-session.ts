@@ -14,6 +14,11 @@ import type { IStreamSession } from "@traycer-clients/shared/host-transport/i-st
 import type { WsStreamClient } from "@traycer-clients/shared/host-transport/ws-stream-client";
 import { ActionTracker, type ChatSnapshotView } from "./action-tracker";
 import type { ActionOutcome, ChatStatus } from "./action-surface";
+import {
+  projectMessage,
+  selectWindow,
+  type Transcript,
+} from "./transcript-projection";
 import type { HostAuth } from "./host-auth";
 
 /** Delay before retrying a subscribe whose UNAUTHORIZED close could not be resolved (no rotation available). */
@@ -112,7 +117,11 @@ export class ChatSession {
         // Do NOT keep reporting connected/pending-state as current.
         this.connected = false;
       }
-      if (status === "closed" && reason !== null && reason.kind === "fatalError") {
+      if (
+        status === "closed" &&
+        reason !== null &&
+        reason.kind === "fatalError"
+      ) {
         if (reason.details.code === "UNAUTHORIZED") {
           void this.recoverFromUnauthorized();
         } else {
@@ -230,6 +239,30 @@ export class ChatSession {
     };
   }
 
+  /**
+   * A window of the chat's transcript, projected for card rendering.
+   *
+   * The messages were already here: `chat.subscribe`'s snapshot carries
+   * `chat.messages` in full, and this class was holding it and projecting
+   * only status out of it. No new host read path, no cursor protocol — the
+   * data has been arriving the whole time and was simply discarded.
+   *
+   * Unlike `getStatus`, an empty result is not distinguishable from "no
+   * snapshot yet" by the shape alone, so callers must read `connected` from
+   * `getStatus` if that distinction matters to them.
+   */
+  async getTranscript(offset: number, limit: number): Promise<Transcript> {
+    await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
+    const messages = this.snapshot?.chat.messages ?? [];
+    return {
+      chatId: this.chatId,
+      title: this.snapshot?.chat.title ?? null,
+      totalCount: messages.length,
+      offset,
+      messages: selectWindow(messages, offset, limit).map(projectMessage),
+    };
+  }
+
   async approve(approvalId: string): Promise<ActionOutcome> {
     return this.decide(approvalId, { approved: true, reason: null });
   }
@@ -246,14 +279,23 @@ export class ChatSession {
     decision: { readonly approved: boolean; readonly reason: string | null },
   ): Promise<ActionOutcome> {
     if (this.terminated !== null) {
-      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+      return {
+        kind: "failed",
+        reason: `chat session is disconnected: ${this.terminated}`,
+      };
     }
     await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     if (this.terminated !== null) {
-      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+      return {
+        kind: "failed",
+        reason: `chat session is disconnected: ${this.terminated}`,
+      };
     }
     if (this.snapshot === null) {
-      return { kind: "failed", reason: "not connected yet - no snapshot observed" };
+      return {
+        kind: "failed",
+        reason: "not connected yet - no snapshot observed",
+      };
     }
     const isToolApproval = this.pendingApprovals.some(
       (a) => a.approvalId === approvalId,
@@ -268,7 +310,9 @@ export class ChatSession {
       };
     }
     const clientActionId = randomUUID();
-    const kind = isFileEditApproval ? "fileEditApprovalDecision" : "approvalDecision";
+    const kind = isFileEditApproval
+      ? "fileEditApprovalDecision"
+      : "approvalDecision";
     return this.tracker.issue({
       clientActionId,
       frame: {
@@ -299,14 +343,23 @@ export class ChatSession {
     answers: readonly InterviewAnswer[],
   ): Promise<ActionOutcome> {
     if (this.terminated !== null) {
-      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+      return {
+        kind: "failed",
+        reason: `chat session is disconnected: ${this.terminated}`,
+      };
     }
     await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     if (this.terminated !== null) {
-      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+      return {
+        kind: "failed",
+        reason: `chat session is disconnected: ${this.terminated}`,
+      };
     }
     if (this.snapshot === null) {
-      return { kind: "failed", reason: "not connected yet - no snapshot observed" };
+      return {
+        kind: "failed",
+        reason: "not connected yet - no snapshot observed",
+      };
     }
     if (!this.pendingInterviews.some((i) => i.blockId === blockId)) {
       return {
@@ -332,14 +385,23 @@ export class ChatSession {
 
   async sendMessage(text: string): Promise<ActionOutcome> {
     if (this.terminated !== null) {
-      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+      return {
+        kind: "failed",
+        reason: `chat session is disconnected: ${this.terminated}`,
+      };
     }
     await this.waitForFirstSnapshot(FIRST_SNAPSHOT_TIMEOUT_MS);
     if (this.terminated !== null) {
-      return { kind: "failed", reason: `chat session is disconnected: ${this.terminated}` };
+      return {
+        kind: "failed",
+        reason: `chat session is disconnected: ${this.terminated}`,
+      };
     }
     if (this.snapshot === null) {
-      return { kind: "failed", reason: "not connected yet - no snapshot observed" };
+      return {
+        kind: "failed",
+        reason: "not connected yet - no snapshot observed",
+      };
     }
     const clientActionId = randomUUID();
     const messageId = clientActionId;
@@ -430,7 +492,11 @@ export class ChatSession {
         return;
       }
       case "approvalRequested": {
-        if (!this.pendingApprovals.some((a) => a.approvalId === frame.approval.approvalId)) {
+        if (
+          !this.pendingApprovals.some(
+            (a) => a.approvalId === frame.approval.approvalId,
+          )
+        ) {
           this.pendingApprovals.push(frame.approval);
         }
         return;

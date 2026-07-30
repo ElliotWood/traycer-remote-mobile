@@ -4,6 +4,10 @@ import {
   buildBridgeUnavailableCard,
   buildChatCard,
   buildComposeCard,
+  buildContextStripCard,
+  buildTranscriptCard,
+  CONTEXT_STRIP_SIZE,
+  TRANSCRIPT_PAGE_SIZE,
   buildInterviewCard,
   buildMessageOutcomeCard,
   buildEpicBoundCard,
@@ -20,6 +24,7 @@ import {
   fetchChatStatus,
   fetchEpicList,
   fetchFleet,
+  fetchTranscript,
   submitChatMessage,
   type HostAccessDeps,
   type ReadSurfaceFailure,
@@ -141,6 +146,25 @@ export async function dispatchCommand(
         for (const interview of result.status.pendingInterviews) {
           cards.push(buildInterviewCard(chat, epicId, interview, now));
         }
+        // A SHORT context strip, not the transcript. Enough to see what the
+        // agent was doing when it stopped, without pushing the approval
+        // behind Teams' "see more" collapse — the full history is `log <id>`,
+        // one button away.
+        //
+        // A transcript failure must not take the decision cards with it: the
+        // approval above is the thing that matters, so a broken strip is
+        // simply omitted rather than turned into an error card.
+        const transcript = await fetchTranscript(
+          principal,
+          conversationId,
+          command.chatId,
+          0,
+          CONTEXT_STRIP_SIZE,
+          deps,
+        );
+        if (transcript.kind === "ok") {
+          cards.push(buildContextStripCard(transcript.transcript, now));
+        }
         // The composer goes LAST, after anything awaiting a decision. A chat
         // you can watch but not talk to was the functional hole; putting the
         // reply box above the approvals would bury the thing that is
@@ -148,6 +172,20 @@ export async function dispatchCommand(
         cards.push(buildComposeCard(chat, epicId));
       }
       return cards;
+    }
+    case "log": {
+      const result = await fetchTranscript(
+        principal,
+        conversationId,
+        command.chatId,
+        command.offset,
+        TRANSCRIPT_PAGE_SIZE,
+        deps,
+      );
+      if (result.kind !== "ok") {
+        return [failureCard(result)];
+      }
+      return [buildTranscriptCard(result.transcript, deps.now())];
     }
     case "compose": {
       // Reads status first rather than composing blind: it resolves the
