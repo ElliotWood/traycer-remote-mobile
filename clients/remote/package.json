@@ -1,0 +1,41 @@
+{
+  "name": "@traycer-clients/remote",
+  "version": "0.1.0",
+  "description": "Traycer Remote - remote-agent and gateway for multi-host access",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "traycer-remote": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/traycerai/traycer.git",
+    "directory": "clients/remote"
+  },
+  "license": "MIT",
+  "scripts": {
+    "traycer-remote": "bun run src/index.ts",
+    "compile": "tsc --noEmit",
+    "format": "bun x prettier --write .",
+    "lint": "eslint . --cache --fix --max-warnings 0",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "commander": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@traycer/protocol": "workspace:*",
+    "@traycer-clients/shared": "workspace:*",
+    "@types/node": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
