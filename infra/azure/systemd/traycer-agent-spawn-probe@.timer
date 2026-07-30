@@ -1,0 +1,14 @@
+[Unit]
+Description=A6 agent-execution spawn probe timer for tenant %i (6-hourly)
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+# Spread the four daily runs off the hour so N tenants don't all spend
+# quota in the same instant.
+RandomizedDelaySec=600
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

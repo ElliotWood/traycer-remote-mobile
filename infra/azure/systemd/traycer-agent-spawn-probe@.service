@@ -1,0 +1,12 @@
+[Unit]
+Description=A6 agent-execution SPAWN probe for tenant %i (real Claude call)
+
+[Service]
+Type=oneshot
+Environment=TRAYCER_HOME_ROOT=__TRAYCER_HOME_ROOT__
+Environment=TRAYCER_OS_USER=__TRAYCER_OS_USER__
+# The only check that proves the token is VALID rather than merely present
+# and delivered. Costs one real Claude call per run, on the shared Altra
+# Max capacity - hence 6-hourly, not the 5-minute cadence of the structural
+# probe. Approved as an explicit spend, not a default.
+ExecStart=/bin/bash -c '/usr/local/bin/traycer-agent-probe.sh %i --spawn || /usr/local/bin/traycer-alert.sh %i agent_token_invalid "spawn probe failed - token may be revoked/expired/quota-exhausted. Check the session-anchor note in traycer-agent-probe.sh before suspecting the credential. See journalctl -u traycer-agent-spawn-probe@%i"'

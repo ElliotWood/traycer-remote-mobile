@@ -129,7 +129,27 @@ fi
 SENTINEL="A6PROBE$(date -u +%s)"
 # shellcheck disable=SC1090
 CLAUDE_CODE_OAUTH_TOKEN="$(awk -F= '/^CLAUDE_CODE_OAUTH_TOKEN=/{sub(/^CLAUDE_CODE_OAUTH_TOKEN=/,"");print;exit}' "$CLAUDE_ENV_FILE")"
-OUT="$(cd / && runuser -u "$OS_USER" -- env HOME="$TENANT_HOME" \
+
+# FRESH HOME PER RUN, not the tenant's own. Two reasons, the first learned
+# the hard way by the agent that wired this credential up:
+#
+#  1. Session anchoring. A chat that once attempted a turn pre-auth stays
+#     anchored to that provider session, and every later retry re-resumes
+#     it and returns `status=interrupted` with no work done - green
+#     credential, red turn, for reasons that have nothing to do with the
+#     token. A probe sharing the tenant's ~/.claude state can inherit that
+#     and produce a false red indistinguishable from an auth failure.
+#  2. A probe must not mutate the thing it observes. Writing session and
+#     project state into the tenant's own HOME every 6 hours is a side
+#     effect on live state, not a measurement of it.
+#
+# The credential is unaffected: it arrives via CLAUDE_CODE_OAUTH_TOKEN,
+# which is the ONLY mechanism here (`claude setup-token` persists nothing),
+# so a throwaway HOME still exercises the real auth path.
+SPAWN_HOME="$(mktemp -d /tmp/a6-spawn-XXXXXX)"
+chown "$OS_USER":"$OS_USER" "$SPAWN_HOME"
+trap 'rm -rf "$SPAWN_HOME"' EXIT
+OUT="$(cd / && runuser -u "$OS_USER" -- env HOME="$SPAWN_HOME" \
   CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" \
   "$CLAUDE_BIN" -p "Reply with exactly this token and nothing else: ${SENTINEL}" 2>&1)" || true
 
