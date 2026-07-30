@@ -175,6 +175,30 @@ export async function dispatchCommand(
       return cards;
     }
     case "log": {
+      // Same destination check as `say`/`compose`, and for the same reason.
+      // Found by asking what ELSE a person might reasonably type: "log in"
+      // parses as `log` + chat id "in", and the bridge answers a bogus id
+      // with a valid, empty transcript —
+      //   {"chatId":"in","title":null,"totalCount":0,"messages":[]}
+      // — which rendered as a history card for a chat that does not exist.
+      // Verified against the real bridge, not assumed.
+      //
+      // Costs one extra spawn on a command that already spawns. Worth it:
+      // the rule is now the same everywhere a user names a chat, so there is
+      // one thing to remember rather than three places to check.
+      const target = await fetchChatStatus(
+        principal,
+        conversationId,
+        command.chatId,
+        deps,
+      );
+      if (target.kind !== "ok") {
+        return [failureCard(target)];
+      }
+      if (!target.status.connected) {
+        return [buildUnknownChatCard(command.chatId)];
+      }
+
       const result = await fetchTranscript(
         principal,
         conversationId,

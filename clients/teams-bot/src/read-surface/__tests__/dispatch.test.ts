@@ -698,6 +698,21 @@ describe("read-surface/dispatch — an unreachable chat never gets an actionable
     expect(body).not.toContain("Message sent");
   });
 
+  it("CONTRACT: `log in` does not render a history card for a chat named 'in'", async () => {
+    // Verified on the real bridge: `transcript in` answers a bogus id with
+    //   {"chatId":"in","title":null,"totalCount":0,"messages":[]}
+    // — a valid, empty transcript, which rendered as a history card for a
+    // chat that does not exist. Found by asking what ELSE someone might
+    // type, not by a bug report.
+    const body = await dispatchAgainstUnreachable({
+      kind: "log",
+      chatId: "in",
+      offset: 0,
+    });
+    expect(body).toContain("doesn't look like a chat");
+    expect(body).not.toContain("messages");
+  });
+
   it("exactly ONE card comes back — a single command is a single reply", async () => {
     const epicBindings = new InMemoryEpicBindingStore();
     await epicBindings.set("conv-1", "epic-1");
