@@ -12,6 +12,8 @@ const base: FleetAgent = {
   harnessId: "claude",
   surface: "gui",
   active: false,
+  isLocal: true,
+  hostId: "h-local",
   pendingApprovals: 0,
   pendingInterviews: 0,
   lastActivityAt: null,
@@ -75,5 +77,51 @@ describe("fleet-types — displayName never shows a bare UUID", () => {
 
   it("names the harness when known so untitled rows still differ", () => {
     expect(displayName({ ...base, title: null })).toContain("claude");
+  });
+});
+
+describe("fleet-types — a remote agent is never reported as idle", () => {
+  /**
+   * Measured against the real host: 53 of 56 agents in the epic run
+   * elsewhere and every one reports `active: false`, correctly — the
+   * activity tracker is local-only and does not replicate. Rendering those
+   * as "Idle" would have told the user nothing was happening while agents
+   * ran, with no dishonest line of code anywhere.
+   */
+  const remote: FleetAgent = {
+    ...base,
+    isLocal: false,
+    hostId: "h-elsewhere",
+    active: false,
+  };
+
+  it("CONTRACT: isLocal false yields 'remote', never 'idle'", () => {
+    expect(fleetStatus(remote)).toBe("remote");
+    expect(fleetStatus(remote)).not.toBe("idle");
+  });
+
+  it("locality outranks every other signal, because the others are unreadable", () => {
+    // Even if pending counts arrived from somewhere, they cannot be trusted
+    // for a host we cannot see. Locality is checked first for that reason.
+    expect(fleetStatus({ ...remote, pendingApprovals: 3, active: true })).toBe(
+      "remote",
+    );
+  });
+
+  it("a LOCAL agent with the same values is genuinely idle", () => {
+    // The control: this is what makes the test above about locality rather
+    // than about the zeros.
+    expect(fleetStatus({ ...remote, isLocal: true })).toBe("idle");
+  });
+
+  it("remote sorts last — least actionable, not middling", () => {
+    const blocked = { ...base, agentId: "b", pendingApprovals: 1 };
+    const idle = { ...base, agentId: "i" };
+    const sorted = [remote, idle, blocked].sort(byUrgency);
+    expect(sorted.map((a) => fleetStatus(a))).toEqual([
+      "blocked",
+      "idle",
+      "remote",
+    ]);
   });
 });

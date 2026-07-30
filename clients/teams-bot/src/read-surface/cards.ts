@@ -285,6 +285,23 @@ function shortId(id: string): string {
 const FLEET_ROW_LIMIT = 12;
 
 /**
+ * "Idle" is a CLAIM, and for a remote agent we have no basis for it.
+ *
+ * `active` is local-only — the host's activity tracker does not replicate —
+ * so it is `false` for every agent running elsewhere no matter what that
+ * agent is doing. Measured against the real host: 53 of 56 agents in the
+ * epic are remote, and this card was rendering every one of them as "Idle".
+ *
+ * That is a fleet calmly reporting nothing is happening while agents run,
+ * produced without a single dishonest line of code — just a field read as
+ * answering a question it does not answer. Say what we actually know.
+ */
+export function agentStatusLabel(agent: AgentSummary): string {
+  if (!agent.isLocal) return "On another host";
+  return agent.active ? "Active" : "Idle";
+}
+
+/**
  * A raw UUID is not a title. `title ?? agentId` used to fall through to the
  * id, so an untitled agent rendered as
  * `d0cf1e5a-0000-4000-8000-0000000000ff` — caught in a screenshot, invisible
@@ -333,13 +350,13 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
           spacing: "none",
         }),
         statusBadge(
-          agent.active ? "Active" : "Idle",
-          agent.active ? "good" : "default",
+          agentStatusLabel(agent),
+          agent.isLocal && agent.active ? "good" : "default",
           `${agent.harnessId ?? "unknown"} · ${agent.surface}`,
         ),
       ],
       {
-        style: agent.active ? "emphasis" : "default",
+        style: agent.isLocal && agent.active ? "emphasis" : "default",
         separator: true,
         spacing: "small",
         // Whole row tappable — the natural gesture is "tap the agent to see it".

@@ -8,6 +8,7 @@ import {
   buildEpicNotBoundCard,
   buildEpicPickerCard,
   agentDisplayName,
+  agentStatusLabel,
   buildFleetCard,
   buildHelpCard,
   buildPrincipalRefusedCard,
@@ -112,6 +113,8 @@ describe("read-surface/cards", () => {
           harnessId: "claude",
           surface: "gui",
           active: true,
+          isLocal: true,
+          hostId: "h-1",
         },
       ]),
     );
@@ -164,6 +167,8 @@ describe("read-surface/cards — agentDisplayName never shows a raw UUID", () =>
     harnessId: null,
     surface: "tui" as const,
     active: false,
+    isLocal: true,
+    hostId: "h-1",
   };
 
   it("does not fall through to the raw agentId when there is no title", () => {
@@ -675,5 +680,46 @@ describe("read-surface/cards — transcript", () => {
       actions?: { title: string }[];
     };
     expect((content.actions ?? [])[0]?.title).toContain("211");
+  });
+});
+
+describe("read-surface/cards — a remote agent is never labelled Idle", () => {
+  const base = {
+    agentId: "a1000000-0000-4000-8000-000000000001",
+    title: "Some agent",
+    harnessId: "claude",
+    surface: "gui" as const,
+    active: false,
+    isLocal: true,
+    hostId: "h-local",
+  };
+
+  it("CONTRACT: an agent on another host reads 'On another host', not 'Idle'", () => {
+    // Measured against the real host: 53 of 56 agents in the epic run
+    // elsewhere and every one reports `active: false` — correctly, because
+    // the activity tracker is local-only. This card rendered all 53 as
+    // "Idle", i.e. calmly reported nothing was happening while agents ran.
+    expect(agentStatusLabel({ ...base, isLocal: false })).toBe(
+      "On another host",
+    );
+    expect(agentStatusLabel({ ...base, isLocal: false })).not.toBe("Idle");
+  });
+
+  it("locality wins even when active is true, since active is meaningless remotely", () => {
+    expect(agentStatusLabel({ ...base, isLocal: false, active: true })).toBe(
+      "On another host",
+    );
+  });
+
+  it("a LOCAL agent still reads Active or Idle — the control for the above", () => {
+    expect(agentStatusLabel({ ...base, active: true })).toBe("Active");
+    expect(agentStatusLabel(base)).toBe("Idle");
+  });
+
+  it("the fleet card itself shows the remote label, not just the helper", () => {
+    const visible = JSON.stringify(
+      collectTextBlocks(buildFleetCard([{ ...base, isLocal: false }]).content),
+    );
+    expect(visible).toContain("On another host");
   });
 });

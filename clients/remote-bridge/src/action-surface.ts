@@ -129,8 +129,19 @@ export interface AgentSummary {
   readonly title: string | null;
   readonly harnessId: string | null;
   readonly surface: "gui" | "tui";
-  /** Actively executing a turn right now, per the host's activity tracker. */
+  /**
+   * Actively executing a turn right now, per the host's activity tracker.
+   *
+   * LOCAL-ONLY, and the qualifier is load-bearing: the activity tracker does
+   * not replicate, so this is `false` for every row where `isLocal` is false,
+   * whatever that agent is actually doing. Read it as "executing ON THIS
+   * HOST", never as "executing".
+   */
   readonly active: boolean;
+  /** Whether this agent runs on the host being queried. See {@link AgentSummary.active}. */
+  readonly isLocal: boolean;
+  /** The host the agent runs on, so a caller can say WHICH rather than just "elsewhere". */
+  readonly hostId: string;
 }
 
 export interface ChatStatus {

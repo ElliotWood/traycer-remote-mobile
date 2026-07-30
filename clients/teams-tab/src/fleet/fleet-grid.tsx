@@ -140,6 +140,15 @@ function StatusBadge({
           Idle
         </Badge>
       );
+    case "remote":
+      // NOT "Idle". This host cannot see a remote agent's activity at all —
+      // `active` is local-only — so "Idle" would be a claim we have no basis
+      // for. "On another host" says exactly what we know and no more.
+      return (
+        <Badge appearance="tint" color="informative">
+          On another host
+        </Badge>
+      );
   }
 }
 

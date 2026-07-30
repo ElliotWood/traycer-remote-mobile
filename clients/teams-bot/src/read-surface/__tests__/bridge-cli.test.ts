@@ -23,6 +23,8 @@ describe("read-surface/bridge-cli", () => {
         harnessId: "claude",
         surface: "gui" as const,
         active: true,
+        isLocal: true,
+        hostId: "h-1",
       },
     ];
     const config = configWith(

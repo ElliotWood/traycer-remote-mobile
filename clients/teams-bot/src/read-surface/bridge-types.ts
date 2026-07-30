@@ -15,7 +15,24 @@ export const agentSummarySchema = z.object({
   title: z.string().nullable(),
   harnessId: z.string().nullable(),
   surface: z.union([z.literal("gui"), z.literal("tui")]),
+  /**
+   * LOCAL-ONLY. The host's activity tracker does not replicate, so this is
+   * `false` for every row where `isLocal` is false, whatever that agent is
+   * actually doing. Read it as "executing ON THIS HOST", never "executing".
+   */
   active: z.boolean(),
+  /**
+   * Whether the agent runs on the host we queried.
+   *
+   * `.catch(true)` rather than a bare boolean: the bot may run against a
+   * bridge binary older than the passthrough that added this field, and a
+   * strict parse would turn a working fleet into a `malformed_output` card.
+   * Defaulting to `true` preserves the previous behaviour exactly — every
+   * row treated as local — rather than silently marking a whole fleet remote
+   * on an old bridge.
+   */
+  isLocal: z.boolean().catch(true),
+  hostId: z.string().catch(""),
 });
 export type AgentSummary = z.infer<typeof agentSummarySchema>;
 

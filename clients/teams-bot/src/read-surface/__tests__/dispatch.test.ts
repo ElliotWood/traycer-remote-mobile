@@ -205,6 +205,8 @@ describe("read-surface/dispatch — routing and identity gating", () => {
             harnessId: "claude",
             surface: "gui",
             active: true,
+            isLocal: true,
+            hostId: "h-1",
           },
         ]),
         stderr: "",

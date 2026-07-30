@@ -202,6 +202,14 @@ export class BridgeClient implements RemoteBridgeActions {
       harnessId: a.harnessId,
       surface: a.surface,
       active: a.active,
+      // Carried, not dropped. `active` is documented LOCAL-ONLY — it is
+      // `false` for every cross-host row regardless of what that agent is
+      // doing — so without `isLocal` a caller cannot tell "idle" from "I
+      // cannot see this agent's state", and renders a whole remote fleet as
+      // idle. `hostId` names WHICH host, so the distinction is explicable
+      // rather than just flagged.
+      isLocal: a.isLocal,
+      hostId: a.hostId,
     }));
   }
 

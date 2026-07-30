@@ -15,8 +15,17 @@ export interface FleetAgent {
   readonly title: string | null;
   readonly harnessId: string | null;
   readonly surface: "gui" | "tui";
-  /** Actively executing a turn right now. */
+  /**
+   * Actively executing right now — LOCAL-ONLY. The host activity tracker
+   * does not replicate, so this is `false` for every row with
+   * `isLocal: false` no matter what that agent is doing. Read it as
+   * "executing ON THIS HOST", never as "executing".
+   */
   readonly active: boolean;
+  /** Whether this agent runs on the host we queried. Gates whether any status field means anything. */
+  readonly isLocal: boolean;
+  /** Which host it runs on, so the UI can name it rather than saying "elsewhere". */
+  readonly hostId: string;
   /** Awaiting a human decision — the column that makes the grid worth reading. */
   readonly pendingApprovals: number;
   readonly pendingInterviews: number;
@@ -31,9 +40,22 @@ export interface FleetAgent {
  * to the fleet to find, and burying it under a green "running" badge is how
  * the card version originally hid the only actionable row on screen.
  */
-export type FleetStatus = "blocked" | "running" | "idle";
+export type FleetStatus = "blocked" | "running" | "idle" | "remote";
 
 export function fleetStatus(agent: FleetAgent): FleetStatus {
+  // Locality FIRST, and this ordering is the whole point.
+  //
+  // Measured against the real host: 53 of 56 agents in this epic run
+  // elsewhere, and every one reports `active: false` — correctly, because
+  // the activity tracker is local-only and does not replicate. Falling
+  // through to the old `active ? "running" : "idle"` rendered all 53 as
+  // "Idle", which is not a degraded answer, it is a FALSE one: the fleet
+  // would calmly report that nothing was happening while agents ran.
+  //
+  // That is the fabricated status column arriving by a different route.
+  // There is no dishonest line of code in it — just a field read as
+  // answering a question it does not answer.
+  if (!agent.isLocal) return "remote";
   if (agent.pendingApprovals > 0 || agent.pendingInterviews > 0) {
     return "blocked";
   }
@@ -42,7 +64,13 @@ export function fleetStatus(agent: FleetAgent): FleetStatus {
 
 /** Blocked first, then running, then idle; stable by title within a group. */
 export function byUrgency(a: FleetAgent, b: FleetAgent): number {
-  const rank: Record<FleetStatus, number> = { blocked: 0, running: 1, idle: 2 };
+  // Remote sorts last: it is the least actionable state, not a middling one.
+  const rank: Record<FleetStatus, number> = {
+    blocked: 0,
+    running: 1,
+    idle: 2,
+    remote: 3,
+  };
   const delta = rank[fleetStatus(a)] - rank[fleetStatus(b)];
   if (delta !== 0) return delta;
   return displayName(a).localeCompare(displayName(b));
