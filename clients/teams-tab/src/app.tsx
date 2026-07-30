@@ -19,7 +19,11 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { FleetGrid } from "./fleet/fleet-grid";
-import { FIXTURE_NOW, FLEET_FIXTURE } from "./fleet/fleet-fixture";
+import {
+  FIXTURE_NOW,
+  FLEET_FIXTURE,
+  LARGE_FLEET_FIXTURE,
+} from "./fleet/fleet-fixture";
 import { themeFor } from "./theme/teams-theme";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
@@ -71,7 +75,22 @@ export function App(): ReactElement {
   // theme before switching to dark is the sort of thing that reads as cheap.
   if (!ready) return <FluentProvider theme={themeFor("default")} />;
 
-  const blocked = FLEET_FIXTURE.filter(
+  // `?fleet=large` and `?view=grid|list` are the same out-of-Teams preview
+  // affordance as `?theme`: they let the 55-agent case and the grid-vs-list
+  // question be answered from images at a FIXED width, rather than by
+  // resizing a window and trusting a memory of what the other one looked
+  // like. Never consulted inside Teams.
+  const params =
+    typeof window === "undefined"
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
+  const fleet =
+    params.get("fleet") === "large" ? LARGE_FLEET_FIXTURE : FLEET_FIXTURE;
+  const rawView = params.get("view");
+  const forceView =
+    rawView === "grid" || rawView === "list" ? rawView : undefined;
+
+  const blocked = fleet.filter(
     (a) => a.pendingApprovals + a.pendingInterviews > 0,
   ).length;
 
@@ -82,15 +101,16 @@ export function App(): ReactElement {
           <Subtitle1>Fleet</Subtitle1>
           <Text size={200} className={styles.subtle}>
             {blocked > 0
-              ? `${String(blocked)} waiting on you · ${String(FLEET_FIXTURE.length)} agents`
-              : `${String(FLEET_FIXTURE.length)} agents`}
+              ? `${String(blocked)} waiting on you · ${String(fleet.length)} agents`
+              : `${String(fleet.length)} agents`}
           </Text>
         </div>
 
         <FleetGrid
-          agents={FLEET_FIXTURE}
+          agents={fleet}
           now={FIXTURE_NOW}
           width={width}
+          forceView={forceView}
           onOpen={() => {
             // Navigation lands with the Epic/Chat tabs; a no-op here keeps the
             // row affordance honest about being a scaffold.

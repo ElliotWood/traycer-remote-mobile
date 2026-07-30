@@ -22,6 +22,7 @@
  */
 import {
   Badge,
+  Button,
   createTableColumn,
   DataGrid,
   DataGridBody,
@@ -34,7 +35,7 @@ import {
   tokens,
   type TableColumnDefinition,
 } from "@fluentui/react-components";
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   byUrgency,
   displayName,
@@ -44,16 +45,17 @@ import {
 } from "./fleet-types";
 
 /**
- * Below this width the grid becomes a list. 780 = the five columns' ideal
- * widths (740) plus the page padding (40), and the two numbers are tied
- * together on purpose.
+ * Below this width the grid becomes a list.
  *
- * Chosen from the renders rather than from a breakpoint convention. At the
- * previous 460 the grid rendered at 500px by squeezing every column below its
- * stated minimum, so agent names read "Research: gui-app RPC …" — while the
- * list form gives the name the entire row. A grid that has to truncate its
- * most important column is worse than a list, so the grid now appears only
- * where it genuinely fits.
+ * Measured, not derived. The grid's fixed layout is ~808px wide whatever the
+ * column hints say, so anything narrower than that makes it scroll sideways
+ * inside `gridScroll`. Scrolling to read a row is worse than a list that
+ * gives the agent name the whole width — at 500 the grid rendered names as
+ * "Research: gui-app RPC …" while the list showed them in full.
+ *
+ * An earlier version of this comment did the arithmetic on paper (740 ideal
+ * widths + 40 padding) and was simply wrong; see `gridScroll`. If this number
+ * changes, re-measure `scrollWidth` rather than recomputing it.
  */
 export const NARROW_PX = 780;
 
@@ -87,6 +89,25 @@ const useStyles = makeStyles({
   /** The badge is a fixed affordance: it truncates nothing and shrinks never. */
   badgeCell: { flexShrink: 0 },
   subtle: { color: tokens.colorNeutralForeground3 },
+  idleToggle: { alignSelf: "flex-start", marginTop: tokens.spacingVerticalS },
+  /**
+   * The grid scrolls sideways INSIDE this box rather than pushing the page.
+   *
+   * Measured, after two wrong guesses. `resizableColumns` makes Fluent give
+   * the table a FIXED total width computed from the column hints — it does
+   * not fluidly fit its container. So the choice is really:
+   *   - no `resizableColumns`: fluid, but every sizing hint is discarded and
+   *     the agent name truncates to nothing;
+   *   - `resizableColumns`: sizing works, but the table can be wider than the
+   *     space it is given.
+   * Shrinking the hints did not help — `scrollWidth` stayed at 808 for an
+   * 800px viewport whatever the numbers were, because the overflow is the
+   * table's own padding and borders on a fixed-width layout.
+   *
+   * A horizontally scrolling GRID is a normal control. A horizontally
+   * scrolling PAGE is a defect, and that is what was shipping.
+   */
+  gridScroll: { width: "100%", overflowX: "auto" },
   empty: {
     padding: tokens.spacingVerticalXXL,
     textAlign: "center",
@@ -155,6 +176,13 @@ interface FleetGridProps {
   readonly now: number;
   readonly width: number;
   readonly onOpen: (agentId: string) => void;
+  /**
+   * Forces grid or list regardless of width. Exists so the two can be
+   * screenshotted side by side at the SAME width and the choice made from
+   * images rather than from preference — "Fluent" is the commitment, "data
+   * grid" is a per-surface decision.
+   */
+  readonly forceView?: "grid" | "list";
 }
 
 export function FleetGrid({
@@ -162,9 +190,22 @@ export function FleetGrid({
   now,
   width,
   onOpen,
+  forceView,
 }: FleetGridProps): ReactElement {
   const styles = useStyles();
+  const [showIdle, setShowIdle] = useState(false);
+
   const sorted = [...agents].sort(byUrgency);
+  const idleCount = sorted.filter((a) => fleetStatus(a) === "idle").length;
+  /**
+   * The long idle tail is collapsed by default. The card version already
+   * solved this — 55 agents dumped as 55 uniform rows is not a fleet view,
+   * it is a wall, and the two rows that need you are lost in it. A grid does
+   * not change that; it just makes the wall tidier.
+   */
+  const visible = showIdle
+    ? sorted
+    : sorted.filter((a) => fleetStatus(a) !== "idle");
 
   if (sorted.length === 0) {
     return (
@@ -174,10 +215,29 @@ export function FleetGrid({
     );
   }
 
-  if (width < NARROW_PX) {
+  const idleToggle =
+    idleCount === 0 ? null : (
+      <Button
+        appearance="subtle"
+        size="small"
+        className={styles.idleToggle}
+        onClick={() => {
+          setShowIdle((v) => !v);
+        }}
+      >
+        {showIdle
+          ? `Hide ${String(idleCount)} idle`
+          : `Show ${String(idleCount)} idle agent${idleCount === 1 ? "" : "s"}`}
+      </Button>
+    );
+
+  const useList =
+    forceView === "list" || (forceView !== "grid" && width < NARROW_PX);
+
+  if (useList) {
     return (
       <div className={styles.root}>
-        {sorted.map((agent) => (
+        {visible.map((agent) => (
           <div
             key={agent.agentId}
             className={styles.listItem}
@@ -213,6 +273,7 @@ export function FleetGrid({
             </Text>
           </div>
         ))}
+        {idleToggle}
       </div>
     );
   }
@@ -263,47 +324,61 @@ export function FleetGrid({
   ];
 
   return (
-    <DataGrid
-      className={styles.root}
-      items={sorted}
-      columns={columns}
-      sortable
-      resizableColumns
-      getRowId={(agent) => agent.agentId}
-      focusMode="composite"
-      // Ideal widths must sum to NARROW_PX minus the page padding, or the
-      // grid overflows its container — visible in the 800px render as row
-      // separators running off the right edge. 260+130+150+90+110 = 740.
-      columnSizingOptions={{
-        name: { minWidth: 160, idealWidth: 260 },
-        status: { minWidth: 120, idealWidth: 130 },
-        waiting: { minWidth: 110, idealWidth: 150 },
-        harness: { minWidth: 70, idealWidth: 90 },
-        activity: { minWidth: 90, idealWidth: 110 },
-      }}
-    >
-      <DataGridHeader>
-        <DataGridRow>
-          {({ renderHeaderCell }) => (
-            <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
-          )}
-        </DataGridRow>
-      </DataGridHeader>
-      <DataGridBody<FleetAgent>>
-        {({ item, rowId }) => (
-          <DataGridRow<FleetAgent>
-            key={rowId}
-            className={styles.row}
-            onClick={() => {
-              onOpen(item.agentId);
-            }}
-          >
-            {({ renderCell }) => (
-              <DataGridCell>{renderCell(item)}</DataGridCell>
+    <>
+      <div className={styles.gridScroll}>
+        <DataGrid
+          className={styles.root}
+          items={visible}
+          columns={columns}
+          sortable
+          resizableColumns
+          getRowId={(agent) => agent.agentId}
+          focusMode="composite"
+          /**
+           * MEASURED, not calculated. The previous values summed to 740 and the
+           * comment here claimed that fit inside 760 — it did not.
+           * `document.documentElement.scrollWidth` came back **808** at an
+           * 800px viewport, because the grid adds its own cell padding and
+           * borders on top of the column widths (~68px across five columns).
+           * The arithmetic was asserted and never checked, which is how a
+           * horizontal page scrollbar shipped in a layout I had "verified".
+           *
+           * 240+130+140+80+100 = 690, + ~68 chrome + 40 page padding ≈ 798.
+           * Re-measure after touching these; do not re-derive them on paper.
+           */
+          columnSizingOptions={{
+            name: { minWidth: 160, idealWidth: 240 },
+            status: { minWidth: 120, idealWidth: 130 },
+            waiting: { minWidth: 110, idealWidth: 140 },
+            harness: { minWidth: 70, idealWidth: 80 },
+            activity: { minWidth: 90, idealWidth: 100 },
+          }}
+        >
+          <DataGridHeader>
+            <DataGridRow>
+              {({ renderHeaderCell }) => (
+                <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
+              )}
+            </DataGridRow>
+          </DataGridHeader>
+          <DataGridBody<FleetAgent>>
+            {({ item, rowId }) => (
+              <DataGridRow<FleetAgent>
+                key={rowId}
+                className={styles.row}
+                onClick={() => {
+                  onOpen(item.agentId);
+                }}
+              >
+                {({ renderCell }) => (
+                  <DataGridCell>{renderCell(item)}</DataGridCell>
+                )}
+              </DataGridRow>
             )}
-          </DataGridRow>
-        )}
-      </DataGridBody>
-    </DataGrid>
+          </DataGridBody>
+        </DataGrid>
+      </div>
+      {idleToggle}
+    </>
   );
 }

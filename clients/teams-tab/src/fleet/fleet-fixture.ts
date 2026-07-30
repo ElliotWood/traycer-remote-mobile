@@ -96,3 +96,37 @@ export const FLEET_FIXTURE: readonly FleetAgent[] = [
 
 /** The clock the fixtures' "ago" labels are relative to, so shots are stable. */
 export const FIXTURE_NOW = T;
+
+/**
+ * The REAL scale. Elliot's epic has ~55 agents, and the card version already
+ * solved what that does to a surface: surface what is blocked or running,
+ * collapse the long idle tail behind a count. A fixture of 8 proves nothing
+ * about that and would let a regression through.
+ */
+export const LARGE_FLEET_FIXTURE: readonly FleetAgent[] = [
+  ...FLEET_FIXTURE,
+  ...Array.from({ length: 47 }, (_, i): FleetAgent => {
+    const n = i + 9;
+    return {
+      agentId: `a1000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+      title:
+        i % 7 === 0
+          ? null
+          : `${["Research", "Critique", "Build", "Review", "Spike"][i % 5]}: ${
+              [
+                "host RPC surface",
+                "artifact rendering decision",
+                "the mobile cache layer",
+                "Teams manifest scopes",
+                "stream reconnect semantics",
+              ][i % 5]
+            }`,
+      harnessId: i % 3 === 0 ? "codex" : "claude",
+      surface: i % 3 === 0 ? "tui" : "gui",
+      active: false,
+      pendingApprovals: 0,
+      pendingInterviews: 0,
+      lastActivityAt: T - (i + 2) * 3_600_000,
+    };
+  }),
+];
