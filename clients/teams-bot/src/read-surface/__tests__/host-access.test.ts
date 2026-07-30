@@ -181,6 +181,7 @@ describe("read-surface/host-access — identity resolution + spawn isolation", (
         active: true,
         isLocal: true,
         hostId: "h-1",
+        capabilities: { readTranscript: true, sendMessage: true },
       },
     ];
     const fleetB = [
@@ -192,6 +193,7 @@ describe("read-surface/host-access — identity resolution + spawn isolation", (
         active: false,
         isLocal: true,
         hostId: "h-1",
+        capabilities: { readTranscript: true, sendMessage: true },
       },
     ];
     const spawnFn = makeFixtureSpawnFn(

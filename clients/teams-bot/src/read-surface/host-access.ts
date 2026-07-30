@@ -281,6 +281,58 @@ export async function submitChatMessage(
   return { kind: "ok", outcome: result.value };
 }
 
+/**
+ * What this host can do with one chat.
+ *
+ * A separate read because the capability is per-AGENT (`agent.list`) while
+ * the chat status is per-CHAT (`chat.subscribe`), and the two do not travel
+ * together. That costs an extra spawn on `chat <id>`, which is the right
+ * trade against rendering a Send box on a chat that cannot receive one —
+ * measured: 53 of 56 agents are readable and not messageable.
+ *
+ * Deliberately NOT cached. Capability is stable for an agent's life, so a
+ * cache is tempting and cheap; a stale one that wrongly ENABLES Send is
+ * worse than the spawn it saves, and there is no measurement yet saying the
+ * spawn hurts.
+ */
+export type ChatCapabilities = {
+  readonly readTranscript: boolean;
+  readonly sendMessage: boolean;
+};
+
+export type CapabilitiesResult =
+  | { readonly kind: "ok"; readonly capabilities: ChatCapabilities }
+  | ReadSurfaceFailure;
+
+export async function fetchChatCapabilities(
+  principal: VerifiedPrincipal,
+  conversationId: string,
+  chatId: string,
+  deps: HostAccessDeps,
+): Promise<CapabilitiesResult> {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) return { kind: "epic_not_bound" };
+
+  const env = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await listAgents(env, deps.bridgeCliConfig);
+  if (result.kind === "failed") return toReadSurfaceFailure(result);
+
+  const agent = result.value.find((a) => a.agentId === chatId);
+  // An id the fleet does not know: report NO capability rather than assuming
+  // one. Guessing "allowed" here would put the Send box back.
+  return {
+    kind: "ok",
+    capabilities: agent?.capabilities ?? {
+      readTranscript: false,
+      sendMessage: false,
+    },
+  };
+}
+
 export type TranscriptResult =
   { readonly kind: "ok"; readonly transcript: Transcript } | ReadSurfaceFailure;
 

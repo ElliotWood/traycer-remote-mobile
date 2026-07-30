@@ -207,6 +207,7 @@ describe("read-surface/dispatch — routing and identity gating", () => {
             active: true,
             isLocal: true,
             hostId: "h-1",
+            capabilities: { readTranscript: true, sendMessage: true },
           },
         ]),
         stderr: "",
@@ -742,5 +743,145 @@ describe("read-surface/dispatch — an unreachable chat never gets an actionable
       deps,
     );
     expect(cards).toHaveLength(1);
+  });
+});
+
+describe("read-surface/dispatch — no Send box on a chat that cannot receive one", () => {
+  /**
+   * The shape measured on the real host: the subscription is healthy (that
+   * is how the transcript arrives) and the agent still cannot be sent to.
+   * `connected` was the gate, and it is not evidence of sendability.
+   */
+  const CONNECTED_STATUS = JSON.stringify({
+    chatId: "c-1",
+    title: "A remote chat",
+    runStatus: "idle",
+    pendingApprovals: [],
+    pendingInterviews: [],
+    connected: true,
+  });
+
+  const agentRow = (sendMessage: boolean): string =>
+    JSON.stringify([
+      {
+        agentId: "c-1",
+        title: "A remote chat",
+        harnessId: "claude",
+        surface: "gui",
+        active: false,
+        isLocal: !sendMessage ? false : true,
+        hostId: "h-1",
+        capabilities: { readTranscript: true, sendMessage },
+      },
+    ]);
+
+  async function chatBody(sendMessage: boolean): Promise<string> {
+    const epicBindings = new InMemoryEpicBindingStore();
+    await epicBindings.set("conv-1", "epic-1");
+    const deps: DispatchDeps = {
+      registry: gateRegistry,
+      epicBindings,
+      bridgeCliConfig: {
+        command: "/absolute/traycer-remote-bridge",
+        timeoutMs: 5000,
+        // Routes on the subcommand so one fixture serves status, list and
+        // transcript — the chat branch calls all three.
+        spawnFn: async (_cmd, args) => {
+          const sub = args[0];
+          const stdout =
+            sub === "list"
+              ? agentRow(sendMessage)
+              : sub === "transcript"
+                ? JSON.stringify({
+                    chatId: "c-1",
+                    title: "A remote chat",
+                    totalCount: 0,
+                    offset: 0,
+                    messages: [],
+                  })
+                : CONNECTED_STATUS;
+          return { code: 0, stdout, stderr: "", timedOut: false };
+        },
+      },
+      senderAgentId: "teams-bot",
+      parentEnv: {},
+      resolvePrincipal: async () => ({
+        kind: "resolved",
+        principal: gateAlice,
+      }),
+      now: () => 0,
+    };
+    const cards = await dispatchCommand(
+      { kind: "chat", chatId: "c-1" },
+      "conv-1",
+      deps,
+    );
+    return JSON.stringify(cards.map((c) => c.content));
+  }
+
+  let jwks4: TestJwksServer;
+  let gateAlice: VerifiedPrincipal;
+  let gateRegistry: IdentityRegistry;
+
+  beforeAll(async () => {
+    jwks4 = await startTestJwksServer();
+    const config: AadIdTokenConfig = {
+      issuer: "https://login.microsoftonline.com/test-tenant/v2.0",
+      openIdMetadataUrl: jwks4.openIdMetadataUrl,
+      audience: AUDIENCE,
+      clockSkewSeconds: 300,
+      jwksCacheMaxAgeMs: 24 * 60 * 60 * 1000,
+      fetchTimeoutMs: 5000,
+    };
+    const now = Math.floor(Date.now() / 1000);
+    gateAlice = {
+      kind: "entra",
+      oid: await validateAadIdToken({
+        token: jwt.sign(
+          {
+            iss: config.issuer,
+            aud: AUDIENCE,
+            oid: ALICE_OID,
+            iat: now,
+            exp: now + 600,
+          },
+          jwks4.privateKeyPem,
+          { algorithm: "RS256", keyid: jwks4.kid },
+        ),
+        config,
+        now: Date.now,
+      }),
+    };
+    gateRegistry = IdentityRegistry.fromConfig(
+      {
+        tenants: [
+          {
+            home: "/tenants/alice",
+            hostId: "alice-host",
+            entraOid: ALICE_OID,
+            traycerUserId: null,
+          },
+        ],
+      },
+      () => {},
+    );
+  });
+
+  afterAll(async () => {
+    await jwks4.close();
+  });
+
+  it("CONTRACT: sendMessage=false renders no composer, despite connected=true", async () => {
+    const body = await chatBody(false);
+    expect(body).not.toContain("Input.Text");
+    expect(body).not.toContain("traycer/send");
+    // And says WHY — a missing box with no explanation reads as broken.
+    expect(body).toContain("Read-only from here");
+  });
+
+  it("sendMessage=true still renders the composer — the control", async () => {
+    const body = await chatBody(true);
+    expect(body).toContain("traycer/send");
+    expect(body).not.toContain("Read-only from here");
   });
 });

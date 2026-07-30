@@ -297,7 +297,21 @@ const FLEET_ROW_LIMIT = 12;
  * answering a question it does not answer. Say what we actually know.
  */
 export function agentStatusLabel(agent: AgentSummary): string {
-  if (!agent.isLocal) return "On another host";
+  // Derived from the CAPABILITY, not from locality — and deliberately so.
+  //
+  // Across all 56 agents today, `isLocal: false` and `sendMessage: false`
+  // agree perfectly. That correlation is the trap, not the shortcut: it is
+  // the third time in a day a field has been read as answering a
+  // neighbouring question. `isLocal` says whether this host can SEE the
+  // agent executing; `capabilities.sendMessage` says whether it can REACH
+  // it. Nothing in the contract makes the second follow from the first —
+  // today's data merely happens to line up.
+  //
+  // The capability first, because that is the constraint the user acts on.
+  // The cause second, because it is context.
+  if (!agent.capabilities.sendMessage) {
+    return agent.isLocal ? "Read-only" : "Read-only — runs on another host";
+  }
   return agent.active ? "Active" : "Idle";
 }
 
@@ -1501,6 +1515,32 @@ export function buildBridgeUnavailableCard(
         text(guidance, { isSubtle: true, spacing: "small" }),
       ],
       { style: "warning" },
+    ),
+  ]);
+}
+
+/**
+ * Why there is no reply box, said out loud.
+ *
+ * A missing composer with no explanation is the white-screen failure in
+ * miniature: the user assumes the surface is broken rather than that the
+ * constraint is real. This costs one line and turns "where's the reply box"
+ * into a fact about where the agent runs.
+ */
+export function buildReadOnlyChatCard(chat: ChatRef): Attachment {
+  return card([
+    container(
+      [
+        text("Read-only from here", {
+          weight: "bolder",
+          spacing: "none",
+        }),
+        text(
+          `You can read ${chatLabel(chat)}, but sending needs the host it runs on.`,
+          { isSubtle: true, spacing: "small" },
+        ),
+      ],
+      { style: "emphasis" },
     ),
   ]);
 }

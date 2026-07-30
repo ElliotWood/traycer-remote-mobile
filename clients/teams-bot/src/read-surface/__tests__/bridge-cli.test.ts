@@ -25,6 +25,7 @@ describe("read-surface/bridge-cli", () => {
         active: true,
         isLocal: true,
         hostId: "h-1",
+        capabilities: { readTranscript: true, sendMessage: true },
       },
     ];
     const config = configWith(

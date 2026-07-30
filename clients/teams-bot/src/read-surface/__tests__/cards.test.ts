@@ -115,6 +115,7 @@ describe("read-surface/cards", () => {
           active: true,
           isLocal: true,
           hostId: "h-1",
+          capabilities: { readTranscript: true, sendMessage: true },
         },
       ]),
     );
@@ -169,6 +170,7 @@ describe("read-surface/cards — agentDisplayName never shows a raw UUID", () =>
     active: false,
     isLocal: true,
     hostId: "h-1",
+    capabilities: { readTranscript: true, sendMessage: true },
   };
 
   it("does not fall through to the raw agentId when there is no title", () => {
@@ -683,8 +685,8 @@ describe("read-surface/cards — transcript", () => {
   });
 });
 
-describe("read-surface/cards — a remote agent is never labelled Idle", () => {
-  const base = {
+describe("read-surface/cards — the label comes from the capability, not locality", () => {
+  const local = {
     agentId: "a1000000-0000-4000-8000-000000000001",
     title: "Some agent",
     harnessId: "claude",
@@ -692,34 +694,59 @@ describe("read-surface/cards — a remote agent is never labelled Idle", () => {
     active: false,
     isLocal: true,
     hostId: "h-local",
+    capabilities: { readTranscript: true, sendMessage: true },
   };
 
-  it("CONTRACT: an agent on another host reads 'On another host', not 'Idle'", () => {
-    // Measured against the real host: 53 of 56 agents in the epic run
-    // elsewhere and every one reports `active: false` — correctly, because
-    // the activity tracker is local-only. This card rendered all 53 as
-    // "Idle", i.e. calmly reported nothing was happening while agents ran.
-    expect(agentStatusLabel({ ...base, isLocal: false })).toBe(
-      "On another host",
-    );
-    expect(agentStatusLabel({ ...base, isLocal: false })).not.toBe("Idle");
+  /** Measured shape of all 53 remote rows: readable, not messageable. */
+  const remote = {
+    ...local,
+    isLocal: false,
+    hostId: "h-elsewhere",
+    capabilities: { readTranscript: true, sendMessage: false },
+  };
+
+  it("CONTRACT: an unsendable agent reads read-only, never Idle", () => {
+    // "Idle" was a claim we had no basis for — `active` is local-only, so it
+    // is false for every remote row whatever that agent is doing.
+    const label = agentStatusLabel(remote);
+    expect(label).toContain("Read-only");
+    expect(label).not.toBe("Idle");
   });
 
-  it("locality wins even when active is true, since active is meaningless remotely", () => {
-    expect(agentStatusLabel({ ...base, isLocal: false, active: true })).toBe(
-      "On another host",
-    );
+  it("names the cause second, because the constraint is what the user acts on", () => {
+    expect(agentStatusLabel(remote)).toBe("Read-only — runs on another host");
   });
 
-  it("a LOCAL agent still reads Active or Idle — the control for the above", () => {
-    expect(agentStatusLabel({ ...base, active: true })).toBe("Active");
-    expect(agentStatusLabel(base)).toBe("Idle");
+  it("CONTRACT: derived from sendMessage, NOT from isLocal", () => {
+    // The two agree on every row we have measured, and that correlation is
+    // the trap: `isLocal` answers "can this host SEE it", `sendMessage`
+    // answers "can this host REACH it". A LOCAL agent that cannot be sent to
+    // must still read read-only — which is what pins that the implementation
+    // reads the capability rather than the locality that happens to match.
+    const localButUnsendable = {
+      ...local,
+      capabilities: { readTranscript: true, sendMessage: false },
+    };
+    expect(agentStatusLabel(localButUnsendable)).toBe("Read-only");
+
+    // ...and the mirror: remote but sendable reads as a normal agent.
+    const remoteButSendable = {
+      ...remote,
+      capabilities: { readTranscript: true, sendMessage: true },
+      active: true,
+    };
+    expect(agentStatusLabel(remoteButSendable)).toBe("Active");
   });
 
-  it("the fleet card itself shows the remote label, not just the helper", () => {
+  it("a sendable agent still reads Active or Idle — the control", () => {
+    expect(agentStatusLabel({ ...local, active: true })).toBe("Active");
+    expect(agentStatusLabel(local)).toBe("Idle");
+  });
+
+  it("the fleet card itself shows it, not just the helper", () => {
     const visible = JSON.stringify(
-      collectTextBlocks(buildFleetCard([{ ...base, isLocal: false }]).content),
+      collectTextBlocks(buildFleetCard([remote]).content),
     );
-    expect(visible).toContain("On another host");
+    expect(visible).toContain("Read-only");
   });
 });

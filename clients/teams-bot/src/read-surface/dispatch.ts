@@ -7,6 +7,7 @@ import {
   buildContextStripCard,
   buildTranscriptCard,
   buildUnknownChatCard,
+  buildReadOnlyChatCard,
   CONTEXT_STRIP_SIZE,
   TRANSCRIPT_PAGE_SIZE,
   buildInterviewCard,
@@ -26,6 +27,7 @@ import {
   fetchEpicList,
   fetchFleet,
   fetchTranscript,
+  fetchChatCapabilities,
   submitChatMessage,
   type HostAccessDeps,
   type ReadSurfaceFailure,
@@ -170,7 +172,26 @@ export async function dispatchCommand(
         // you can watch but not talk to was the functional hole; putting the
         // reply box above the approvals would bury the thing that is
         // actually blocking the agent.
-        cards.push(buildComposeCard(chat, epicId));
+        //
+        // But ONLY when this host can actually send. `connected` is not
+        // sufficient evidence: it describes the subscription, which works
+        // fine for a remote chat — that is how the transcript above arrives.
+        // Measured, 53 of 56 agents are readable and NOT messageable, so
+        // gating on `connected` put a Send box on 53 chats that could not
+        // receive one. Same class as the composer `say hi` opened onto a
+        // chat that did not exist, one field over.
+        const caps = await fetchChatCapabilities(
+          principal,
+          conversationId,
+          command.chatId,
+          deps,
+        );
+        const canSend = caps.kind === "ok" && caps.capabilities.sendMessage;
+        cards.push(
+          canSend
+            ? buildComposeCard(chat, epicId)
+            : buildReadOnlyChatCard(chat),
+        );
       }
       return cards;
     }

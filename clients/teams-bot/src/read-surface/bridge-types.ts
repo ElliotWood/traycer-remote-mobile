@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logWarn } from "../logger";
 
 /**
  * Mirrors `remote-bridge`'s `RemoteBridgeActions` return shapes
@@ -24,15 +25,54 @@ export const agentSummarySchema = z.object({
   /**
    * Whether the agent runs on the host we queried.
    *
-   * `.catch(true)` rather than a bare boolean: the bot may run against a
-   * bridge binary older than the passthrough that added this field, and a
-   * strict parse would turn a working fleet into a `malformed_output` card.
+   * `.catch` rather than a bare boolean: the bot may run against a bridge
+   * binary older than the passthrough that added this field, and a strict
+   * parse would turn a working fleet into a `malformed_output` card.
    * Defaulting to `true` preserves the previous behaviour exactly — every
-   * row treated as local — rather than silently marking a whole fleet remote
-   * on an old bridge.
+   * row treated as local — rather than silently marking a whole fleet
+   * remote on an old bridge.
+   *
+   * It LOGS, because the fallback restores a behaviour we now know is
+   * false: every row rendered as Active/Idle when we cannot actually see
+   * any of them. The bot and bridge ship together so this should never
+   * fire, which is exactly why a silent path that only runs when something
+   * unexpected happened deserves a line in the journal. Without it the
+   * fleet would quietly go back to claiming 53 agents are idle, with
+   * nothing anywhere saying why.
    */
-  isLocal: z.boolean().catch(true),
+  isLocal: z.boolean().catch(() => {
+    logWarn("bridge omitted isLocal — treating every agent as local", {
+      consequence: "remote agents will read Active/Idle instead of remote",
+      likelyCause: "bridge binary older than the isLocal passthrough",
+    });
+    return true;
+  }),
   hostId: z.string().catch(""),
+  /**
+   * What this host can DO with the agent — a different question from whether
+   * it can see the agent executing, and the distinction is load-bearing.
+   *
+   * Measured: all 53 remote agents report `readTranscript: true` and
+   * `sendMessage: false`. So "we cannot see it" and "we cannot reach it" are
+   * not the same fact, and a surface that conflates them either offers
+   * actions that cannot work or hides reads that would.
+   *
+   * `.catch` for the same forward-compatibility reason as `isLocal`, and it
+   * defaults to BOTH TRUE to preserve the pre-capabilities behaviour exactly
+   * — the bot offered every action to every agent before this field existed.
+   */
+  capabilities: z
+    .object({ readTranscript: z.boolean(), sendMessage: z.boolean() })
+    .catch(() => {
+      logWarn(
+        "bridge omitted capabilities — assuming every action is allowed",
+        {
+          consequence: "a Send box may appear on chats that cannot receive one",
+          likelyCause: "bridge binary older than the capabilities passthrough",
+        },
+      );
+      return { readTranscript: true, sendMessage: true };
+    }),
 });
 export type AgentSummary = z.infer<typeof agentSummarySchema>;
 
