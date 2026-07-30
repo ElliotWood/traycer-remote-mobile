@@ -84,3 +84,73 @@ export const actionOutcomeSchema = z.union([
   z.object({ kind: z.literal("failed"), reason: z.string() }),
 ]);
 export type ActionOutcome = z.infer<typeof actionOutcomeSchema>;
+
+/**
+ * P1 transcript. A PROJECTION, not the host's message shape.
+ *
+ * The host's `chat.messages[]` carries assistant rows whose content is an
+ * array of fifteen different content-block types — text, reasoning, tool
+ * calls, file changes, commands, sub-agents, plans, interviews and more.
+ * Teaching this package to walk that union would give it exactly the
+ * protocol knowledge its own package description says it does not hold, and
+ * would bind card rendering to a schema that changes for reasons that have
+ * nothing to do with Teams.
+ *
+ * So the bridge flattens each message to prose plus a list of non-prose
+ * PARTS, and this validates that flattened shape. One projection, kept where
+ * the protocol types already are.
+ */
+export const transcriptPartSchema = z.object({
+  kind: z.union([
+    z.literal("code"),
+    z.literal("table"),
+    z.literal("tool"),
+    z.literal("file_change"),
+    z.literal("command"),
+    z.literal("error"),
+    z.literal("other"),
+  ]),
+  /** Short human label: a file path, a command, a tool name. */
+  label: z.string(),
+  /** Line count where the part is line-shaped, else 0. */
+  lines: z.number().int().nonnegative(),
+});
+export type TranscriptPart = z.infer<typeof transcriptPartSchema>;
+
+export const transcriptMessageSchema = z.object({
+  messageId: z.string(),
+  role: z.union([z.literal("user"), z.literal("assistant")]),
+  /** Display name of the sender; `null` when the bridge could not name one. */
+  author: z.string().nullable(),
+  timestamp: z.number(),
+  /** The message's prose, already flattened out of its blocks. */
+  text: z.string(),
+  parts: z.array(transcriptPartSchema),
+});
+export type TranscriptMessage = z.infer<typeof transcriptMessageSchema>;
+
+export const transcriptSchema = z.object({
+  chatId: z.string(),
+  title: z.string().nullable(),
+  /**
+   * How many messages the chat has IN TOTAL, not how many are in `messages`.
+   * Without it a card cannot honestly say "20 of 214" and would have to imply
+   * that a window is the whole history.
+   */
+  totalCount: z.number().int().nonnegative(),
+  /**
+   * How many of the NEWEST messages this window skips — i.e. the offset is
+   * measured from the RECENT end, not from message #1.
+   *
+   * Stated this way round on purpose. Paging here runs newest-first: you
+   * land on the current state and walk backwards. An offset measured from
+   * the oldest message would mean "show me the latest" requires knowing
+   * `totalCount` first, and every page boundary shifts as new messages
+   * arrive. Measured from the newest end, `offset: 0` is always "now" and a
+   * page you have already loaded keeps its contents.
+   */
+  offset: z.number().int().nonnegative(),
+  /** The window itself, always oldest-first WITHIN the window. */
+  messages: z.array(transcriptMessageSchema),
+});
+export type Transcript = z.infer<typeof transcriptSchema>;

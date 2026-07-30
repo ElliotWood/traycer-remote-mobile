@@ -254,6 +254,93 @@ add("25-message-unconfirmed", () =>
   ),
 );
 
+/**
+ * A realistic transcript, NOT tidy prose. Judging paging candidates against
+ * clean one-liners would flatter all three equally; the content that breaks
+ * layout is a message carrying a fenced block, a message that is nothing but
+ * a tool call, and a genuinely long agent answer.
+ */
+const T0 = Date.now() - 3_600_000;
+const msg = (i, role, author, text, parts) => ({
+  messageId: `m-${String(i)}`,
+  role,
+  author,
+  timestamp: T0 + i * 240_000,
+  text,
+  parts: parts ?? [],
+});
+
+const TRANSCRIPT_MESSAGES = [
+  msg(0, "user", "You", "Can you get the approval cards rendering properly?"),
+  msg(
+    1,
+    "assistant",
+    "claude",
+    "Looking at it now. The card builds fine but the fenced block in the description renders its delimiters literally, so the diff is unreadable on a phone.",
+  ),
+  msg(
+    2,
+    "assistant",
+    "claude",
+    "Here's the failing case:\n```ts\nconst card = buildApprovalCard(chat, epicId, approval, now);\nexpect(card).toMatchSnapshot();\n```\nTeams card markdown supports no preformatted text at all.",
+    [{ kind: "code", label: "cards.test.ts", lines: 4 }],
+  ),
+  msg(3, "user", "You", "Can we not just escape it?"),
+  msg(
+    4,
+    "assistant",
+    "claude",
+    "Escaping doesn't help — the constraint isn't the characters, it's that Teams strips the construct. `fontType: \"monospace\"` is a card property rather than markdown, so it sidesteps the whole thing.",
+  ),
+  msg(5, "assistant", "claude", "", [
+    { kind: "command", label: "bun test --filter cards", lines: 0 },
+    { kind: "file_change", label: "cards.ts", lines: 165 },
+  ]),
+  msg(
+    6,
+    "assistant",
+    "claude",
+    "That works. All 104 tests pass and the diff keeps its alignment at 320px. I also caught that the table case collapses into one paragraph of run-together pipes, so tables get the same treatment.",
+    [{ kind: "table", label: "coverage", lines: 4 }],
+  ),
+  msg(7, "user", "You", "Ship it."),
+  msg(
+    8,
+    "assistant",
+    "claude",
+    "Committed. One thing worth flagging before I move on: the action styling we're using for Approve/Reject is documented as unsupported in Teams, so the colours may not appear at all. I've added a glyph and kept the ordering fixed so the distinction survives either way, but you should know the screenshots are more colourful than the product might be.",
+    [{ kind: "error", label: "styling unverified", lines: 0 }],
+  ),
+];
+
+const TRANSCRIPT = {
+  chatId: STATUS_LIVE.chatId,
+  title: STATUS_LIVE.title,
+  totalCount: 214,
+  offset: 0,
+  messages: TRANSCRIPT_MESSAGES,
+};
+
+add("30-transcript-A-newest-first", () =>
+  C.buildTranscriptCardA(TRANSCRIPT, Date.now()),
+);
+add("31-transcript-B-window", () =>
+  C.buildTranscriptCardB({ ...TRANSCRIPT, offset: 40 }, Date.now()),
+);
+add("32-transcript-C-recent-only", () =>
+  C.buildTranscriptCardC(TRANSCRIPT, Date.now()),
+);
+add("33-transcript-A-short-chat", () =>
+  C.buildTranscriptCardA(
+    {
+      ...TRANSCRIPT,
+      totalCount: TRANSCRIPT_MESSAGES.length,
+      messages: TRANSCRIPT_MESSAGES.slice(0, 4),
+    },
+    Date.now(),
+  ),
+);
+
 // The two that answer the open question: what does a fenced code block / a
 // markdown table actually LOOK like once Teams card markdown has refused to
 // render it? These are the evidence, not the assertion.

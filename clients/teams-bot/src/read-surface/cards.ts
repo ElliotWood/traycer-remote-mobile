@@ -8,6 +8,9 @@ import type {
   EpicSummary,
   PendingApproval,
   PendingInterview,
+  Transcript,
+  TranscriptMessage,
+  TranscriptPart,
 } from "./bridge-types";
 import type { BridgeCliFailureReason } from "./bridge-cli";
 
@@ -71,6 +74,13 @@ export const SEND_VERB = "traycer/send";
 export const APPROVE_TITLE = "✓ Approve";
 export const REJECT_TITLE = "✕ Reject";
 export const SEND_TITLE = "➤ Send";
+/**
+ * ↑/↓ rather than ⌃/⌄: the arrowhead glyphs fell back to a plain caret and
+ * "v" in the render, which reads as a typo. Caught in a screenshot — the
+ * card JSON was correct and the font simply had no glyph.
+ */
+export const OLDER_TITLE = "↑ Older";
+export const NEWER_TITLE = "↓ Newer";
 
 /**
  * `Action.Submit`, NOT `Action.Execute` — deliberate, and the reasoning is
@@ -691,6 +701,274 @@ export interface ChatRef {
 function chatLabel(chat: ChatRef): string {
   const title = chat.title?.trim() ?? "";
   return title.length > 0 ? title : shortId(chat.chatId);
+}
+
+export const OLDER_VERB = "traycer/older";
+export const NEWER_VERB = "traycer/newer";
+
+/**
+ * How a transcript message is rendered INLINE, and why it is not
+ * {@link describeApproval}.
+ *
+ * The two cards have different jobs. An approval card shows one thing you
+ * must read completely before making an irreversible decision, so full
+ * fidelity is correct there — an unreadable diff means a blind approval. A
+ * transcript shows many things you SCAN to orient yourself, and optimising
+ * each message for complete fidelity makes the whole unreadable: one 14-line
+ * monospace block already dominates a 320px card, and ten of them is not a
+ * transcript, it is a wall.
+ *
+ * So this reuses the segmentation — which is correct and tested — and
+ * changes the presentation: prose stays readable, and code, tables and tool
+ * output collapse to a marker that says WHAT is there without spending the
+ * height. Full fidelity is a drill-in, not an inline concern.
+ *
+ * One segmentation, two presentations. Deliberately not a second parser.
+ */
+const TRANSCRIPT_TEXT_LIMIT = 220;
+
+export function partMarker(part: TranscriptPart): string {
+  const noun =
+    part.kind === "file_change"
+      ? "file"
+      : part.kind === "other"
+        ? "content"
+        : part.kind;
+  const label = part.label.trim();
+  const head = label.length > 0 ? `${noun} · ${label}` : noun;
+  return part.lines > 0
+    ? `⟨${head} · ${String(part.lines)} lines⟩`
+    : `⟨${head}⟩`;
+}
+
+/**
+ * The message's prose, with fences, tables and headings taken out by the
+ * SAME segmenter the approval card uses — their content is represented by
+ * `parts` markers instead, which the card renders on their own line.
+ *
+ * Returns `""` for a message that is entirely non-prose; the caller decides
+ * what to show, because "nothing to preview" reads differently depending on
+ * whether there are parts to name.
+ */
+export function transcriptPreview(message: TranscriptMessage): string {
+  const prose = describeApproval(message.text)
+    .map((block) => {
+      // Only TOP-LEVEL TextBlocks: code and tables live inside containers,
+      // so skipping non-TextBlocks is exactly what drops them from the
+      // preview without a second parser.
+      const b = block as { type?: string; text?: string };
+      return b.type === "TextBlock" && typeof b.text === "string" ? b.text : "";
+    })
+    .filter((line) => line.length > 0 && line !== "(no description provided)")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return prose.length > TRANSCRIPT_TEXT_LIMIT
+    ? `${prose.slice(0, TRANSCRIPT_TEXT_LIMIT - 1)}…`
+    : prose;
+}
+
+/**
+ * One transcript row. Shared by all three paging candidates so the
+ * comparison is about PAGING, not about row design.
+ *
+ * The author line and the body are separate blocks rather than
+ * "**Alice:** text": at 320px a bolded prefix and its message wrap into one
+ * another and you lose the turn boundary, which is the one thing a
+ * transcript has to make obvious.
+ */
+function transcriptRow(message: TranscriptMessage, now: number): unknown {
+  const preview = transcriptPreview(message);
+  const items: unknown[] = [
+    text(
+      `${message.author ?? (message.role === "user" ? "You" : "Agent")} · ${approvalAgeLabel(message.timestamp, now)}`,
+      {
+        weight: "bolder",
+        size: "small",
+        color: message.role === "user" ? "accent" : "default",
+        isSubtle: message.role !== "user",
+        spacing: "none",
+      },
+    ),
+  ];
+  if (preview.length > 0) {
+    items.push(text(preview, { spacing: "small" }));
+  }
+  if (message.parts.length > 0) {
+    // Markers on their own line: they are metadata about the message, not
+    // part of its prose, and running them together reads as if the agent
+    // wrote "⟨code · 24 lines⟩".
+    items.push(
+      text(message.parts.map(partMarker).join("  "), {
+        isSubtle: true,
+        size: "small",
+        fontType: "monospace",
+        spacing: preview.length > 0 ? "small" : "none",
+      }),
+    );
+  }
+  if (preview.length === 0 && message.parts.length === 0) {
+    items.push(text("(no content)", { isSubtle: true, size: "small" }));
+  }
+  return container(items, {
+    style: message.role === "user" ? "emphasis" : undefined,
+    separator: true,
+    spacing: "small",
+  });
+}
+
+/** Newest-first ordering, applied at render time. */
+function newestFirst(
+  messages: readonly TranscriptMessage[],
+): readonly TranscriptMessage[] {
+  return [...messages].reverse();
+}
+
+function transcriptHeader(transcript: Transcript, shown: number): unknown {
+  const { totalCount, offset } = transcript;
+  const from = totalCount - offset - shown + 1;
+  const to = totalCount - offset;
+  return container(
+    [
+      text(chatLabel({ chatId: transcript.chatId, title: transcript.title }), {
+        weight: "bolder",
+        size: "medium",
+        spacing: "none",
+      }),
+      text(
+        totalCount <= shown
+          ? `${String(totalCount)} messages`
+          : `${String(Math.max(1, from))}–${String(to)} of ${String(totalCount)}`,
+        { isSubtle: true, size: "small", spacing: "none" },
+      ),
+    ],
+    { style: "emphasis" },
+  );
+}
+
+/**
+ * CANDIDATE A — newest-first, one "load older" button.
+ *
+ * You land on the card wanting the CURRENT state, not message #1 of 214, so
+ * the newest message is at the top and older history is something you
+ * explicitly ask for. One control, one direction, no page arithmetic to hold
+ * in your head.
+ */
+export function buildTranscriptCardA(
+  transcript: Transcript,
+  now: number,
+): Attachment {
+  const shown = newestFirst(transcript.messages);
+  const hasOlder =
+    transcript.offset > 0 ||
+    transcript.totalCount > transcript.messages.length + transcript.offset;
+  return buildCard(
+    [
+      transcriptHeader(transcript, shown.length),
+      ...shown.map((m) => transcriptRow(m, now)),
+    ],
+    hasOlder
+      ? [
+          submitAction(
+            OLDER_TITLE,
+            OLDER_VERB,
+            {
+              chatId: transcript.chatId,
+              offset: String(transcript.offset + transcript.messages.length),
+            },
+            { associateInputs: false },
+          ),
+        ]
+      : [],
+  );
+}
+
+/**
+ * CANDIDATE B — a fixed window with both directions.
+ *
+ * Symmetrical and predictable, and the only candidate that lets you walk
+ * BACK toward the present without re-running the command. The cost is two
+ * controls and a position you have to track.
+ */
+export function buildTranscriptCardB(
+  transcript: Transcript,
+  now: number,
+): Attachment {
+  const shown = newestFirst(transcript.messages);
+  const hasOlder =
+    transcript.totalCount > transcript.messages.length + transcript.offset;
+  const hasNewer = transcript.offset > 0;
+  const actions: unknown[] = [];
+  if (hasNewer) {
+    actions.push(
+      submitAction(
+        NEWER_TITLE,
+        NEWER_VERB,
+        {
+          chatId: transcript.chatId,
+          offset: String(
+            Math.max(0, transcript.offset - transcript.messages.length),
+          ),
+        },
+        { associateInputs: false },
+      ),
+    );
+  }
+  if (hasOlder) {
+    actions.push(
+      submitAction(
+        OLDER_TITLE,
+        OLDER_VERB,
+        {
+          chatId: transcript.chatId,
+          offset: String(transcript.offset + transcript.messages.length),
+        },
+        { associateInputs: false },
+      ),
+    );
+  }
+  return buildCard(
+    [
+      transcriptHeader(transcript, shown.length),
+      ...shown.map((m) => transcriptRow(m, now)),
+    ],
+    actions,
+  );
+}
+
+/**
+ * CANDIDATE C — a short recent window plus a drill-in.
+ *
+ * Shows only the last few turns inline and sends everything else to the
+ * full-history surface, on the theory that a phone card is for orienting and
+ * anything deeper wants a real reader. Shortest card by a wide margin.
+ *
+ * The drill-in is NOT built — it is P2's URL dialog. Rendered here as a
+ * disabled-looking affordance so the comparison is honest about what would
+ * still be missing if this candidate won.
+ */
+export function buildTranscriptCardC(
+  transcript: Transcript,
+  now: number,
+): Attachment {
+  const shown = newestFirst(transcript.messages).slice(0, 3);
+  const remaining = transcript.totalCount - shown.length;
+  return buildCard(
+    [
+      transcriptHeader(transcript, shown.length),
+      ...shown.map((m) => transcriptRow(m, now)),
+      ...(remaining > 0
+        ? [
+            text(
+              `${String(remaining)} earlier messages — full history isn't available from Teams yet.`,
+              { isSubtle: true, size: "small", separator: true },
+            ),
+          ]
+        : []),
+    ],
+    [],
+  );
 }
 
 /** Matches the host's own composer cap; a longer body is a paste accident. */
