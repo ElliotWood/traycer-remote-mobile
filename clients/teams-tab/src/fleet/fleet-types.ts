@@ -26,6 +26,17 @@ export interface FleetAgent {
   readonly isLocal: boolean;
   /** Which host it runs on, so the UI can name it rather than saying "elsewhere". */
   readonly hostId: string;
+  /**
+   * What this host can DO with the agent — a different question from whether
+   * it can SEE it executing, and the two must not be conflated. Measured on
+   * the live host: all 53 remote agents are `readTranscript: true,
+   * sendMessage: false`, so "cannot see" and "cannot reach" are separate
+   * facts that happen to coincide today.
+   */
+  readonly capabilities: {
+    readonly readTranscript: boolean;
+    readonly sendMessage: boolean;
+  };
   /** Awaiting a human decision — the column that makes the grid worth reading. */
   readonly pendingApprovals: number;
   readonly pendingInterviews: number;
@@ -55,7 +66,12 @@ export function fleetStatus(agent: FleetAgent): FleetStatus {
   // That is the fabricated status column arriving by a different route.
   // There is no dishonest line of code in it — just a field read as
   // answering a question it does not answer.
-  if (!agent.isLocal) return "remote";
+  // Derived from the CAPABILITY, not from locality — matching the bot, and
+  // for the reason the bot records: the two agree on all 56 rows measured,
+  // and that correlation is the trap. `isLocal` says whether this host can
+  // SEE the agent execute; `sendMessage` says whether it can REACH it.
+  // Nothing in the contract makes the second follow from the first.
+  if (!agent.capabilities.sendMessage) return "remote";
   if (agent.pendingApprovals > 0 || agent.pendingInterviews > 0) {
     return "blocked";
   }

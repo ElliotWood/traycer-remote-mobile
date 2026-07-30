@@ -296,21 +296,82 @@ const FLEET_ROW_LIMIT = 12;
  * produced without a single dishonest line of code — just a field read as
  * answering a question it does not answer. Say what we actually know.
  */
+export interface AgentStatusPresentation {
+  readonly label: string;
+  readonly color: SemanticColor;
+  readonly emphasised: boolean;
+}
+
+/**
+ * Label AND styling from ONE derivation, so they cannot disagree.
+ *
+ * They did. The label was moved to the capability and the badge colour was
+ * left on `agent.isLocal && agent.active` two lines below — so a row that
+ * is remote but sendable rendered the word "Active" in grey, in a default
+ * container. Text and styling contradicting each other about the same agent,
+ * with no dishonest line of code, exactly like the `attention` container
+ * that once wrapped a green "Running" badge.
+ *
+ * It survived because the two happened to agree on all 56 real rows —
+ * `isLocal === sendMessage` today — which is the correlation the docblock
+ * two functions up calls "the trap, not the shortcut", and which I then
+ * walked into.
+ *
+ * A test could have caught it. Returning one object means there is nothing
+ * left to catch: a caller cannot take the label from here and the colour
+ * from somewhere else without deleting a field.
+ */
+export function agentStatusPresentation(
+  agent: AgentSummary,
+): AgentStatusPresentation {
+  const label = agentStatusLabel(agent);
+  /**
+   * `good` + emphasis ONLY when activity is both OBSERVABLE and true.
+   *
+   * `isLocal` is the observability axis and `sendMessage` is the
+   * reachability one; they are different questions and this needs the first.
+   * An earlier version used `capabilities.sendMessage && agent.active`, which
+   * is the same category error one axis over — it would have painted a row
+   * green on the strength of an `active` flag that cannot be trusted for a
+   * host we cannot see.
+   */
+  const running = agent.isLocal && agent.active;
+  return {
+    label,
+    color: running ? "good" : "default",
+    emphasised: running,
+  };
+}
+
 export function agentStatusLabel(agent: AgentSummary): string {
-  // Derived from the CAPABILITY, not from locality — and deliberately so.
-  //
-  // Across all 56 agents today, `isLocal: false` and `sendMessage: false`
-  // agree perfectly. That correlation is the trap, not the shortcut: it is
-  // the third time in a day a field has been read as answering a
-  // neighbouring question. `isLocal` says whether this host can SEE the
-  // agent executing; `capabilities.sendMessage` says whether it can REACH
-  // it. Nothing in the contract makes the second follow from the first —
-  // today's data merely happens to line up.
-  //
-  // The capability first, because that is the constraint the user acts on.
-  // The cause second, because it is context.
-  if (!agent.capabilities.sendMessage) {
-    return agent.isLocal ? "Read-only" : "Read-only — runs on another host";
+  /**
+   * THREE axes, deliberately not collapsed into two.
+   *
+   *   reachable   `capabilities.sendMessage` — can this host act on it
+   *   observable  `isLocal`                  — can this host SEE it work
+   *   active      `agent.active`             — meaningful ONLY if observable
+   *
+   * They agree on all 56 rows today, which is exactly why they are kept
+   * apart: that correlation is a fact about this deployment, not about the
+   * contract.
+   *
+   * The case that forced the third axis: an agent that is REACHABLE but not
+   * OBSERVABLE. A previous version returned "Idle" for it — reading an
+   * unobservable as a negative, which is the identical error to the original
+   * `active: false` reading that made a fleet of 53 running agents report as
+   * idle. We do not know that it is idle. We cannot see it.
+   *
+   * So: never claim activity we cannot observe. Say what is true instead.
+   */
+  const reachable = agent.capabilities.sendMessage;
+  const observable = agent.isLocal;
+
+  if (!reachable) {
+    // Constraint first — that is what the user acts on. Cause second.
+    return observable ? "Read-only" : "Read-only — runs on another host";
+  }
+  if (!observable) {
+    return "Activity not visible from here";
   }
   return agent.active ? "Active" : "Idle";
 }
@@ -356,21 +417,23 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
     ),
   ];
 
-  const rows = shown.map((agent) =>
-    container(
+  const rows = shown.map((agent) => {
+    // One derivation for label and styling — see agentStatusPresentation.
+    const presentation = agentStatusPresentation(agent);
+    return container(
       [
         text(agentDisplayName(agent), {
           weight: "bolder",
           spacing: "none",
         }),
         statusBadge(
-          agentStatusLabel(agent),
-          agent.isLocal && agent.active ? "good" : "default",
+          presentation.label,
+          presentation.color,
           `${agent.harnessId ?? "unknown"} · ${agent.surface}`,
         ),
       ],
       {
-        style: agent.isLocal && agent.active ? "emphasis" : "default",
+        style: presentation.emphasised ? "emphasis" : "default",
         separator: true,
         spacing: "small",
         // Whole row tappable — the natural gesture is "tap the agent to see it".
@@ -381,8 +444,8 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
           { associateInputs: false },
         ),
       },
-    ),
-  );
+    );
+  });
 
   const overflow =
     agents.length > FLEET_ROW_LIMIT

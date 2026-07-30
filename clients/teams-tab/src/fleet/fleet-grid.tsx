@@ -205,16 +205,24 @@ export function FleetGrid({
   const [showIdle, setShowIdle] = useState(false);
 
   const sorted = [...agents].sort(byUrgency);
-  const idleCount = sorted.filter((a) => fleetStatus(a) === "idle").length;
   /**
-   * The long idle tail is collapsed by default. The card version already
-   * solved this — 55 agents dumped as 55 uniform rows is not a fleet view,
-   * it is a wall, and the two rows that need you are lost in it. A grid does
-   * not change that; it just makes the wall tidier.
+   * Collapse what you CANNOT ACT ON, not what is merely quiet.
+   *
+   * This collapsed `idle` when idle was the only inert state. Then `remote`
+   * arrived, and against the real fleet the result was exactly inverted: the
+   * 53 rows this host cannot touch were all expanded, and the 3 local agents
+   * — the only ones you can do anything with — were hidden behind "Show 3
+   * idle agents". Caught in the render with the real 53/3 distribution; the
+   * friendly 8-agent fixture could never have shown it, because it had no
+   * remote rows at all.
+   *
+   * The rule that survives both distributions: hide the unactionable tail,
+   * whatever is currently making it unactionable.
    */
+  const hiddenCount = sorted.filter((a) => fleetStatus(a) === "remote").length;
   const visible = showIdle
     ? sorted
-    : sorted.filter((a) => fleetStatus(a) !== "idle");
+    : sorted.filter((a) => fleetStatus(a) !== "remote");
 
   if (sorted.length === 0) {
     return (
@@ -225,7 +233,7 @@ export function FleetGrid({
   }
 
   const idleToggle =
-    idleCount === 0 ? null : (
+    hiddenCount === 0 ? null : (
       <Button
         appearance="subtle"
         size="small"
@@ -235,8 +243,8 @@ export function FleetGrid({
         }}
       >
         {showIdle
-          ? `Hide ${String(idleCount)} idle`
-          : `Show ${String(idleCount)} idle agent${idleCount === 1 ? "" : "s"}`}
+          ? `Hide the ${String(hiddenCount)} on other hosts`
+          : `Show ${String(hiddenCount)} agent${hiddenCount === 1 ? "" : "s"} on other hosts`}
       </Button>
     );
 

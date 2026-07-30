@@ -9,6 +9,7 @@ import {
   buildEpicPickerCard,
   agentDisplayName,
   agentStatusLabel,
+  agentStatusPresentation,
   buildFleetCard,
   buildHelpCard,
   buildPrincipalRefusedCard,
@@ -717,25 +718,61 @@ describe("read-surface/cards — the label comes from the capability, not locali
     expect(agentStatusLabel(remote)).toBe("Read-only — runs on another host");
   });
 
-  it("CONTRACT: derived from sendMessage, NOT from isLocal", () => {
-    // The two agree on every row we have measured, and that correlation is
-    // the trap: `isLocal` answers "can this host SEE it", `sendMessage`
-    // answers "can this host REACH it". A LOCAL agent that cannot be sent to
-    // must still read read-only — which is what pins that the implementation
-    // reads the capability rather than the locality that happens to match.
-    const localButUnsendable = {
-      ...local,
-      capabilities: { readTranscript: true, sendMessage: false },
-    };
-    expect(agentStatusLabel(localButUnsendable)).toBe("Read-only");
+  it("CONTRACT: reachability and observability are separate axes", () => {
+    // The two agree on every row measured, and that correlation is the trap:
+    // `sendMessage` answers "can this host REACH it", `isLocal` answers "can
+    // this host SEE it work". Neither of these rows exists in production, and
+    // both fail if the implementation collapses one axis into the other.
 
-    // ...and the mirror: remote but sendable reads as a normal agent.
+    // Reachable, not observable. It must NOT say "Active" — we cannot see it
+    // — and it must NOT say "Idle" either, which was the first attempt and
+    // is the same error as reading `active: false` as "not working".
     const remoteButSendable = {
       ...remote,
       capabilities: { readTranscript: true, sendMessage: true },
       active: true,
     };
-    expect(agentStatusLabel(remoteButSendable)).toBe("Active");
+    const label = agentStatusLabel(remoteButSendable);
+    expect(label).not.toBe("Active");
+    expect(label).not.toBe("Idle");
+    expect(label).toContain("not visible");
+
+    // Observable, not reachable. Read-only, and no claim about the host.
+    const localButUnsendable = {
+      ...local,
+      capabilities: { readTranscript: true, sendMessage: false },
+    };
+    expect(agentStatusLabel(localButUnsendable)).toBe("Read-only");
+  });
+
+  it("CONTRACT: label and styling come from one derivation and cannot disagree", () => {
+    // They did: the label moved to the capability and the badge colour was
+    // left on locality two lines below, so a row rendered the word "Active"
+    // in grey. No test asserted colour, which is why it was invisible.
+    const remoteButSendable = {
+      ...remote,
+      capabilities: { readTranscript: true, sendMessage: true },
+      active: true,
+    };
+    const p = agentStatusPresentation(remoteButSendable);
+    // Not observable, so no green — and the label agrees.
+    expect(p.color).toBe("default");
+    expect(p.emphasised).toBe(false);
+    expect(p.label).toContain("not visible");
+
+    // The genuinely running row is the only one that goes green.
+    const running = agentStatusPresentation({ ...local, active: true });
+    expect(running.color).toBe("good");
+    expect(running.emphasised).toBe(true);
+    expect(running.label).toBe("Active");
+  });
+
+  it("a remote unreachable row is never painted as running", () => {
+    // `active` is local-only, so this row's `active: true` is not a signal we
+    // have. Painting it green would be the fabricated status column again.
+    const p = agentStatusPresentation({ ...remote, active: true });
+    expect(p.color).toBe("default");
+    expect(p.emphasised).toBe(false);
   });
 
   it("a sendable agent still reads Active or Idle — the control", () => {

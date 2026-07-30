@@ -21,10 +21,11 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { FleetGrid } from "./fleet/fleet-grid";
+import type { FleetAgent } from "./fleet/fleet-types";
 import {
   FIXTURE_NOW,
   FLEET_FIXTURE,
-  LARGE_FLEET_FIXTURE,
+  REAL_FLEET_FIXTURE,
 } from "./fleet/fleet-fixture";
 import { themeFor } from "./theme/teams-theme";
 import { configProblems } from "./config";
@@ -102,7 +103,38 @@ export function App(): ReactElement {
     );
   }
 
-  if (status.kind !== "signed-in") {
+  const params =
+    typeof window === "undefined"
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
+
+  /**
+   * Renders the FIXTURE fleet without signing in, so the surface can still be
+   * screenshotted and reviewed. Adding the auth gate silently killed the
+   * shoot-before-wire loop — the loop that has caught nearly every UI defect
+   * on this project — and losing it would cost more than it saves.
+   *
+   * Three hard constraints, stated as PROPERTIES rather than mechanisms —
+   * the distinction matters and the first draft got it wrong.
+   *
+   * 1. **Never reachable inside Teams.** `inTeams` comes from a successful
+   *    host handshake, so a query param on a real tab cannot get here.
+   *
+   * 2. **No code path reachable from here ever reads the host.** The first
+   *    version said "it renders fixtures only", which is a mechanism, not a
+   *    property: a future change that reads the host while still calling
+   *    itself the fixture path satisfies that wording exactly and breaks
+   *    the thing it was meant to protect. Phrased as the property, the
+   *    constraint still bites after the wiring lands.
+   *
+   * 3. **Nothing rendered here is real.** Also a property, and it is why the
+   *    fixtures contain invented titles and synthetic host ids: this URL is
+   *    served unauthenticated, so anything in a fixture is public. That is
+   *    a constraint on the FIXTURES, not on this flag.
+   */
+  const previewingFleet = !inTeams && params.get("preview") === "fleet";
+
+  if (status.kind !== "signed-in" && !previewingFleet) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <SignIn
@@ -116,24 +148,21 @@ export function App(): ReactElement {
     );
   }
 
-  // `?fleet=large` and `?view=grid|list` are the same out-of-Teams preview
-  // affordance as `?theme`: they let the 55-agent case and the grid-vs-list
-  // question be answered from images at a FIXED width, rather than by
-  // resizing a window and trusting a memory of what the other one looked
-  // like. Never consulted inside Teams.
-  const params =
-    typeof window === "undefined"
-      ? new URLSearchParams()
-      : new URLSearchParams(window.location.search);
+  // `?fleet=real` and `?view=grid|list` are the same out-of-Teams preview
+  // affordance as `?theme`: they answer layout questions from images at a
+  // FIXED width, rather than by resizing a window and trusting a memory of
+  // what the other one looked like. Never consulted inside Teams.
   const fleet =
-    params.get("fleet") === "large" ? LARGE_FLEET_FIXTURE : FLEET_FIXTURE;
+    params.get("fleet") === "real" ? REAL_FLEET_FIXTURE : FLEET_FIXTURE;
   const rawView = params.get("view");
   const forceView =
     rawView === "grid" || rawView === "list" ? rawView : undefined;
 
   const blocked = fleet.filter(
-    (a) => a.pendingApprovals + a.pendingInterviews > 0,
+    (a: FleetAgent) => a.pendingApprovals + a.pendingInterviews > 0,
   ).length;
+  const local = fleet.filter((a: FleetAgent) => a.isLocal).length;
+  const remote = fleet.length - local;
 
   return (
     <FluentProvider theme={themeFor(themeName)}>
@@ -152,8 +181,8 @@ export function App(): ReactElement {
         */}
         <MessageBar intent="warning">
           <MessageBarBody>
-            <strong>Sample data.</strong> This fleet is a fixture — these
-            agents are not real and nothing here reflects your host yet.
+            <strong>Sample data.</strong> This fleet is a fixture — these agents
+            are not real and nothing here reflects your host yet.
           </MessageBarBody>
         </MessageBar>
 
@@ -165,6 +194,29 @@ export function App(): ReactElement {
               : `${String(fleet.length)} agents`}
           </Text>
         </div>
+
+        {/*
+          The honest fleet is 3 local agents and 53 read-only ones, all idle.
+          Every row is true and the whole thing reads as dead — which is only
+          half the job. Said ONCE here rather than inferred from 53 identical
+          badges, because "why is everything read-only" is the first question
+          the surface should answer, not the last.
+
+          Counts by host, because "which agents can this host actually drive"
+          is the real situation and today it has to be inferred.
+        */}
+        {remote > 0 ? (
+          <MessageBar intent="info">
+            <MessageBarBody>
+              <strong>
+                {local} on this host · {remote} elsewhere.
+              </strong>{" "}
+              Agents running on another machine can be read but not messaged
+              from here, and their activity isn&rsquo;t visible — so they show
+              as read-only rather than idle.
+            </MessageBarBody>
+          </MessageBar>
+        ) : null}
 
         <FleetGrid
           agents={fleet}

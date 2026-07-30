@@ -14,6 +14,7 @@ const base: FleetAgent = {
   active: false,
   isLocal: true,
   hostId: "h-local",
+  capabilities: { readTranscript: true, sendMessage: true },
   pendingApprovals: 0,
   pendingInterviews: 0,
   lastActivityAt: null,
@@ -80,38 +81,53 @@ describe("fleet-types — displayName never shows a bare UUID", () => {
   });
 });
 
-describe("fleet-types — a remote agent is never reported as idle", () => {
+describe("fleet-types — status comes from the capability, not locality", () => {
   /**
-   * Measured against the real host: 53 of 56 agents in the epic run
-   * elsewhere and every one reports `active: false`, correctly — the
-   * activity tracker is local-only and does not replicate. Rendering those
-   * as "Idle" would have told the user nothing was happening while agents
-   * ran, with no dishonest line of code anywhere.
+   * The measured shape of all 53 remote rows: readable, not messageable,
+   * and `active: false` because the activity tracker is local-only.
    */
   const remote: FleetAgent = {
     ...base,
     isLocal: false,
     hostId: "h-elsewhere",
+    capabilities: { readTranscript: true, sendMessage: false },
     active: false,
   };
 
-  it("CONTRACT: isLocal false yields 'remote', never 'idle'", () => {
+  it("CONTRACT: an unsendable agent is 'remote', never 'idle'", () => {
+    // "Idle" would be a claim with no basis — this host cannot see the agent
+    // execute, so `active: false` says nothing about what it is doing.
     expect(fleetStatus(remote)).toBe("remote");
     expect(fleetStatus(remote)).not.toBe("idle");
   });
 
-  it("locality outranks every other signal, because the others are unreadable", () => {
-    // Even if pending counts arrived from somewhere, they cannot be trusted
-    // for a host we cannot see. Locality is checked first for that reason.
-    expect(fleetStatus({ ...remote, pendingApprovals: 3, active: true })).toBe(
-      "remote",
-    );
+  it("CONTRACT: derived from sendMessage, NOT from isLocal", () => {
+    // The two agree on every row measured, and that correlation is the trap.
+    // These two cases do not exist in production and are the only ones that
+    // fail if anyone re-derives one field from the other.
+    const localButUnsendable: FleetAgent = {
+      ...base,
+      isLocal: true,
+      capabilities: { readTranscript: true, sendMessage: false },
+    };
+    expect(fleetStatus(localButUnsendable)).toBe("remote");
+
+    const remoteButSendable: FleetAgent = {
+      ...remote,
+      capabilities: { readTranscript: true, sendMessage: true },
+      active: true,
+    };
+    expect(fleetStatus(remoteButSendable)).toBe("running");
   });
 
-  it("a LOCAL agent with the same values is genuinely idle", () => {
-    // The control: this is what makes the test above about locality rather
-    // than about the zeros.
-    expect(fleetStatus({ ...remote, isLocal: true })).toBe("idle");
+  it("a sendable agent is genuinely idle — the control", () => {
+    expect(
+      fleetStatus({
+        ...remote,
+        isLocal: true,
+        capabilities: { readTranscript: true, sendMessage: true },
+      }),
+    ).toBe("idle");
   });
 
   it("remote sorts last — least actionable, not middling", () => {

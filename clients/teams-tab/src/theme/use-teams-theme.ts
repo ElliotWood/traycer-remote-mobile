@@ -84,12 +84,22 @@ export function useTeamsTheme(): TeamsThemeState {
       }, INITIALIZE_TIMEOUT_MS),
     );
 
-    Promise.race([app.initialize().then(() => "ok" as const), timeout])
+    // `.catch(() => {})` on the initialize promise itself, NOT only on the
+    // race: once the timeout wins, the race is settled and a later rejection
+    // from `initialize()` has no handler — an unhandled-rejection warning in
+    // the console of a Teams tab, which is exactly the noise that makes a
+    // real error hard to spot later.
+    const initialize = app
+      .initialize()
+      .then(() => "ok" as const)
+      .catch(() => "failed" as const);
+
+    Promise.race([initialize, timeout])
       .then(async (outcome) => {
-        if (outcome === timedOut) {
-          // A parent that never answered. Not an error — the tab is simply
-          // not running under Teams, or Teams is not responding, and either
-          // way rendering something beats rendering nothing.
+        if (outcome === timedOut || outcome === "failed") {
+          // A parent that never answered, or an initialize that rejected.
+          // Neither is an error here — the tab is simply not running under
+          // Teams, and rendering something beats rendering nothing.
           if (!cancelled) {
             setState({
               themeName: themeFromLocation(),
