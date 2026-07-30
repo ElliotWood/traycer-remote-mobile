@@ -577,3 +577,153 @@ describe("read-surface/dispatch-action — the send path", () => {
     expect(body).not.toContain("try again");
   });
 });
+
+describe("read-surface/dispatch — an unreachable chat never gets an actionable card", () => {
+  /**
+   * Verified against the real bridge on the VM: `status hi` returns
+   *   {"chatId":"hi","title":null,"runStatus":"idle",...,"connected":false}
+   * i.e. a well-formed, entirely plausible status for an id that does not
+   * exist. `connected` is the ONLY thing distinguishing it from a real chat,
+   * which is why these tests use exactly that fixture.
+   */
+  const UNREACHABLE = JSON.stringify({
+    chatId: "hi",
+    title: null,
+    runStatus: "idle",
+    pendingApprovals: [],
+    pendingInterviews: [],
+    connected: false,
+  });
+
+  let jwks3: TestJwksServer;
+  let alice3: VerifiedPrincipal;
+  let registry3: IdentityRegistry;
+
+  beforeAll(async () => {
+    jwks3 = await startTestJwksServer();
+    const config: AadIdTokenConfig = {
+      issuer: "https://login.microsoftonline.com/test-tenant/v2.0",
+      openIdMetadataUrl: jwks3.openIdMetadataUrl,
+      audience: AUDIENCE,
+      clockSkewSeconds: 300,
+      jwksCacheMaxAgeMs: 24 * 60 * 60 * 1000,
+      fetchTimeoutMs: 5000,
+    };
+    const now = Math.floor(Date.now() / 1000);
+    alice3 = {
+      kind: "entra",
+      oid: await validateAadIdToken({
+        token: jwt.sign(
+          {
+            iss: config.issuer,
+            aud: AUDIENCE,
+            oid: ALICE_OID,
+            iat: now,
+            exp: now + 600,
+          },
+          jwks3.privateKeyPem,
+          { algorithm: "RS256", keyid: jwks3.kid },
+        ),
+        config,
+        now: Date.now,
+      }),
+    };
+    registry3 = IdentityRegistry.fromConfig(
+      {
+        tenants: [
+          {
+            home: "/tenants/alice",
+            hostId: "alice-host",
+            entraOid: ALICE_OID,
+            traycerUserId: null,
+          },
+        ],
+      },
+      () => {},
+    );
+  });
+
+  afterAll(async () => {
+    await jwks3.close();
+  });
+
+  async function dispatchAgainstUnreachable(
+    command: Parameters<typeof dispatchCommand>[0],
+  ): Promise<string> {
+    const epicBindings = new InMemoryEpicBindingStore();
+    await epicBindings.set("conv-1", "epic-1");
+    const deps: DispatchDeps = {
+      registry: registry3,
+      epicBindings,
+      bridgeCliConfig: {
+        command: "/absolute/traycer-remote-bridge",
+        timeoutMs: 5000,
+        spawnFn: async () => ({
+          code: 0,
+          stdout: UNREACHABLE,
+          stderr: "",
+          timedOut: false,
+        }),
+      },
+      senderAgentId: "teams-bot",
+      parentEnv: {},
+      resolvePrincipal: async () => ({
+        kind: "resolved",
+        principal: alice3,
+      }),
+      now: () => 0,
+    };
+    const cards = await dispatchCommand(command, "conv-1", deps);
+    return JSON.stringify(cards.map((c) => c.content));
+  }
+
+  it("CONTRACT: `say hi` does not render a composer bound to a chat named 'hi'", async () => {
+    // The shipped behaviour: a card headed "Reply to hi", pointing nowhere.
+    const body = await dispatchAgainstUnreachable({
+      kind: "compose",
+      chatId: "hi",
+    });
+    expect(body).toContain("doesn't look like a chat");
+    expect(body).not.toContain("Reply to");
+    expect(body).not.toContain("Input.Text");
+  });
+
+  it("CONTRACT: `say hi there` does not deliver 'there' to a chat named 'hi'", async () => {
+    const body = await dispatchAgainstUnreachable({
+      kind: "say",
+      chatId: "hi",
+      text: "there",
+    });
+    expect(body).toContain("doesn't look like a chat");
+    expect(body).not.toContain("Message sent");
+  });
+
+  it("exactly ONE card comes back — a single command is a single reply", async () => {
+    const epicBindings = new InMemoryEpicBindingStore();
+    await epicBindings.set("conv-1", "epic-1");
+    const deps: DispatchDeps = {
+      registry: registry3,
+      epicBindings,
+      bridgeCliConfig: {
+        command: "/absolute/traycer-remote-bridge",
+        timeoutMs: 5000,
+        spawnFn: async () => ({
+          code: 0,
+          stdout: UNREACHABLE,
+          stderr: "",
+          timedOut: false,
+        }),
+      },
+      senderAgentId: "teams-bot",
+      parentEnv: {},
+      resolvePrincipal: async () => ({ kind: "resolved", principal: alice3 }),
+      now: () => 0,
+    };
+    const cards = await dispatchCommand(
+      { kind: "compose", chatId: "hi" },
+      "conv-1",
+      deps,
+    );
+    expect(cards).toHaveLength(1);
+  });
+});
