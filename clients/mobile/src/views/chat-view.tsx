@@ -347,6 +347,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
         />
         <Composer
           epicId={epicId}
+          chatId={chatId}
           client={hostClient}
           prefillText={prefill?.text ?? null}
           prefillNonce={prefill?.nonce ?? 0}

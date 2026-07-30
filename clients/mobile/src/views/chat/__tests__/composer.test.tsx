@@ -8,10 +8,17 @@
  * the models one, so this stays the one place that catches "Send is
  * disabled with no hint" for any of them.
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Composer, type ComposerProps } from "@/views/chat/composer";
+import { resetDraftsForTest } from "@/router/drafts";
 import { createFakeHostClient, type FakeHostClient } from "@/test-utils/fakes";
 import { fireEvent, render, screen, waitFor } from "@/test-utils/dom";
+
+// The composer's draft text now outlives its component (see `drafts.ts`), so
+// the store is module state one test could otherwise leak into the next.
+beforeEach(() => {
+  resetDraftsForTest();
+});
 
 function renderComposer(props: {
   readonly client: FakeHostClient["client"] | null;
@@ -22,6 +29,7 @@ function renderComposer(props: {
   render(
     <Composer
       epicId="e1"
+      chatId="c1"
       client={props.client}
       prefillText={null}
       prefillNonce={0}
@@ -40,6 +48,7 @@ function renderComposer(props: {
 function fullProps(overrides: Partial<ComposerProps>): ComposerProps {
   return {
     epicId: "e1",
+    chatId: "c1",
     client: null,
     prefillText: null,
     prefillNonce: 0,

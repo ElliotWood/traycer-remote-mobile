@@ -37,6 +37,7 @@ import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persiste
 import type { AgentMode } from "@traycer/protocol/common/schemas";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useHarnessModels } from "@/host/use-harness-models";
+import { chatDraftKey, useDraft } from "@/router/drafts";
 import {
   AttachmentTooLargeError,
   MAX_ATTACHMENTS_PER_MESSAGE,
@@ -74,6 +75,8 @@ const DEFAULT_HARNESS = "claude" as const;
 
 export interface ComposerProps {
   readonly epicId: string;
+  /** Scopes the preserved draft, so backing out of two chats keeps two separate unsent messages. */
+  readonly chatId: string;
   readonly client: MobileHostClient | null;
   /**
    * Perf fix: the composer owns its OWN draft text internally now (below) —
@@ -99,6 +102,7 @@ export interface ComposerProps {
 
 export function Composer({
   epicId,
+  chatId,
   client,
   prefillText,
   prefillNonce,
@@ -111,7 +115,12 @@ export function Composer({
   onSend,
   onStop,
 }: ComposerProps): ReactElement {
-  const [draftText, setDraftText] = useState("");
+  // Draft-backed rather than `useState("")`: popping the chat route unmounts
+  // this component, and a half-typed message must survive that round trip. The
+  // store is keyed per chat and cleared on a successful send — see `drafts.ts`.
+  const draft = useDraft(chatDraftKey(chatId));
+  const draftText = draft.value;
+  const setDraftText = draft.set;
   const [attachments, setAttachments] = useState<readonly AttachmentDraft[]>([]);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
     chatSettings?.permissionMode ?? "full_access",
@@ -213,7 +222,9 @@ export function Composer({
       },
       readyAttachments.map((a) => a.prepared),
     );
-    setDraftText("");
+    // The text is now a real message: drop the preserved draft, or returning to
+    // this chat would show the sent message still sitting in the composer.
+    draft.clear();
     setAttachments([]);
   };
 

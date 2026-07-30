@@ -59,6 +59,17 @@ export function currentRoute(stack: NavStack): Route {
   return stack[stack.length - 1];
 }
 
+/**
+ * Route frames above the fleet root — the route half of the app's back depth
+ * (`nav-host.tsx` adds the open-layer half). Fleet is depth 0 because it is
+ * where the app boots, not somewhere the user navigated *to*: there is no app
+ * screen behind it, which is exactly why the platform default (back closes the
+ * app) is the right behaviour there and only there.
+ */
+export function routeDepth(stack: NavStack): number {
+  return stack.length - 1;
+}
+
 export function navReducer(stack: NavStack, action: NavAction): NavStack {
   switch (action.type) {
     case "open-epic":

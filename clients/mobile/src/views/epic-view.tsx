@@ -25,6 +25,7 @@ import {
   useState,
   type ReactElement,
 } from "react";
+import { useDismissLayer } from "@/router/nav-host";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useCurrentEpicDoc } from "@/host/current-epic-context";
@@ -104,6 +105,10 @@ export function EpicView({
 
   const [drill, setDrill] = useState<Drill>(null);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT_MODE);
+  // A drill covers the tree full-screen, so the OS back gesture must close it
+  // and land back on the tree — NOT pop the epic route out from underneath it.
+  // One hook call is the entire contract; see `nav-host.tsx`.
+  const dismissDrill = useDismissLayer(drill !== null, () => setDrill(null));
 
   if (drill?.kind === "author" && hostClient !== null) {
     return (
@@ -112,7 +117,7 @@ export function EpicView({
         client={hostClient}
         parentId={drill.parentId}
         onCreated={(chatId) => onOpenChat(chatId, null)}
-        onCancel={() => setDrill(null)}
+        onCancel={dismissDrill}
       />
     );
   }
@@ -123,11 +128,15 @@ export function EpicView({
         epicId={epicId}
         parentId={drill.parentId}
         client={hostClient}
+        /* A REPLACE, not a dismissal: the drill closes as the artifact route is
+           pushed, leaving total back-depth unchanged, so one back returns to the
+           tree rather than to the form. Routing this through history instead
+           would pop the artifact straight back off. */
         onCreated={(artifactId) => {
           setDrill(null);
           openArtifact(epicId, artifactId);
         }}
-        onCancel={() => setDrill(null)}
+        onCancel={dismissDrill}
       />
     );
   }

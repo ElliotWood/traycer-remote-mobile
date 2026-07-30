@@ -14,7 +14,7 @@
  * so this is the desktop's status-text idiom, not artifact kind colors).
  */
 import { Layers } from "lucide-react";
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   formatEpicMeta,
   useEpicList,
@@ -23,6 +23,8 @@ import {
 } from "@/host/use-epic-list";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDismissLayer } from "@/router/nav-host";
+import { NewEpicView } from "./new-epic-view";
 import {
   Button,
   Card,
@@ -46,6 +48,34 @@ export function FleetView({
   onSignOut,
 }: FleetViewProps): ReactElement {
   const list = useEpicList(client, {});
+  // Drilldown-as-local-state, matching `EpicView`'s own `drill` handling of
+  // `AuthorView` — the nav stack (`router/nav.ts`) models the Fleet → Epic →
+  // Chat hierarchy, and a create form is a modal step off the Fleet rather than
+  // a level in it.
+  const [creating, setCreating] = useState(false);
+  // This form is the acute case the back-navigation rework was built for: it
+  // sits on the stack ROOT, so before `useDismissLayer` existed the OS back
+  // gesture closed the whole PWA from here and took the typed instruction with
+  // it. Registering it as a layer makes back close the form and land on the
+  // Fleet; the text itself survives via `useDraft` in `NewEpicView`.
+  const dismissCreate = useDismissLayer(creating, () => setCreating(false));
+
+  if (creating) {
+    return (
+      <NewEpicView
+        client={client}
+        onCancel={dismissCreate}
+        onCreated={(epicId, epicTitle) => {
+          // The list is fetch-based (no live stream), so the new epic would not
+          // appear until the 20s poll fires. Refetch on the way out so backing
+          // out of the epic lands on a fleet that already has it.
+          list.refetch();
+          setCreating(false);
+          onOpenEpic(epicId, epicTitle);
+        }}
+      />
+    );
+  }
 
   return (
     <main style={screen}>
@@ -58,7 +88,10 @@ export function FleetView({
         }}
       >
         <SectionHeading>Your work</SectionHeading>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            New epic
+          </Button>
           <Button
             variant="secondary"
             onClick={list.refetch}
@@ -72,7 +105,7 @@ export function FleetView({
         </div>
       </header>
 
-      <FleetBody list={list} onOpenEpic={onOpenEpic} />
+      <FleetBody list={list} onOpenEpic={onOpenEpic} onCreateEpic={() => setCreating(true)} />
     </main>
   );
 }
@@ -80,9 +113,11 @@ export function FleetView({
 function FleetBody({
   list,
   onOpenEpic,
+  onCreateEpic,
 }: {
   readonly list: EpicListResult;
   readonly onOpenEpic: (epicId: string, epicTitle: string) => void;
+  readonly onCreateEpic: () => void;
 }): ReactElement {
   // UX fix: `isError` flips true on the FIRST failed attempt, before
   // TanStack's automatic retries have run — showing the hard error then
@@ -110,9 +145,17 @@ function FleetBody({
   // rather than dead-ending on the empty copy.
   if (list.epics.length === 0 && !list.hasNextPage) {
     return (
-      <p style={{ ...type.body, color: theme.mutedText }}>
-        No epics yet. Start one from the Traycer desktop app, then refresh here.
-      </p>
+      <div>
+        <p style={{ ...type.body, color: theme.mutedText }}>
+          No epics yet. Start one here, or from the Traycer desktop app.
+        </p>
+        {/* Distinct copy from the header's "New epic", not a second button with
+            the same name: on the empty screen this is THE action, and an
+            unambiguous accessible name is what lets a test tell the two apart. */}
+        <Button variant="primary" fullWidth onClick={onCreateEpic}>
+          Start your first epic
+        </Button>
+      </div>
     );
   }
 

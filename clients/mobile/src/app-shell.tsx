@@ -12,13 +12,27 @@
  * bypass), so the Evaluator can drive comments live in a real browser without
  * Sprint 3's artifact tree existing in this worktree.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+  type Dispatch,
+  type ReactElement,
+} from "react";
 import {
   currentRoute,
   INITIAL_NAV_STACK,
   navReducer,
+  routeDepth,
+  type NavAction,
+  type NavStack,
   type Route,
 } from "@/router/nav";
+import { NavHost, useNavBack } from "@/router/nav-host";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostNotifications } from "@/host/use-host-notifications";
@@ -121,18 +135,20 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
   // ChatView instead, since only it knows whether a turn is in flight — the
   // two are mutually exclusive, so at most one lock is ever held.
   useScreenWakeLock(useWakeLockPreference() === "always");
-  const route = currentRoute(stack);
-  const streamConnection = useStreamConnectionOrNull();
-  const { summary: notificationsSummary } = useHostNotifications(streamConnection);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [usageOpen, setUsageOpen] = useState(false);
-  const [liveChatTitle, setLiveChatTitle] = useState<LiveChatTitle | null>(null);
-  // Stable identity (never reconstructed) so `ChatView`'s effect that calls
-  // this doesn't refire on every AppShell render.
-  const handleChatTitleChange = useCallback((chatId: string, title: string | null) => {
-    setLiveChatTitle({ chatId, title });
+
+  /**
+   * The route half of back consumption, handed to `NavHost` — which calls it
+   * from its `popstate` handler and nowhere else, so a route only ever pops in
+   * response to a real backwards navigation. `count` is normally 1; it exceeds
+   * 1 only when the user traverses several history entries at once (a
+   * long-press on Android's back button), where popping the matching number of
+   * frames is exactly what they asked for.
+   */
+  const popRoutes = useCallback((count: number) => {
+    for (let index = 0; index < count; index += 1) {
+      dispatch({ type: "back" });
+    }
   }, []);
-  const canGoBack = stack.length > 1;
 
   // S5 (C, P1): a blocked-chat / background-push notification's click posts a
   // message to an existing client (see `src/sw.ts`'s `notificationclick`);
@@ -185,7 +201,10 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
       return;
     }
     dispatch({ type: "goto-chat", epicId, chatId });
-    window.history.replaceState(null, "", window.location.pathname);
+    // Preserve the entry's existing `state`: `NavHost` has already stamped this
+    // (the root) entry with its depth marker, and passing `null` here would
+    // erase it. Only the query string is being stripped.
+    window.history.replaceState(window.history.state, "", window.location.pathname);
   }, []);
 
   const harnessParams = useMemo(
@@ -196,13 +215,57 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
     return <CommentsPanel {...harnessParams} />;
   }
 
+  // Everything below `NavHost` can reach `useNavBack`/`useDismissLayer`, which
+  // is why the shell's own chrome lives in a child component rather than here.
+  return (
+    <NavHost routeDepth={routeDepth(stack)} onPopRoutes={popRoutes}>
+      <AppShellChrome
+        client={client}
+        user={user}
+        onSignOut={onSignOut}
+        stack={stack}
+        dispatch={dispatch}
+      />
+    </NavHost>
+  );
+}
+
+interface AppShellChromeProps extends AppShellProps {
+  readonly stack: NavStack;
+  readonly dispatch: Dispatch<NavAction>;
+}
+
+function AppShellChrome({
+  client,
+  user,
+  onSignOut,
+  stack,
+  dispatch,
+}: AppShellChromeProps): ReactElement {
+  const route = currentRoute(stack);
+  const streamConnection = useStreamConnectionOrNull();
+  const { summary: notificationsSummary } = useHostNotifications(streamConnection);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
+  const [liveChatTitle, setLiveChatTitle] = useState<LiveChatTitle | null>(null);
+  // Stable identity (never reconstructed) so `ChatView`'s effect that calls
+  // this doesn't refire on every render.
+  const handleChatTitleChange = useCallback((chatId: string, title: string | null) => {
+    setLiveChatTitle({ chatId, title });
+  }, []);
+  // The top bar's back arrow goes through history rather than dispatching
+  // `back` directly — see `nav-host.tsx`'s docblock. This is what guarantees
+  // the arrow and the OS gesture can never mean different things.
+  const back = useNavBack();
+  const canGoBack = routeDepth(stack) > 0;
+
   return (
     <ArtifactNavProvider dispatch={dispatch}>
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
         <TopAppBar
           user={user}
           title={computeScreenTitle(route, liveChatTitle)}
-          onBack={canGoBack ? () => dispatch({ type: "back" }) : null}
+          onBack={canGoBack ? back : null}
           notificationsSummary={notificationsSummary}
           onOpenUsage={() => setUsageOpen(true)}
           onOpenNotifications={() => dispatch({ type: "open-notifications" })}
@@ -212,7 +275,17 @@ export function AppShell({ client, user, onSignOut }: AppShellProps): ReactEleme
         {accountOpen && (
           <AccountSheet
             user={user}
+            /* `BottomSheet` registers itself as a dismissible layer and routes
+               its own ✕/backdrop through history, so this is the *result* of a
+               dismissal, not a second way to trigger one. */
             onClose={() => setAccountOpen(false)}
+            /* A REPLACE, not a dismissal — so it deliberately does NOT go
+               through history. Closing the sheet (−1 layer) and pushing the
+               settings route (+1 frame) leaves total back-depth unchanged, so
+               the entry the sheet occupied now stands for the settings screen
+               and one back returns to where the user was. Calling `dismiss()`
+               here instead would fire an async `history.back()` that then popped
+               the settings route straight back off. */
             onOpenSettings={() => {
               setAccountOpen(false);
               dispatch({ type: "open-settings" });
