@@ -469,6 +469,36 @@ describe("read-surface/cards — approval and interview cards stand alone", () =
     expect(visible.some((t) => t.includes("no description"))).toBe(true);
   });
 
+  it("CONTRACT: Approve and Reject stay distinguishable WITHOUT colour", () => {
+    // Microsoft documents `positive`/`destructive` as unsupported in Teams,
+    // and our local renderer honours them — so screenshots show a blue and a
+    // red button that Teams may render as two identical grey ones. If the
+    // only difference were colour, a destructive action would sit next to an
+    // identical-looking safe one. Order, opposite words and a leading glyph
+    // are the distinctions no host can drop.
+    const content = buildApprovalCard(
+      { chatId: LONG_CHAT_ID, title: "c" },
+      "epic-1",
+      APPROVAL,
+      0,
+    ).content as { actions: { title: string; style?: string }[] };
+
+    expect(content.actions).toHaveLength(2);
+    const [approve, reject] = content.actions;
+
+    // Safe action first.
+    expect(approve.title).toContain("Approve");
+    expect(reject.title).toContain("Reject");
+    // A distinguishing mark that is not a colour and not an image.
+    expect(approve.title).not.toBe(reject.title);
+    expect(approve.title.startsWith("✓")).toBe(true);
+    expect(reject.title.startsWith("✕")).toBe(true);
+    // Styling is still SET — it is free upside where supported. It just must
+    // never be the only thing carrying the distinction.
+    expect(approve.style).toBe("positive");
+    expect(reject.style).toBe("destructive");
+  });
+
   it("the approval card carries the FULL chat id in its action payload — shortening is a display concern only", () => {
     // The buttons have to act on the real id; only what the user READS is short.
     const body = cardBody(

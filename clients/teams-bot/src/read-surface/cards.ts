@@ -61,6 +61,16 @@ export const REJECT_VERB = "traycer/reject";
 export const OPEN_CHAT_VERB = "traycer/openChat";
 
 /**
+ * Plain Unicode, NOT emoji: no variation selector, no colour font, no image
+ * URL to host. It survives a host that drops action styling, which is the
+ * whole point — see {@link submitAction}. Emoji were rejected because their
+ * rendering varies by platform and they read as decorative; these read as
+ * affordances.
+ */
+export const APPROVE_TITLE = "✓ Approve";
+export const REJECT_TITLE = "✕ Reject";
+
+/**
  * `Action.Submit`, NOT `Action.Execute` — deliberate, and the reasoning is
  * load-bearing enough to record here.
  *
@@ -89,13 +99,24 @@ function submitAction(
   options: {
     readonly associateInputs: boolean;
     /**
-     * `positive` / `destructive` are reported unsupported in Teams — but
-     * they are valid schema and an unsupported value degrades to a normal
-     * button rather than breaking the card, so setting it is free upside.
-     * Crucially it is NOT the only thing distinguishing Approve from
-     * Reject: the titles are explicit words, so a host that ignores the
-     * style still leaves an unambiguous pair. Colour alone would have been
-     * a misclick risk on a destructive action.
+     * UNVERIFIED IN TEAMS, and treated as such. Microsoft documents
+     * `positive` / `destructive` as unsupported in Teams; our local renderer
+     * honours them, so screenshots show a blue Approve and a red Reject that
+     * Teams may render as two identical grey buttons. That is exactly the
+     * schema-says-yes / Teams-says-no gap that already burned us twice, with
+     * `Action.Execute` and `targetWidth`.
+     *
+     * It is set anyway — an unsupported value degrades to a normal button
+     * rather than breaking the card, so it is free upside where it works.
+     * But NOTHING is allowed to depend on it. Two identical grey buttons on
+     * a destructive decision would be a genuine misclick hazard, so the
+     * distinction is carried by things no host can drop:
+     *   - opposite-meaning words in the titles, not colour;
+     *   - a leading glyph, plain Unicode rather than an emoji or an icon
+     *     URL, so it needs no image hosting and no host support;
+     *   - fixed order, safe action first.
+     * Do not remove any of those on the grounds that the colours make it
+     * obvious. They may not exist.
      */
     readonly style?: "positive" | "destructive";
   },
@@ -716,13 +737,13 @@ export function buildApprovalCard(
     ],
     [
       submitAction(
-        "Approve",
+        APPROVE_TITLE,
         APPROVE_VERB,
         { approvalId: approval.approvalId, chatId },
         { associateInputs: false, style: "positive" },
       ),
       submitAction(
-        "Reject",
+        REJECT_TITLE,
         REJECT_VERB,
         { approvalId: approval.approvalId, chatId },
         { associateInputs: true, style: "destructive" },

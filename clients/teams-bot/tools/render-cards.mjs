@@ -185,6 +185,65 @@ const HOST_CONFIG = {
   },
 };
 
+/**
+ * A CONTROL with a known answer, run against the instrument before the
+ * instrument is trusted. It exists because of a near-miss worth recording.
+ *
+ * The first version of this harness registered no markdown processor at all.
+ * `adaptivecards` renders text verbatim in that state, so a fenced code block
+ * screenshotted as literal ``` characters with its line breaks intact — a
+ * clean, plausible image from which the obvious conclusion ("multi-line text
+ * survives Teams markdown, it just looks plain") was completely wrong. The
+ * images looked like evidence and were an artefact of a silently-dead
+ * dependency.
+ *
+ * So: render four constructs Teams IS documented to support, and fail loudly
+ * if they come out as literal punctuation. If someone moves the markdown-it
+ * script, renames `onProcessMarkdown`, or upgrades `adaptivecards` past a
+ * hook rename, this stops the run instead of quietly producing a set of
+ * confident, wrong pictures.
+ *
+ * Deliberately asserts on the PRESENCE of rendered HTML rather than the
+ * absence of the source characters: `<strong>` is unambiguous, whereas a card
+ * could legitimately contain an asterisk.
+ */
+async function assertMarkdownIsLive(page) {
+  const html = await page.evaluate(() => {
+    const probe = {
+      type: "AdaptiveCard",
+      version: "1.5",
+      body: [
+        { type: "TextBlock", text: "**b** _i_", wrap: true },
+        { type: "TextBlock", text: "- one\n- two", wrap: true },
+        { type: "TextBlock", text: "[x](https://example.com)", wrap: true },
+      ],
+    };
+    const ac = new window.AdaptiveCards.AdaptiveCard();
+    ac.parse(probe);
+    return ac.render().innerHTML;
+  });
+
+  const missing = [
+    ["bold", /<strong>/i],
+    ["italic", /<em>/i],
+    ["list", /<li>/i],
+    ["link", /<a\s/i],
+  ]
+    .filter(([, re]) => !re.test(html))
+    .map(([name]) => name);
+
+  if (missing.length > 0) {
+    console.error(
+      `\nMarkdown processor is not doing its job — missing: ${missing.join(", ")}.\n` +
+        `  Every screenshot from this run would show literal markdown source,\n` +
+        `  which is NOT what Teams does, and any conclusion drawn from them\n` +
+        `  about text rendering would be wrong. Refusing to render.\n` +
+        `  Check MARKDOWN_IT_PATH and AdaptiveCard.onProcessMarkdown.`,
+    );
+    process.exit(1);
+  }
+}
+
 export async function renderCards(cards, outDir) {
   mkdirSync(outDir, { recursive: true });
   const acJs = readFileSync(join(AC_DIR, "adaptivecards.js"), "utf8");
@@ -235,6 +294,8 @@ export async function renderCards(cards, outDir) {
           result.didProcess = true;
         };
       }, TEAMS_UNSUPPORTED_MARKDOWN);
+
+      await assertMarkdownIsLive(page);
 
       for (const { name, card } of cards) {
         const errors = await page.evaluate(
