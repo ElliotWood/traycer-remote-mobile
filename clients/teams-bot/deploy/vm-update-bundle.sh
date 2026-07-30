@@ -17,15 +17,21 @@ set -euo pipefail
 BOT_DIR="${BOT_DIR:-/srv/traycer/teams-bot}"
 BUNDLE_BRANCH="${BUNDLE_BRANCH:-demo/teams-bot-bundle}"
 BUNDLE_REPO="${BUNDLE_REPO:?BUNDLE_REPO is required}"
-# A string present in the NEW build and absent from the old one. Passed in so
-# the check is specific to the change being deployed rather than a generic
-# "file exists" that would pass against the previous bundle.
-NEW_BUILD_MARKER="${NEW_BUILD_MARKER:?NEW_BUILD_MARKER is required}"
+# sha256 of the bot.cjs the CALLER built. This is the verification, and it is
+# a hash rather than a string search on purpose.
+#
+# The first version of this script took a NEW_BUILD_MARKER string to grep
+# for. That works exactly once. On the second deploy the marker was a string
+# both builds contained, so it read "1 before, 1 after" and proved nothing —
+# a check that could not fail, which is the failure this whole project keeps
+# tripping over. A hash cannot be accidentally satisfied by the previous
+# build, and it verifies every byte rather than one line.
+EXPECTED_BOT_SHA256="${EXPECTED_BOT_SHA256:?EXPECTED_BOT_SHA256 is required (sha256sum of the bot.cjs you built)}"
 
 cd "$BOT_DIR"
 echo "=== before ==="
 stat -c '%n %y %U:%G %s' bot.cjs 2>/dev/null || echo "bot.cjs absent"
-echo "marker before: $(grep -c "$NEW_BUILD_MARKER" bot.cjs 2>/dev/null || echo 0)"
+echo "sha before: $(sha256sum bot.cjs 2>/dev/null | cut -c1-16 || echo none)"
 
 # `az vm run-command` executes as root with NO `$HOME`, and the bundle
 # checkout is traycer-owned, so git refuses it as "dubious ownership". Two
@@ -64,8 +70,20 @@ sleep 4
 
 echo "=== after ==="
 stat -c '%n %y %U:%G %s' bot.cjs traycer-remote-bridge
-echo "marker after: $(grep -c "$NEW_BUILD_MARKER" bot.cjs)"
+ACTUAL_SHA="$(sha256sum bot.cjs | cut -d' ' -f1)"
+echo "sha after:  $(echo "$ACTUAL_SHA" | cut -c1-16)"
 echo "untouched: $(stat -c '%n %U:%G %a' secret.env identity-registry.json 2>/dev/null | tr '\n' ' ')"
 echo "unit active: $(systemctl is-active traycer-teams-bot.service)"
 echo "healthz: $(curl -s -m 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:3978/healthz)"
 journalctl -u traycer-teams-bot.service -n 8 --no-pager | tail -8
+
+# Last, and FATAL. Deliberately after the service report so a mismatch still
+# shows what state the box is in, and deliberately non-zero so a caller that
+# only checks the exit code still learns the truth.
+if [ "$ACTUAL_SHA" != "$EXPECTED_BOT_SHA256" ]; then
+  echo "DEPLOY VERIFY FAILED: deployed bot.cjs is not the build you asked for" >&2
+  echo "  expected $EXPECTED_BOT_SHA256" >&2
+  echo "  actual   $ACTUAL_SHA" >&2
+  exit 1
+fi
+echo "verified: deployed bot.cjs is byte-identical to the build you supplied"
