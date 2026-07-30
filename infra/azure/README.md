@@ -889,3 +889,27 @@ One note for whoever edits it: the `try/catch` around the `localStorage` seed is
 load-bearing. Init scripts run in *every* frame, and this app renders wireframe
 previews in sandboxed iframes where `localStorage` access throws — without the
 guard the harness manufactures the page errors it exists to detect.
+
+### nginx hygiene guard (run before any nginx change)
+
+`verify-nginx-hygiene.sh` asserts `sites-enabled/` and `conf.d/` contain **only**
+expected files, then runs `nginx -t`. Both directories are globbed, so a backup
+left beside a real file is *loaded as config* — which has already cost one repair
+cycle via a duplicate `server_name` reported as
+`server_names_hash_bucket_size`, a message naming neither the duplicate nor the
+backup. `--quarantine` moves offenders to `/root/nginx-backups/`. Back up
+**there**, never into a globbed directory.
+
+`apply-authn-allowlist.sh` applies the `/authn` allowlist to an already-running
+VM **in place**, rewriting one `location` block by brace-matching rather than
+regenerating the file — because certbot and other agents also edit it (the Teams
+bot's `/api/messages` lives there and must survive). Hygiene check first, backup
+outside the globbed dirs, idempotent, `nginx -t` before reload, auto-rollback if
+the test fails.
+
+`verify-signin-cold.mjs` drives a **cold** browser (no seeded credentials) and
+proves the tightened allowlist still carries a real sign-in: `device/authorize`
+returns 200 *through the proxy*, a real user code reaches the DOM, and
+`device/token` polling begins. The RFC 8628 human-approval step is not
+automatable and is explicitly **not** claimed as proven — everything nginx could
+have broken sits before it.
