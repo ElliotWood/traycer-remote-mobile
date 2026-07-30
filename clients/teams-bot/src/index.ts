@@ -13,7 +13,11 @@ import {
   createDemoPrincipalSource,
   DEMO_IDENTITY_ENV_FLAG,
 } from "./read-surface/demo-principal-source";
-import { InMemoryEpicBindingStore } from "./read-surface/epic-binding-store";
+import {
+  DefaultingEpicBindingStore,
+  InMemoryEpicBindingStore,
+  type EpicBindingStore,
+} from "./read-surface/epic-binding-store";
 import { createReadSurfaceHandler } from "./read-surface/read-surface-handler";
 import type { ResolvePrincipal } from "./read-surface/principal-source";
 
@@ -88,15 +92,27 @@ async function main(): Promise<void> {
     defaultAuditSink,
   );
 
+  // Optional convenience so a fresh chat can run `fleet` without first
+  // typing an epic UUID. Not an auth shortcut — see the class docblock.
+  const defaultEpicId = process.env.TRAYCER_TEAMS_DEFAULT_EPIC_ID?.trim();
+  let epicBindings: EpicBindingStore = new InMemoryEpicBindingStore();
+  if (defaultEpicId !== undefined && defaultEpicId.length > 0) {
+    epicBindings = new DefaultingEpicBindingStore(epicBindings, defaultEpicId);
+    logInfo("default epic configured for unbound conversations", {
+      epicId: defaultEpicId,
+    });
+  }
+
   const handler = createReadSurfaceHandler({
     registry,
-    epicBindings: new InMemoryEpicBindingStore(),
+    epicBindings,
     bridgeCliConfig: defaultBridgeCliConfig(
       requireEnv("TRAYCER_REMOTE_BRIDGE_BIN"),
     ),
     senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
     parentEnv: process.env,
     resolvePrincipal: selectPrincipalSource(process.env),
+    now: Date.now,
   });
 
   const server = createHttpServer({

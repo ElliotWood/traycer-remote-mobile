@@ -265,7 +265,9 @@ describe("read-surface/host-access — identity resolution + spawn isolation", (
       deps,
     );
 
-    expect(result).toEqual({ kind: "ok", status: statusA });
+    // `epicId` comes back alongside the status so cards can show which epic a
+    // decision belongs to without re-reading the binding store.
+    expect(result).toEqual({ kind: "ok", status: statusA, epicId: "epic-a" });
   });
 
   it("a nonzero bridge exit surfaces as bridge_unavailable, not a thrown error or silent empty result", async () => {

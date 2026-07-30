@@ -66,3 +66,21 @@ export const epicSummarySchema = z.object({
 });
 export type EpicSummary = z.infer<typeof epicSummarySchema>;
 export const epicListSchema = z.array(epicSummarySchema);
+
+/**
+ * `ActionOutcome` from `remote-bridge`'s action surface. Exactly three
+ * states, and the distinction matters: `applied` and `rejected` both mean
+ * the fate is KNOWN, `failed` means unconfirmed — the action may still have
+ * landed with no way for this process to know. Never render `failed` as
+ * "didn't happen".
+ */
+export const actionOutcomeSchema = z.union([
+  z.object({ kind: z.literal("applied") }),
+  z.object({
+    kind: z.literal("rejected"),
+    reason: z.string().nullable(),
+    code: z.string().nullable(),
+  }),
+  z.object({ kind: z.literal("failed"), reason: z.string() }),
+]);
+export type ActionOutcome = z.infer<typeof actionOutcomeSchema>;

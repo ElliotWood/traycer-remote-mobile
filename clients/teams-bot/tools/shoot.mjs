@@ -1,0 +1,246 @@
+/**
+ * Builds every card with realistic data and screenshots it.
+ *
+ * Imports the REAL card builders (via a bundled copy, since they're TS), so
+ * what is screenshotted is what the bot actually sends — not a hand-written
+ * approximation that could drift.
+ *
+ * Usage:
+ *   bun x esbuild src/read-surface/cards.ts --bundle --format=esm \
+ *     --platform=node --outfile=/tmp/cards.mjs \
+ *     --banner:js='import{createRequire as __cr}from "node:module";const require=__cr(import.meta.url);'
+ *   node tools/shoot.mjs /tmp/cards.mjs <outDir> [--dark]
+ *
+ * The banner is not optional: `CardFactory` pulls in `@microsoft/agents-*`,
+ * which is CJS and calls `require("crypto")` at load. Without it the bundle
+ * dies with `Dynamic require of "crypto" is not supported` before a single
+ * card is built.
+ */
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
+import { renderCards } from "./render-cards.mjs";
+
+const [, , bundlePath, outDir] = process.argv;
+if (!bundlePath || !outDir) {
+  console.error("usage: node tools/shoot.mjs <bundle.mjs> <outDir> [--dark]");
+  process.exit(1);
+}
+
+// `import()` of an absolute Windows path needs a file:// URL, otherwise Node
+// rejects it with ERR_UNSUPPORTED_ESM_URL_SCHEME.
+const C = await import(pathToFileURL(resolve(bundlePath)).href);
+
+// Realistic fixtures. 8 agents rather than 2: the fleet card's real problem
+// only appears at length, and a real epic can have dozens.
+const AGENTS = [
+  {
+    agentId: "a1000000-0000-4000-8000-000000000001",
+    title: "Investigate flaky integration suite",
+    harnessId: "claude",
+    surface: "gui",
+    active: true,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000002",
+    title: "Review: streaming reconnect logic",
+    harnessId: "claude",
+    surface: "gui",
+    active: false,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000003",
+    title: "Research: cache invalidation strategy",
+    harnessId: "claude",
+    surface: "gui",
+    active: false,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000004",
+    title: "Migrate config loader to zod",
+    harnessId: "claude",
+    surface: "gui",
+    active: true,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000005",
+    title: "Audit: dependency licence report",
+    harnessId: "codex",
+    surface: "tui",
+    active: false,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000006",
+    title: null,
+    harnessId: null,
+    surface: "tui",
+    active: false,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000007",
+    title: "Prototype: offline draft sync",
+    harnessId: "claude",
+    surface: "gui",
+    active: true,
+  },
+  {
+    agentId: "a1000000-0000-4000-8000-000000000008",
+    title: "Refactor the notification queue",
+    harnessId: "claude",
+    surface: "gui",
+    active: false,
+  },
+];
+
+const APPROVAL = {
+  approvalId: "ap-7f3c1e",
+  toolName: "Edit",
+  description:
+    "Write clients/teams-bot/src/read-surface/cards.ts (+165 −4). Adds Action.Execute approval cards.",
+  requestedAt: Date.now() - 90_000,
+};
+
+/**
+ * Markdown-hostile fixtures. `approval.description` is AGENT-AUTHORED text
+ * flowing straight into a `TextBlock`, and Teams card markdown supports no
+ * headers, tables, preformatted text or blockquotes. Every fixture above is
+ * clean prose, so it probes none of that — the risk has been "covered" four
+ * times while measuring zero. These two make the images answer the question
+ * instead of leaving it asserted.
+ */
+const APPROVAL_FENCED = {
+  approvalId: "ap-fence1",
+  toolName: "Edit",
+  description:
+    "Apply this patch:\n```ts\nconst x: number = 1;\nif (x > 0) { run(); }\n```\nThen run `bun test --filter cards`.",
+  requestedAt: Date.now() - 30_000,
+};
+
+const APPROVAL_TABLE = {
+  approvalId: "ap-table1",
+  toolName: "Write",
+  description:
+    "# Summary\n\n| File | Change |\n| --- | --- |\n| cards.ts | +165 −4 |\n| dispatch.ts | +22 |\n\n> Blockquote: needs review before merge.",
+  requestedAt: Date.now() - 45_000,
+};
+
+const STATUS_LIVE = {
+  chatId: "a1000000-0000-4000-8000-000000000004",
+  title: "Migrate config loader to zod",
+  runStatus: "running",
+  pendingApprovals: [APPROVAL],
+  pendingInterviews: [{ blockId: "iv-22", requestedAt: Date.now() - 30_000 }],
+  connected: true,
+};
+
+const STATUS_STALE = { ...STATUS_LIVE, connected: false };
+
+/**
+ * A real epic id, not "epic-1": the point of shooting these is to see what a
+ * 36-character identifier does to a 320px card, so the fixture has to be one.
+ */
+const EPIC_ID = "e0000000-0000-4000-8000-0000000000e1";
+
+const cards = [];
+const failures = [];
+/**
+ * A builder that throws used to be logged and skipped, which meant a card
+ * dropped out of the set silently and the contact sheet still looked
+ * complete. Failures are collected and the run exits non-zero instead.
+ */
+const add = (name, fn) => {
+  try {
+    cards.push({ name, card: fn().content });
+  } catch (e) {
+    failures.push(`${name}: ${e.message}`);
+  }
+};
+
+add("01-fleet", () => C.buildFleetCard(AGENTS));
+add("02-fleet-empty", () => C.buildFleetCard([]));
+add("03-chat-live", () => C.buildChatCard(STATUS_LIVE, EPIC_ID));
+add("04-chat-disconnected", () => C.buildChatCard(STATUS_STALE, EPIC_ID));
+add("05-help", () => C.buildHelpCard());
+add("06-epic-not-bound", () => C.buildEpicNotBoundCard());
+add("07-access-denied", () =>
+  C.buildPrincipalRefusedCard("unmapped_principal"),
+);
+add("08-bridge-unavailable", () =>
+  C.buildBridgeUnavailableCard(
+    "spawn_timed_out",
+    "traycer-remote-bridge list did not exit within 20000ms",
+  ),
+);
+add("09-epic-picker", () =>
+  C.buildEpicPickerCard([
+    { epicId: "e1000000-0000-4000-8000-000000000001", title: "Traycer Teams" },
+    {
+      epicId: "e1000000-0000-4000-8000-000000000002",
+      title: "Traycer Remote (mobile)",
+    },
+    { epicId: "e1000000-0000-4000-8000-000000000003", title: null },
+  ]),
+);
+const CHAT_REF = { chatId: STATUS_LIVE.chatId, title: STATUS_LIVE.title };
+
+add("10-approval", () =>
+  C.buildApprovalCard(CHAT_REF, EPIC_ID, APPROVAL, Date.now()),
+);
+add("11-outcome-applied", () =>
+  C.buildActionOutcomeCard({ kind: "applied" }, "approve"),
+);
+add("12-outcome-rejected", () =>
+  C.buildActionOutcomeCard(
+    { kind: "rejected", reason: "not this file — see the epic", code: null },
+    "reject",
+  ),
+);
+add("13-outcome-failed", () =>
+  C.buildActionOutcomeCard(
+    { kind: "failed", reason: "reconcile window expired after 45s" },
+    "approve",
+  ),
+);
+add("14-usage", () =>
+  C.buildUsageCard("epic <id> — select an epic for this chat"),
+);
+add("15-interview", () =>
+  C.buildInterviewCard(
+    CHAT_REF,
+    EPIC_ID,
+    { blockId: "iv-22", requestedAt: Date.now() - 30_000 },
+    Date.now(),
+  ),
+);
+add("16-epic-bound", () => C.buildEpicBoundCard(EPIC_ID));
+add("17-identity-unavailable", () =>
+  C.buildIdentityUnavailableCard("demo_identity_not_configured"),
+);
+add("18-chat-idle", () =>
+  C.buildChatCard(
+    {
+      ...STATUS_LIVE,
+      runStatus: "idle",
+      pendingApprovals: [],
+      pendingInterviews: [],
+    },
+    EPIC_ID,
+  ),
+);
+
+// The two that answer the open question: what does a fenced code block / a
+// markdown table actually LOOK like once Teams card markdown has refused to
+// render it? These are the evidence, not the assertion.
+add("19-approval-fenced-code", () =>
+  C.buildApprovalCard(CHAT_REF, EPIC_ID, APPROVAL_FENCED, Date.now()),
+);
+add("20-approval-table-and-heading", () =>
+  C.buildApprovalCard(CHAT_REF, EPIC_ID, APPROVAL_TABLE, Date.now()),
+);
+
+await renderCards(cards, outDir);
+
+if (failures.length > 0) {
+  console.error(`\n${failures.length} card(s) failed to build:`);
+  for (const f of failures) console.error(`  ✗ ${f}`);
+  process.exit(1);
+}

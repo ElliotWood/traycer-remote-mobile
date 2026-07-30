@@ -1,7 +1,9 @@
 import type { Attachment } from "@microsoft/agents-activity";
 import {
+  buildApprovalCard,
   buildBridgeUnavailableCard,
   buildChatCard,
+  buildInterviewCard,
   buildEpicBoundCard,
   buildEpicNotBoundCard,
   buildEpicPickerCard,
@@ -9,6 +11,7 @@ import {
   buildHelpCard,
   buildIdentityUnavailableCard,
   buildPrincipalRefusedCard,
+  buildUsageCard,
 } from "./cards";
 import type { Command } from "./commands";
 import {
@@ -33,6 +36,8 @@ import type { ResolvePrincipal } from "./principal-source";
 
 export interface DispatchDeps extends HostAccessDeps {
   readonly resolvePrincipal: ResolvePrincipal;
+  /** Injected so "requested 2m ago" labels are deterministic in tests. */
+  readonly now: () => number;
 }
 
 function failureCard(failure: ReadSurfaceFailure): Attachment {
@@ -46,13 +51,24 @@ function failureCard(failure: ReadSurfaceFailure): Attachment {
   }
 }
 
+/**
+ * Returns one OR MORE cards. `chat <id>` renders the status card plus one
+ * actionable approval card per pending approval, so a blocked agent can be
+ * answered from the same reply — that is the product's whole promise and it
+ * shouldn't take a second command to reach.
+ */
 export async function dispatchCommand(
   command: Command,
   conversationId: string,
   deps: DispatchDeps,
-): Promise<Attachment> {
+): Promise<readonly Attachment[]> {
   if (command.kind === "help") {
-    return buildHelpCard();
+    return [buildHelpCard()];
+  }
+  // A recognised word used wrongly gets a usage card, not the help card —
+  // the user typed bare `epic`, saw help, and read it as "no such command".
+  if (command.kind === "usage") {
+    return [buildUsageCard(command.usage)];
   }
 
   // Identity first, always — before any host data is fetched, for every
@@ -60,16 +76,18 @@ export async function dispatchCommand(
   // asking gets a refusal, never a default or a partial view.
   const identity = await deps.resolvePrincipal();
   if (identity.kind === "unavailable") {
-    return buildIdentityUnavailableCard(identity.reason);
+    return [buildIdentityUnavailableCard(identity.reason)];
   }
   const { principal } = identity;
 
   switch (command.kind) {
     case "epics": {
       const result = await fetchEpicList(principal, deps);
-      return result.kind === "ok"
-        ? buildEpicPickerCard(result.epics)
-        : failureCard(result);
+      return [
+        result.kind === "ok"
+          ? buildEpicPickerCard(result.epics)
+          : failureCard(result),
+      ];
     }
     case "bind_epic": {
       // Binding is still identity-gated: an unmapped principal must not be
@@ -77,16 +95,18 @@ export async function dispatchCommand(
       // whether an epic id exists.
       const resolution = deps.registry.resolveTenant(principal);
       if (resolution.kind === "refused") {
-        return buildPrincipalRefusedCard(resolution.reason);
+        return [buildPrincipalRefusedCard(resolution.reason)];
       }
       await deps.epicBindings.set(conversationId, command.epicId);
-      return buildEpicBoundCard(command.epicId);
+      return [buildEpicBoundCard(command.epicId)];
     }
     case "fleet": {
       const result = await fetchFleet(principal, conversationId, deps);
-      return result.kind === "ok"
-        ? buildFleetCard(result.agents)
-        : failureCard(result);
+      return [
+        result.kind === "ok"
+          ? buildFleetCard(result.agents)
+          : failureCard(result),
+      ];
     }
     case "chat": {
       const result = await fetchChatStatus(
@@ -95,9 +115,31 @@ export async function dispatchCommand(
         command.chatId,
         deps,
       );
-      return result.kind === "ok"
-        ? buildChatCard(result.status)
-        : failureCard(result);
+      if (result.kind !== "ok") {
+        return [failureCard(result)];
+      }
+      const { epicId } = result;
+      const cards: Attachment[] = [buildChatCard(result.status, epicId)];
+      // Only offer buttons when the bridge says the subscription is genuinely
+      // live. Acting on a stale snapshot is how you approve something that
+      // was already resolved — `connected: false` means every field above may
+      // be out of date, so it must not carry actions.
+      if (result.status.connected) {
+        const now = deps.now();
+        // Carries the title too: these cards are read on their own, detached
+        // from the status card above them, so a bare short id names nothing.
+        const chat = {
+          chatId: result.status.chatId,
+          title: result.status.title,
+        };
+        for (const approval of result.status.pendingApprovals) {
+          cards.push(buildApprovalCard(chat, epicId, approval, now));
+        }
+        for (const interview of result.status.pendingInterviews) {
+          cards.push(buildInterviewCard(chat, epicId, interview, now));
+        }
+      }
+      return cards;
     }
   }
 }

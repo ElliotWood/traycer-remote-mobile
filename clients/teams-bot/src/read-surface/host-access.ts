@@ -5,14 +5,21 @@ import type {
   VerifiedPrincipal,
 } from "@traycer-clients/shared/identity-registry/types";
 import {
+  approveAction,
   getChatStatus,
   listAgents,
   listEpics,
+  rejectAction,
   type BridgeCliConfig,
   type BridgeCliFailureReason,
 } from "./bridge-cli";
 import type { EpicBindingStore } from "./epic-binding-store";
-import type { AgentSummary, ChatStatus, EpicSummary } from "./bridge-types";
+import type {
+  ActionOutcome,
+  AgentSummary,
+  ChatStatus,
+  EpicSummary,
+} from "./bridge-types";
 
 /**
  * Ties A2's identity resolution to the bridge CLI, per read. Every
@@ -37,7 +44,14 @@ export type FleetResult =
   | ReadSurfaceFailure;
 
 export type ChatResult =
-  { readonly kind: "ok"; readonly status: ChatStatus } | ReadSurfaceFailure;
+  | {
+      readonly kind: "ok";
+      readonly status: ChatStatus;
+      /** The epic this status was fetched under — returned so cards can show
+       * which epic a decision belongs to without re-reading the binding. */
+      readonly epicId: string;
+    }
+  | ReadSurfaceFailure;
 
 export type EpicListResult =
   | { readonly kind: "ok"; readonly epics: readonly EpicSummary[] }
@@ -131,7 +145,7 @@ export async function fetchChatStatus(
   if (result.kind === "failed") {
     return toReadSurfaceFailure(result);
   }
-  return { kind: "ok", status: result.value };
+  return { kind: "ok", status: result.value, epicId };
 }
 
 /**
@@ -143,6 +157,58 @@ export async function fetchChatStatus(
  * docblock for why this call fails against the real bridge today
  * regardless.
  */
+export type ActionResult =
+  { readonly kind: "ok"; readonly outcome: ActionOutcome } | ReadSurfaceFailure;
+
+export type ApprovalDecision =
+  | { readonly kind: "approve" }
+  | { readonly kind: "reject"; readonly reason: string | null };
+
+/**
+ * T3's write path. Identity-gated exactly like the reads — `resolveTenant`
+ * runs BEFORE the action is issued, and the bridge runs under that tenant's
+ * own `HOME`, so an action can only ever land on the host of the principal
+ * that authorised it.
+ *
+ * A routing bug here is categorically worse than in a read (see T3's
+ * ticket): a read shows the wrong data, an action is *taken as the wrong
+ * person*. Hence the same gate, no shortcuts, and no path that reaches the
+ * bridge without a resolved tenant.
+ */
+export async function submitApprovalDecision(
+  principal: VerifiedPrincipal,
+  conversationId: string,
+  approvalId: string,
+  decision: ApprovalDecision,
+  deps: HostAccessDeps,
+): Promise<ActionResult> {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+
+  const env = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result =
+    decision.kind === "approve"
+      ? await approveAction(approvalId, env, deps.bridgeCliConfig)
+      : await rejectAction(
+          approvalId,
+          decision.reason,
+          env,
+          deps.bridgeCliConfig,
+        );
+
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", outcome: result.value };
+}
+
 export async function fetchEpicList(
   principal: VerifiedPrincipal,
   deps: HostAccessDeps,

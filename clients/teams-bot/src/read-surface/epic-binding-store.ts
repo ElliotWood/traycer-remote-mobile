@@ -31,3 +31,34 @@ export class InMemoryEpicBindingStore implements EpicBindingStore {
     this.bindings.set(conversationId, epicId);
   }
 }
+
+/**
+ * Falls back to a single configured epic for conversations that have not
+ * bound one yet, so a fresh chat can run `fleet` without first typing a
+ * UUID. An explicit `set` always wins and is per-conversation as normal.
+ *
+ * Only used when `TRAYCER_TEAMS_DEFAULT_EPIC_ID` is set. It is a
+ * convenience, NOT an identity or authorisation shortcut: the epic is
+ * still only ever read AFTER `resolveTenant` has accepted the principal,
+ * and the bridge still runs under that tenant's own `HOME`, so a default
+ * epic cannot expose another tenant's data — it only saves typing for the
+ * one tenant already entitled to it.
+ */
+export class DefaultingEpicBindingStore implements EpicBindingStore {
+  private readonly inner: EpicBindingStore;
+  private readonly defaultEpicId: string;
+
+  constructor(inner: EpicBindingStore, defaultEpicId: string) {
+    this.inner = inner;
+    this.defaultEpicId = defaultEpicId;
+  }
+
+  async get(conversationId: string): Promise<string | null> {
+    const bound = await this.inner.get(conversationId);
+    return bound ?? this.defaultEpicId;
+  }
+
+  async set(conversationId: string, epicId: string): Promise<void> {
+    await this.inner.set(conversationId, epicId);
+  }
+}

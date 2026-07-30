@@ -41,6 +41,28 @@ describe("read-surface/commands", () => {
   });
 
   it("does not treat a bare 'epic' with no id as a binding", () => {
-    expect(parseCommand("epic").kind).toBe("help");
+    expect(parseCommand("epic").kind).not.toBe("bind_epic");
+  });
+});
+
+describe("read-surface/commands — usage errors are distinct from help", () => {
+  it("bare 'epic' returns a usage error, not help — the user read help as 'no such command'", () => {
+    const c = parseCommand("epic");
+    expect(c.kind).toBe("usage");
+    if (c.kind !== "usage") return;
+    expect(c.usage).toContain("epic <id>");
+  });
+
+  it("bare 'chat' and 'status' also return usage, naming where to get ids", () => {
+    for (const word of ["chat", "status"]) {
+      const c = parseCommand(word);
+      expect(c.kind, word).toBe("usage");
+      if (c.kind !== "usage") continue;
+      expect(c.usage).toContain("fleet");
+    }
+  });
+
+  it("still returns help for genuinely unknown input", () => {
+    expect(parseCommand("wat").kind).toBe("help");
   });
 });

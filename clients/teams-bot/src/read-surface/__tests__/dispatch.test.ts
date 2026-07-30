@@ -20,8 +20,9 @@ const AUDIENCE = "22222222-3333-4444-5555-666666666666";
 const ALICE_OID = "aaaaaaaa-1111-1111-1111-111111111111";
 const UNMAPPED_OID = "cccccccc-3333-3333-3333-333333333333";
 
-function bodyOf(attachment: Attachment): string {
-  return JSON.stringify(attachment.content);
+/** `dispatchCommand` returns one OR MORE cards; assert across all of them. */
+function bodyOf(cards: readonly Attachment[]): string {
+  return JSON.stringify(cards.map((c) => c.content));
 }
 
 describe("read-surface/dispatch — routing and identity gating", () => {
@@ -99,6 +100,7 @@ describe("read-surface/dispatch — routing and identity gating", () => {
       senderAgentId: "teams-bot",
       parentEnv: {},
       resolvePrincipal: opts.resolvePrincipal,
+      now: Date.now,
     };
   }
 

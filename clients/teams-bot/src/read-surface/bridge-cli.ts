@@ -1,8 +1,10 @@
 import type { ZodType } from "zod";
 import {
+  actionOutcomeSchema,
   agentListSchema,
   chatStatusSchema,
   epicListSchema,
+  type ActionOutcome,
   type AgentSummary,
   type ChatStatus,
   type EpicSummary,
@@ -130,4 +132,82 @@ export function listEpics(
   config: BridgeCliConfig,
 ): Promise<BridgeCliResult<readonly EpicSummary[]>> {
   return runAndParse(["epics"], env, config, epicListSchema);
+}
+
+/**
+ * Runs an ACTION command (`approve` / `reject`) and parses its
+ * {@link ActionOutcome} from stdout.
+ *
+ * Deliberately does NOT use {@link runAndParse}: the bridge's CLI adapter
+ * sets `process.exitCode = 1` for any outcome that isn't `applied`
+ * (`cli-adapter.ts`'s `runApprove`/`runReject`). So a legitimate `rejected`
+ * outcome — the host declining the decision, a real and meaningful answer —
+ * exits non-zero. Treating non-zero as failure would discard stdout and
+ * report "the bridge failed" for what is actually "the host rejected it",
+ * losing the outcome the user needs to see. Found by reading the adapter
+ * before building against it.
+ *
+ * So: parse stdout FIRST, whatever the exit code. Only fall back to an
+ * exit-code error when stdout carries no valid outcome.
+ */
+async function runAction(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<ActionOutcome>> {
+  const result = await config.spawnFn(config.command, args, {
+    env,
+    timeoutMs: config.timeoutMs,
+  });
+
+  if (result.timedOut) {
+    return {
+      kind: "failed",
+      reason: "spawn_timed_out",
+      detail: `"${config.command} ${args.join(" ")}" did not exit within ${config.timeoutMs}ms — the action may still have been applied`,
+    };
+  }
+
+  const trimmed = result.stdout.trim();
+  if (trimmed.length > 0) {
+    try {
+      const parsed = actionOutcomeSchema.safeParse(JSON.parse(trimmed));
+      if (parsed.success) {
+        return { kind: "ok", value: parsed.data };
+      }
+    } catch {
+      // Fall through to the exit-code path below.
+    }
+  }
+
+  return {
+    kind: "failed",
+    reason: result.code === 0 ? "malformed_output" : "nonzero_exit",
+    detail:
+      result.stderr.trim().length > 0
+        ? result.stderr.trim()
+        : `exit code ${result.code ?? "null"} with no parseable outcome on stdout`,
+  };
+}
+
+export function approveAction(
+  approvalId: string,
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<ActionOutcome>> {
+  return runAction(["approve", approvalId], env, config);
+}
+
+/** `reason` is surfaced to the agent as the denial explanation; omit for none. */
+export function rejectAction(
+  approvalId: string,
+  reason: string | null,
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<ActionOutcome>> {
+  const args =
+    reason === null || reason.length === 0
+      ? ["reject", approvalId]
+      : ["reject", approvalId, reason];
+  return runAction(args, env, config);
 }

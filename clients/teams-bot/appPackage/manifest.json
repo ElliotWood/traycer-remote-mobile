@@ -22,7 +22,7 @@
     "short": "Approve, reject, and monitor Traycer agent runs from Teams.",
     "full": "Relays through the Traycer remote bridge to your own desktop host — browse the fleet, read a chat's transcript, and approve or reject pending actions without leaving Teams."
   },
-  "accentColor": "#FFFFFF",
+  "accentColor": "#148A7A",
   "bots": [
     {
       "botId": "00000000-0000-0000-0000-000000000000",

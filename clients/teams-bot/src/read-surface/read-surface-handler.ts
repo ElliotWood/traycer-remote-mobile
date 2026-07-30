@@ -1,37 +1,100 @@
-import { ActivityHandler, MessageFactory } from "@microsoft/agents-hosting";
+import {
+  ActivityHandler,
+  MessageFactory,
+  type TurnContext,
+} from "@microsoft/agents-hosting";
+import type {
+  AdaptiveCardInvokeResponse,
+  AdaptiveCardInvokeValue,
+} from "@microsoft/agents-hosting";
 import { parseCommand } from "./commands";
 import { dispatchCommand, type DispatchDeps } from "./dispatch";
+import { dispatchActionInvoke } from "./dispatch-action";
 import { logWarn } from "../logger";
 
 /**
- * The read-only activity handler — replaced the T1 echo handler.
+ * The activity handler — messages and card actions.
  *
- * Deliberately thin: everything that can be decided without a
- * `TurnContext` lives in `commands.ts` (parsing) and `dispatch.ts`
- * (routing, identity gating, card selection), both fully unit-tested. This
- * file only adapts the SDK's turn to those, so the part that's hard to
- * test is the part with almost no logic in it.
+ * Deliberately thin: everything decidable without a `TurnContext` lives in
+ * `commands.ts` (parsing), `dispatch.ts` (reads) and `dispatch-action.ts`
+ * (writes), all unit-tested. This file only adapts the SDK's turn to those,
+ * so the part that's hard to test holds almost no logic.
  */
-export function createReadSurfaceHandler(deps: DispatchDeps): ActivityHandler {
-  const handler = new ActivityHandler();
-  handler.onMessage(async (context, next) => {
+class ReadSurfaceHandler extends ActivityHandler {
+  private readonly deps: DispatchDeps;
+
+  constructor(deps: DispatchDeps) {
+    super();
+    this.deps = deps;
+    this.onMessage(async (context, next) => {
+      await this.handleMessage(context);
+      await next();
+    });
+  }
+
+  private async handleMessage(context: TurnContext): Promise<void> {
     const command = parseCommand(context.activity.text ?? "");
     const conversationId = context.activity.conversation?.id ?? "";
 
     if (conversationId === "") {
-      // No conversation id means no epic binding is possible and nothing
-      // can be scoped correctly — refuse rather than guessing a key.
       logWarn("activity has no conversation id", { command: command.kind });
       await context.sendActivity(
         MessageFactory.text("Couldn't identify this conversation."),
       );
-      await next();
       return;
     }
 
-    const card = await dispatchCommand(command, conversationId, deps);
-    await context.sendActivity(MessageFactory.attachment(card));
-    await next();
-  });
-  return handler;
+    const cards = await dispatchCommand(command, conversationId, this.deps);
+    for (const card of cards) {
+      await context.sendActivity(MessageFactory.attachment(card));
+    }
+  }
+
+  /**
+   * `Action.Execute` from an approval card. Returns HTTP 200 with a fresh
+   * card so Teams replaces the pressed card in place — that is the whole
+   * point of Execute over Submit, and it is what stops a resolved approval
+   * leaving live buttons behind.
+   */
+  protected async onAdaptiveCardInvoke(
+    context: TurnContext,
+    invokeValue: AdaptiveCardInvokeValue,
+  ): Promise<AdaptiveCardInvokeResponse> {
+    const conversationId = context.activity.conversation?.id ?? "";
+    const verb = invokeValue.action?.verb ?? "";
+    const data =
+      (invokeValue.action?.data as Record<string, unknown> | undefined) ?? {};
+
+    const result = await dispatchActionInvoke(
+      { verb, conversationId, data },
+      this.deps,
+    );
+
+    if (!result.acted) {
+      logWarn("card action did not complete", { verb });
+    }
+
+    return {
+      statusCode: 200,
+      type: "application/vnd.microsoft.card.adaptive",
+      value: asCardContent(result.card.content),
+    };
+  }
+}
+
+/**
+ * `Attachment.content` is untyped at the SDK boundary; the invoke response
+ * requires a `Record<string, unknown>`. Narrow it after a real runtime check
+ * rather than asserting blindly — an empty object is a safe fallback that
+ * Teams renders as an empty card instead of throwing.
+ */
+function asCardContent(value: unknown): Record<string, unknown> {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+export function createReadSurfaceHandler(deps: DispatchDeps): ActivityHandler {
+  return new ReadSurfaceHandler(deps);
 }
