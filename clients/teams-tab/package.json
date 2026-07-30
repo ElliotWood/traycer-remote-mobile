@@ -1,0 +1,31 @@
+{
+  "name": "@traycer-clients/teams-tab",
+  "license": "MIT",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "compile": "tsc -b",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@traycer/protocol": "workspace:*",
+    "@traycer-clients/shared": "workspace:*",
+    "@fluentui/react-components": "^9.71.0",
+    "@microsoft/teams-js": "^2.44.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

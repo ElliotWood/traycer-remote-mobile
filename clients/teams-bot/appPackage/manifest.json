@@ -23,6 +23,22 @@
     "full": "Relays through the Traycer remote bridge to your own desktop host — browse the fleet, read a chat's transcript, and approve or reject pending actions without leaving Teams."
   },
   "accentColor": "#148A7A",
+  "staticTabs": [
+    {
+      "entityId": "traycer.fleet",
+      "name": "Fleet",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/tab/fleet",
+      "websiteUrl": "https://REPLACE_WITH_TAB_HOST/tab/fleet",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "traycer.epics",
+      "name": "Epics",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/tab/epics",
+      "websiteUrl": "https://REPLACE_WITH_TAB_HOST/tab/epics",
+      "scopes": ["personal"]
+    }
+  ],
   "bots": [
     {
       "botId": "00000000-0000-0000-0000-000000000000",
@@ -31,5 +47,5 @@
       "isNotificationOnly": false
     }
   ],
-  "validDomains": []
+  "validDomains": ["REPLACE_WITH_TAB_HOST"]
 }
