@@ -101,6 +101,11 @@ const port = server.address().port;
  * become a list. 780 straddles the breakpoint. 1200 is the desktop case.
  */
 const WIDTHS = [
+  // 320 is the narrowest Teams renders a personal tab at, and the approval
+  // row — description, two buttons, an optional field and a status line — is
+  // the densest thing in the app. It gets its own width rather than being
+  // inferred from 380.
+  { name: "tiny", px: 320 },
   { name: "phone", px: 380 },
   { name: "narrow", px: 780 },
   { name: "desktop", px: 1200 },
@@ -126,6 +131,7 @@ const VIEWS = [
   // EMPTY FIRST, deliberately: on this surface "nothing is waiting" is the
   // success state and the one most users see most often, so it is reviewed
   // first rather than last.
+  { name: "approvals", q: "preview=approvals", path: "/epics" },
   { name: "waiting-empty", q: "preview=waiting&state=empty", path: "/waiting" },
   { name: "waiting", q: "preview=waiting", path: "/waiting" },
   { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting" },

@@ -36,6 +36,7 @@ import {
 import { buildChatTree } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { buildArtifactTree } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
+import { ApprovalsPreview } from "./chat/approvals-preview";
 import {
   ATTENTION_FIXTURE,
   ATTENTION_NOW,
@@ -330,6 +331,10 @@ export function App(): ReactElement {
    *   3. Nothing rendered here is real, which is a constraint on the FIXTURES
    *      (this URL is served unauthenticated), not on this flag.
    */
+  // Every action phase at once. Not a route: it is a review surface for the
+  // states that are hardest to reach by hand.
+  const showApprovals = !inTeams && params.get("preview") === "approvals";
+
   const waitingPreview = ((): AttentionState | null => {
     if (inTeams || params.get("preview") !== "waiting") return null;
     switch (params.get("state")) {
@@ -451,7 +456,10 @@ export function App(): ReactElement {
   // for the second time. Fixing the instance rather than the class is what
   // let it recur; `previewing` is the class.
   const previewing =
-    previewState !== null || agentsPreview !== null || waitingPreview !== null;
+    previewState !== null ||
+    agentsPreview !== null ||
+    waitingPreview !== null ||
+    showApprovals;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
@@ -523,6 +531,17 @@ export function App(): ReactElement {
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <FleetLoading rows={3} />
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  if (showApprovals) {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <Subtitle1>Approval states</Subtitle1>
+          <ApprovalsPreview />
         </div>
       </FluentProvider>
     );
