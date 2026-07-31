@@ -27,6 +27,12 @@ import {
   FLEET_FIXTURE,
   REAL_FLEET_FIXTURE,
 } from "./fleet/fleet-fixture";
+import {
+  FleetEmpty,
+  FleetError,
+  FleetLoading,
+  FleetStale,
+} from "./fleet/fleet-state";
 import { themeFor } from "./theme/teams-theme";
 import { configProblems } from "./config";
 import { SignIn } from "./auth/sign-in";
@@ -93,6 +99,28 @@ export function App(): ReactElement {
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <Subtitle1>Traycer isn&rsquo;t configured</Subtitle1>
+          {/*
+            Says WHOSE problem it is and what resolves it, not just which
+            variable is unset.
+
+            Elliot hit this screen and it named all three missing variables —
+            correct, and useless to him: he cannot set a build-time variable
+            from inside Teams, and nothing on screen said so. A person told
+            only what is broken, with no way to tell whether they broke it,
+            assumes they did.
+
+            The variable names stay, because whoever fixes this needs them.
+            The sentence above is for whoever is merely LOOKING at it.
+          */}
+          <MessageBar intent="error">
+            <MessageBarBody>
+              <strong>This isn&rsquo;t something you can fix from here.</strong>{" "}
+              The app was built without its deployment settings, so it
+              doesn&rsquo;t know which Traycer host to talk to. It needs to be
+              rebuilt and redeployed with the values below set — nothing is
+              wrong with your account or your agents.
+            </MessageBarBody>
+          </MessageBar>
           {problems.map((p) => (
             <Text key={p.key} className={styles.subtle}>
               <strong>{p.key}</strong> — {p.detail}
@@ -158,6 +186,66 @@ export function App(): ReactElement {
   const forceView =
     rawView === "grid" || rawView === "list" ? rawView : undefined;
 
+  /**
+   * `?state=loading|empty|error|disconnected` — previews a state the happy
+   * path cannot reach on demand.
+   *
+   * These are the states that are HARD to see and therefore the ones that
+   * ship broken: `loading` lasts 200ms, `error` needs the host down, and
+   * `empty` needs an account with no agents. Every one of them shipped
+   * unreviewed in the PWA for exactly that reason. A query param makes each
+   * one a URL that can be opened, screenshotted and argued about.
+   *
+   * Same constraints as `?preview` — never reachable inside Teams, and it
+   * only ever chooses which of these components renders. Once the fleet is
+   * wired, this selects a state to DISPLAY; it never induces one, so it
+   * cannot be used to fake a healthy fleet into looking broken or back.
+   */
+  const forcedState = params.get("state");
+
+  if (forcedState === "loading") {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <div className={styles.header}>
+            <Subtitle1>Fleet</Subtitle1>
+          </div>
+          <FleetLoading />
+        </div>
+      </FluentProvider>
+    );
+  }
+  if (forcedState === "empty") {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <div className={styles.header}>
+            <Subtitle1>Fleet</Subtitle1>
+          </div>
+          <FleetEmpty hostId="this host" />
+        </div>
+      </FluentProvider>
+    );
+  }
+  if (forcedState === "error") {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <div className={styles.header}>
+            <Subtitle1>Fleet</Subtitle1>
+          </div>
+          <FleetError
+            detail="host unreachable — connect ECONNREFUSED 127.0.0.1:55945"
+            onRetry={() => {
+              // Wired with the host; the button is here so the state is
+              // reviewed with its affordance rather than without it.
+            }}
+          />
+        </div>
+      </FluentProvider>
+    );
+  }
+
   const blocked = fleet.filter(
     (a: FleetAgent) => a.pendingApprovals + a.pendingInterviews > 0,
   ).length;
@@ -185,6 +273,16 @@ export function App(): ReactElement {
             are not real and nothing here reflects your host yet.
           </MessageBarBody>
         </MessageBar>
+
+        {/*
+          Stale rows UNDER a banner, never a blank grid. Blanking would render
+          zero rows, which is the empty state's pixels and a claim we have
+          lost the basis for — "we last saw this" and "there is nothing" are
+          opposite statements.
+        */}
+        {forcedState === "disconnected" ? (
+          <FleetStale since="4 minutes ago" onRetry={() => undefined} />
+        ) : null}
 
         <div className={styles.header}>
           <Subtitle1>Fleet</Subtitle1>

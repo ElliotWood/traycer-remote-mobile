@@ -38,6 +38,25 @@ export function configProblems(): readonly ConfigProblem[] {
       key: "VITE_AUTHN_BASE_URL",
       detail: "Sign-in cannot start without the authn base URL.",
     });
+  } else if (!/^https?:\/\//.test(AUTHN_BASE_URL)) {
+    // ABSOLUTE, not relative — and this is a gate rather than a note because
+    // the failure it prevents is invisible.
+    //
+    // A relative `/authn` throws inside `new URL(relative, base)` before any
+    // request is made, so sign-in fails with ZERO network traffic: no failed
+    // request in devtools, no server log, nothing to find. That cost the PWA
+    // a long debugging session, and `.env.example` still suggests the form
+    // that cannot work.
+    //
+    // Caught at load, where it names itself, rather than at first sign-in,
+    // where it looks like an auth outage.
+    problems.push({
+      key: "VITE_AUTHN_BASE_URL",
+      detail:
+        `Must be absolute (https://…/authn), not "${AUTHN_BASE_URL}". ` +
+        "A relative value throws while building the request URL, so sign-in " +
+        "fails without a single network call.",
+    });
   }
   if (HOST_WS_URL === "") {
     problems.push({
