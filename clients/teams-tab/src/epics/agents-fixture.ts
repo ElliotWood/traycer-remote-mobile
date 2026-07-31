@@ -70,3 +70,69 @@ export const AGENTS_FIXTURE: readonly EpicChatEntry[] = [
     hostId: null,
   },
 ];
+
+/**
+ * A DEEP chain — five levels — which the friendly fixture cannot produce.
+ *
+ * Depth is the case that breaks this surface: indentation eats the title, and
+ * at 320px there is nothing left. Truncation has returned twice on this
+ * project at exactly that width, both times because the fixture had no example
+ * of the shape that causes it.
+ *
+ * Level 4 and 5 exist specifically to exercise the indent CAP: past
+ * `MAX_INDENT_DEPTH` rows must stop moving right, and a shot of a
+ * five-deep chain at 380px is the only thing that shows whether they do.
+ */
+export const AGENTS_DEEP_FIXTURE: readonly EpicChatEntry[] = [
+  {
+    chatId: "d1000000-0000-4000-8000-000000000001",
+    title: "Migrate config loader to zod",
+    parentId: null,
+    createdAt: T - 8 * 3_600_000,
+    updatedAt: T - 30_000,
+    hostId: AGENTS_FIXTURE_HOST,
+  },
+  {
+    chatId: "d1000000-0000-4000-8000-000000000002",
+    title: "Research: schema inference approaches",
+    parentId: "d1000000-0000-4000-8000-000000000001",
+    createdAt: T - 7 * 3_600_000,
+    updatedAt: T - 15 * 60_000,
+    hostId: AGENTS_FIXTURE_HOST,
+  },
+  {
+    chatId: "d1000000-0000-4000-8000-000000000003",
+    title: "Spike: runtime validation cost",
+    parentId: "d1000000-0000-4000-8000-000000000002",
+    createdAt: T - 6 * 3_600_000,
+    updatedAt: T - 2 * 3_600_000,
+    hostId: OTHER_HOST,
+  },
+  {
+    chatId: "d1000000-0000-4000-8000-000000000004",
+    // Long AND deep — the two failure modes at once, which is the combination
+    // a fixture of short names or shallow trees never produces.
+    title:
+      "Benchmark the parser against the streaming transport under load and report",
+    parentId: "d1000000-0000-4000-8000-000000000003",
+    createdAt: T - 5 * 3_600_000,
+    updatedAt: T - 5 * 3_600_000,
+    hostId: OTHER_HOST,
+  },
+  {
+    chatId: "d1000000-0000-4000-8000-000000000005",
+    title: "",
+    parentId: "d1000000-0000-4000-8000-000000000004",
+    createdAt: T - 4 * 3_600_000,
+    updatedAt: T - 20 * 3_600_000,
+    hostId: null,
+  },
+  {
+    chatId: "d1000000-0000-4000-8000-000000000006",
+    title: "Audit: dependency licence report",
+    parentId: null,
+    createdAt: T - 40 * 3_600_000,
+    updatedAt: T - 26 * 3_600_000,
+    hostId: AGENTS_FIXTURE_HOST,
+  },
+];

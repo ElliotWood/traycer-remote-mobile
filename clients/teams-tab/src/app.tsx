@@ -27,6 +27,7 @@ import { EpicsView } from "./epics/epics-view";
 import { useEpics, type EpicsState } from "./epics/use-epics";
 import { useEpicAgents, type EpicAgentsState } from "./epics/use-epic-agents";
 import {
+  AGENTS_DEEP_FIXTURE,
   AGENTS_FIXTURE,
   AGENTS_FIXTURE_HOST,
   AGENTS_FIXTURE_NOW,
@@ -261,6 +262,14 @@ export function App(): ReactElement {
       // reached Elliot as a thirty-second lie.
       case "retrying":
         return { kind: "loading", phase: "retrying" };
+      // Five levels, so the indent cap is reviewable at 380px rather than
+      // discovered there.
+      case "deep":
+        return {
+          kind: "ready",
+          chats: AGENTS_DEEP_FIXTURE,
+          tree: buildChatTree(AGENTS_DEEP_FIXTURE),
+        };
       case "error":
         return {
           kind: "error",

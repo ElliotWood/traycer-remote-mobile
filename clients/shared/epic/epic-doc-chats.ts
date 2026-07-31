@@ -178,3 +178,49 @@ export function agentLocality(
   if (configuredHostId === "") return "unknown";
   return entry.hostId === configuredHostId ? "this-host" : "other-host";
 }
+
+/** A chat plus its depth in the tree, ready to render as an indented row. */
+export interface FlatChatRow {
+  readonly entry: EpicChatEntry;
+  readonly depth: number;
+  /** True when this row has children beneath it — the parent styling cue. */
+  readonly hasChildren: boolean;
+  /** True when this is the LAST child of its parent, so a guide rail can stop. */
+  readonly isLastChild: boolean;
+}
+
+/**
+ * Depth-first flatten of {@link ChatTree}: a parent immediately followed by its
+ * descendants, siblings in tree order.
+ *
+ * Returned FLAT rather than nested because the row is the unit of interaction
+ * — a real `<button>` per agent, keyboard-navigable in document order. Nesting
+ * the DOM would put buttons inside buttons, which is invalid and which browsers
+ * resolve by dropping one of them.
+ *
+ * `isLastChild` exists so a guide rail can stop at the final child instead of
+ * running past it into whitespace, which reads as a broken line rather than a
+ * deliberate one.
+ */
+export function flattenChatTree(tree: ChatTree): readonly FlatChatRow[] {
+  const out: FlatChatRow[] = [];
+  const visit = (ids: readonly string[], depth: number): void => {
+    ids.forEach((id, index) => {
+      const entry = tree.byId[id];
+      if (entry === undefined) return;
+      const children = tree.childrenByParent[id] ?? [];
+      out.push({
+        entry,
+        depth,
+        hasChildren: children.length > 0,
+        isLastChild: index === ids.length - 1,
+      });
+      // Depth is unbounded in the DATA; the cap belongs to the renderer, which
+      // has a width to respect. Truncating the structure here would silently
+      // drop agents.
+      visit(children, depth + 1);
+    });
+  };
+  visit(tree.roots, 0);
+  return out;
+}

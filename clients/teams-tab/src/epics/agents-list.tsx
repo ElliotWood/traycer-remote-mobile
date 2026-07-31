@@ -34,12 +34,14 @@ import {
 } from "@fluentui/react-icons";
 import {
   agentLocality,
+  flattenChatTree,
   type AgentLocality,
+  type ChatTree,
   type EpicChatEntry,
 } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { FleetError, FleetLoading } from "../fleet/fleet-state";
 import { LOAD_PHASE_LABELS, type EpicAgentsState } from "./use-epic-agents";
-import { relativeTime } from "../fleet/fleet-grid";
+import { terseTime } from "../fleet/fleet-grid";
 
 const useStyles = makeStyles({
   list: { display: "flex", flexDirection: "column" },
@@ -78,7 +80,46 @@ const useStyles = makeStyles({
     gap: "4px",
     color: tokens.colorNeutralForeground3,
   },
-  when: { color: tokens.colorNeutralForeground3, flexShrink: 0 },
+  when: {
+    color: tokens.colorNeutralForeground3,
+    flexShrink: 0,
+    // Fixed width so the timestamps form a column rather than ragging in and
+    // out with each value's length — the desktop sidebar's shape, and the
+    // reason the terse form exists.
+    minWidth: "34px",
+    textAlign: "right",
+  },
+  /**
+   * The indent well and its guide rail.
+   *
+   * A rail rather than indentation alone: at one level, whitespace reads as
+   * accidental; the line is what makes "beneath" legible. It stops at the last
+   * child, because a rail running past the final row into empty space reads as
+   * broken rather than deliberate.
+   */
+  rail: {
+    flexShrink: 0,
+    alignSelf: "stretch",
+    borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  /**
+   * A parent differs from a leaf in WEIGHT only.
+   *
+   * The first version set just `fontWeight` here, which silently dropped the
+   * truncation rules that live on `title` — so parent rows WRAPPED to four
+   * lines while leaf rows ellipsised, on the same list. Two overflow
+   * behaviours selected by an unrelated property (does this row have
+   * children), visible only in a five-deep fixture at 380px.
+   *
+   * A row is a navigation target, not a reading surface: it truncates, and
+   * the full title belongs on the screen you land on.
+   */
+  parentTitle: {
+    fontWeight: tokens.fontWeightBold,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
   empty: {
     padding: tokens.spacingVerticalXXL,
     textAlign: "center",
@@ -116,6 +157,34 @@ function LocalityTag({ locality }: { locality: AgentLocality }): ReactElement {
       {label}
     </Caption1>
   );
+}
+
+/**
+ * Visual indent for a depth, CAPPED.
+ *
+ * Depth is unbounded in the data — an agent can spawn an agent that spawns an
+ * agent — but the width is not. Without a cap, a chain four deep at 320px
+ * pushes the title into nothing, and truncation has already returned twice on
+ * this project at exactly that width.
+ *
+ * Past the cap, rows stop moving right: the rail still shows they are nested,
+ * and the levels beyond it stop being distinguishable by position. That is a
+ * deliberate trade — losing depth-4-vs-depth-5 is cheaper than losing the
+ * title on every deep row, and the alternative (a horizontal scrollbar) was
+ * already rejected once on this surface.
+ */
+const INDENT_STEP_PX = 16;
+const MAX_INDENT_DEPTH = 3;
+
+function indentPx(depth: number): number {
+  return Math.min(depth, MAX_INDENT_DEPTH) * INDENT_STEP_PX;
+}
+
+/** The parent's display name, for the nested row's accessible name. */
+function parentName(entry: EpicChatEntry, tree: ChatTree): string {
+  const parent =
+    entry.parentId === null ? undefined : tree.byId[entry.parentId];
+  return parent === undefined ? "another agent" : agentDisplayName(parent);
 }
 
 /** Never a bare id, same rule as agents and epics. */
@@ -167,33 +236,61 @@ export function AgentsList({
     );
   }
 
-  // Tree order (parents before their children, newest first within a level),
-  // flattened. Nesting is rendered later; the ORDER is worth having now so
-  // the list does not reshuffle when indentation arrives.
-  const ordered = [...state.chats].sort(
-    (a, b) => b.updatedAt - a.updatedAt || a.chatId.localeCompare(b.chatId),
-  );
+  const rows = flattenChatTree(state.tree);
 
   return (
     <div className={styles.list}>
-      {ordered.map((entry) => (
+      {rows.map(({ entry, depth, hasChildren, isLastChild }) => (
         <button
           key={entry.chatId}
           type="button"
           className={styles.row}
+          /*
+            Depth is stated in the ACCESSIBLE NAME, not via `aria-level`.
+
+            `aria-level` is only honoured on `treeitem`/`row`/`heading`; on a
+            plain button it is silently ignored, so the first version claimed
+            to announce hierarchy while announcing nothing. Adopting
+            `role="treeitem"` would make the attribute valid and would also
+            promise arrow-key tree navigation this does not implement — a
+            worse trade than putting the parent in the name.
+
+            A screen reader gets no indentation and no rail, so without this
+            the hierarchy a sighted reader can see does not exist for anyone
+            else.
+          */
+          aria-label={
+            depth === 0
+              ? agentDisplayName(entry)
+              : `${agentDisplayName(entry)}, under ${parentName(entry, state.tree)}`
+          }
+          style={{ paddingLeft: `${String(indentPx(depth))}px` }}
           onClick={() => {
             onOpen(entry.chatId);
           }}
         >
+          {depth > 0 ? (
+            <span
+              aria-hidden
+              className={styles.rail}
+              // The rail stops at the last child instead of running into the
+              // whitespace below it.
+              style={{ opacity: isLastChild ? 0.6 : 1 }}
+            />
+          ) : null}
           <span aria-hidden className={styles.icon}>
             <PersonRegular fontSize={20} />
           </span>
           <span className={styles.main}>
-            <Body1 className={styles.title}>{agentDisplayName(entry)}</Body1>
+            <Body1
+              className={hasChildren ? styles.parentTitle : styles.title}
+            >
+              {agentDisplayName(entry)}
+            </Body1>
             <LocalityTag locality={agentLocality(entry, configuredHostId)} />
           </span>
           <Caption1 className={styles.when}>
-            {relativeTime(entry.updatedAt, now)}
+            {terseTime(entry.updatedAt, now)}
           </Caption1>
           <span aria-hidden className={styles.icon}>
             <ChevronRightRegular fontSize={16} />

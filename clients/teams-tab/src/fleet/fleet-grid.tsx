@@ -431,3 +431,26 @@ export function FleetGrid({
     </>
   );
 }
+
+/**
+ * The terse form the desktop sidebar uses: `now`, `2m`, `21h`, `3d`.
+ *
+ * A tree row carries an indent, a guide rail, an icon, a title and a chevron
+ * before the timestamp gets any width — "23 hours ago" costs three times the
+ * characters of "21h" for the same fact, and at 320px that difference comes
+ * out of the title.
+ *
+ * `now` rather than `0s`: under a minute, the exact count is noise, and a
+ * ticking seconds value on a list that is not live-updating would be a
+ * precision the data does not have.
+ */
+export function terseTime(at: number | null, now: number): string {
+  if (at === null) return "—";
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < 60) return "now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${String(minutes)}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${String(hours)}h`;
+  return `${String(Math.round(hours / 24))}d`;
+}
