@@ -192,13 +192,26 @@ export function FleetEmpty({ hostId }: { hostId?: string }): ReactElement {
 export function FleetError({
   detail,
   onRetry,
+  title = "Couldn’t load your agents",
+  subject = "your fleet",
 }: {
   detail?: string;
   onRetry?: () => void;
+  /**
+   * Overridable, because this component is reused across surfaces and the
+   * default is written for the agents list.
+   *
+   * On "Waiting on you" it rendered "Couldn't load your agents — not a
+   * statement about your fleet" under a heading that says nothing about
+   * agents or fleets. Nothing about it was FALSE; it was answering a
+   * question the screen had not asked. Caught in an image, like the rest.
+   */
+  title?: string;
+  subject?: string;
 }): ReactElement {
   return (
     <State
-      title="Couldn’t load your agents"
+      title={title}
       action={
         onRetry ? (
           <Button appearance="primary" onClick={onRetry}>
@@ -207,8 +220,8 @@ export function FleetError({
         ) : undefined
       }
     >
-      This is a problem reaching Traycer, not a statement about your fleet —
-      your agents are unaffected.
+      This is a problem reaching Traycer, not a statement about {subject} —
+      nothing has changed on your host.
       {detail ? (
         <>
           {" "}

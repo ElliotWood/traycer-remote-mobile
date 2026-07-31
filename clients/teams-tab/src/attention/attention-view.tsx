@@ -137,7 +137,13 @@ export function AttentionView({
     return <FleetLoading rows={3} slowAfterMs={2500} label="Checking…" />;
   }
   if (state.kind === "error") {
-    return <FleetError detail={state.detail} />;
+    return (
+      <FleetError
+        title="Couldn’t check what’s waiting"
+        subject="what needs you"
+        detail={state.detail}
+      />
+    );
   }
 
   if (state.items.length === 0) {
