@@ -165,6 +165,22 @@ export function toFleetEpics(
   return [...epics.filter((e) => e.pinned), ...epics.filter((e) => !e.pinned)];
 }
 
+/**
+ * Never an empty name, and never a bare id.
+ *
+ * Same rule the agent rows settled on: a row with no name teaches the reader
+ * nothing, and a raw UUID is not a name. An untitled epic gets a humane label
+ * plus a short id so two untitled epics are still distinguishable.
+ *
+ * The id is truncated, not shown whole — enough to tell rows apart, not so
+ * much that it reads as the epic's identity.
+ */
+export function epicDisplayName(epic: FleetEpic): string {
+  const title = epic.title.trim();
+  if (title.length > 0) return title;
+  return `Untitled epic (${epic.id.slice(0, 8)})`;
+}
+
 function pluralize(n: number, singular: string, plural?: string): string {
   return `${n} ${n === 1 ? singular : (plural ?? `${singular}s`)}`;
 }

@@ -22,6 +22,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import {
+  epicDisplayName,
   formatEpicMeta,
   type FleetEpic,
 } from "@traycer-clients/shared/epic/epic-list";
@@ -115,7 +116,7 @@ export function EpicsView({
               }}
             >
               <div className={styles.main}>
-                <Body1 className={styles.title}>{epic.title}</Body1>
+                <Body1 className={styles.title}>{epicDisplayName(epic)}</Body1>
                 {meta.length > 0 ? (
                   <Caption1 className={styles.subtle}>{meta}</Caption1>
                 ) : null}
