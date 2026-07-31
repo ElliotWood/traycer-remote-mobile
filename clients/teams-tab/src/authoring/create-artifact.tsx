@@ -23,6 +23,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import type { ArtifactKind } from "@traycer-clients/shared/epic/epic-doc-artifacts";
+import { retryAdvice, type CreatePhase } from "./create-phase";
 
 const KINDS: readonly { readonly kind: ArtifactKind; readonly label: string }[] =
   [
@@ -42,12 +43,6 @@ const useStyles = makeStyles({
   actions: { display: "flex", gap: tokens.spacingHorizontalS },
   failed: { color: tokens.colorPaletteDarkOrangeForeground1 },
 });
-
-export type CreatePhase =
-  | { readonly kind: "idle" }
-  | { readonly kind: "submitting" }
-  /** UNCONFIRMED, not "failed" — the request may have landed. */
-  | { readonly kind: "unconfirmed"; readonly reason: string };
 
 export interface CreateArtifactProps {
   readonly phase: CreatePhase;
@@ -111,10 +106,16 @@ export function CreateArtifact({
         </Button>
       </div>
 
+      {/*
+        This component's wording happened to be right already — `createArtifact`
+        takes no client id, so "check before creating again" is correct. It now
+        comes from the phase anyway, so that it stays right by construction
+        rather than by luck if this form is ever pointed at a different call.
+      */}
       {phase.kind === "unconfirmed" ? (
         <Caption1 className={styles.failed} role="alert">
-          Couldn’t confirm this was created. It may have gone through — check
-          the artifacts list before creating it again. ({phase.reason})
+          Couldn’t confirm this was created.{" "}
+          {retryAdvice(phase.retry, "artifact")} ({phase.reason})
         </Caption1>
       ) : null}
     </div>

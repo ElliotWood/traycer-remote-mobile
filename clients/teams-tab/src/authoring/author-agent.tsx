@@ -23,7 +23,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { hostDisclosure } from "./authoring-scope";
-import type { CreatePhase } from "./create-artifact";
+import { retryAdvice, type CreatePhase } from "./create-phase";
 
 const useStyles = makeStyles({
   form: {
@@ -95,21 +95,16 @@ export function AuthorAgent({
       </div>
 
       {/*
-        WORDING CHANGED once `epic.createChat` was actually wired. This used to
-        say "check the agents list before creating it again" — the correct
-        advice for an unconfirmed APPROVAL, and the wrong advice here.
-
-        The chat id is minted before the first attempt and reused, and the host
-        resolver is idempotent on it, so pressing the button again cannot
-        produce a second agent. Sending someone off to verify by hand would be
-        asking them to do work the protocol already guarantees. Same
-        "unconfirmed", opposite instruction — which is why the reason is stated
-        rather than just the reassurance.
+        The advice comes from the PHASE, not from this component. It used to be
+        hardcoded here as "check the agents list before creating it again" —
+        the right words for an unconfirmed approval and the wrong ones for an
+        idempotent create. A component cannot see which RPC it is wired to, so
+        it is not the place that decides. See `./create-phase`.
       */}
       {phase.kind === "unconfirmed" ? (
         <Caption1 className={styles.failed} role="alert">
-          Couldn’t confirm this agent was created. Press Create agent again —
-          it’s the same request, so it can’t make a second agent. ({phase.reason})
+          Couldn’t confirm this agent was created.{" "}
+          {retryAdvice(phase.retry, "agent")} ({phase.reason})
         </Caption1>
       ) : null}
     </div>

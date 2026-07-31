@@ -28,7 +28,7 @@ import {
   titleFromInstruction,
   type CreateChatClient,
 } from "@traycer-clients/shared/epic/create-chat";
-import type { CreatePhase } from "./create-artifact";
+import type { CreatePhase } from "./create-phase";
 
 export interface CreateAgentResult {
   readonly phase: CreatePhase;
@@ -82,7 +82,15 @@ export function useCreateAgent(
           setPhase({ kind: "idle" });
           return;
         }
-        setPhase({ kind: "unconfirmed", reason: outcome.reason });
+        // "idempotent" because `createChatRequestSchema` takes a client-supplied
+        // `chatId` and states the resolver dedupes on it — not because retrying
+        // feels safe. The neighbouring artifact create reads the opposite from
+        // its own contract.
+        setPhase({
+          kind: "unconfirmed",
+          reason: outcome.reason,
+          retry: "idempotent",
+        });
       });
     },
     [client, epicId, configuredHostId],

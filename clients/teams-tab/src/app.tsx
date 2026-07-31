@@ -43,7 +43,9 @@ import { CommentsPanel } from "./comments/comments-panel";
 import { AuthorAgent } from "./authoring/author-agent";
 import { CreateArtifact } from "./authoring/create-artifact";
 import { useCreateAgent } from "./authoring/use-create-agent";
+import { useCreateArtifact } from "./authoring/use-create-artifact";
 import type { CreateChatClient } from "@traycer-clients/shared/epic/create-chat";
+import type { CreateArtifactClient } from "@traycer-clients/shared/epic/create-artifact";
 import {
   COMMENTS_FIXTURE,
   COMMENTS_FIXTURE_NOW,
@@ -204,7 +206,13 @@ function EpicScreen({
 }: {
   readonly styles: Record<string, string>;
   readonly streamConnection: HostStreamConnection | null;
-  readonly hostClient: CreateChatClient | null;
+  /**
+   * The unary requester, feeding BOTH creates. Named as both rather than as
+   * one: the two client types are structurally identical, so declaring only
+   * `CreateChatClient` compiles perfectly while telling the next reader this
+   * screen creates chats and nothing else.
+   */
+  readonly hostClient: (CreateChatClient & CreateArtifactClient) | null;
   readonly epicId: string;
   readonly epic: FleetEpic | null;
   readonly now: number;
@@ -219,6 +227,7 @@ function EpicScreen({
   const configuredHostId =
     preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST;
   const authoring = useCreateAgent(hostClient, epicId, configuredHostId);
+  const artifactAuthoring = useCreateArtifact(hostClient, epicId);
   return (
     <div className={styles.page}>
       <EpicDetail
@@ -251,6 +260,11 @@ function EpicScreen({
         configuredHostId={configuredHostId}
         phase={authoring.phase}
         onCreate={authoring.create}
+      />
+      <Subtitle1>New artifact</Subtitle1>
+      <CreateArtifact
+        phase={artifactAuthoring.phase}
+        onCreate={artifactAuthoring.create}
       />
     </div>
   );
@@ -667,17 +681,44 @@ export function App(): ReactElement {
     // visible at a glance.
     const hostForPreview =
       params.get("state") === "nohost" ? "" : "f1000000-0000-4000-8000-000000000001";
+    // `state=unconfirmed` puts the two creates side by side in their failed
+    // state, which is the ONLY view where the finding is visible: identical
+    // forms, identical failure, opposite instructions. Nobody reaches this
+    // pair by hand — it needs two RPCs to fail — and it is the thing most
+    // worth looking at, so it gets a preview rather than a description.
+    const unconfirmed = params.get("state") === "unconfirmed";
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <Subtitle1>New agent</Subtitle1>
           <AuthorAgent
             configuredHostId={hostForPreview}
-            phase={{ kind: "idle" }}
+            phase={
+              unconfirmed
+                ? {
+                    kind: "unconfirmed",
+                    reason: "socket closed",
+                    retry: "idempotent",
+                  }
+                : { kind: "idle" }
+            }
             onCreate={() => undefined}
           />
           <Subtitle1>New artifact</Subtitle1>
-          <CreateArtifact phase={{ kind: "idle" }} onCreate={() => undefined} />
+          <CreateArtifact
+            phase={
+              unconfirmed
+                ? {
+                    kind: "unconfirmed",
+                    reason: "socket closed",
+                    // SAME failure as the agent above, opposite advice. The
+                    // difference is `createArtifact` taking no client id.
+                    retry: "may-duplicate",
+                  }
+                : { kind: "idle" }
+            }
+            onCreate={() => undefined}
+          />
         </div>
       </FluentProvider>
     );
