@@ -38,6 +38,11 @@ import { buildArtifactTree } from "@traycer-clients/shared/epic/epic-doc-artifac
 import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { ApprovalsPreview } from "./chat/approvals-preview";
+import { ArtifactMarkdown } from "./artifacts/artifact-markdown";
+import {
+  ARTIFACT_FIXTURE_BODY,
+  ARTIFACT_FIXTURE_TITLE,
+} from "./artifacts/artifact-fixture";
 import { ChatScreen } from "./chat/chat-screen";
 import {
   CHAT_FIXTURE,
@@ -406,6 +411,7 @@ export function App(): ReactElement {
    * and that is the densest combination in the app.
    */
   const showChat = !inTeams && params.get("preview") === "chat";
+  const showArtifact = !inTeams && params.get("preview") === "artifact";
 
   const waitingPreview = ((): AttentionState | null => {
     if (inTeams || params.get("preview") !== "waiting") return null;
@@ -532,7 +538,8 @@ export function App(): ReactElement {
     agentsPreview !== null ||
     waitingPreview !== null ||
     showApprovals ||
-    showChat;
+    showChat ||
+    showArtifact;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
@@ -604,6 +611,17 @@ export function App(): ReactElement {
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <FleetLoading rows={3} />
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  if (showArtifact) {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <Subtitle1>{ARTIFACT_FIXTURE_TITLE}</Subtitle1>
+          <ArtifactMarkdown body={ARTIFACT_FIXTURE_BODY} />
         </div>
       </FluentProvider>
     );

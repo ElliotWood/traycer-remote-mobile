@@ -132,6 +132,7 @@ const VIEWS = [
   // success state and the one most users see most often, so it is reviewed
   // first rather than last.
   { name: "approvals", q: "preview=approvals", path: "/epics" },
+  { name: "artifact", q: "preview=artifact", path: "/epics" },
   { name: "chat", q: "preview=chat", path: "/epics" },
   { name: "chat-pending", q: "preview=chat&state=pending", path: "/epics" },
   { name: "chat-unconfirmed", q: "preview=chat&state=unconfirmed", path: "/epics" },

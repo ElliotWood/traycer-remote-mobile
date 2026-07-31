@@ -19,6 +19,22 @@
  * high-contrast Teams that is a bright rectangle in a dark page. So the
  * element's background is a Fluent token, not a default.
  *
+ * THIS COMPONENT CANNOT BE VERIFIED BY SCREENSHOT. Chromium does not
+ * composite an OPAQUE-ORIGIN iframe into a `fullPage` capture, so the shoot
+ * photographs an empty box however well the wireframe renders. The first
+ * capture looked exactly like a broken component.
+ *
+ * The same sandboxing that contains the document hides it from the camera —
+ * so the verification for this one element is a DOM assertion, not an image:
+ *
+ *   frames().length === 2
+ *   frame.body.innerText === the wireframe's own text
+ *
+ * Confirmed that way on 2026-07-31: srcdoc 873 bytes, sandbox
+ * "allow-scripts", body text "Reconnecting… / Queue held: 3 messages". The
+ * IMAGE still proves the surrounding fix — the element's background follows
+ * the theme instead of rendering white — which is the half a picture can show.
+ *
  * The height message is validated by SOURCE first, then marker, then shape.
  * Source first matters here specifically: a Teams tab is itself in an iframe
  * and receives postMessages from the Teams SDK, so a marker-only check would
