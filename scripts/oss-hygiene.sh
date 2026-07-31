@@ -47,7 +47,14 @@ PATTERNS=(
   "tailscale CGNAT address|\b100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b(?!/[0-9])"
 
   # Home paths whose username is NOT a known placeholder.
-  "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)\\\\)[A-Za-z0-9._-]+"
+  #
+  # The placeholder may be followed by a separator OR end the line: prose and
+  # docs write `C:\Users\example` as a terminal path, and requiring a trailing
+  # backslash flagged it as a real username. A gate that cries wolf gets
+  # disabled — see the header — so this false positive is a correctness bug in
+  # the gate, not cosmetics. `\s|$` and not `\b`, because `\b` would fail for
+  # the `...` placeholder, whose last character is not a word character.
+  "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)(\\\\|\\s|$))[A-Za-z0-9._-]+"
   "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+/\.traycer"
 )
 

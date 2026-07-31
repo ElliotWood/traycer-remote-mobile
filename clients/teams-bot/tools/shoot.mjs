@@ -30,8 +30,25 @@ if (!bundlePath || !outDir) {
 // rejects it with ERR_UNSUPPORTED_ESM_URL_SCHEME.
 const C = await import(pathToFileURL(resolve(bundlePath)).href);
 
-// Realistic fixtures. 8 agents rather than 2: the fleet card's real problem
-// only appears at length, and a real epic can have dozens.
+/**
+ * Realistic fixtures — SHAPED from the real fleet, INVENTED in content.
+ *
+ * Shape: 8 agents rather than 2, because the fleet card's real problems only
+ * appear at length; mixed harnesses and surfaces; one untitled row; titles
+ * long enough to truncate.
+ *
+ * Content must NOT be real. The first version used the actual in-flight agent
+ * titles, on the reasoning that fixtures matching reality make the screenshots
+ * honest. They do — and they also put internal work names in a public repo.
+ * Those are separate goals and invented names of realistic shape satisfy both;
+ * no card layout cares whose work it names.
+ *
+ * `scripts/oss-hygiene.sh` will NOT catch a regression here. Every pattern in
+ * that gate is a SHAPE — a tailnet name, a CGNAT address, a home path — and
+ * internal work titles have no shape that distinguishes them from invented
+ * ones. This docblock is the control, which is a weaker guarantee than a gate
+ * and is written down so nobody mistakes it for one.
+ */
 const AGENTS = [
   {
     agentId: "a1000000-0000-4000-8000-000000000001",
@@ -262,8 +279,10 @@ add("22-compose-long-title", () =>
   C.buildComposeCard(
     {
       chatId: STATUS_LIVE.chatId,
+      // Long on purpose: title truncation in the compose header is the thing
+      // most likely to look wrong, and short fixtures never exercise it.
       title:
-        "Migrate config loader to zod, read surface, approvals and the card quality pass",
+        "Migrate config loader to zod, including the streaming transport and its reconnect path",
     },
     EPIC_ID,
   ),
