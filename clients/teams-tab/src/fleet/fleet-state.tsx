@@ -171,6 +171,30 @@ export function FleetError({
 }
 
 /**
+ * Signed in, and the fleet is not connected to the host yet.
+ *
+ * This exists because the alternative was worse than a missing feature. The
+ * authenticated view rendered the FIXTURE fleet behind a "sample data"
+ * warning — honest about the rows being invented, and silent on the question
+ * an authenticated user is actually asking, which is *why am I seeing sample
+ * data after signing in*. A placeholder before sign-in is reasonable; the
+ * same placeholder after sign-in reads as the app claiming to have your
+ * fleet.
+ *
+ * Deliberately NOT the empty state: "no agents" is a claim about the fleet,
+ * and we have not asked yet. Deleted in the commit that wires the host.
+ */
+export function FleetNotWired(): ReactElement {
+  return (
+    <State title="Not connected to your host yet">
+      You&rsquo;re signed in. Showing your real agents is the next piece of
+      work — this screen isn&rsquo;t reading from your host yet, so nothing is
+      missing and nothing is wrong with your fleet.
+    </State>
+  );
+}
+
+/**
  * Contact lost while rows were already on screen.
  *
  * Deliberately a BANNER over the existing rows rather than a replacement for

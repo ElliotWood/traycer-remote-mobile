@@ -340,6 +340,27 @@ export function FleetGrid({
     }),
   ];
 
+  /**
+   * The name column's width, derived from the viewport rather than fixed.
+   *
+   * The subtractions are the MEASURED overheads from the note below — ~68px
+   * of grid chrome and 40px of page padding — not fresh arithmetic. At 800px
+   * this yields 242, i.e. essentially the 240 that was measured not to
+   * overflow, so widening cannot reintroduce the horizontal page scrollbar it
+   * replaced. Above that the name simply takes the room that was going spare.
+   *
+   * Capped, because a 1400px name column on an ultrawide monitor is its own
+   * kind of wrong — past a point the line becomes hard to track back to its
+   * row rather than easier to read.
+   */
+  const FIXED_COLUMNS = 130 + 140 + 80 + 100;
+  const GRID_CHROME = 68;
+  const PAGE_PADDING = 40;
+  const nameWidth = Math.min(
+    800,
+    Math.max(240, width - PAGE_PADDING - GRID_CHROME - FIXED_COLUMNS),
+  );
+
   return (
     <>
       <div className={styles.gridScroll}>
@@ -360,11 +381,22 @@ export function FleetGrid({
            * The arithmetic was asserted and never checked, which is how a
            * horizontal page scrollbar shipped in a layout I had "verified".
            *
-           * 240+130+140+80+100 = 690, + ~68 chrome + 40 page padding ≈ 798.
-           * Re-measure after touching these; do not re-derive them on paper.
+           * The fixed hints then caused the OPPOSITE defect at the other end.
+           * Because `resizableColumns` gives the table a fixed total width,
+           * the grid stayed ~690px wide however wide the window was — so at
+           * 1200px the agent name truncated to "Research: cache invalidation
+           * strateg…" with roughly half the viewport sitting empty beside it.
+           * Elliot's own screenshot of the live tab shows it. Truncating the
+           * one column carrying the information, while the space it needs is
+           * visibly unused, is the sort of thing that reads as broken.
+           *
+           * So the name column ABSORBS the slack and the others stay fixed:
+           * name is the only column whose content is unbounded, and the only
+           * one that gets better with more room. `status`/`waiting` are short
+           * labels that would just gain padding.
            */
           columnSizingOptions={{
-            name: { minWidth: 160, idealWidth: 240 },
+            name: { minWidth: 160, idealWidth: nameWidth },
             status: { minWidth: 120, idealWidth: 130 },
             waiting: { minWidth: 110, idealWidth: 140 },
             harness: { minWidth: 70, idealWidth: 80 },

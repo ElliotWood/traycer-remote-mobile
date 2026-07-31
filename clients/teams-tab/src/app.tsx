@@ -31,6 +31,7 @@ import {
   FleetEmpty,
   FleetError,
   FleetLoading,
+  FleetNotWired,
   FleetStale,
 } from "./fleet/fleet-state";
 import { themeFor } from "./theme/teams-theme";
@@ -82,7 +83,7 @@ export function App(): ReactElement {
   const styles = useStyles();
   const { themeName, inTeams, ready } = useTeamsTheme();
   const width = useViewportWidth();
-  const auth = useAuthService();
+  const { auth, restoring } = useAuthService();
   const status = useAuthStatus(auth);
 
   // Nothing paints until initialize settles either way — a flash of the light
@@ -161,6 +162,20 @@ export function App(): ReactElement {
    *    a constraint on the FIXTURES, not on this flag.
    */
   const previewingFleet = !inTeams && params.get("preview") === "fleet";
+
+  // Nothing about sign-in paints while the session is still being restored.
+  // Offering a "Sign in" button to someone who is already signed in is how
+  // Elliot ended up starting a device flow he did not need — and it is what
+  // would make a reload look like a lost session when it is not.
+  if (restoring && !previewingFleet) {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <FleetLoading rows={3} />
+        </div>
+      </FluentProvider>
+    );
+  }
 
   if (status.kind !== "signed-in" && !previewingFleet) {
     return (
@@ -241,6 +256,34 @@ export function App(): ReactElement {
               // reviewed with its affordance rather than without it.
             }}
           />
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  /**
+   * FIXTURES ARE FOR `?preview=` ONLY, never for a signed-in user.
+   *
+   * Elliot signed in — device code and all — and landed on eight invented
+   * agents behind the sample-data warning. The warning was doing its job,
+   * which is the only reason this was a defect rather than a disaster: the
+   * bar is honest that the rows are invented, and says nothing about why
+   * they are on screen after authenticating. Sample data before sign-in is a
+   * placeholder; the same rows after sign-in are the app implying it has
+   * fetched your fleet.
+   *
+   * Same family as everything else here — a surface that looks like an
+   * answer and is not one. Removed with the host wiring, which replaces this
+   * branch rather than deleting it.
+   */
+  if (!previewingFleet) {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <div className={styles.header}>
+            <Subtitle1>Fleet</Subtitle1>
+          </div>
+          <FleetNotWired />
         </div>
       </FluentProvider>
     );
