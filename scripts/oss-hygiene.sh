@@ -88,8 +88,27 @@ for entry in "${PATTERNS[@]}"; do
   fi
 done
 
+# WHAT WAS ACTUALLY CHECKED, always printed — pass or fail.
+#
+# Three separate leaks got through a sweep that reported clean because the
+# sweep's BOUNDARY was wrong, not its patterns: a username prefix that didn't
+# match, a package scope that excluded the offending package, and a directory
+# scope of `*/src` that silently skipped `tools/`. Each time the output said
+# "clean" and the scope it was clean WITHIN was invisible.
+#
+# So the boundary is stated. "clean" is not a claim anyone can check; "checked
+# 1,204 files, home paths within 7 paths" is one you can look at and say
+# that's the wrong set. The point is not a wider glob — it is a boundary the
+# reader can falsify.
+files_scanned=$(git grep -lI '' -- . "${EXCLUDES[@]}" 2>/dev/null | wc -l | tr -d ' ')
+printf '\noss-hygiene: scanned %s tracked files\n' "$files_scanned"
+printf '  infrastructure patterns  repo-wide\n'
+printf '  home-path patterns       %s\n' "${OWNED[*]}"
+printf '  NOT covered              internal work titles — no distinguishing\n'
+printf '                           shape exists; see the fixture docblocks\n'
+
 if [ "$fail" -eq 0 ]; then
-  echo "oss-hygiene: clean — no machine-identifying strings in tracked files"
+  echo "oss-hygiene: clean within the scope above"
   exit 0
 fi
 
