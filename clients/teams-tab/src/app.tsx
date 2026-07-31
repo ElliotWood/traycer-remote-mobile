@@ -10,7 +10,7 @@
  * below it comes from the Teams theme, so light / dark / high-contrast are
  * correct without a single colour being chosen here.
  */
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   FluentProvider,
   makeStyles,
@@ -20,22 +20,11 @@ import {
   Text,
   tokens,
 } from "@fluentui/react-components";
-import { FleetGrid } from "./fleet/fleet-grid";
-import type { FleetAgent } from "./fleet/fleet-types";
-import {
-  FIXTURE_NOW,
-  FLEET_FIXTURE,
-  REAL_FLEET_FIXTURE,
-} from "./fleet/fleet-fixture";
-import {
-  FleetEmpty,
-  FleetError,
-  FleetLoading,
-  FleetStale,
-} from "./fleet/fleet-state";
+import { FleetLoading } from "./fleet/fleet-state";
 import { EpicDetail } from "./epics/epic-detail";
+import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
-import { useEpics } from "./epics/use-epics";
+import { useEpics, type EpicsState } from "./epics/use-epics";
 import { useRoute } from "./router/use-route";
 import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import {
@@ -70,23 +59,6 @@ const useStyles = makeStyles({
   subtle: { color: tokens.colorNeutralForeground3 },
 });
 
-/** Width drives grid-vs-list, so it is measured rather than guessed from a media query. */
-function useViewportWidth(): number {
-  const [width, setWidth] = useState(() =>
-    typeof window === "undefined" ? 1024 : window.innerWidth,
-  );
-  useEffect(() => {
-    const onResize = (): void => {
-      setWidth(window.innerWidth);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-    };
-  }, []);
-  return width;
-}
-
 /**
  * The signed-in screen: the user's real epics.
  *
@@ -103,15 +75,31 @@ function useViewportWidth(): number {
 function EpicsScreen({
   styles,
   auth,
+  preview,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth;
+  /**
+   * Forces a state instead of talking to the host, so every state has a URL
+   * that can be opened, screenshotted and argued about.
+   *
+   * Same properties as the other preview affordances: unreachable inside
+   * Teams, and no code path from here reads the host — with `preview` set the
+   * connection is never built at all, so this is a property of the wiring and
+   * not a promise in a comment.
+   */
+  readonly preview: EpicsState | null;
 }): ReactElement {
-  const [connection] = useState(() => createTabHostConnection(auth));
-  const { state, reload, loadMore } = useEpics(connection?.hostClient ?? null);
+  const [connection] = useState(() =>
+    preview === null ? createTabHostConnection(auth) : null,
+  );
+  const live = useEpics(connection?.hostClient ?? null);
+  const { state, reload, loadMore } = preview === null
+    ? live
+    : { state: preview, reload: () => undefined, loadMore: () => undefined };
   const { route, navigate } = useRoute();
   // One clock for the whole render, so two rows never disagree about "now".
-  const [now] = useState(() => Date.now());
+  const [now] = useState(() => (preview === null ? Date.now() : EPICS_FIXTURE_NOW));
   // Remembered so the detail screen can show a real title immediately. NOT
   // required by it: a deep link or reload arrives with only the id, and a
   // detail view that renders solely when navigated to from the list is one
@@ -159,7 +147,6 @@ function EpicsScreen({
 export function App(): ReactElement {
   const styles = useStyles();
   const { themeName, inTeams, ready } = useTeamsTheme();
-  const width = useViewportWidth();
   const { auth, restoring } = useAuthService();
   const status = useAuthStatus(auth);
 
@@ -167,11 +154,74 @@ export function App(): ReactElement {
   // theme before switching to dark is the sort of thing that reads as cheap.
   if (!ready) return <FluentProvider theme={themeFor("default")} />;
 
+  const params =
+    typeof window === "undefined"
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
+
+  /**
+   * `?preview=epics[&state=…]` renders the FIXTURE epics without signing in.
+   *
+   * The states that ship broken are the ones that are hard to reach —
+   * `loading` lasts 200ms, `error` needs the host down, `empty` needs an
+   * account with no epics. A query param turns each into a URL.
+   *
+   * Constraints as PROPERTIES, not mechanisms:
+   *   1. Never reachable inside Teams — `inTeams` comes from a successful
+   *      host handshake, so a query param on a real tab cannot get here.
+   *   2. No code path from here reads the host. Enforced by the WIRING: with
+   *      a preview state set, the connection is never constructed.
+   *   3. Nothing rendered here is real, which is a constraint on the FIXTURES
+   *      (this URL is served unauthenticated), not on this flag.
+   */
+  const previewState = ((): EpicsState | null => {
+    if (inTeams || params.get("preview") !== "epics") return null;
+    switch (params.get("state")) {
+      case "loading":
+        return { kind: "loading" };
+      case "error":
+        return {
+          kind: "error",
+          detail: "host unreachable — connect ECONNREFUSED 127.0.0.1:55945",
+        };
+      case "empty":
+        return {
+          kind: "ready",
+          epics: [],
+          hasMore: false,
+          loadingMore: false,
+          stale: false,
+        };
+      case "disconnected":
+        return {
+          kind: "ready",
+          epics: EPICS_FIXTURE,
+          hasMore: false,
+          loadingMore: false,
+          stale: true,
+        };
+      default:
+        return {
+          kind: "ready",
+          epics: EPICS_FIXTURE,
+          hasMore: true,
+          loadingMore: false,
+          stale: false,
+        };
+    }
+  })();
+
   // Config problems are reported BEFORE anything is attempted. A tab that
   // starts and then fails on its first RPC is far harder to diagnose from
   // inside Teams than one that names the missing build variable — there is
   // no address bar and no easy console in there.
-  const problems = configProblems();
+  // The PREVIEW path skips this gate, and that is a property of the wiring
+  // rather than a convenience: with a preview state set the host connection
+  // is never constructed, so deployment config cannot affect what renders.
+  // Gating it anyway cost real time — a shoot built without the build-time
+  // variables produced fifteen images of this very screen, which would have
+  // been reported as the epics surface if I had not opened one.
+  const problems = previewState === null ? configProblems() : [];
   if (problems.length > 0) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
@@ -209,11 +259,6 @@ export function App(): ReactElement {
     );
   }
 
-  const params =
-    typeof window === "undefined"
-      ? new URLSearchParams()
-      : new URLSearchParams(window.location.search);
-
   /**
    * Renders the FIXTURE fleet without signing in, so the surface can still be
    * screenshotted and reviewed. Adding the auth gate silently killed the
@@ -238,13 +283,11 @@ export function App(): ReactElement {
    *    served unauthenticated, so anything in a fixture is public. That is
    *    a constraint on the FIXTURES, not on this flag.
    */
-  const previewingFleet = !inTeams && params.get("preview") === "fleet";
-
   // Nothing about sign-in paints while the session is still being restored.
   // Offering a "Sign in" button to someone who is already signed in is how
   // Elliot ended up starting a device flow he did not need — and it is what
   // would make a reload look like a lost session when it is not.
-  if (restoring && !previewingFleet) {
+  if (restoring && previewState === null) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
@@ -254,7 +297,7 @@ export function App(): ReactElement {
     );
   }
 
-  if (status.kind !== "signed-in" && !previewingFleet) {
+  if (status.kind !== "signed-in" && previewState === null) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <SignIn
@@ -268,190 +311,10 @@ export function App(): ReactElement {
     );
   }
 
-  // `?fleet=real` and `?view=grid|list` are the same out-of-Teams preview
-  // affordance as `?theme`: they answer layout questions from images at a
-  // FIXED width, rather than by resizing a window and trusting a memory of
-  // what the other one looked like. Never consulted inside Teams.
-  const fleet =
-    params.get("fleet") === "real" ? REAL_FLEET_FIXTURE : FLEET_FIXTURE;
-  const rawView = params.get("view");
-  const forceView =
-    rawView === "grid" || rawView === "list" ? rawView : undefined;
-
-  /**
-   * `?state=loading|empty|error|disconnected` — previews a state the happy
-   * path cannot reach on demand.
-   *
-   * These are the states that are HARD to see and therefore the ones that
-   * ship broken: `loading` lasts 200ms, `error` needs the host down, and
-   * `empty` needs an account with no agents. Every one of them shipped
-   * unreviewed in the PWA for exactly that reason. A query param makes each
-   * one a URL that can be opened, screenshotted and argued about.
-   *
-   * Same constraints as `?preview` — never reachable inside Teams, and it
-   * only ever chooses which of these components renders. Once the fleet is
-   * wired, this selects a state to DISPLAY; it never induces one, so it
-   * cannot be used to fake a healthy fleet into looking broken or back.
-   */
-  const forcedState = params.get("state");
-
-  if (forcedState === "loading") {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
-          <div className={styles.header}>
-            <Subtitle1>Fleet</Subtitle1>
-          </div>
-          <FleetLoading />
-        </div>
-      </FluentProvider>
-    );
-  }
-  if (forcedState === "empty") {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
-          <div className={styles.header}>
-            <Subtitle1>Fleet</Subtitle1>
-          </div>
-          <FleetEmpty hostId="this host" />
-        </div>
-      </FluentProvider>
-    );
-  }
-  if (forcedState === "error") {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
-          <div className={styles.header}>
-            <Subtitle1>Fleet</Subtitle1>
-          </div>
-          <FleetError
-            detail="host unreachable — connect ECONNREFUSED 127.0.0.1:55945"
-            onRetry={() => {
-              // Wired with the host; the button is here so the state is
-              // reviewed with its affordance rather than without it.
-            }}
-          />
-        </div>
-      </FluentProvider>
-    );
-  }
-
-  /**
-   * FIXTURES ARE FOR `?preview=` ONLY, never for a signed-in user.
-   *
-   * Elliot signed in — device code and all — and landed on eight invented
-   * agents behind the sample-data warning. The warning was doing its job,
-   * which is the only reason this was a defect rather than a disaster: the
-   * bar is honest that the rows are invented, and says nothing about why
-   * they are on screen after authenticating. Sample data before sign-in is a
-   * placeholder; the same rows after sign-in are the app implying it has
-   * fetched your fleet.
-   *
-   * Same family as everything else here — a surface that looks like an
-   * answer and is not one. Removed with the host wiring, which replaces this
-   * branch rather than deleting it.
-   */
-  if (!previewingFleet) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <EpicsScreen styles={styles} auth={auth} />
-      </FluentProvider>
-    );
-  }
-
-  const blocked = fleet.filter(
-    (a: FleetAgent) => a.pendingApprovals + a.pendingInterviews > 0,
-  ).length;
-  const local = fleet.filter((a: FleetAgent) => a.isLocal).length;
-  const remote = fleet.length - local;
 
   return (
     <FluentProvider theme={themeFor(themeName)}>
-      <div className={styles.page}>
-        {/*
-          UNMISSABLE, and deliberately not a footnote.
-
-          The previous marker only rendered when Teams was ABSENT — which is
-          exactly backwards. Inside Teams `app.initialize()` succeeds, the
-          marker disappears, and the user sees eight plausible agents with
-          real-looking titles and nothing saying they are invented. That is a
-          surface stating something false, and no line of code in it is
-          dishonest — the same shape as a fleet reporting 53 agents idle.
-
-          This is removed in the commit that wires real data, not before.
-        */}
-        <MessageBar intent="warning">
-          <MessageBarBody>
-            <strong>Sample data.</strong> This fleet is a fixture — these agents
-            are not real and nothing here reflects your host yet.
-          </MessageBarBody>
-        </MessageBar>
-
-        {/*
-          Stale rows UNDER a banner, never a blank grid. Blanking would render
-          zero rows, which is the empty state's pixels and a claim we have
-          lost the basis for — "we last saw this" and "there is nothing" are
-          opposite statements.
-        */}
-        {forcedState === "disconnected" ? (
-          <FleetStale since="4 minutes ago" onRetry={() => undefined} />
-        ) : null}
-
-        <div className={styles.header}>
-          <Subtitle1>Fleet</Subtitle1>
-          <Text size={200} className={styles.subtle}>
-            {blocked > 0
-              ? `${String(blocked)} waiting on you · ${String(fleet.length)} agents`
-              : `${String(fleet.length)} agents`}
-          </Text>
-        </div>
-
-        {/*
-          The honest fleet is 3 local agents and 53 read-only ones, all idle.
-          Every row is true and the whole thing reads as dead — which is only
-          half the job. Said ONCE here rather than inferred from 53 identical
-          badges, because "why is everything read-only" is the first question
-          the surface should answer, not the last.
-
-          Counts by host, because "which agents can this host actually drive"
-          is the real situation and today it has to be inferred.
-        */}
-        {remote > 0 ? (
-          <MessageBar intent="info">
-            <MessageBarBody>
-              <strong>
-                {local} on this host · {remote} elsewhere.
-              </strong>{" "}
-              Agents running on another machine can be read but not messaged
-              from here, and their activity isn&rsquo;t visible — so they show
-              as read-only rather than idle.
-            </MessageBarBody>
-          </MessageBar>
-        ) : null}
-
-        <FleetGrid
-          agents={fleet}
-          now={FIXTURE_NOW}
-          width={width}
-          forceView={forceView}
-          onOpen={() => {
-            // Navigation lands with the Epic/Chat tabs; a no-op here keeps the
-            // row affordance honest about being a scaffold.
-          }}
-        />
-
-        {!inTeams ? (
-          // Names the theme actually in use rather than the default. The
-          // first version said "theme defaults to light" unconditionally and
-          // appeared beneath a dark-themed screenshot, which is exactly the
-          // kind of caption that gets quoted back as fact.
-          <Text size={200} className={styles.subtle}>
-            Running outside Teams — {themeName} theme.
-          </Text>
-        ) : null}
-      </div>
+      <EpicsScreen styles={styles} auth={auth} preview={previewState} />
     </FluentProvider>
   );
 }

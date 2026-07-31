@@ -82,7 +82,13 @@ export function SignIn({
       <div className={styles.wrap}>
         <Subtitle1>Traycer</Subtitle1>
         <Body1>
-          Sign in to see your fleet and answer agents that are waiting on you.
+          {/*
+            Says "epics", not "fleet". The screen behind this sign-in is the
+            epics list — "Fleet" named a surface that no longer exists, and
+            copy promising one thing before a screen shows another is a small
+            version of the same defect the whole week has been about.
+          */}
+          Sign in to see your epics and the agents working on them.
         </Body1>
 
         {!isStorageDurable() ? (

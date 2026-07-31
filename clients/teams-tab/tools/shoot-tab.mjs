@@ -92,12 +92,11 @@ const THEMES = ["default", "dark", "contrast"];
 
 /** Each state, and the query that produces it. */
 const VIEWS = [
-  { name: "fleet-real", q: "preview=fleet&fleet=real" },
-  { name: "fleet-lively", q: "preview=fleet" },
-  { name: "loading", q: "preview=fleet&state=loading" },
-  { name: "empty", q: "preview=fleet&state=empty" },
-  { name: "error", q: "preview=fleet&state=error" },
-  { name: "disconnected", q: "preview=fleet&fleet=real&state=disconnected" },
+  { name: "epics", q: "preview=epics" },
+  { name: "loading", q: "preview=epics&state=loading" },
+  { name: "empty", q: "preview=epics&state=empty" },
+  { name: "error", q: "preview=epics&state=error" },
+  { name: "disconnected", q: "preview=epics&state=disconnected" },
 ];
 
 mkdirSync(outDir, { recursive: true });
@@ -112,11 +111,11 @@ try {
           viewport: { width: width.px, height: 900 },
           deviceScaleFactor: 2,
         });
-        const url = `http://localhost:${String(port)}/fleet?${view.q}&theme=${theme}`;
+        const url = `http://localhost:${String(port)}/epics?${view.q}&theme=${theme}`;
         await page.goto(url, { waitUntil: "networkidle" });
         // The theme handshake races a 4s timeout before anything paints, so
         // waiting for the heading is waiting for `ready`, not for a guess.
-        await page.waitForSelector("text=Fleet", { timeout: 8000 }).catch(() => {
+        await page.waitForSelector("text=Epics", { timeout: 8000 }).catch(() => {
           // `loading`/`empty`/`error` all render the heading; if one ever
           // doesn't, a blank shot is the finding, not a reason to bail.
         });
