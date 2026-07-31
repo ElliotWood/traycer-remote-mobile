@@ -15,6 +15,7 @@
  *     indentation that will consume it exists.
  */
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
+import type { EpicArtifactEntry } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 
 /** Matches the fixture host id the preview configures, so rows read "On this host". */
 export const AGENTS_FIXTURE_HOST = "h-alpha";
@@ -134,5 +135,83 @@ export const AGENTS_DEEP_FIXTURE: readonly EpicChatEntry[] = [
     createdAt: T - 40 * 3_600_000,
     updatedAt: T - 26 * 3_600_000,
     hostId: AGENTS_FIXTURE_HOST,
+  },
+];
+
+/**
+ * Artifacts, SHAPED from a real epic's tree: a spec with nested tickets, a
+ * story with children, a review, and one untitled row.
+ *
+ * All four kinds appear, because the icons only earn their space if
+ * spec/ticket/story/review read as different at 380px — and that is only
+ * checkable with all four side by side.
+ *
+ * Statuses cover 0/1/2 AND null: tickets and stories carry one, specs and
+ * reviews never do. A fixture where everything has a status would hide that
+ * the dot must be absent rather than grey for the kinds that have none.
+ */
+export const ARTIFACTS_FIXTURE: readonly EpicArtifactEntry[] = [
+  {
+    id: "s1000000-0000-4000-8000-000000000001",
+    kind: "spec",
+    title: "Streaming transport reconnect",
+    parentId: null,
+    artifactRoomId: "r1",
+    status: null,
+    createdAt: T - 40 * 3_600_000,
+    updatedAt: T - 60_000,
+  },
+  {
+    id: "s1000000-0000-4000-8000-000000000002",
+    kind: "ticket",
+    title: "Re-dial with exponential backoff",
+    parentId: "s1000000-0000-4000-8000-000000000001",
+    artifactRoomId: "r2",
+    status: 2,
+    createdAt: T - 38 * 3_600_000,
+    updatedAt: T - 30 * 60_000,
+  },
+  {
+    id: "s1000000-0000-4000-8000-000000000003",
+    kind: "ticket",
+    // Long AND nested — the pair that broke the agents list.
+    title:
+      "Surface the reconnect state in the UI without claiming progress that has not happened",
+    parentId: "s1000000-0000-4000-8000-000000000001",
+    artifactRoomId: "r3",
+    status: 1,
+    createdAt: T - 36 * 3_600_000,
+    updatedAt: T - 3 * 3_600_000,
+  },
+  {
+    id: "s1000000-0000-4000-8000-000000000004",
+    kind: "story",
+    title: "A user reconnects after a laptop sleep",
+    parentId: null,
+    artifactRoomId: "r4",
+    status: 0,
+    createdAt: T - 20 * 3_600_000,
+    updatedAt: T - 5 * 3_600_000,
+  },
+  {
+    id: "s1000000-0000-4000-8000-000000000005",
+    kind: "review",
+    // Untitled: the never-a-bare-id rule, third surface.
+    title: "",
+    parentId: "s1000000-0000-4000-8000-000000000004",
+    artifactRoomId: "r5",
+    status: null,
+    createdAt: T - 18 * 3_600_000,
+    updatedAt: T - 26 * 3_600_000,
+  },
+  {
+    id: "s1000000-0000-4000-8000-000000000006",
+    kind: "review",
+    title: "Critique: the staleness banner wording",
+    parentId: null,
+    artifactRoomId: "r6",
+    status: null,
+    createdAt: T - 50 * 3_600_000,
+    updatedAt: T - 2 * 86_400_000,
   },
 ];

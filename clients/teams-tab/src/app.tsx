@@ -29,10 +29,12 @@ import { useEpicAgents, type EpicAgentsState } from "./epics/use-epic-agents";
 import {
   AGENTS_DEEP_FIXTURE,
   AGENTS_FIXTURE,
+  ARTIFACTS_FIXTURE,
   AGENTS_FIXTURE_HOST,
   AGENTS_FIXTURE_NOW,
 } from "./epics/agents-fixture";
 import { buildChatTree } from "@traycer-clients/shared/epic/epic-doc-chats";
+import { buildArtifactTree } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 import {
   HostStreamConnection,
   type StreamConnectionAuth,
@@ -114,6 +116,10 @@ function EpicScreen({
           preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST
         }
         now={preview === null ? now : AGENTS_FIXTURE_NOW}
+        onOpenArtifact={() => {
+          // Artifact reading lands next; a no-op keeps the affordance honest
+          // about being unfinished rather than silently doing nothing.
+        }}
         onOpenAgent={() => {
           // Chat lands next; a no-op keeps the row affordance honest about
           // being unfinished rather than silently doing nothing.
@@ -269,6 +275,7 @@ export function App(): ReactElement {
           kind: "ready",
           chats: AGENTS_DEEP_FIXTURE,
           tree: buildChatTree(AGENTS_DEEP_FIXTURE),
+          artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
         };
       case "error":
         return {
@@ -276,12 +283,18 @@ export function App(): ReactElement {
           detail: "stream closed — host unreachable",
         };
       case "empty":
-        return { kind: "ready", chats: [], tree: buildChatTree([]) };
+        return {
+          kind: "ready",
+          chats: [],
+          tree: buildChatTree([]),
+          artifacts: buildArtifactTree([]),
+        };
       default:
         return {
           kind: "ready",
           chats: AGENTS_FIXTURE,
           tree: buildChatTree(AGENTS_FIXTURE),
+          artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
         };
     }
   })();

@@ -116,14 +116,18 @@ const WIDTHS = [
 const THEMES = ["default", "dark", "contrast"];
 
 /** Each state, and the query that produces it. */
+/**
+ * Every surface and every state. RESTORED after a run was trimmed to two
+ * views to iterate faster — a trimmed config does not announce itself, and
+ * the next person to run it gets a full-looking "shot N images" for a
+ * fraction of the coverage. Trim by commenting out, never by deleting.
+ */
 const VIEWS = [
   { name: "epics", q: "preview=epics", path: "/epics" },
   { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics" },
   { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics" },
   { name: "epics-error", q: "preview=epics&state=error", path: "/epics" },
   { name: "epics-stale", q: "preview=epics&state=disconnected", path: "/epics" },
-  // The epic-detail surface. Same query pair, different route — the agents
-  // list had NO images at all until this existed, while the epics list had 45.
   { name: "agents", q: "preview=agents", path: "/epics/e1000000-0000-4000-8000-000000000001" },
   { name: "agents-loading", q: "preview=agents&state=loading", path: "/epics/e1000000-0000-4000-8000-000000000001" },
   { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001" },

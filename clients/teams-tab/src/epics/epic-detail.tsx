@@ -28,6 +28,7 @@ import {
 } from "@fluentui/react-components";
 import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import { AgentsList } from "./agents-list";
+import { ArtifactsTree } from "./artifacts-tree";
 import type { EpicAgentsState } from "./use-epic-agents";
 
 const useStyles = makeStyles({
@@ -65,6 +66,7 @@ export interface EpicDetailProps {
   readonly configuredHostId: string;
   readonly now: number;
   readonly onOpenAgent: (chatId: string) => void;
+  readonly onOpenArtifact: (artifactId: string) => void;
 }
 
 export function EpicDetail({
@@ -75,6 +77,7 @@ export function EpicDetail({
   configuredHostId,
   now,
   onOpenAgent,
+  onOpenArtifact,
 }: EpicDetailProps): ReactElement {
   const styles = useStyles();
   const name = epic === null ? null : epicDisplayName(epic);
@@ -119,14 +122,21 @@ export function EpicDetail({
         onOpen={onOpenAgent}
       />
 
-      {/*
-        Artifacts come from the same epic doc and land next. Named rather than
-        omitted, so their absence reads as unfinished work rather than as this
-        epic having none.
-      */}
-      <div className={styles.pending}>
-        <Body1>Artifacts aren&rsquo;t wired up yet.</Body1>
-      </div>
+      <Subtitle2 className={styles.section}>Artifacts</Subtitle2>
+      {agents.kind === "ready" ? (
+        <ArtifactsTree
+          tree={agents.artifacts}
+          now={now}
+          onOpen={onOpenArtifact}
+        />
+      ) : (
+        // Artifacts share the agents' subscription, so they share its states.
+        // Rendering "no artifacts" while the snapshot is still in flight would
+        // state something false for the whole 47s.
+        <div className={styles.pending}>
+          <Body1>Loading…</Body1>
+        </div>
+      )}
     </>
   );
 }

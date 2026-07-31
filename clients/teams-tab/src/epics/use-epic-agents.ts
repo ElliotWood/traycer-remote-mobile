@@ -34,6 +34,11 @@ import {
   fleetEpicFromLight,
   type FleetEpic,
 } from "@traycer-clients/shared/epic/epic-list";
+import {
+  buildArtifactTree,
+  readArtifactsFromEpicDoc,
+  type ArtifactTree,
+} from "@traycer-clients/shared/epic/epic-doc-artifacts";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
 
@@ -110,6 +115,14 @@ export type EpicAgentsState =
       readonly kind: "ready";
       readonly chats: readonly EpicChatEntry[];
       readonly tree: ChatTree;
+      /**
+       * Artifacts from the SAME doc and the SAME subscription.
+       *
+       * Not a second stream: the snapshot that costs ~47s carries both, so
+       * opening another for artifacts would pay that cost twice for data
+       * already in memory.
+       */
+      readonly artifacts: ArtifactTree;
     }
   | { readonly kind: "error"; readonly detail: string };
 
@@ -177,7 +190,12 @@ export function useEpicAgents(
     if (cached?.loaded === true) {
       const chats = readChatsFromEpicDoc(doc);
       lastSerialized.current = JSON.stringify(chats);
-      setState({ kind: "ready", chats, tree: buildChatTree(chats) });
+      setState({
+        kind: "ready",
+        chats,
+        tree: buildChatTree(chats),
+        artifacts: buildArtifactTree(readArtifactsFromEpicDoc(doc)),
+      });
     } else {
       setState({ kind: "loading", phase: "connecting" });
     }
@@ -212,10 +230,19 @@ export function useEpicAgents(
     const refresh = (): void => {
       if (disposed) return;
       const chats = readChatsFromEpicDoc(doc);
-      const serialized = JSON.stringify(chats);
+      const artifacts = readArtifactsFromEpicDoc(doc);
+      // Compare BOTH slices: keying the guard on chats alone meant an update
+      // touching only artifacts was discarded, so the artifact tree would sit
+      // stale until an unrelated chat happened to change.
+      const serialized = JSON.stringify({ chats, artifacts });
       if (serialized === lastSerialized.current) return;
       lastSerialized.current = serialized;
-      setState({ kind: "ready", chats, tree: buildChatTree(chats) });
+      setState({
+        kind: "ready",
+        chats,
+        tree: buildChatTree(chats),
+        artifacts: buildArtifactTree(artifacts),
+      });
     };
 
     // Only snapshot and update frames matter for this screen. The rest are
