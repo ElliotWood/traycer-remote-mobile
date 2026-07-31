@@ -134,6 +134,8 @@ const VIEWS = [
   { name: "approvals", q: "preview=approvals", path: "/epics" },
   { name: "artifact", q: "preview=artifact", path: "/epics" },
   { name: "comments", q: "preview=comments", path: "/epics" },
+  { name: "authoring", q: "preview=authoring", path: "/epics" },
+  { name: "authoring-nohost", q: "preview=authoring&state=nohost", path: "/epics" },
   { name: "chat", q: "preview=chat", path: "/epics" },
   { name: "chat-pending", q: "preview=chat&state=pending", path: "/epics" },
   { name: "chat-unconfirmed", q: "preview=chat&state=unconfirmed", path: "/epics" },
