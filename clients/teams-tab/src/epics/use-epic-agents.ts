@@ -30,6 +30,10 @@ import {
   type ChatTree,
   type EpicChatEntry,
 } from "@traycer-clients/shared/epic/epic-doc-chats";
+import {
+  fleetEpicFromLight,
+  type FleetEpic,
+} from "@traycer-clients/shared/epic/epic-list";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
 
@@ -46,13 +50,58 @@ import type { HostStreamConnection } from "@traycer-clients/shared/host-transpor
  * below the threshold anyone perceives, and labelling it would be inventing a
  * stage to make the indicator look thorough.
  */
-export type LoadPhase = "connecting" | "subscribing" | "receiving";
+export type LoadPhase =
+  | "connecting"
+  | "subscribing"
+  | "preparing"
+  | "receiving"
+  | "retrying";
 
 export const LOAD_PHASE_LABELS: Readonly<Record<LoadPhase, string>> = {
   connecting: "Connecting to your host…",
   subscribing: "Opening the epic…",
+  /**
+   * The forty seconds. MEASURED from Elliot's frame log, not guessed:
+   *
+   *   13:36:02.972  subscribe
+   *   13:36:03.515  earlyMeta          543ms
+   *   13:36:43.299  snapshot meta      39.8s   ← here
+   *   13:36:49.155  binary 50.6 MB     +5.9s
+   *
+   * The host spends ~40s SERIALISING the snapshot before a byte is sent. The
+   * copy names that, because "loading" invites the user to blame their
+   * connection for something that is not their connection.
+   */
+  preparing: "Your host is preparing this epic — large epics take a while…",
   receiving: "Downloading the epic…",
+  /**
+   * The phase that existed as a hole until today.
+   *
+   * The router's log shows the upstream WebSocket closing before it is
+   * established, then re-dialling seconds later. `receiving` was entered on
+   * the open-ack and NOTHING walked it back, so the label sat on "Downloading
+   * the epic…" straight through a failure and a retry. Elliot watched that
+   * for thirty seconds.
+   *
+   * A progress label that cannot represent "this failed and we are trying
+   * again" is the fake-progress problem in a different costume: it is not
+   * animating a lie, it is holding a true-once statement long after it stopped
+   * being true.
+   */
+  retrying: "Still waiting on your host — retrying…",
 };
+
+/**
+ * How long `receiving` may persist with no snapshot before it is no longer an
+ * honest description of what is happening.
+ *
+ * A TIMEOUT rather than only a transport signal, because the drop we actually
+ * observed arrives as an upstream close inside the relay — the client may see
+ * a silent re-dial and no status transition at all. Reacting only to
+ * `onConnectionStatus` would leave the label correct in the cases we already
+ * handle and wrong in the case that prompted this.
+ */
+const RECEIVING_STALL_MS = 12_000;
 
 export type EpicAgentsState =
   /** Subscribed, no snapshot yet. NOT "this epic has no agents". */
@@ -84,14 +133,24 @@ export type EpicAgentsState =
  */
 const DOC_CACHE = new Map<string, { doc: Y.Doc; loaded: boolean }>();
 
+export interface EpicScreenData {
+  readonly agents: EpicAgentsState;
+  /**
+   * The epic itself, from `earlyMeta` — available ~90x sooner than the
+   * agents. `null` until that frame lands.
+   */
+  readonly header: FleetEpic | null;
+}
+
 export function useEpicAgents(
   streamConnection: HostStreamConnection | null,
   epicId: string,
-): EpicAgentsState {
+): EpicScreenData {
   const [state, setState] = useState<EpicAgentsState>({
     kind: "loading",
     phase: "connecting",
   });
+  const [header, setHeader] = useState<FleetEpic | null>(null);
   // Serialised comparison, so an update frame that changes an artifact does
   // not hand the agents list a new array identity and re-render every row.
   const lastSerialized = useRef<string | null>(null);
@@ -136,6 +195,16 @@ export function useEpicAgents(
      */
     const t0 = Date.now();
     const marks: string[] = [];
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    const armStallWatchdog = (): void => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        if (disposed) return;
+        setState((prev) =>
+          prev.kind === "loading" ? { kind: "loading", phase: "retrying" } : prev,
+        );
+      }, RECEIVING_STALL_MS);
+    };
     const mark = (name: string): void => {
       marks.push(`${name}=${String(Date.now() - t0)}ms`);
     };
@@ -157,6 +226,7 @@ export function useEpicAgents(
     const callbacks: EpicStreamCallbacks = {
       onSnapshot: (_meta, snapshotBytes) => {
         mark("snapshot-arrived");
+        clearTimeout(stallTimer);
         const decodeStart = Date.now();
         Y.applyUpdate(doc, snapshotBytes);
         marks.push(`bytes=${String(snapshotBytes.byteLength)}`);
@@ -174,12 +244,26 @@ export function useEpicAgents(
         Y.applyUpdate(doc, updateBytes);
         refresh();
       },
-      onEarlyMeta: () => {
-        // The open has been acknowledged; bytes are what we are waiting on now.
-        mark("open-acked");
+      /**
+       * THE FAST PATH WE WERE THROWING AWAY.
+       *
+       * `earlyMeta` lands in ~543ms carrying the epic's title, all four
+       * artifact counts and its status — everything the header needs — while
+       * the full snapshot takes ~47s. The screen rendered a skeleton for the
+       * whole 47s with that in hand at half a second.
+       *
+       * Its existence suggests the host already knows the snapshot is slow:
+       * this is a deliberate fast path, and we simply were not consuming it.
+       */
+      onEarlyMeta: (meta) => {
+        mark("early-meta");
         if (disposed) return;
+        if (meta.epicLight !== null) {
+          setHeader(fleetEpicFromLight(meta.epicLight));
+        }
+        armStallWatchdog();
         setState((prev) =>
-          prev.kind === "loading" ? { kind: "loading", phase: "receiving" } : prev,
+          prev.kind === "loading" ? { kind: "loading", phase: "preparing" } : prev,
         );
       },
       onAwareness: () => undefined,
@@ -218,9 +302,10 @@ export function useEpicAgents(
     const handle = streamConnection.openEpic({ epicId, callbacks });
     return () => {
       disposed = true;
+      clearTimeout(stallTimer);
       handle.stream.close();
     };
   }, [streamConnection, epicId]);
 
-  return state;
+  return { agents: state, header };
 }

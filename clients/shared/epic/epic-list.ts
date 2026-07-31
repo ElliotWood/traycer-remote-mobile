@@ -139,6 +139,44 @@ export interface FleetEpic {
  * invisible, because pinned epics tend to be recently touched and therefore on
  * page 1 anyway. Flagged rather than silent.
  */
+/**
+ * One `epicLight` → one row.
+ *
+ * Factored out because `epic.subscribe`'s `earlyMeta` frame carries the SAME
+ * `epicLightSchema` as `epic.listTasks`, and that frame arrives in ~540ms
+ * against ~47s for the full snapshot. Reusing this mapping means the epic
+ * header rendered from the fast path and the row rendered from the list
+ * cannot disagree about the same epic — a second hand-written projection is
+ * how two surfaces start showing different counts for one thing.
+ */
+export function fleetEpicFromLight(
+  light: {
+    readonly id: string;
+    readonly title: string;
+    readonly ticketCount: number;
+    readonly specCount: number;
+    readonly storyCount: number;
+    readonly reviewCount: number;
+    readonly status: string;
+    readonly createdAt: number;
+    readonly updatedAt: number;
+  },
+  pinned = false,
+): FleetEpic {
+  return {
+    id: light.id,
+    title: light.title,
+    ticketCount: light.ticketCount,
+    specCount: light.specCount,
+    storyCount: light.storyCount,
+    reviewCount: light.reviewCount,
+    status: light.status,
+    createdAt: light.createdAt,
+    updatedAt: light.updatedAt,
+    pinned,
+  };
+}
+
 export function toFleetEpics(
   tasks: readonly ListTaskLight[],
 ): readonly FleetEpic[] {
@@ -149,18 +187,7 @@ export function toFleetEpics(
     if (light === undefined || light === null) continue;
     if (seen.has(light.id)) continue;
     seen.add(light.id);
-    epics.push({
-      id: light.id,
-      title: light.title,
-      ticketCount: light.ticketCount,
-      specCount: light.specCount,
-      storyCount: light.storyCount,
-      reviewCount: light.reviewCount,
-      status: light.status,
-      createdAt: light.createdAt,
-      updatedAt: light.updatedAt,
-      pinned: task.pinned === true,
-    });
+    epics.push(fleetEpicFromLight(light, task.pinned === true));
   }
   return [...epics.filter((e) => e.pinned), ...epics.filter((e) => !e.pinned)];
 }

@@ -128,6 +128,7 @@ const VIEWS = [
   { name: "agents-loading", q: "preview=agents&state=loading", path: "/epics/e1000000-0000-4000-8000-000000000001" },
   { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001" },
   { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001" },
+  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001" },
 ];
 
 mkdirSync(outDir, { recursive: true });

@@ -98,11 +98,14 @@ function EpicScreen({
   // The hook runs either way — hooks cannot be conditional — but it is handed
   // a null connection under preview, so it opens no stream.
   const live = useEpicAgents(preview === null ? streamConnection : null, epicId);
-  const agents = preview ?? live;
+  const agents = preview ?? live.agents;
   return (
     <div className={styles.page}>
       <EpicDetail
-        epic={epic}
+        // The row that was clicked, else the header from `earlyMeta` — which
+        // lands in ~543ms, so a DEEP LINK stops showing a bare id after half a
+        // second instead of after forty-seven.
+        epic={epic ?? live.header}
         epicId={epicId}
         onBack={onBack}
         agents={agents}
@@ -254,6 +257,10 @@ export function App(): ReactElement {
     switch (params.get("state")) {
       case "loading":
         return { kind: "loading", phase: "connecting" };
+      // The state that was unreachable and therefore unreviewed until it
+      // reached Elliot as a thirty-second lie.
+      case "retrying":
+        return { kind: "loading", phase: "retrying" };
       case "error":
         return {
           kind: "error",
