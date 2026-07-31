@@ -10,6 +10,7 @@ import type { ReactElement } from "react";
 import { makeStyles, Subtitle2, tokens } from "@fluentui/react-components";
 import { ApprovalCard } from "./approval-card";
 import type { ActionPhase } from "./action-state";
+import type { Actionability } from "./actionability";
 
 const useStyles = makeStyles({
   wrap: {
@@ -22,8 +23,11 @@ const useStyles = makeStyles({
 const DESCRIPTION =
   "Write clients/teams-tab/src/chat/approval-card.tsx (+128 −0). Adds the approval row with approve and reject actions.";
 
-const PHASES: readonly { readonly label: string; readonly phase: ActionPhase }[] =
-  [
+const PHASES: readonly {
+  readonly label: string;
+  readonly phase: ActionPhase;
+  readonly actionability?: Actionability;
+}[] = [
     { label: "Idle", phase: { kind: "idle" } },
     { label: "Pending", phase: { kind: "pending", verb: "Approving" } },
     { label: "Applied", phase: { kind: "applied" } },
@@ -35,19 +39,31 @@ const PHASES: readonly { readonly label: string; readonly phase: ActionPhase }[]
       label: "Unconfirmed",
       phase: { kind: "unconfirmed", reason: "reconcile window expired" },
     },
+    // The common case in a real epic — 53 of 56 chats. No buttons at all.
+    {
+      label: "On another host",
+      phase: { kind: "idle" },
+      actionability: { kind: "other-host" },
+    },
+    {
+      label: "Host not established",
+      phase: { kind: "idle" },
+      actionability: { kind: "unknown" },
+    },
   ];
 
 export function ApprovalsPreview(): ReactElement {
   const styles = useStyles();
   return (
     <div className={styles.wrap}>
-      {PHASES.map(({ label, phase }) => (
+      {PHASES.map(({ label, phase, actionability }) => (
         <div key={label}>
           <Subtitle2>{label}</Subtitle2>
           <ApprovalCard
             toolName="Edit"
             description={DESCRIPTION}
             phase={phase}
+            actionability={actionability ?? { kind: "actionable" }}
             onApprove={() => undefined}
             onReject={() => undefined}
           />

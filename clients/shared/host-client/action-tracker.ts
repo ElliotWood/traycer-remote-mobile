@@ -2,6 +2,23 @@ import type { StreamFrameEnvelope } from "@traycer-clients/shared/host-transport
 /**
  * Tracks an owner action until a REAL signal resolves it.
  *
+ * PRECONDITION, UNSTATED UNTIL THE TAB NEARLY VIOLATED IT: the chat must live
+ * on the host this connection is bound to.
+ *
+ * `handleAck` settles "accepted" as `applied`, reasoning that the decision
+ * "either just took effect or already had". That is true for a chat the host
+ * OWNS. For a chat on another host it is not a claim about anything — and if
+ * such a frame were acked, this tracker would report success for an action
+ * that reached nothing, with the pending set for an unknown chat trivially
+ * empty so the snapshot reconcile would agree.
+ *
+ * The bridge always satisfied this precondition implicitly: it only acts on
+ * chats it subscribed to on its own host. A user-facing client sees chats
+ * from EVERY host in an epic — 53 of 56 in the epic this was written against
+ * — so it must gate on locality BEFORE sending, and not rely on the host to
+ * refuse. Whether an unknown chat is rejected, ignored or acked is untested,
+ * and a design that needs the answer is a design that can be wrong about it.
+ *
  * MOVED from `clients/remote-bridge` when the Teams tab needed to approve
  * and answer from a user session. This is the single most valuable thing in
  * this repo to not write twice: it encodes measured knowledge about ack

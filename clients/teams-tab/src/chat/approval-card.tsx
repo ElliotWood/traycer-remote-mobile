@@ -28,6 +28,10 @@ import {
   actionsEnabled,
   type ActionPhase,
 } from "./action-state";
+import {
+  actionabilityReason,
+  type Actionability,
+} from "./actionability";
 
 const useStyles = makeStyles({
   card: {
@@ -68,6 +72,16 @@ export interface ApprovalCardProps {
   readonly toolName: string;
   readonly description: string;
   readonly phase: ActionPhase;
+  /**
+   * Whether owner frames for this chat can reach anything.
+   *
+   * Not actionable → NO BUTTONS, and the reason stated in their place. The
+   * gate is here rather than a disabled button because a disabled control
+   * still says "this is the thing you would do", and the honest message is
+   * that this client is in the wrong place — with a pointer to where it
+   * would work.
+   */
+  readonly actionability: Actionability;
   readonly onApprove: () => void;
   readonly onReject: (reason: string | null) => void;
 }
@@ -76,13 +90,15 @@ export function ApprovalCard({
   toolName,
   description,
   phase,
+  actionability,
   onApprove,
   onReject,
 }: ApprovalCardProps): ReactElement {
   const styles = useStyles();
   const [reason, setReason] = useState("");
   const [showReason, setShowReason] = useState(false);
-  const enabled = actionsEnabled(phase);
+  const blockedReason = actionabilityReason(actionability);
+  const enabled = blockedReason === null && actionsEnabled(phase);
   const message = actionPhaseMessage(phase);
 
   return (
@@ -95,7 +111,14 @@ export function ApprovalCard({
       </div>
       <Body1 className={styles.what}>{description}</Body1>
 
-      {showReason ? (
+      {blockedReason !== null ? (
+        // Stated INSTEAD of the buttons, not beside them.
+        <Caption1 className={styles.status} role="status">
+          {blockedReason}
+        </Caption1>
+      ) : null}
+
+      {blockedReason === null && showReason ? (
         <Field
           // OPTIONAL, and labelled as such. A required reason blocks the
           // fastest legitimate action — "no, obviously not" — and users type
@@ -115,6 +138,7 @@ export function ApprovalCard({
         </Field>
       ) : null}
 
+      {blockedReason !== null ? null : (
       <div className={styles.actions}>
         <Button
           appearance="primary"
@@ -143,6 +167,7 @@ export function ApprovalCard({
           {showReason ? "Send rejection" : "Reject"}
         </Button>
       </div>
+      )}
 
       {message === null ? null : (
         <Caption1
