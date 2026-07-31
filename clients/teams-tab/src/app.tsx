@@ -39,6 +39,11 @@ import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { ApprovalsPreview } from "./chat/approvals-preview";
 import { ArtifactMarkdown } from "./artifacts/artifact-markdown";
+import { CommentsPanel } from "./comments/comments-panel";
+import {
+  COMMENTS_FIXTURE,
+  COMMENTS_FIXTURE_NOW,
+} from "./comments/comments-fixture";
 import {
   ARTIFACT_FIXTURE_BODY,
   ARTIFACT_FIXTURE_TITLE,
@@ -412,6 +417,7 @@ export function App(): ReactElement {
    */
   const showChat = !inTeams && params.get("preview") === "chat";
   const showArtifact = !inTeams && params.get("preview") === "artifact";
+  const showComments = !inTeams && params.get("preview") === "comments";
 
   const waitingPreview = ((): AttentionState | null => {
     if (inTeams || params.get("preview") !== "waiting") return null;
@@ -539,7 +545,8 @@ export function App(): ReactElement {
     waitingPreview !== null ||
     showApprovals ||
     showChat ||
-    showArtifact;
+    showArtifact ||
+    showComments;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
@@ -611,6 +618,23 @@ export function App(): ReactElement {
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <FleetLoading rows={3} />
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  if (showComments) {
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <Subtitle1>Comments</Subtitle1>
+          <CommentsPanel
+            threads={COMMENTS_FIXTURE}
+            now={COMMENTS_FIXTURE_NOW}
+            busyThreadId={params.get("state") === "pending" ? "th-1" : null}
+            onReply={() => undefined}
+            onSetResolved={() => undefined}
+          />
         </div>
       </FluentProvider>
     );
