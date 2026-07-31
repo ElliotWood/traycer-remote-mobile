@@ -296,6 +296,7 @@ function buildFakeBridge(
         logs: [],
         links: [],
         supportEmail: "",
+        privateDeliveryAvailable: true,
       }),
       revealLog: async (target) => ({ target, path: "/tmp/test.log" }),
       tailLog: async (input) => ({
