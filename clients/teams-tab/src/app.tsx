@@ -39,6 +39,11 @@ import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { ApprovalsPreview } from "./chat/approvals-preview";
 import { ChatScreen } from "./chat/chat-screen";
+import {
+  CHAT_FIXTURE,
+  CHAT_FIXTURE_NOW,
+  CHAT_FIXTURE_TITLE,
+} from "./chat/chat-fixture";
 import { useChat } from "./chat/use-chat";
 import {
   ATTENTION_FIXTURE,
@@ -395,6 +400,13 @@ export function App(): ReactElement {
   // states that are hardest to reach by hand.
   const showApprovals = !inTeams && params.get("preview") === "approvals";
 
+  /**
+   * The chat surface with a realistic block mix. The chips, the interview
+   * card and the approval row have never been seen together at phone width,
+   * and that is the densest combination in the app.
+   */
+  const showChat = !inTeams && params.get("preview") === "chat";
+
   const waitingPreview = ((): AttentionState | null => {
     if (inTeams || params.get("preview") !== "waiting") return null;
     switch (params.get("state")) {
@@ -519,7 +531,8 @@ export function App(): ReactElement {
     previewState !== null ||
     agentsPreview !== null ||
     waitingPreview !== null ||
-    showApprovals;
+    showApprovals ||
+    showChat;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
@@ -591,6 +604,64 @@ export function App(): ReactElement {
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <FleetLoading rows={3} />
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  if (showChat) {
+    const phase = params.get("state");
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <ChatScreen
+            controller={{
+              state: {
+                kind: "ready",
+                approvals: [
+                  {
+                    approvalId: "ap-1",
+                    toolName: "Edit",
+                    description:
+                      "Write clients/teams-tab/src/config.ts (+34 −6). Adds the zod schema and keeps the per-variable messages.",
+                    input: null,
+                    requestedAt: CHAT_FIXTURE_NOW - 3 * 60_000,
+                    kind: "tool",
+                    planId: null,
+                    actions: [],
+                  },
+                ],
+                messages: CHAT_FIXTURE,
+                title: CHAT_FIXTURE_TITLE,
+                access: { canAct: true, role: "owner" },
+              },
+              phases:
+                phase === "pending"
+                  ? { "ap-1": { kind: "pending", verb: "Approving" } }
+                  : phase === "unconfirmed"
+                    ? {
+                        "ap-1": {
+                          kind: "unconfirmed",
+                          reason: "reconcile window expired",
+                        },
+                      }
+                    : {},
+              approve: () => undefined,
+              reject: () => undefined,
+              answerInterview: () => undefined,
+            }}
+            entry={{
+              chatId: "c1",
+              title: CHAT_FIXTURE_TITLE,
+              parentId: null,
+              createdAt: CHAT_FIXTURE_NOW,
+              updatedAt: CHAT_FIXTURE_NOW,
+              hostId: "h-alpha",
+            }}
+            configuredHostId="h-alpha"
+            now={CHAT_FIXTURE_NOW}
+            onBack={() => undefined}
+          />
         </div>
       </FluentProvider>
     );

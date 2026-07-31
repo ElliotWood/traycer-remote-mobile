@@ -58,6 +58,12 @@ const useStyles = makeStyles({
     borderLeft: `2px solid ${tokens.colorNeutralStroke2}`,
     paddingLeft: tokens.spacingHorizontalS,
   },
+  answered: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+  },
+  answeredHead: { color: tokens.colorNeutralForeground3 },
   chips: {
     display: "flex",
     flexWrap: "wrap",
@@ -86,6 +92,34 @@ const useStyles = makeStyles({
 
 function Block({ block }: { block: TranscriptBlock }): ReactElement | null {
   const styles = useStyles();
+  /**
+   * An ANSWERED interview renders here as history.
+   *
+   * It has to, and the reason is a defect this file created: promoting
+   * `interview` out of `other` removed it from the chip path, and an
+   * answered one is filtered out of the card path — so it fell through BOTH
+   * and rendered as nothing. Silently invisible, which is the exact failure
+   * the sixteen-chips rule exists to prevent, introduced by the promotion
+   * that was meant to improve on it.
+   *
+   * Found by looking at the image: the fixture's answered interview simply
+   * was not on screen.
+   */
+  if (block.kind === "interview") {
+    if (!block.answered) return null; // rendered as a live card, above.
+    return (
+      <div className={styles.answered}>
+        <Caption1 className={styles.answeredHead}>
+          Answered: {block.title ?? "the agent's question"}
+        </Caption1>
+        {block.questions.map((q, i) => (
+          <Caption1 key={q.questionId ?? String(i)} className={styles.reasoning}>
+            {q.question}
+          </Caption1>
+        ))}
+      </div>
+    );
+  }
   if (block.kind === "text") {
     if (block.text.trim().length === 0) return null;
     return <Body1 className={styles.text}>{block.text}</Body1>;
