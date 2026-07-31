@@ -631,8 +631,18 @@ export function App(): ReactElement {
     // `state=nohost` renders the REFUSAL — the state nobody hits by hand and
     // the one that matters most, since it is what prevents a permanent wrong
     // host id in someone's data.
+    // SYNTHETIC, and it must stay that way. This was a real host GUID, copied
+    // in to make the disclosure look right — a host id identifies a MACHINE,
+    // which the OSS rule names, and `oss-hygiene` did not catch it because
+    // that gate matches known values and this one was not on the list.
+    //
+    // The tell was the shape: every other fixture in this file is
+    // `a1000000-…-000000000001`, and this was the only UUID here with real
+    // random entropy. Entropy in a fixture means it was copied from
+    // somewhere. Keeping the house pattern is what makes the next one
+    // visible at a glance.
     const hostForPreview =
-      params.get("state") === "nohost" ? "" : "3107fb3b-3215-4965-8654-d39173aae0e7";
+      params.get("state") === "nohost" ? "" : "f1000000-0000-4000-8000-000000000001";
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>

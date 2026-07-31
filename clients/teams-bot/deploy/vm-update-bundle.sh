@@ -53,6 +53,28 @@ else
   $GIT clone -q --depth 1 --branch "$BUNDLE_BRANCH" "$BUNDLE_REPO" src
 fi
 
+# GATE: the bundle must PARSE before it replaces a working one.
+#
+# The sha256 check below proves the deployed bytes are the bytes you built.
+# It says nothing about whether they RUN — and those are different questions.
+# A bundle built as CJS with an ESM `import` banner shipped with a perfect
+# sha match and took the bot down on restart: unit activating, healthz 000,
+# module load error. Provenance verified, viability never asked.
+#
+# `node --check` parses without executing, so it needs no env, no secrets and
+# no network — and it catches exactly that class. Verified both ways before
+# being trusted: an ESM import in a .cjs file exits 1, a valid CJS file
+# exits 0.
+#
+# Run BEFORE the copy, so a bundle that cannot parse never replaces one that
+# works. The old binary keeps serving and the deploy fails loudly instead.
+if ! node --check src/bot.cjs; then
+  echo "REFUSING TO DEPLOY: bot.cjs does not parse as CommonJS" >&2
+  echo "  the currently-deployed bundle has been left untouched" >&2
+  exit 1
+fi
+echo "parse check: bot.cjs is valid CommonJS"
+
 cp src/bot.cjs "$BOT_DIR/bot.cjs"
 # Name is load-bearing: the bridge CLI guards its entrypoint on
 # basename(argv[1]), and under any other filename commander never parses and
