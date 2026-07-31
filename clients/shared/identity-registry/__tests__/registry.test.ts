@@ -369,23 +369,28 @@ describe("IdentityRegistry.fromFile — the REAL shipped default, not an injecte
   });
 
   /**
-   * FLAKY ON WINDOWS, ~1 run in 4, and it is NOT the assertion that fails —
-   * the test times out at 5000ms. Nothing here is async, so the block is
-   * inside `existsSync`: `Z:` is a conventional MAPPED NETWORK DRIVE letter,
-   * and a stat against an unmapped one can sit in SMB/DFS resolution for
-   * several seconds before returning false. On a machine with no Z: mapping
-   * it usually answers instantly, which is why it passes most runs.
+   * WAS FLAKY ON WINDOWS, ~1 run in 4, and it was never the assertion that
+   * failed — the test timed out at 5000ms. Nothing here is async, so the
+   * block was inside the `readFileSync` in `fromFile`: `Z:` is a conventional
+   * MAPPED NETWORK DRIVE letter, and a read against an unmapped one can sit
+   * in SMB/DFS resolution for several seconds before failing. On a machine
+   * with no Z: mapping it usually answers instantly, which is why it passed
+   * most runs. Observed here at 21070ms against the 5000ms limit.
    *
-   * Diagnosed, deliberately not changed: the fix is a path that cannot be a
-   * network drive, but this file is security-adjacent and the assertion is
-   * about refusing garbage input, so the choice of literal belongs to whoever
-   * owns this test. Recorded here rather than in a commit message because
-   * this is where the next person watching it fail will be looking.
+   * Fixed by moving the garbage path under `tmpdir()`: a local directory that
+   * structurally cannot be a network mount, so the read fails immediately with
+   * ENOENT. The assertion is unchanged — this test is about `fromFile`
+   * refusing input it cannot read, and the drive letter was always incidental
+   * to that. The subdirectory is never created, so the path stays absent.
    */
   it("also refuses a garbage literal path (the isolation mechanics above are the point, not this assertion)", () => {
     expect(() =>
       IdentityRegistry.fromFile(
-        "Z:\\definitely-not-a-real-path\\identity-registry-that-does-not-exist.json",
+        join(
+          tmpdir(),
+          "definitely-not-a-real-path",
+          "identity-registry-that-does-not-exist.json",
+        ),
         () => {},
       ),
     ).toThrow(/refusing to load/);
