@@ -31,9 +31,14 @@ import {
   FleetEmpty,
   FleetError,
   FleetLoading,
-  FleetNotWired,
   FleetStale,
 } from "./fleet/fleet-state";
+import { EpicsView } from "./epics/epics-view";
+import { useEpics } from "./epics/use-epics";
+import {
+  createTabHostConnection,
+  type HostConnectionAuth,
+} from "./host/connection";
 import { themeFor } from "./theme/teams-theme";
 import { configProblems } from "./config";
 import { SignIn } from "./auth/sign-in";
@@ -77,6 +82,55 @@ function useViewportWidth(): number {
     };
   }, []);
   return width;
+}
+
+/**
+ * The signed-in screen: the user's real epics.
+ *
+ * A separate component because the host connection is built ONCE and must not
+ * be rebuilt on every render of `App` — a new `HostClient` per render would
+ * re-dial the socket continuously. `useState`'s initialiser gives it app
+ * lifetime, matching how the PWA holds its connection.
+ *
+ * Not disposed on unmount, deliberately and for the same reason mobile
+ * doesn't: this only unmounts on full page teardown, and disposing in an
+ * effect cleanup would tear the connection down under StrictMode's simulated
+ * remount.
+ */
+function EpicsScreen({
+  styles,
+  auth,
+}: {
+  readonly styles: Record<string, string>;
+  readonly auth: HostConnectionAuth;
+}): ReactElement {
+  const [connection] = useState(() => createTabHostConnection(auth));
+  const { state, reload, loadMore } = useEpics(connection?.hostClient ?? null);
+  // One clock for the whole render, so two rows never disagree about "now".
+  const [now] = useState(() => Date.now());
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.header}>
+        <Subtitle1>Epics</Subtitle1>
+        {state.kind === "ready" ? (
+          <Text size={200} className={styles.subtle}>
+            {state.epics.length} {state.epics.length === 1 ? "epic" : "epics"}
+          </Text>
+        ) : null}
+      </div>
+      <EpicsView
+        state={state}
+        now={now}
+        onReload={reload}
+        onLoadMore={loadMore}
+        onOpen={() => {
+          // Epic detail lands next; a no-op keeps the row affordance honest
+          // about being unfinished rather than silently doing nothing.
+        }}
+      />
+    </div>
+  );
 }
 
 export function App(): ReactElement {
@@ -279,12 +333,7 @@ export function App(): ReactElement {
   if (!previewingFleet) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
-          <div className={styles.header}>
-            <Subtitle1>Fleet</Subtitle1>
-          </div>
-          <FleetNotWired />
-        </div>
+        <EpicsScreen styles={styles} auth={auth} />
       </FluentProvider>
     );
   }
