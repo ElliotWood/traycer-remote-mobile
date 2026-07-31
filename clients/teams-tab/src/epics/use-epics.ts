@@ -40,6 +40,15 @@ export type EpicsState =
       readonly loadingMore: boolean;
       /** Set once a refresh fails while rows are already on screen — see below. */
       readonly stale: boolean;
+      /**
+       * When these rows were actually fetched.
+       *
+       * Carried so the staleness banner can say HOW stale. "Disconnected"
+       * without an age is much weaker than "as it was 4 minutes ago" —
+       * whether to trust the rows is entirely a function of their age, and a
+       * banner that withholds it leaves the user with no basis to decide.
+       */
+      readonly loadedAt: number;
     }
   /** No answer. Never worded as a fact about the user's epics. */
   | { readonly kind: "error"; readonly detail: string };
@@ -101,6 +110,7 @@ export function useEpics(client: EpicListClient | null): EpicsResult {
             hasMore: cursor.current !== undefined,
             loadingMore: false,
             stale: false,
+            loadedAt: Date.now(),
           });
         })
         .catch((error: unknown) => {

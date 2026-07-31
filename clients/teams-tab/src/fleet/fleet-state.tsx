@@ -215,9 +215,9 @@ export function FleetStale({
   return (
     <MessageBar intent="warning">
       <MessageBarBody>
-        <strong>Disconnected.</strong> Showing the fleet as it was
-        {since ? ` ${since}` : " when contact was lost"}. Statuses below may
-        have changed.
+        <strong>Disconnected.</strong> Showing what we last read
+        {since ? ` ${since}` : " before contact was lost"}. This may have
+        changed since.
       </MessageBarBody>
       {onRetry ? (
         <MessageBarActions>

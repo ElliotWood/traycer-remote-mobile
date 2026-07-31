@@ -112,7 +112,21 @@ try {
           deviceScaleFactor: 2,
         });
         const url = `http://localhost:${String(port)}/epics?${view.q}&theme=${theme}`;
-        await page.goto(url, { waitUntil: "networkidle" });
+        // RETRY the navigation, because the local static server intermittently
+        // fails a request under this load — three runs died partway, at 32,
+        // 45 and 9 images, each on a different URL that worked in other runs.
+        // A flaky shoot is worse than a slow one: a partial set looks like a
+        // complete one unless someone counts, and the count is the only thing
+        // that catches it.
+        let navigated = false;
+        for (let attempt = 0; attempt < 3 && !navigated; attempt += 1) {
+          try {
+            await page.goto(url, { waitUntil: "networkidle" });
+            navigated = true;
+          } catch (error) {
+            if (attempt === 2) throw error;
+          }
+        }
         // The theme handshake races a 4s timeout before anything paints, so
         // waiting for the heading is waiting for `ready`, not for a guess.
         await page.waitForSelector("text=Epics", { timeout: 8000 }).catch(() => {

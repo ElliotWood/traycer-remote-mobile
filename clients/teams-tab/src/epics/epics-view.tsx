@@ -198,7 +198,12 @@ export function EpicsView({
         this" and "you have none" are different claims, and only one of them
         survives losing contact.
       */}
-      {state.stale ? <FleetStale onRetry={onReload} /> : null}
+      {state.stale ? (
+        <FleetStale
+          since={relativeTime(state.loadedAt, now)}
+          onRetry={onReload}
+        />
+      ) : null}
       <div className={styles.list}>
         {state.epics.map((epic: FleetEpic) => (
           <button

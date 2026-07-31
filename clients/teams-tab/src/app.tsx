@@ -191,6 +191,7 @@ export function App(): ReactElement {
           hasMore: false,
           loadingMore: false,
           stale: false,
+          loadedAt: EPICS_FIXTURE_NOW,
         };
       case "disconnected":
         return {
@@ -199,6 +200,7 @@ export function App(): ReactElement {
           hasMore: false,
           loadingMore: false,
           stale: true,
+          loadedAt: EPICS_FIXTURE_NOW - 4 * 60_000,
         };
       default:
         return {
@@ -207,6 +209,7 @@ export function App(): ReactElement {
           hasMore: true,
           loadingMore: false,
           stale: false,
+          loadedAt: EPICS_FIXTURE_NOW,
         };
     }
   })();
