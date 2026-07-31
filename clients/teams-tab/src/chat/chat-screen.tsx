@@ -20,6 +20,7 @@ import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats"
 import { FleetError, FleetLoading } from "../fleet/fleet-state";
 import { ApprovalCard } from "./approval-card";
 import { TranscriptView } from "./transcript-view";
+import { InterviewCard } from "./interview-card";
 import { chatActionability } from "./actionability";
 import type { ChatController } from "./use-chat";
 
@@ -49,7 +50,7 @@ export function ChatScreen({
   onBack,
 }: ChatScreenProps): ReactElement {
   const styles = useStyles();
-  const { state, phases, approve, reject } = controller;
+  const { state, phases, approve, reject, answerInterview } = controller;
 
   /**
    * A deep-linked chat has no epic-doc row yet, so locality is UNKNOWN — not
@@ -90,6 +91,34 @@ export function ChatScreen({
         />
       ) : (
         <>
+          {/*
+            Unanswered interviews, pulled out of the transcript.
+
+            They are pending owner actions like approvals, so they belong
+            beside them rather than buried where the conversation happens to
+            have reached. An already-answered block stays inline as history.
+          */}
+          {state.kind === "ready" &&
+            state.messages
+              .flatMap((m) => m.blocks)
+              .filter(
+                (b) => b.kind === "interview" && !b.answered,
+              )
+              .map((b) =>
+                b.kind !== "interview" ? null : (
+                  <InterviewCard
+                    key={b.blockId}
+                    title={b.title}
+                    questions={b.questions}
+                    phase={phases[b.blockId] ?? { kind: "idle" }}
+                    actionability={actionability}
+                    onAnswer={(answers) => {
+                      answerInterview(b.blockId, answers);
+                    }}
+                  />
+                ),
+              )}
+
           {state.approvals.length > 0 ? (
             <>
               <Subtitle2 className={styles.section}>Waiting on you</Subtitle2>

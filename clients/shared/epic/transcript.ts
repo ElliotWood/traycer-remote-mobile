@@ -11,6 +11,11 @@
  * Edit" — is honest about both what happened and about our not rendering it,
  * which is the difference between an incomplete view and a misleading one.
  *
+ * ONE KIND IS NEITHER RENDERED NOR MERELY NAMED: `interview`. It carries the
+ * questions a human is being asked, and the pending-interview state gives only
+ * a `blockId` — so the questions can be found nowhere else. A named chip
+ * would leave the user told that a question exists and unable to read it.
+ *
  * This is also why the bot's card surface was retired: it projected rich
  * content into text and the projection became the product. Naming what is not
  * rendered keeps the gap visible instead of letting it close over.
@@ -29,6 +34,23 @@ export type TranscriptBlock =
    * can tell whether a gap is a kind we chose not to render or one we have
    * never seen.
    */
+  /**
+   * An interview: the questions themselves, because they are ACTIONABLE.
+   *
+   * `blockId` is how the answer frame addresses it, and `answered` is read
+   * from the block's own `answers` — a block that already has them is history,
+   * not a prompt.
+   */
+  | {
+      readonly kind: "interview";
+      readonly blockId: string;
+      readonly title: string | null;
+      readonly questions: readonly {
+        readonly questionId: string | null;
+        readonly question: string;
+      }[];
+      readonly answered: boolean;
+    }
   | {
       readonly kind: "other";
       readonly blockType: string;
@@ -92,6 +114,39 @@ export function toTranscriptBlock(raw: unknown): TranscriptBlock {
   const type = typeof block["type"] === "string" ? block["type"] : "unknown";
   if (type === "text") return { kind: "text", text: readText(block) };
   if (type === "reasoning") return { kind: "reasoning", text: readText(block) };
+  if (type === "interview") {
+    const rawQuestions = Array.isArray(block["questions"])
+      ? (block["questions"] as unknown[])
+      : [];
+    const rawAnswers = Array.isArray(block["answers"])
+      ? (block["answers"] as unknown[])
+      : [];
+    const blockId =
+      typeof block["blockId"] === "string" ? block["blockId"] : "";
+    return {
+      kind: "interview",
+      blockId,
+      title: typeof block["title"] === "string" ? block["title"] : null,
+      questions: rawQuestions.flatMap((q) => {
+        if (typeof q !== "object" || q === null) return [];
+        const question = q as Record<string, unknown>;
+        const text = question["question"];
+        if (typeof text !== "string") return [];
+        return [
+          {
+            questionId:
+              typeof question["questionId"] === "string"
+                ? question["questionId"]
+                : null,
+            question: text,
+          },
+        ];
+      }),
+      // Already answered → history. Rendering it as a live prompt would ask
+      // the user for something they have given.
+      answered: rawAnswers.length > 0,
+    };
+  }
   return { kind: "other", blockType: type, label: labelFor(type) };
 }
 

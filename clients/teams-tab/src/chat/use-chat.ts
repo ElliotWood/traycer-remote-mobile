@@ -65,6 +65,14 @@ export interface ChatController {
   readonly phases: Readonly<Record<string, ActionPhase>>;
   readonly approve: (approvalId: string) => void;
   readonly reject: (approvalId: string, reason: string | null) => void;
+  readonly answerInterview: (
+    blockId: string,
+    answers: readonly {
+      readonly questionId: string | null;
+      readonly question: string;
+      readonly value: string;
+    }[],
+  ) => void;
 }
 
 export function useChat(
@@ -181,6 +189,63 @@ export function useChat(
     };
   }, [streamConnection, epicId, chatId]);
 
+  /**
+   * An interview answer, on the SAME tracker path as an approval.
+   *
+   * Settles on the block leaving `pendingInterviewBlockIds` — the analogue of
+   * the approval's pending set, and the reason the full snapshot view had to
+   * be passed rather than only the approvals half.
+   */
+  const answerInterview = useCallback(
+    (
+      blockId: string,
+      answers: readonly {
+        readonly questionId: string | null;
+        readonly question: string;
+        readonly value: string;
+      }[],
+    ) => {
+      const tracker = trackerRef.current;
+      if (tracker === null) return;
+      const clientActionId = uuidv4();
+      setPhases((p) => ({
+        ...p,
+        [blockId]: { kind: "pending", verb: "Sending" },
+      }));
+      void tracker
+        .issue({
+          clientActionId,
+          frame: {
+            kind: "interviewAnswer",
+            hasBinaryPayload: false,
+            epicId,
+            chatId,
+            clientActionId,
+            blockId,
+            answers: answers.map((a) => ({
+              questionId: a.questionId,
+              question: a.question,
+              values: [a.value],
+              notes: null,
+            })),
+          } as ChatSubscribeClientFrame,
+          isSettled: (view) => !view.pendingInterviewBlockIds.has(blockId),
+        })
+        .then((outcome) => {
+          setPhases((p) => ({
+            ...p,
+            [blockId]:
+              outcome.kind === "applied"
+                ? { kind: "applied" }
+                : outcome.kind === "rejected"
+                  ? { kind: "rejected", reason: outcome.reason }
+                  : { kind: "unconfirmed", reason: outcome.reason },
+          }));
+        });
+    },
+    [epicId, chatId],
+  );
+
   const runAction = useCallback(
     (
       approvalId: string,
@@ -231,6 +296,7 @@ export function useChat(
   return {
     state,
     phases,
+    answerInterview,
     approve: useCallback(
       (id: string) => {
         runAction(id, "Approving", { approved: true, reason: null });
