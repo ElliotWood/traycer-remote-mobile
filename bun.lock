@@ -348,6 +348,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@fluentui/react-components": "^9.71.0",
+        "@fluentui/react-icons": "^2.0.334",
         "@microsoft/teams-js": "^2.44.0",
         "@traycer-clients/shared": "workspace:*",
         "@traycer/protocol": "workspace:*",

@@ -12,10 +12,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@traycer/protocol": "workspace:*",
-    "@traycer-clients/shared": "workspace:*",
     "@fluentui/react-components": "^9.71.0",
+    "@fluentui/react-icons": "^2.0.334",
     "@microsoft/teams-js": "^2.44.0",
+    "@traycer-clients/shared": "workspace:*",
+    "@traycer/protocol": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

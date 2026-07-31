@@ -33,8 +33,11 @@ import {
   FleetLoading,
   FleetStale,
 } from "./fleet/fleet-state";
+import { EpicDetail } from "./epics/epic-detail";
 import { EpicsView } from "./epics/epics-view";
 import { useEpics } from "./epics/use-epics";
+import { useRoute } from "./router/use-route";
+import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import {
   createTabHostConnection,
   type HostConnectionAuth,
@@ -106,8 +109,28 @@ function EpicsScreen({
 }): ReactElement {
   const [connection] = useState(() => createTabHostConnection(auth));
   const { state, reload, loadMore } = useEpics(connection?.hostClient ?? null);
+  const { route, navigate } = useRoute();
   // One clock for the whole render, so two rows never disagree about "now".
   const [now] = useState(() => Date.now());
+  // Remembered so the detail screen can show a real title immediately. NOT
+  // required by it: a deep link or reload arrives with only the id, and a
+  // detail view that renders solely when navigated to from the list is one
+  // that breaks on refresh.
+  const [opened, setOpened] = useState<FleetEpic | null>(null);
+
+  if (route.name === "epic") {
+    return (
+      <div className={styles.page}>
+        <EpicDetail
+          epic={opened !== null && opened.id === route.epicId ? opened : null}
+          epicId={route.epicId}
+          onBack={() => {
+            navigate({ name: "epics" });
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -124,9 +147,9 @@ function EpicsScreen({
         now={now}
         onReload={reload}
         onLoadMore={loadMore}
-        onOpen={() => {
-          // Epic detail lands next; a no-op keeps the row affordance honest
-          // about being unfinished rather than silently doing nothing.
+        onOpen={(epic) => {
+          setOpened(epic);
+          navigate({ name: "epic", epicId: epic.id });
         }}
       />
     </div>
