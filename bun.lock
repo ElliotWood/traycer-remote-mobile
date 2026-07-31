@@ -301,6 +301,7 @@
     "clients/shared": {
       "name": "@traycer-clients/shared",
       "dependencies": {
+        "@traycer/protocol": "workspace:*",
         "culori": "^4.0.2",
         "jsonwebtoken": "^9.0.3",
         "mermaid": "^11.16.0",
