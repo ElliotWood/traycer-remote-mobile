@@ -304,6 +304,7 @@
         "jsonwebtoken": "^9.0.3",
         "uuid": "^14.0.1",
         "ws": "catalog:",
+        "yjs": "^13.6.31",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -354,6 +355,7 @@
         "@traycer/protocol": "workspace:*",
         "react": "catalog:",
         "react-dom": "catalog:",
+        "yjs": "^13.6.31",
       },
       "devDependencies": {
         "@types/node": "catalog:",

@@ -22,10 +22,13 @@ import {
   BreadcrumbItem,
   Caption1,
   Subtitle1,
+  Subtitle2,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
 import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
+import { AgentsList } from "./agents-list";
+import type { EpicAgentsState } from "./use-epic-agents";
 
 const useStyles = makeStyles({
   header: {
@@ -35,6 +38,7 @@ const useStyles = makeStyles({
   },
   title: { overflowWrap: "anywhere" },
   subtle: { color: tokens.colorNeutralForeground3 },
+  section: { marginTop: tokens.spacingVerticalL },
   pending: {
     marginTop: tokens.spacingVerticalL,
     padding: tokens.spacingVerticalXXL,
@@ -57,12 +61,18 @@ export interface EpicDetailProps {
   readonly epic: FleetEpic | null;
   readonly epicId: string;
   readonly onBack: () => void;
+  readonly agents: EpicAgentsState;
+  readonly now: number;
+  readonly onOpenAgent: (chatId: string) => void;
 }
 
 export function EpicDetail({
   epic,
   epicId,
   onBack,
+  agents,
+  now,
+  onOpenAgent,
 }: EpicDetailProps): ReactElement {
   const styles = useStyles();
   const name = epic === null ? null : epicDisplayName(epic);
@@ -99,12 +109,16 @@ export function EpicDetail({
         ) : null}
       </div>
 
+      <Subtitle2 className={styles.section}>Agents</Subtitle2>
+      <AgentsList state={agents} now={now} onOpen={onOpenAgent} />
+
+      {/*
+        Artifacts come from the same epic doc and land next. Named rather than
+        omitted, so their absence reads as unfinished work rather than as this
+        epic having none.
+      */}
       <div className={styles.pending}>
-        <Body1>
-          The agents and artifacts in this epic aren&rsquo;t wired up yet.
-          That&rsquo;s unfinished work on our side — this epic isn&rsquo;t
-          empty.
-        </Body1>
+        <Body1>Artifacts aren&rsquo;t wired up yet.</Body1>
       </div>
     </>
   );

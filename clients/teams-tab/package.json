@@ -18,7 +18,8 @@
     "@traycer-clients/shared": "workspace:*",
     "@traycer/protocol": "workspace:*",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -36,6 +36,19 @@
  */
 import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
+import {
+  buildParentedTree,
+  readChatsFromEpicDoc,
+  type EpicChatEntry,
+
+} from "@traycer-clients/shared/epic/epic-doc-chats";
+
+export {
+  buildChatTree,
+  readChatsFromEpicDoc,
+  type ChatTree,
+  type EpicChatEntry,
+} from "@traycer-clients/shared/epic/epic-doc-chats";
 import { IndexeddbPersistence } from "y-indexeddb";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { CardKind, ArtifactStatus } from "@/views/kind-tokens";
@@ -51,49 +64,9 @@ import { startLivenessRecovery } from "./liveness-recovery";
  * (persistence/epic/chat.ts:44) and feed the Agents tree's nesting + default
  * sort, exactly as `EpicArtifactEntry`'s equivalents already do below.
  */
-export interface EpicChatEntry {
-  readonly chatId: string;
-  readonly title: string;
-  readonly parentId: string | null;
-  readonly createdAt: number;
-  readonly updatedAt: number;
-  /** H2: the host this chat is durably bound to (`chatSchema.hostId`) — `null` only for a malformed/not-yet-replicated entry, never a legitimate "no host". */
-  readonly hostId: string | null;
-}
-
-/**
- * Pure projection of the chats slice from an epic `Y.Doc`. Independently
- * unit-testable: build a `Y.Doc`, populate `epic → chats`, assert the output.
- * Mirrors `projectChatsSlice` (projection-helpers.ts:560) minus visibility
- * filtering and the extra projected fields.
- */
-export function readChatsFromEpicDoc(doc: Y.Doc): readonly EpicChatEntry[] {
-  const chatsValue = doc.getMap("epic").get("chats");
-  if (!(chatsValue instanceof Y.Map)) {
-    return [];
-  }
-  const out: EpicChatEntry[] = [];
-  for (const [chatId, entry] of chatsValue.entries()) {
-    // A well-formed chat record is a nested Y.Map. Anything else (a stray
-    // primitive, a partially-replicated entry) is skipped rather than crashing
-    // the whole list — exactly how `projectChatsSlice` guards each entry.
-    if (!(entry instanceof Y.Map)) {
-      continue;
-    }
-    const rawTitle = entry.get("title");
-    const rawParentId = entry.get("parentId");
-    const rawHostId = entry.get("hostId");
-    out.push({
-      chatId,
-      title: typeof rawTitle === "string" ? rawTitle : "",
-      parentId: typeof rawParentId === "string" ? rawParentId : null,
-      createdAt: readMaybeNumber(entry.get("createdAt"), 0),
-      updatedAt: readMaybeNumber(entry.get("updatedAt"), 0),
-      hostId: typeof rawHostId === "string" ? rawHostId : null,
-    });
-  }
-  return out;
-}
+// `EpicChatEntry` / `readChatsFromEpicDoc` MOVED to
+// `@traycer-clients/shared/epic/epic-doc-chats` when the Teams tab needed the
+// same projection. Re-exported below so no call site moved.
 
 /** One artifact enumerated from the epic doc's `artifacts` Y.Map. */
 export interface EpicArtifactEntry {
@@ -161,82 +134,11 @@ export interface ArtifactTree {
   readonly byId: Readonly<Record<string, EpicArtifactEntry>>;
 }
 
-export interface ChatTree {
-  readonly roots: readonly string[];
-  readonly childrenByParent: Readonly<Record<string, readonly string[]>>;
-  readonly byId: Readonly<Record<string, EpicChatEntry>>;
-}
-
-interface ParentedNode {
-  readonly parentId: string | null;
-  readonly updatedAt: number;
-}
-
-/**
- * Sibling comparator mirroring desktop's `DEFAULT_SORT_MODE` (`updatedAt`
- * DESC, id ASC tie-break) — `epic-sort.ts`'s `makeNodeComparator`, scoped
- * down to the two fields this tree needs rather than porting the full
- * multi-field module. Shared by the chat and artifact trees (P1) since both
- * nest by `parentId` under the identical desktop default-sort rule.
- */
-function compareParentedNodes(aId: string, a: ParentedNode, bId: string, b: ParentedNode): number {
-  if (a.updatedAt !== b.updatedAt) return b.updatedAt - a.updatedAt;
-  if (aId < bId) return -1;
-  if (aId > bId) return 1;
-  return 0;
-}
-
-/**
- * Nests entries by `parentId`. A `parentId` that points at an id not present
- * in `entries` (deleted parent, stale reference) promotes the child to root
- * rather than dropping it — mirrors `resolveEffectiveParent`'s "unknown id ->
- * null (orphan promotion)" rule. Generic over chats and artifacts (P1) — both
- * families nest by `parentId` within their own map, never across families;
- * `keyOf` supplies each family's identity field (`id` vs `chatId`).
- */
-function buildParentedTree<T extends ParentedNode>(
-  entries: readonly T[],
-  keyOf: (entry: T) => string,
-): {
-  readonly roots: readonly string[];
-  readonly childrenByParent: Readonly<Record<string, readonly string[]>>;
-  readonly byId: Readonly<Record<string, T>>;
-} {
-  const byId: Record<string, T> = {};
-  for (const entry of entries) byId[keyOf(entry)] = entry;
-
-  const rootsUnsorted: T[] = [];
-  const childrenUnsorted: Record<string, T[]> = {};
-  for (const entry of entries) {
-    const effectiveParentId =
-      entry.parentId !== null && Object.hasOwn(byId, entry.parentId) ? entry.parentId : null;
-    if (effectiveParentId === null) {
-      rootsUnsorted.push(entry);
-      continue;
-    }
-    (childrenUnsorted[effectiveParentId] ??= []).push(entry);
-  }
-
-  const sortIds = (nodes: readonly T[]): readonly string[] =>
-    [...nodes].sort((a, b) => compareParentedNodes(keyOf(a), a, keyOf(b), b)).map(keyOf);
-
-  const childrenByParent: Record<string, readonly string[]> = {};
-  for (const [parentId, children] of Object.entries(childrenUnsorted)) {
-    childrenByParent[parentId] = sortIds(children);
-  }
-
-  return { roots: sortIds(rootsUnsorted), childrenByParent, byId };
-}
-
 export function buildArtifactTree(entries: readonly EpicArtifactEntry[]): ArtifactTree {
   return buildParentedTree(entries, (e) => e.id);
 }
 
-/** Chat-tree equivalent of {@link buildArtifactTree}, keyed by `chatId`. */
-export function buildChatTree(entries: readonly EpicChatEntry[]): ChatTree {
-  return buildParentedTree(entries, (e) => e.chatId);
-}
-
+// `buildChatTree` moved with the projection — re-exported below.
 /**
  * P0 caching, layer B: the epic tree's `Y.Doc` is the authoritative CRDT
  * store, persisted via `y-indexeddb`. IndexedDB has no synchronous

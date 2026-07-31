@@ -25,6 +25,12 @@ import { EpicDetail } from "./epics/epic-detail";
 import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
 import { useEpics, type EpicsState } from "./epics/use-epics";
+import { useEpicAgents } from "./epics/use-epic-agents";
+import {
+  HostStreamConnection,
+  type StreamConnectionAuth,
+} from "@traycer-clients/shared/host-transport/single-host-stream-connection";
+import { CONFIGURED_HOST_ID, HOST_WS_URL } from "./config";
 import { useRoute } from "./router/use-route";
 import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import {
@@ -60,6 +66,46 @@ const useStyles = makeStyles({
 });
 
 /**
+ * One epic: its agents, from `epic.subscribe`.
+ *
+ * A separate component because the subscription must not be opened by a
+ * conditional branch of a larger component — hooks cannot live behind an
+ * `if`, and the epic route is exactly that.
+ */
+function EpicScreen({
+  styles,
+  streamConnection,
+  epicId,
+  epic,
+  now,
+  onBack,
+}: {
+  readonly styles: Record<string, string>;
+  readonly streamConnection: HostStreamConnection | null;
+  readonly epicId: string;
+  readonly epic: FleetEpic | null;
+  readonly now: number;
+  readonly onBack: () => void;
+}): ReactElement {
+  const agents = useEpicAgents(streamConnection, epicId);
+  return (
+    <div className={styles.page}>
+      <EpicDetail
+        epic={epic}
+        epicId={epicId}
+        onBack={onBack}
+        agents={agents}
+        now={now}
+        onOpenAgent={() => {
+          // Chat lands next; a no-op keeps the row affordance honest about
+          // being unfinished rather than silently doing nothing.
+        }}
+      />
+    </div>
+  );
+}
+
+/**
  * The signed-in screen: the user's real epics.
  *
  * A separate component because the host connection is built ONCE and must not
@@ -78,7 +124,7 @@ function EpicsScreen({
   preview,
 }: {
   readonly styles: Record<string, string>;
-  readonly auth: HostConnectionAuth;
+  readonly auth: HostConnectionAuth & StreamConnectionAuth;
   /**
    * Forces a state instead of talking to the host, so every state has a URL
    * that can be opened, screenshotted and argued about.
@@ -92,6 +138,17 @@ function EpicsScreen({
 }): ReactElement {
   const [connection] = useState(() =>
     preview === null ? createTabHostConnection(auth) : null,
+  );
+  // One stream client for the screen's lifetime — a new one per render would
+  // re-dial the socket continuously. Not built at all in preview, so the
+  // "no path from here reads the host" property holds for the stream too.
+  const [streamConnection] = useState(() =>
+    preview === null && HOST_WS_URL !== ""
+      ? new HostStreamConnection(auth, {
+          hostWsUrl: HOST_WS_URL,
+          hostId: CONFIGURED_HOST_ID,
+        })
+      : null,
   );
   const live = useEpics(connection?.hostClient ?? null);
   const { state, reload, loadMore } = preview === null
@@ -108,15 +165,16 @@ function EpicsScreen({
 
   if (route.name === "epic") {
     return (
-      <div className={styles.page}>
-        <EpicDetail
-          epic={opened !== null && opened.id === route.epicId ? opened : null}
-          epicId={route.epicId}
-          onBack={() => {
-            navigate({ name: "epics" });
-          }}
-        />
-      </div>
+      <EpicScreen
+        styles={styles}
+        streamConnection={streamConnection}
+        epicId={route.epicId}
+        epic={opened !== null && opened.id === route.epicId ? opened : null}
+        now={now}
+        onBack={() => {
+          navigate({ name: "epics" });
+        }}
+      />
     );
   }
 
