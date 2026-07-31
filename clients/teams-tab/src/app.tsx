@@ -25,7 +25,13 @@ import { EpicDetail } from "./epics/epic-detail";
 import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
 import { useEpics, type EpicsState } from "./epics/use-epics";
-import { useEpicAgents } from "./epics/use-epic-agents";
+import { useEpicAgents, type EpicAgentsState } from "./epics/use-epic-agents";
+import {
+  AGENTS_FIXTURE,
+  AGENTS_FIXTURE_HOST,
+  AGENTS_FIXTURE_NOW,
+} from "./epics/agents-fixture";
+import { buildChatTree } from "@traycer-clients/shared/epic/epic-doc-chats";
 import {
   HostStreamConnection,
   type StreamConnectionAuth,
@@ -79,6 +85,7 @@ function EpicScreen({
   epic,
   now,
   onBack,
+  preview,
 }: {
   readonly styles: Record<string, string>;
   readonly streamConnection: HostStreamConnection | null;
@@ -86,8 +93,12 @@ function EpicScreen({
   readonly epic: FleetEpic | null;
   readonly now: number;
   readonly onBack: () => void;
+  readonly preview: EpicAgentsState | null;
 }): ReactElement {
-  const agents = useEpicAgents(streamConnection, epicId);
+  // The hook runs either way — hooks cannot be conditional — but it is handed
+  // a null connection under preview, so it opens no stream.
+  const live = useEpicAgents(preview === null ? streamConnection : null, epicId);
+  const agents = preview ?? live;
   return (
     <div className={styles.page}>
       <EpicDetail
@@ -95,7 +106,10 @@ function EpicScreen({
         epicId={epicId}
         onBack={onBack}
         agents={agents}
-        now={now}
+        configuredHostId={
+          preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST
+        }
+        now={preview === null ? now : AGENTS_FIXTURE_NOW}
         onOpenAgent={() => {
           // Chat lands next; a no-op keeps the row affordance honest about
           // being unfinished rather than silently doing nothing.
@@ -122,6 +136,7 @@ function EpicsScreen({
   styles,
   auth,
   preview,
+  agentsPreview,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth & StreamConnectionAuth;
@@ -135,6 +150,7 @@ function EpicsScreen({
    * not a promise in a comment.
    */
   readonly preview: EpicsState | null;
+  readonly agentsPreview: EpicAgentsState | null;
 }): ReactElement {
   const [connection] = useState(() =>
     preview === null ? createTabHostConnection(auth) : null,
@@ -167,6 +183,7 @@ function EpicsScreen({
     return (
       <EpicScreen
         styles={styles}
+        preview={agentsPreview}
         streamConnection={streamConnection}
         epicId={route.epicId}
         epic={opened !== null && opened.id === route.epicId ? opened : null}
@@ -232,6 +249,27 @@ export function App(): ReactElement {
    *   3. Nothing rendered here is real, which is a constraint on the FIXTURES
    *      (this URL is served unauthenticated), not on this flag.
    */
+  const agentsPreview = ((): EpicAgentsState | null => {
+    if (inTeams || params.get("preview") !== "agents") return null;
+    switch (params.get("state")) {
+      case "loading":
+        return { kind: "loading", phase: "connecting" };
+      case "error":
+        return {
+          kind: "error",
+          detail: "stream closed — host unreachable",
+        };
+      case "empty":
+        return { kind: "ready", chats: [], tree: buildChatTree([]) };
+      default:
+        return {
+          kind: "ready",
+          chats: AGENTS_FIXTURE,
+          tree: buildChatTree(AGENTS_FIXTURE),
+        };
+    }
+  })();
+
   const previewState = ((): EpicsState | null => {
     if (inTeams || params.get("preview") !== "epics") return null;
     switch (params.get("state")) {
@@ -282,7 +320,13 @@ export function App(): ReactElement {
   // Gating it anyway cost real time — a shoot built without the build-time
   // variables produced fifteen images of this very screen, which would have
   // been reported as the epics surface if I had not opened one.
-  const problems = previewState === null ? configProblems() : [];
+  // ANY preview skips the gate, not just the epics one. The first version
+  // named `previewState` specifically, so `?preview=agents` still hit the
+  // config screen — and fifteen agent screenshots came out as that screen,
+  // for the second time. Fixing the instance rather than the class is what
+  // let it recur; `previewing` is the class.
+  const previewing = previewState !== null || agentsPreview !== null;
+  const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
@@ -375,7 +419,12 @@ export function App(): ReactElement {
 
   return (
     <FluentProvider theme={themeFor(themeName)}>
-      <EpicsScreen styles={styles} auth={auth} preview={previewState} />
+      <EpicsScreen
+        styles={styles}
+        auth={auth}
+        preview={previewState}
+        agentsPreview={agentsPreview}
+      />
     </FluentProvider>
   );
 }

@@ -62,6 +62,7 @@ export interface EpicDetailProps {
   readonly epicId: string;
   readonly onBack: () => void;
   readonly agents: EpicAgentsState;
+  readonly configuredHostId: string;
   readonly now: number;
   readonly onOpenAgent: (chatId: string) => void;
 }
@@ -71,6 +72,7 @@ export function EpicDetail({
   epicId,
   onBack,
   agents,
+  configuredHostId,
   now,
   onOpenAgent,
 }: EpicDetailProps): ReactElement {
@@ -110,7 +112,12 @@ export function EpicDetail({
       </div>
 
       <Subtitle2 className={styles.section}>Agents</Subtitle2>
-      <AgentsList state={agents} now={now} onOpen={onOpenAgent} />
+      <AgentsList
+        state={agents}
+        now={now}
+        configuredHostId={configuredHostId}
+        onOpen={onOpenAgent}
+      />
 
       {/*
         Artifacts come from the same epic doc and land next. Named rather than

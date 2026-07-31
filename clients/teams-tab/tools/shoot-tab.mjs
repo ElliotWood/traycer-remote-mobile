@@ -11,8 +11,12 @@
  *   CHROMIUM_PATH=... node tools/shoot-tab.mjs <outDir>
  */
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+} from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { chromium } from "playwright-core";
 
@@ -41,7 +45,30 @@ const TYPES = {
   ".png": "image/png",
 };
 
-// SPA fallback, so `/fleet?state=empty` serves index.html the way nginx does.
+/**
+ * Every file read ONCE, up front, and served from memory.
+ *
+ * The previous version did a fresh `readFile` per request and intermittently
+ * answered 404 under load — four runs died partway, at 32, 45, 9 and 15
+ * images. A per-request open of the same handful of files, dozens of times
+ * across concurrent pages, is a transient-failure source on Windows, and the
+ * navigation retry I added first only papered over it: it made the symptom
+ * rarer without removing the cause, which is why it still failed.
+ *
+ * There are three files. Reading them once is both the fix and the simpler
+ * program.
+ */
+const FILES = new Map();
+function preload(dir, prefix) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) preload(full, `${prefix}/${entry.name}`);
+    else FILES.set(`${prefix}/${entry.name}`, readFileSync(full));
+  }
+}
+preload(DIST, "");
+
+// SPA fallback, so `/epics?state=empty` serves index.html the way nginx does.
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
   // Tolerate either base. The deployed build uses `--base=/tab/`, so its
@@ -50,19 +77,17 @@ const server = createServer((req, res) => {
   // JavaScript was expected and renders a blank page. A blank screenshot
   // would then be reported as a layout finding rather than a serving mistake.
   const path = url.pathname.replace(/^\/tab\//, "/");
-  let file = join(DIST, path);
-  if (!existsSync(file) || url.pathname === "/") file = join(DIST, "index.html");
-  readFile(file)
-    .then((buf) => {
-      res.writeHead(200, {
-        "content-type": TYPES[extname(file)] ?? "application/octet-stream",
-      });
-      res.end(buf);
-    })
-    .catch(() => {
-      res.writeHead(404);
-      res.end();
-    });
+  const key = FILES.has(path) ? path : "/index.html";
+  const body = FILES.get(key);
+  if (body === undefined) {
+    res.writeHead(500);
+    res.end();
+    return;
+  }
+  res.writeHead(200, {
+    "content-type": TYPES[extname(key)] ?? "application/octet-stream",
+  });
+  res.end(body);
 });
 await new Promise((r) => {
   server.listen(0, r);
@@ -92,11 +117,17 @@ const THEMES = ["default", "dark", "contrast"];
 
 /** Each state, and the query that produces it. */
 const VIEWS = [
-  { name: "epics", q: "preview=epics" },
-  { name: "loading", q: "preview=epics&state=loading" },
-  { name: "empty", q: "preview=epics&state=empty" },
-  { name: "error", q: "preview=epics&state=error" },
-  { name: "disconnected", q: "preview=epics&state=disconnected" },
+  { name: "epics", q: "preview=epics", path: "/epics" },
+  { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics" },
+  { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics" },
+  { name: "epics-error", q: "preview=epics&state=error", path: "/epics" },
+  { name: "epics-stale", q: "preview=epics&state=disconnected", path: "/epics" },
+  // The epic-detail surface. Same query pair, different route — the agents
+  // list had NO images at all until this existed, while the epics list had 45.
+  { name: "agents", q: "preview=agents", path: "/epics/e1000000-0000-4000-8000-000000000001" },
+  { name: "agents-loading", q: "preview=agents&state=loading", path: "/epics/e1000000-0000-4000-8000-000000000001" },
+  { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001" },
+  { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001" },
 ];
 
 mkdirSync(outDir, { recursive: true });
@@ -111,7 +142,7 @@ try {
           viewport: { width: width.px, height: 900 },
           deviceScaleFactor: 2,
         });
-        const url = `http://localhost:${String(port)}/epics?${view.q}&theme=${theme}`;
+        const url = `http://localhost:${String(port)}${view.path}?${view.q}&theme=${theme}`;
         // RETRY the navigation, because the local static server intermittently
         // fails a request under this load — three runs died partway, at 32,
         // 45 and 9 images, each on a different URL that worked in other runs.

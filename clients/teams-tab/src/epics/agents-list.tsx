@@ -37,9 +37,8 @@ import {
   type AgentLocality,
   type EpicChatEntry,
 } from "@traycer-clients/shared/epic/epic-doc-chats";
-import { CONFIGURED_HOST_ID } from "@/config";
 import { FleetError, FleetLoading } from "../fleet/fleet-state";
-import type { EpicAgentsState } from "./use-epic-agents";
+import { LOAD_PHASE_LABELS, type EpicAgentsState } from "./use-epic-agents";
 import { relativeTime } from "../fleet/fleet-grid";
 
 const useStyles = makeStyles({
@@ -129,17 +128,34 @@ function agentDisplayName(entry: EpicChatEntry): string {
 export interface AgentsListProps {
   readonly state: EpicAgentsState;
   readonly now: number;
+  /**
+   * The host this client is bound to, passed in rather than imported.
+   *
+   * Keeps the component renderable from a fixture at a chosen host id — the
+   * three locality states are otherwise unreachable in a screenshot, and an
+   * unshot state is one that ships broken.
+   */
+  readonly configuredHostId: string;
   readonly onOpen: (chatId: string) => void;
 }
 
 export function AgentsList({
   state,
   now,
+  configuredHostId,
   onOpen,
 }: AgentsListProps): ReactElement {
   const styles = useStyles();
 
-  if (state.kind === "loading") return <FleetLoading rows={4} />;
+  if (state.kind === "loading") {
+    return (
+      <FleetLoading
+        rows={4}
+        slowAfterMs={2500}
+        label={LOAD_PHASE_LABELS[state.phase]}
+      />
+    );
+  }
   if (state.kind === "error") return <FleetError detail={state.detail} />;
   if (state.chats.length === 0) {
     // A CONFIRMED empty epic — the snapshot arrived and had no chats. Distinct
@@ -174,7 +190,7 @@ export function AgentsList({
           </span>
           <span className={styles.main}>
             <Body1 className={styles.title}>{agentDisplayName(entry)}</Body1>
-            <LocalityTag locality={agentLocality(entry, CONFIGURED_HOST_ID)} />
+            <LocalityTag locality={agentLocality(entry, configuredHostId)} />
           </span>
           <Caption1 className={styles.when}>
             {relativeTime(entry.updatedAt, now)}

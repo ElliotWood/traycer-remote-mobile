@@ -19,7 +19,7 @@
  * fleet that renders "No agents" when the request failed is stating something
  * false, which is the same defect as 53 agents reporting Idle.
  */
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import {
   Body1,
   Button,
@@ -70,10 +70,47 @@ const useStyles = makeStyles({
  * shape is arriving", which is the actual answer, and it holds the layout so
  * nothing jumps when the data lands.
  */
-export function FleetLoading({ rows = 6 }: { rows?: number }): ReactElement {
+export function FleetLoading({
+  rows = 6,
+  slowAfterMs,
+  label,
+}: {
+  rows?: number;
+  /**
+   * After this long, say so.
+   *
+   * A skeleton is honest about SHAPE and silent about DURATION, and the two
+   * are not the same promise. An epic doc here was measured at ~3.2MB and
+   * ~8.3s to decode — long enough that a user concludes the screen is broken
+   * and leaves, which is a worse outcome than the wait itself.
+   *
+   * Omitted where loading is genuinely brief; a "still working" line that
+   * flashes on a fast path is its own noise.
+   */
+  slowAfterMs?: number;
+  /**
+   * What we are waiting on RIGHT NOW, from a real transport event.
+   *
+   * Named, never a percentage: only a byte total could justify one, and the
+   * snapshot frame is not confirmed to carry it. A bar advancing on a timer
+   * would look like information and carry none.
+   */
+  label?: string;
+}): ReactElement {
   const styles = useStyles();
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (slowAfterMs === undefined) return;
+    const timer = setTimeout(() => {
+      setSlow(true);
+    }, slowAfterMs);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [slowAfterMs]);
+
   return (
-    <div className={styles.rows} aria-busy="true" aria-label="Loading agents">
+    <div className={styles.rows} aria-busy="true" aria-label="Loading">
       <Skeleton>
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className={styles.row}>
@@ -83,6 +120,18 @@ export function FleetLoading({ rows = 6 }: { rows?: number }): ReactElement {
           </div>
         ))}
       </Skeleton>
+      {label !== undefined ? (
+        <Caption1 className={styles.subtle} role="status">
+          {label}
+        </Caption1>
+      ) : null}
+      {slow ? (
+        // `role="status"` so it is announced rather than only seen — someone
+        // relying on a screen reader gets no skeleton at all.
+        <Caption1 className={styles.subtle} role="status">
+          Still loading. Large epics can take several seconds to open.
+        </Caption1>
+      ) : null}
     </div>
   );
 }
