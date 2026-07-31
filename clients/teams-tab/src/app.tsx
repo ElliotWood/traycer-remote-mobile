@@ -35,12 +35,19 @@ import {
 } from "./epics/agents-fixture";
 import { buildChatTree } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { buildArtifactTree } from "@traycer-clients/shared/epic/epic-doc-artifacts";
+import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
+import {
+  ATTENTION_FIXTURE,
+  ATTENTION_NOW,
+} from "./attention/attention-fixture";
 import {
   HostStreamConnection,
   type StreamConnectionAuth,
 } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
 import { CONFIGURED_HOST_ID, HOST_WS_URL } from "./config";
 import { useRoute } from "./router/use-route";
+import { AttentionView } from "./attention/attention-view";
+import { useAttention, type AttentionState } from "./attention/use-attention";
 import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import {
   createTabHostConnection,
@@ -73,6 +80,52 @@ const useStyles = makeStyles({
   },
   subtle: { color: tokens.colorNeutralForeground3 },
 });
+
+/**
+ * "Waiting on you" — the cross-epic attention feed.
+ *
+ * Its own component for the same reason as the epic screen: the subscription
+ * is a hook, and the route that selects it is a conditional.
+ */
+function WaitingScreen({
+  styles,
+  streamConnection,
+  listClient,
+  now,
+  preview,
+}: {
+  readonly styles: Record<string, string>;
+  readonly streamConnection: HostStreamConnection | null;
+  readonly listClient: EpicListClient | null;
+  readonly now: number;
+  readonly preview: AttentionState | null;
+}): ReactElement {
+  const live = useAttention(
+    preview === null ? streamConnection : null,
+    preview === null ? listClient : null,
+  );
+  const state = preview ?? live;
+  return (
+    <div className={styles.page}>
+      <div className={styles.header}>
+        <Subtitle1>Waiting on you</Subtitle1>
+        {state.kind === "ready" && state.items.length > 0 ? (
+          <Text size={200} className={styles.subtle}>
+            {state.items.length}
+          </Text>
+        ) : null}
+      </div>
+      <AttentionView
+        state={state}
+        now={now}
+        onOpen={() => {
+          // Chat lands next; a no-op keeps the affordance honest about being
+          // unfinished rather than silently doing nothing.
+        }}
+      />
+    </div>
+  );
+}
 
 /**
  * One epic: its agents, from `epic.subscribe`.
@@ -147,6 +200,7 @@ function EpicsScreen({
   auth,
   preview,
   agentsPreview,
+  waitingPreview,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth & StreamConnectionAuth;
@@ -161,6 +215,7 @@ function EpicsScreen({
    */
   readonly preview: EpicsState | null;
   readonly agentsPreview: EpicAgentsState | null;
+  readonly waitingPreview: AttentionState | null;
 }): ReactElement {
   const [connection] = useState(() =>
     preview === null ? createTabHostConnection(auth) : null,
@@ -188,6 +243,22 @@ function EpicsScreen({
   // detail view that renders solely when navigated to from the list is one
   // that breaks on refresh.
   const [opened, setOpened] = useState<FleetEpic | null>(null);
+
+  if (route.name === "waiting") {
+    return (
+      <WaitingScreen
+        styles={styles}
+        streamConnection={streamConnection}
+        listClient={connection?.hostClient ?? null}
+        // The FIXTURE clock under preview. Passing the real one floors every
+        // age to "now" — the fixture timestamps sit ahead of it, so
+        // `max(0, now - at)` is zero for all of them and the oldest-first
+        // sort becomes unverifiable. Caught in the image, not the types.
+        now={waitingPreview === null ? now : ATTENTION_NOW}
+        preview={waitingPreview}
+      />
+    );
+  }
 
   if (route.name === "epic") {
     return (
@@ -259,6 +330,31 @@ export function App(): ReactElement {
    *   3. Nothing rendered here is real, which is a constraint on the FIXTURES
    *      (this URL is served unauthenticated), not on this flag.
    */
+  const waitingPreview = ((): AttentionState | null => {
+    if (inTeams || params.get("preview") !== "waiting") return null;
+    switch (params.get("state")) {
+      case "loading":
+        return { kind: "loading" };
+      case "error":
+        return { kind: "error", detail: "stream closed — host unreachable" };
+      // The state most users see most often, and the reason it has its own
+      // URL: "nothing is waiting" is unreachable on demand otherwise.
+      case "empty":
+        return { kind: "ready", items: [], summary: null, epicTitles: {} };
+      default:
+        return {
+          kind: "ready",
+          items: ATTENTION_FIXTURE,
+          summary: null,
+          // One title resolved and one deliberately MISSING, so the shot
+          // shows both the resolved name and the labelled-id fallback.
+          epicTitles: {
+            "e1000000-0000-4000-8000-000000000001": "Streaming Transport Reconnect",
+          },
+        };
+    }
+  })();
+
   const agentsPreview = ((): EpicAgentsState | null => {
     if (inTeams || params.get("preview") !== "agents") return null;
     switch (params.get("state")) {
@@ -354,7 +450,8 @@ export function App(): ReactElement {
   // config screen — and fifteen agent screenshots came out as that screen,
   // for the second time. Fixing the instance rather than the class is what
   // let it recur; `previewing` is the class.
-  const previewing = previewState !== null || agentsPreview !== null;
+  const previewing =
+    previewState !== null || agentsPreview !== null || waitingPreview !== null;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
@@ -453,6 +550,7 @@ export function App(): ReactElement {
         auth={auth}
         preview={previewState}
         agentsPreview={agentsPreview}
+        waitingPreview={waitingPreview}
       />
     </FluentProvider>
   );

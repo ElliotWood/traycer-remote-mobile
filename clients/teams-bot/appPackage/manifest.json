@@ -24,6 +24,13 @@
   "accentColor": "#148A7A",
   "staticTabs": [
     {
+      "entityId": "traycer.waiting",
+      "name": "Waiting on you",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/tab/waiting",
+      "websiteUrl": "https://REPLACE_WITH_TAB_HOST/tab/waiting",
+      "scopes": ["personal"]
+    },
+    {
       "entityId": "traycer.epics",
       "name": "Epics",
       "contentUrl": "https://REPLACE_WITH_TAB_HOST/tab/epics",

@@ -123,6 +123,13 @@ const THEMES = ["default", "dark", "contrast"];
  * fraction of the coverage. Trim by commenting out, never by deleting.
  */
 const VIEWS = [
+  // EMPTY FIRST, deliberately: on this surface "nothing is waiting" is the
+  // success state and the one most users see most often, so it is reviewed
+  // first rather than last.
+  { name: "waiting-empty", q: "preview=waiting&state=empty", path: "/waiting" },
+  { name: "waiting", q: "preview=waiting", path: "/waiting" },
+  { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting" },
+  { name: "waiting-error", q: "preview=waiting&state=error", path: "/waiting" },
   { name: "epics", q: "preview=epics", path: "/epics" },
   { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics" },
   { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics" },
@@ -166,7 +173,7 @@ try {
         }
         // The theme handshake races a 4s timeout before anything paints, so
         // waiting for the heading is waiting for `ready`, not for a guess.
-        await page.waitForSelector("text=Epics", { timeout: 8000 }).catch(() => {
+        await page.waitForSelector("h1, h2, h3, [role=\"status\"]", { timeout: 8000 }).catch(() => {
           // `loading`/`empty`/`error` all render the heading; if one ever
           // doesn't, a blank shot is the finding, not a reason to bail.
         });
