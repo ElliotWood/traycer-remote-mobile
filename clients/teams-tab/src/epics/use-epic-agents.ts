@@ -39,6 +39,7 @@ import {
   readArtifactsFromEpicDoc,
   type ArtifactTree,
 } from "@traycer-clients/shared/epic/epic-doc-artifacts";
+import { ArtifactRoomRegistry } from "@traycer-clients/shared/epic/artifact-room-registry";
 import type { EpicStreamCallbacks } from "@traycer-clients/shared/host-transport/epic-stream-client";
 import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
 
@@ -147,6 +148,11 @@ export type EpicAgentsState =
 const DOC_CACHE = new Map<string, { doc: Y.Doc; loaded: boolean }>();
 
 export interface EpicScreenData {
+  /**
+   * Artifact-room replicas accumulated over this subscription's lifetime.
+   * `null` until the stream opens.
+   */
+  readonly artifactRooms: ArtifactRoomRegistry | null;
   readonly agents: EpicAgentsState;
   /**
    * The epic itself, from `earlyMeta` — available ~90x sooner than the
@@ -164,6 +170,7 @@ export function useEpicAgents(
     phase: "connecting",
   });
   const [header, setHeader] = useState<FleetEpic | null>(null);
+  const [rooms, setRooms] = useState<ArtifactRoomRegistry | null>(null);
   // Serialised comparison, so an update frame that changes an artifact does
   // not hand the agents list a new array identity and re-render every row.
   const lastSerialized = useRef<string | null>(null);
@@ -211,6 +218,10 @@ export function useEpicAgents(
      * record — the real legs are recorded so the next slow load says where
      * the time went instead of inviting another guess.
      */
+    // One registry per subscription, disposed with it.
+    const artifactRooms = new ArtifactRoomRegistry();
+    setRooms(artifactRooms);
+
     const t0 = Date.now();
     const marks: string[] = [];
     let stallTimer: ReturnType<typeof setTimeout> | undefined;
@@ -245,11 +256,24 @@ export function useEpicAgents(
       });
     };
 
-    // Only snapshot and update frames matter for this screen. The rest are
-    // deliberately no-ops rather than unimplemented: artifact rooms, awareness
-    // and migration lifecycle are real concerns that this surface does not
-    // render, and a silent no-op is honest where a throw would take down a
-    // screen over a frame it does not use.
+    /**
+     * ARTIFACT-ROOM BYTES ARE RETAINED, not rendered.
+     *
+     * The first version no-op'd these on the grounds that a frame this
+     * surface does not render must not take the screen down. That reasoning
+     * is right for awareness and migration frames and WRONG here: a room's
+     * snapshot fires only ONCE per ready transition per session, and
+     * `epic.subscribe` has no "open this room" client frame to ask again.
+     * Dropping the bytes means the artifact body is permanently unavailable
+     * for the rest of the session, with a retry that cannot help.
+     *
+     * NOT RENDERING and NOT RETAINING are different decisions. The registry
+     * holds one lightweight `Y.Doc` per room — `applyUpdate` calls only —
+     * and the expensive XmlFragment→markdown work happens for the opened
+     * artifact alone.
+     *
+     * Everything else below stays a deliberate no-op for the original reason.
+     */
     const callbacks: EpicStreamCallbacks = {
       onSnapshot: (_meta, snapshotBytes) => {
         mark("snapshot-arrived");
@@ -304,10 +328,17 @@ export function useEpicAgents(
           detail: "This epic was deleted.",
         });
       },
-      onArtifactRoomSnapshot: () => undefined,
-      onArtifactRoomUpdate: () => undefined,
+      onArtifactRoomSnapshot: (artifactRoomId, snapshotBytes) => {
+        artifactRooms.applySnapshot(artifactRoomId, snapshotBytes);
+      },
+      onArtifactRoomUpdate: (artifactRoomId, updateBytes) => {
+        artifactRooms.applyUpdate(artifactRoomId, updateBytes);
+      },
+      // Awareness is presence — genuinely not rendered and not retained.
       onArtifactRoomAwareness: () => undefined,
-      onArtifactRoomState: () => undefined,
+      onArtifactRoomState: (artifactRoomId, state) => {
+        artifactRooms.applyState(artifactRoomId, state);
+      },
       onCloudSyncStatus: () => undefined,
       onConnectionStatus: (status) => {
         if (disposed) return;
@@ -334,5 +365,5 @@ export function useEpicAgents(
     };
   }, [streamConnection, epicId]);
 
-  return { agents: state, header };
+  return { agents: state, header, artifactRooms: rooms };
 }
