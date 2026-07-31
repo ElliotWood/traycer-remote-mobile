@@ -31,6 +31,10 @@ import type {
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
 import { ActionTracker } from "@traycer-clients/shared/host-client/action-tracker";
+import {
+  toTranscript,
+  type TranscriptMessage,
+} from "@traycer-clients/shared/epic/transcript";
 import type { ActionPhase } from "./action-state";
 
 export type ChatState =
@@ -38,6 +42,9 @@ export type ChatState =
   | {
       readonly kind: "ready";
       readonly approvals: readonly ChatApprovalState[];
+      /** Same snapshot, same subscription — never a second read path. */
+      readonly messages: readonly TranscriptMessage[];
+      readonly title: string;
     }
   | { readonly kind: "error"; readonly detail: string };
 
@@ -88,7 +95,16 @@ export function useChat(
           if (disposed) return;
           const approvals = frame.snapshot.pendingApprovals;
           pendingIds = new Set(approvals.map((a) => a.approvalId));
-          setState({ kind: "ready", approvals });
+          const chat = frame.snapshot.chat;
+          setState({
+            kind: "ready",
+            approvals,
+            messages: toTranscript(chat.messages, "Agent"),
+            title:
+              chat.title.trim().length > 0
+                ? chat.title
+                : `Untitled chat (${chatId.slice(0, 8)})`,
+          });
           // Reconcile every in-flight action against the FRESH snapshot —
           // this is the route that settles an action whose ack died with a
           // dropped socket.

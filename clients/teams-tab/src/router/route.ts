@@ -26,6 +26,11 @@
 export type Route =
   | { readonly name: "epics" }
   | { readonly name: "epic"; readonly epicId: string }
+  | {
+      readonly name: "chat";
+      readonly epicId: string;
+      readonly chatId: string;
+    }
   /** Reserved for the notifications surface; parsed now so the URL is stable. */
   | { readonly name: "waiting" };
 
@@ -54,6 +59,9 @@ export function parseRoute(pathname: string): Route {
 
   if (segments[0] === "waiting") return { name: "waiting" };
   if (segments[0] === "epics" && typeof segments[1] === "string") {
+    if (segments[2] === "chats" && typeof segments[3] === "string") {
+      return { name: "chat", epicId: segments[1], chatId: segments[3] };
+    }
     return { name: "epic", epicId: segments[1] };
   }
   return { name: "epics" };
@@ -61,6 +69,8 @@ export function parseRoute(pathname: string): Route {
 
 export function routeToPath(route: Route): string {
   switch (route.name) {
+    case "chat":
+      return `${BASE}/epics/${route.epicId}/chats/${route.chatId}`;
     case "epic":
       return `${BASE}/epics/${route.epicId}`;
     case "waiting":

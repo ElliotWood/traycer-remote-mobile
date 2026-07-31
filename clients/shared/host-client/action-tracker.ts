@@ -105,6 +105,23 @@ const DEFAULT_MAX_RECONCILE_ATTEMPTS = 5;
  */
 const DEFAULT_UNCONFIRMED_TIMEOUT_MS = 45_000;
 
+/**
+ * What the host actually said, as the settle checks read it.
+ *
+ * EVERY FIELD IS REQUIRED, AND MUST STAY REQUIRED. Do not make these optional
+ * for the convenience of a caller that only cares about one of them.
+ *
+ * Absence IS the settle signal — `isSettled` resolves an action by the item
+ * no longer appearing here. So an optional field is indistinguishable from an
+ * empty one, and an empty one means "settled". A caller passing a partial
+ * view would silently resolve every in-flight action of the kinds it omitted.
+ *
+ * That is not hypothetical: the Teams tab's first wiring passed only
+ * `pendingApprovalIds`, which would have resolved every interview answer as
+ * applied against a set that was never populated. It failed to compile
+ * BECAUSE these fields are required. With optional fields it would have
+ * compiled and lied.
+ */
 export interface ChatSnapshotView {
   readonly pendingApprovalIds: ReadonlySet<string>;
   readonly pendingInterviewBlockIds: ReadonlySet<string>;

@@ -205,7 +205,12 @@ export interface AgentsListProps {
    * unshot state is one that ships broken.
    */
   readonly configuredHostId: string;
-  readonly onOpen: (chatId: string) => void;
+  /**
+   * Passes the whole ENTRY, not just the id: the chat screen needs its
+   * `hostId` to decide actionability, and re-deriving that from a second
+   * lookup is how the badge and the gate would drift apart.
+   */
+  readonly onOpen: (chatId: string, entry: EpicChatEntry) => void;
 }
 
 export function AgentsList({
@@ -266,7 +271,7 @@ export function AgentsList({
           }
           style={{ paddingLeft: `${String(indentPx(depth))}px` }}
           onClick={() => {
-            onOpen(entry.chatId);
+            onOpen(entry.chatId, entry);
           }}
         >
           {depth > 0 ? (

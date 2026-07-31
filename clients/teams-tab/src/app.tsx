@@ -36,7 +36,10 @@ import {
 import { buildChatTree } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { buildArtifactTree } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
+import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { ApprovalsPreview } from "./chat/approvals-preview";
+import { ChatScreen } from "./chat/chat-screen";
+import { useChat } from "./chat/use-chat";
 import {
   ATTENTION_FIXTURE,
   ATTENTION_NOW,
@@ -81,6 +84,40 @@ const useStyles = makeStyles({
   },
   subtle: { color: tokens.colorNeutralForeground3 },
 });
+
+/**
+ * One chat, opened from an agent row.
+ */
+function ChatRoute({
+  styles,
+  streamConnection,
+  epicId,
+  chatId,
+  entry,
+  now,
+  onBack,
+}: {
+  readonly styles: Record<string, string>;
+  readonly streamConnection: HostStreamConnection | null;
+  readonly epicId: string;
+  readonly chatId: string;
+  readonly entry: EpicChatEntry | null;
+  readonly now: number;
+  readonly onBack: () => void;
+}): ReactElement {
+  const controller = useChat(streamConnection, epicId, chatId);
+  return (
+    <div className={styles.page}>
+      <ChatScreen
+        controller={controller}
+        entry={entry}
+        configuredHostId={CONFIGURED_HOST_ID}
+        now={now}
+        onBack={onBack}
+      />
+    </div>
+  );
+}
 
 /**
  * "Waiting on you" — the cross-epic attention feed.
@@ -142,6 +179,7 @@ function EpicScreen({
   epic,
   now,
   onBack,
+  onOpenAgent,
   preview,
 }: {
   readonly styles: Record<string, string>;
@@ -150,6 +188,7 @@ function EpicScreen({
   readonly epic: FleetEpic | null;
   readonly now: number;
   readonly onBack: () => void;
+  readonly onOpenAgent: (chatId: string, entry: EpicChatEntry) => void;
   readonly preview: EpicAgentsState | null;
 }): ReactElement {
   // The hook runs either way — hooks cannot be conditional — but it is handed
@@ -174,10 +213,7 @@ function EpicScreen({
           // Artifact reading lands next; a no-op keeps the affordance honest
           // about being unfinished rather than silently doing nothing.
         }}
-        onOpenAgent={() => {
-          // Chat lands next; a no-op keeps the row affordance honest about
-          // being unfinished rather than silently doing nothing.
-        }}
+        onOpenAgent={onOpenAgent}
       />
     </div>
   );
@@ -244,6 +280,7 @@ function EpicsScreen({
   // detail view that renders solely when navigated to from the list is one
   // that breaks on refresh.
   const [opened, setOpened] = useState<FleetEpic | null>(null);
+  const [openedChat, setOpenedChat] = useState<EpicChatEntry | null>(null);
 
   if (route.name === "waiting") {
     return (
@@ -261,6 +298,25 @@ function EpicsScreen({
     );
   }
 
+  if (route.name === "chat") {
+    return (
+      <ChatRoute
+        styles={styles}
+        streamConnection={streamConnection}
+        epicId={route.epicId}
+        chatId={route.chatId}
+        // The agent row that opened it, so locality is known immediately. A
+        // DEEP LINK has none, and the chat screen treats that as unknown —
+        // not actionable — rather than assuming local.
+        entry={openedChat}
+        now={now}
+        onBack={() => {
+          navigate({ name: "epic", epicId: route.epicId });
+        }}
+      />
+    );
+  }
+
   if (route.name === "epic") {
     return (
       <EpicScreen
@@ -272,6 +328,10 @@ function EpicsScreen({
         now={now}
         onBack={() => {
           navigate({ name: "epics" });
+        }}
+        onOpenAgent={(chatId, entry) => {
+          setOpenedChat(entry);
+          navigate({ name: "chat", epicId: route.epicId, chatId });
         }}
       />
     );
