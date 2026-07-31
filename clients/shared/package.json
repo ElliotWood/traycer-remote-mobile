@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "jsonwebtoken": "^9.0.3",
+    "uuid": "^14.0.1",
     "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/uuid": "^11.0.0",
     "@types/ws": "catalog:",
     "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
