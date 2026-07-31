@@ -355,6 +355,7 @@
         "@traycer/protocol": "workspace:*",
         "react": "catalog:",
         "react-dom": "catalog:",
+        "uuid": "^14.0.1",
         "yjs": "^13.6.31",
       },
       "devDependencies": {
