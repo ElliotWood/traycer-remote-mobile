@@ -40,6 +40,8 @@ import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats"
 import { ApprovalsPreview } from "./chat/approvals-preview";
 import { ArtifactMarkdown } from "./artifacts/artifact-markdown";
 import { CommentsPanel } from "./comments/comments-panel";
+import { AuthorAgent } from "./authoring/author-agent";
+import { CreateArtifact } from "./authoring/create-artifact";
 import {
   COMMENTS_FIXTURE,
   COMMENTS_FIXTURE_NOW,
@@ -418,6 +420,7 @@ export function App(): ReactElement {
   const showChat = !inTeams && params.get("preview") === "chat";
   const showArtifact = !inTeams && params.get("preview") === "artifact";
   const showComments = !inTeams && params.get("preview") === "comments";
+  const showAuthoring = !inTeams && params.get("preview") === "authoring";
 
   const waitingPreview = ((): AttentionState | null => {
     if (inTeams || params.get("preview") !== "waiting") return null;
@@ -546,7 +549,8 @@ export function App(): ReactElement {
     showApprovals ||
     showChat ||
     showArtifact ||
-    showComments;
+    showComments ||
+    showAuthoring;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
     return (
@@ -618,6 +622,28 @@ export function App(): ReactElement {
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
           <FleetLoading rows={3} />
+        </div>
+      </FluentProvider>
+    );
+  }
+
+  if (showAuthoring) {
+    // `state=nohost` renders the REFUSAL — the state nobody hits by hand and
+    // the one that matters most, since it is what prevents a permanent wrong
+    // host id in someone's data.
+    const hostForPreview =
+      params.get("state") === "nohost" ? "" : "3107fb3b-3215-4965-8654-d39173aae0e7";
+    return (
+      <FluentProvider theme={themeFor(themeName)}>
+        <div className={styles.page}>
+          <Subtitle1>New agent</Subtitle1>
+          <AuthorAgent
+            configuredHostId={hostForPreview}
+            phase={{ kind: "idle" }}
+            onCreate={() => undefined}
+          />
+          <Subtitle1>New artifact</Subtitle1>
+          <CreateArtifact phase={{ kind: "idle" }} onCreate={() => undefined} />
         </div>
       </FluentProvider>
     );

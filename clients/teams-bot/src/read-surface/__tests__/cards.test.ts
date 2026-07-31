@@ -787,3 +787,61 @@ describe("read-surface/cards — the label comes from the capability, not locali
     expect(visible).toContain("Read-only");
   });
 });
+
+/**
+ * The version pin, and a guard on what may be emitted under it.
+ *
+ * 1.5 shipped and EVERY card rendered as "cards.unsupported" in real Teams —
+ * on desktop, not only mobile. Web Chat rendered them all correctly
+ * throughout, which is why this was not caught: it is a more permissive
+ * client, so verifying there measured the wrong specimen.
+ *
+ * These tests are the cheap thing that would have caught it.
+ */
+describe("CONTRACT: cards stay within the version they declare", () => {
+  const ALL_CARDS = [
+    buildHelpCard(),
+    buildFleetCard([
+      {
+        agentId: "a1000000-0000-4000-8000-000000000001",
+        title: "Migrate config loader to zod",
+        harnessId: "claude",
+        surface: "gui",
+        active: true,
+        isLocal: true,
+        hostId: "h-1",
+        capabilities: { readTranscript: true, sendMessage: true },
+      },
+    ]),
+    buildEpicPickerCard([{ epicId: "e-1", title: "My Epic" }]),
+    buildEpicNotBoundCard(),
+    buildBridgeUnavailableCard("spawn_timed_out", "took too long"),
+  ];
+
+  it("declares 1.2 — the highest version any emitted feature requires", () => {
+    for (const card of ALL_CARDS) {
+      expect((card.content as { version?: string }).version).toBe("1.2");
+    }
+  });
+
+  it("emits no element or property that needs more than 1.2", () => {
+    // Every name here is 1.3+. If one becomes necessary, RAISE the version —
+    // this test is a tripwire on drift, not an argument against the feature.
+    const ABOVE_1_2 = [
+      "targetWidth",        // 1.5
+      "Action.Execute",     // 1.4
+      '"Table"',            // 1.5
+      "RichTextBlock",      // 1.2 element but 1.5 `style: heading` pairs with it
+      '"heading"',          // 1.5
+      '"refresh"',          // 1.4
+      "Input.ChoiceSet",    // not used; would need care
+      "Action.ToggleVisibility", // 1.2 — listed to catch accidental adoption
+    ];
+    for (const card of ALL_CARDS) {
+      const json = JSON.stringify(card.content);
+      for (const feature of ABOVE_1_2) {
+        expect(json).not.toContain(feature.replace(/"/g, ""));
+      }
+    }
+  });
+});

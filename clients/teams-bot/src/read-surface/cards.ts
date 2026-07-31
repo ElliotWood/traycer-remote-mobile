@@ -42,18 +42,40 @@ import type { BridgeCliFailureReason } from "./bridge-cli";
 const ADAPTIVE_CARD_SCHEMA =
   "http://adaptivecards.io/schemas/adaptive-card.json";
 /**
- * 1.5 gives us `Container.style`, `FactSet`, `separator` and `selectAction`,
- * all of which render on desktop and web.
+ * SETTLED EMPIRICALLY, 2026-07-31, after being wrong at 1.5.
  *
- * DOCUMENTED CONSTRAINT, not a settled verification: Microsoft's docs state
- * Teams **mobile** supports Adaptive Cards only up to **1.2**, so this pin
- * is above that cap and mobile rendering is UNVERIFIED. The failure
- * signature to look for is the card rendering as "We're sorry, this card
- * couldn't be displayed." Desktop-first was an explicit user decision; do
- * not claim mobile works, and do not redesign for 1.2 until someone has
- * actually looked at a phone.
+ * This block used to pin 1.5 and carried its own warning: "Microsoft's docs
+ * state Teams MOBILE supports Adaptive Cards only up to 1.2, so this pin is
+ * above that cap and mobile rendering is UNVERIFIED", with the failure
+ * signature to watch for spelled out. We deferred on desktop-first.
+ *
+ * The install answered it: EVERY card rendered as "Card - access it on
+ * go.skype.com/cards.unsupported" in real Teams — and on DESKTOP, not just
+ * mobile. So the recorded risk was real and its scope was understated: the
+ * cap is not a mobile-only concern.
+ *
+ * Web Chat rendered all of them correctly throughout. It is a MORE PERMISSIVE
+ * client than Teams, so "verified in Web Chat" was a true measurement of the
+ * wrong specimen — the same shape as timing a 4MB synthetic doc against a
+ * 50.6MB real one. Do not treat Web Chat as a proxy for Teams again.
+ *
+ * 1.2 COSTS NOTHING. Audited every element and property this file emits:
+ *
+ *   AdaptiveCard, TextBlock, Container, ColumnSet, Column,
+ *   FactSet, Input.Text, Action.Submit                        1.0
+ *   verticalContentAlignment                                   1.1
+ *   fontType: "monospace"                                      1.2
+ *   Container style good / attention / warning                 1.2
+ *
+ * Nothing above 1.2 is used: no `targetWidth`, no `Action.Execute`, no
+ * `Table`, no `RichTextBlock`, no `style: "heading"`. The version was raised
+ * for features we never adopted.
+ *
+ * If something here ever needs 1.4, RAISE IT TO 1.4 — do not drop a feature
+ * to hit a lower number. The rule is "the lowest version that renders what we
+ * actually emit", not "the lowest number".
  */
-const ADAPTIVE_CARD_VERSION = "1.5";
+const ADAPTIVE_CARD_VERSION = "1.2";
 
 /**
  * Verbs carried in action `data` so the handler routes on a field rather
