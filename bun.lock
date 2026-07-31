@@ -301,13 +301,16 @@
     "clients/shared": {
       "name": "@traycer-clients/shared",
       "dependencies": {
+        "culori": "^4.0.2",
         "jsonwebtoken": "^9.0.3",
+        "mermaid": "^11.16.0",
         "uuid": "^14.0.1",
         "ws": "catalog:",
         "yjs": "^13.6.31",
         "zod": "catalog:",
       },
       "devDependencies": {
+        "@types/culori": "^4.0.1",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/uuid": "^11.0.0",
         "@types/ws": "catalog:",
