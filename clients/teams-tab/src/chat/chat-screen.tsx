@@ -58,9 +58,11 @@ export function ChatScreen({
    * as success.
    */
   const actionability =
-    entry === null
+    state.kind !== "ready"
       ? ({ kind: "unknown" } as const)
-      : chatActionability(entry, configuredHostId);
+      : entry === null
+        ? ({ kind: "unknown" } as const)
+        : chatActionability(entry, configuredHostId, state.access);
 
   return (
     <>

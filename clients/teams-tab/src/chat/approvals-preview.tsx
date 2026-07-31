@@ -50,6 +50,17 @@ const PHASES: readonly {
       phase: { kind: "idle" },
       actionability: { kind: "unknown" },
     },
+    // PERMISSION, not reachability — a different reason, so different words.
+    {
+      label: "View-only access",
+      phase: { kind: "idle" },
+      actionability: { kind: "viewer" },
+    },
+    {
+      label: "Stream reconnecting",
+      phase: { kind: "idle" },
+      actionability: { kind: "stream-not-live" },
+    },
   ];
 
 export function ApprovalsPreview(): ReactElement {

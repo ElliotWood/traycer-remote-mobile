@@ -19,6 +19,23 @@
  *
  * Same discipline as the bot's composer gate: absence of a proven capability
  * is not a capability.
+ *
+ * TWO GATES, ANSWERING DIFFERENT QUESTIONS. Locality is only half of it:
+ *
+ *   canAct    am I PERMITTED, and is the stream live?   host-provided
+ *   locality  will an owner frame REACH the agent?      client-derived
+ *
+ * Neither implies the other. `canAct` folds role and connection — a viewer
+ * can never act, and a non-viewer with `canAct === false` means the stream is
+ * not currently open. It is computed by the host that answered the
+ * subscription, so it says nothing about a chat on a different host.
+ *
+ * Gating on locality ALONE would show approve and reject to a viewer, who is
+ * not allowed to use them. Gating on `canAct` alone would show them for a
+ * cross-host chat, where they reach nothing and report success twice over.
+ * The first version of this module had only the second gate — the rule
+ * "gate on the field that means what you need" applied once, to reachability,
+ * while a second field meaning something else went unread.
  */
 import {
   agentLocality,
@@ -26,6 +43,9 @@ import {
 } from "@traycer-clients/shared/epic/epic-doc-chats";
 
 export type Actionability =
+  /** Permitted, but the host says this stream cannot act right now. */
+  | { readonly kind: "viewer" }
+  | { readonly kind: "stream-not-live" }
   /** The chat is on this host. Owner frames are meaningful. */
   | { readonly kind: "actionable" }
   /** It runs elsewhere. We know that, and we say it. */
@@ -43,7 +63,13 @@ export type Actionability =
 export function chatActionability(
   entry: EpicChatEntry,
   configuredHostId: string,
+  access: { readonly canAct: boolean; readonly role: "owner" | "viewer" },
 ): Actionability {
+  // PERMISSION FIRST. A viewer is not allowed to act regardless of where the
+  // chat runs, and telling them "it runs on another machine" would explain
+  // the wrong reason.
+  if (access.role === "viewer") return { kind: "viewer" };
+  if (!access.canAct) return { kind: "stream-not-live" };
   switch (agentLocality(entry, configuredHostId)) {
     case "this-host":
       return { kind: "actionable" };
@@ -65,6 +91,10 @@ export function actionabilityReason(state: Actionability): string | null {
   switch (state.kind) {
     case "actionable":
       return null;
+    case "viewer":
+      return "You have view-only access to this chat, so you can’t approve or reject here.";
+    case "stream-not-live":
+      return "Reconnecting to your host — approving is paused until the connection is back.";
     case "other-host":
       return "This agent runs on another machine, so it can’t be approved from here. Open it on that host, or from Traycer on your desktop.";
     case "unknown":

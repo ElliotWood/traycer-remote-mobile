@@ -45,6 +45,17 @@ export type ChatState =
       /** Same snapshot, same subscription — never a second read path. */
       readonly messages: readonly TranscriptMessage[];
       readonly title: string;
+      /**
+       * The host's own answer to "may this client act right now".
+       *
+       * Folds role and connection. Read alongside locality, never instead of
+       * it: this says PERMITTED, locality says REACHABLE, and neither implies
+       * the other.
+       */
+      readonly access: {
+        readonly canAct: boolean;
+        readonly role: "owner" | "viewer";
+      };
     }
   | { readonly kind: "error"; readonly detail: string };
 
@@ -104,6 +115,10 @@ export function useChat(
               chat.title.trim().length > 0
                 ? chat.title
                 : `Untitled chat (${chatId.slice(0, 8)})`,
+            access: {
+              canAct: frame.snapshot.access.canAct,
+              role: frame.snapshot.access.role,
+            },
           });
           // Reconcile every in-flight action against the FRESH snapshot —
           // this is the route that settles an action whose ack died with a
