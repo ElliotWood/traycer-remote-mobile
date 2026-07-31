@@ -392,7 +392,7 @@ export function App(): ReactElement {
   // Offering a "Sign in" button to someone who is already signed in is how
   // Elliot ended up starting a device flow he did not need — and it is what
   // would make a reload look like a lost session when it is not.
-  if (restoring && previewState === null) {
+  if (restoring && !previewing) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <div className={styles.page}>
@@ -402,7 +402,7 @@ export function App(): ReactElement {
     );
   }
 
-  if (status.kind !== "signed-in" && previewState === null) {
+  if (status.kind !== "signed-in" && !previewing) {
     return (
       <FluentProvider theme={themeFor(themeName)}>
         <SignIn
