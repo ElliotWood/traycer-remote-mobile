@@ -15,7 +15,7 @@ const { TAB_HOST_LABEL, createTabHostConnection, isForeignHost } = await import(
   "../connection"
 );
 
-const HOST = "9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef";
+const HOST = "a1000000-0000-4000-8000-000000000e91";
 
 beforeEach(() => {
   config.CONFIGURED_HOST_ID = HOST;

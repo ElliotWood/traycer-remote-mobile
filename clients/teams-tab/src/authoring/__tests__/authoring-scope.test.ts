@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hostDisclosure } from "../authoring-scope";
 
-const HOST = "9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef";
+const HOST = "a1000000-0000-4000-8000-000000000e91";
 
 describe("hostDisclosure — creation is refused without a host", () => {
   it("CONTRACT: an unconfigured host id refuses the create", () => {

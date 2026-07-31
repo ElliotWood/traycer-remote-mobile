@@ -21,7 +21,7 @@ async function problemsFor(
 const COMPLETE = {
   VITE_AUTHN_BASE_URL: "https://example.invalid/authn",
   VITE_HOST_WS_URL: "wss://example.invalid/rpc",
-  VITE_HOST_ID: "9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef",
+  VITE_HOST_ID: "a1000000-0000-4000-8000-000000000e91",
 };
 
 const keys = (problems: readonly ConfigProblem[]): readonly string[] =>

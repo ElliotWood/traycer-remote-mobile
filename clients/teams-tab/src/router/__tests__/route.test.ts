@@ -8,11 +8,11 @@ import { BASE, parseRoute, routeToPath, type Route } from "../route";
  */
 const ALL_ROUTES: readonly Route[] = [
   { name: "epics" },
-  { name: "epic", epicId: "9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef" },
+  { name: "epic", epicId: "a1000000-0000-4000-8000-000000000e91" },
   {
     name: "chat",
-    epicId: "9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef",
-    chatId: "29feb5f0-b273-4906-a87b-a8a71038952c",
+    epicId: "a1000000-0000-4000-8000-000000000e91",
+    chatId: "a1000000-0000-4000-8000-000000000c4a",
   },
   { name: "waiting" },
 ];
