@@ -368,10 +368,25 @@ describe("IdentityRegistry.fromFile — the REAL shipped default, not an injecte
     }
   });
 
+  /**
+   * The garbage path lives under `tmpdir()` rather than on a drive letter.
+   * `Z:` is a conventional MAPPED NETWORK DRIVE letter, and the readFileSync
+   * inside `fromFile` can sit in SMB/DFS resolution for several seconds
+   * against an unmapped one — which timed this test out at 5000ms roughly
+   * 1 run in 4 on Windows, measured once at 21070ms. A temp directory
+   * structurally cannot be a network mount, so the read fails immediately
+   * with ENOENT. The assertion is unchanged: this test is about `fromFile`
+   * refusing input it cannot read, and the drive letter was always
+   * incidental. The subdirectory is never created, so the path stays absent.
+   */
   it("also refuses a garbage literal path (the isolation mechanics above are the point, not this assertion)", () => {
     expect(() =>
       IdentityRegistry.fromFile(
-        "Z:\\definitely-not-a-real-path\\identity-registry-that-does-not-exist.json",
+        join(
+          tmpdir(),
+          "definitely-not-a-real-path",
+          "identity-registry-that-does-not-exist.json",
+        ),
         () => {},
       ),
     ).toThrow(/refusing to load/);
