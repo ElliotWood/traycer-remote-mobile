@@ -368,6 +368,20 @@ describe("IdentityRegistry.fromFile — the REAL shipped default, not an injecte
     }
   });
 
+  /**
+   * FLAKY ON WINDOWS, ~1 run in 4, and it is NOT the assertion that fails —
+   * the test times out at 5000ms. Nothing here is async, so the block is
+   * inside `existsSync`: `Z:` is a conventional MAPPED NETWORK DRIVE letter,
+   * and a stat against an unmapped one can sit in SMB/DFS resolution for
+   * several seconds before returning false. On a machine with no Z: mapping
+   * it usually answers instantly, which is why it passes most runs.
+   *
+   * Diagnosed, deliberately not changed: the fix is a path that cannot be a
+   * network drive, but this file is security-adjacent and the assertion is
+   * about refusing garbage input, so the choice of literal belongs to whoever
+   * owns this test. Recorded here rather than in a commit message because
+   * this is where the next person watching it fail will be looking.
+   */
   it("also refuses a garbage literal path (the isolation mechanics above are the point, not this assertion)", () => {
     expect(() =>
       IdentityRegistry.fromFile(

@@ -94,10 +94,22 @@ export function AuthorAgent({
         </Button>
       </div>
 
+      {/*
+        WORDING CHANGED once `epic.createChat` was actually wired. This used to
+        say "check the agents list before creating it again" — the correct
+        advice for an unconfirmed APPROVAL, and the wrong advice here.
+
+        The chat id is minted before the first attempt and reused, and the host
+        resolver is idempotent on it, so pressing the button again cannot
+        produce a second agent. Sending someone off to verify by hand would be
+        asking them to do work the protocol already guarantees. Same
+        "unconfirmed", opposite instruction — which is why the reason is stated
+        rather than just the reassurance.
+      */}
       {phase.kind === "unconfirmed" ? (
         <Caption1 className={styles.failed} role="alert">
-          Couldn’t confirm this agent was created. It may exist — check the
-          agents list before creating it again. ({phase.reason})
+          Couldn’t confirm this agent was created. Press Create agent again —
+          it’s the same request, so it can’t make a second agent. ({phase.reason})
         </Caption1>
       ) : null}
     </div>

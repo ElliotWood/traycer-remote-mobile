@@ -42,6 +42,8 @@ import { ArtifactMarkdown } from "./artifacts/artifact-markdown";
 import { CommentsPanel } from "./comments/comments-panel";
 import { AuthorAgent } from "./authoring/author-agent";
 import { CreateArtifact } from "./authoring/create-artifact";
+import { useCreateAgent } from "./authoring/use-create-agent";
+import type { CreateChatClient } from "@traycer-clients/shared/epic/create-chat";
 import {
   COMMENTS_FIXTURE,
   COMMENTS_FIXTURE_NOW,
@@ -192,6 +194,7 @@ function WaitingScreen({
 function EpicScreen({
   styles,
   streamConnection,
+  hostClient,
   epicId,
   epic,
   now,
@@ -201,6 +204,7 @@ function EpicScreen({
 }: {
   readonly styles: Record<string, string>;
   readonly streamConnection: HostStreamConnection | null;
+  readonly hostClient: CreateChatClient | null;
   readonly epicId: string;
   readonly epic: FleetEpic | null;
   readonly now: number;
@@ -212,6 +216,9 @@ function EpicScreen({
   // a null connection under preview, so it opens no stream.
   const live = useEpicAgents(preview === null ? streamConnection : null, epicId);
   const agents = preview ?? live.agents;
+  const configuredHostId =
+    preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST;
+  const authoring = useCreateAgent(hostClient, epicId, configuredHostId);
   return (
     <div className={styles.page}>
       <EpicDetail
@@ -222,15 +229,28 @@ function EpicScreen({
         epicId={epicId}
         onBack={onBack}
         agents={agents}
-        configuredHostId={
-          preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST
-        }
+        configuredHostId={configuredHostId}
         now={preview === null ? now : AGENTS_FIXTURE_NOW}
         onOpenArtifact={() => {
           // Artifact reading lands next; a no-op keeps the affordance honest
           // about being unfinished rather than silently doing nothing.
         }}
         onOpenAgent={onOpenAgent}
+      />
+      {/*
+        NO NAVIGATION ON SUCCESS, deliberately. Jumping to the new chat would
+        need an `EpicChatEntry`, and the only way to have one here is to
+        fabricate it from the request we just sent — inventing a row that
+        claims to be replicated state. The agents stream is already open on
+        this screen and delivers the real entry within its normal update, so
+        the new agent appears in the tree above on its own. Slower by a beat,
+        and it is the host's row rather than our guess at it.
+      */}
+      <Subtitle1>New agent</Subtitle1>
+      <AuthorAgent
+        configuredHostId={configuredHostId}
+        phase={authoring.phase}
+        onCreate={authoring.create}
       />
     </div>
   );
@@ -340,6 +360,10 @@ function EpicsScreen({
         styles={styles}
         preview={agentsPreview}
         streamConnection={streamConnection}
+        // The UNARY client, not the stream one: `epic.createChat` is a
+        // request/response call, and it is null under preview so the
+        // "no path from here reaches the host" property still holds.
+        hostClient={connection?.hostClient ?? null}
         epicId={route.epicId}
         epic={opened !== null && opened.id === route.epicId ? opened : null}
         now={now}
