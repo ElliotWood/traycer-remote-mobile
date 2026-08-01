@@ -28,6 +28,8 @@
     "yjs": "^13.6.31"
   },
   "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "jsdom": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

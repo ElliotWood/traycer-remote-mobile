@@ -228,10 +228,17 @@ export function useEpicAgents(
     // where `setTimeout` returns a number; the conditional type resolves to
     // Node's `Timeout` whenever node types are in scope, which is how a
     // browser file silently acquires a Node shape.
+    //
+    // The DIAGNOSIS above is right and the annotation alone did not deliver
+    // it: `@types/node` is in scope here, so bare `setTimeout` still resolved
+    // to the Node overload and still returned `Timeout` — the annotation just
+    // moved the Node shape from the variable to a type error on the
+    // assignment. `window.setTimeout` is the DOM overload, which genuinely
+    // returns `number`, so the call now matches what the comment claims.
     let stallTimer: number | undefined;
     const armStallWatchdog = (): void => {
-      clearTimeout(stallTimer);
-      stallTimer = setTimeout(() => {
+      window.clearTimeout(stallTimer);
+      stallTimer = window.setTimeout(() => {
         if (disposed) return;
         setState((prev) =>
           prev.kind === "loading" ? { kind: "loading", phase: "retrying" } : prev,
