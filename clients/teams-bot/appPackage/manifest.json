@@ -43,7 +43,42 @@
       "botId": "00000000-0000-0000-0000-000000000000",
       "scopes": ["personal"],
       "supportsFiles": false,
-      "isNotificationOnly": false
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "fleet",
+              "description": "List the agents in this conversation's epic, each row with Open, Reply and Log buttons"
+            },
+            {
+              "title": "epics",
+              "description": "List your epics, so you can bind one to this conversation"
+            },
+            {
+              "title": "epic",
+              "description": "epic <id> — bind this conversation to an epic. Sent bare, replies with the id you need"
+            },
+            {
+              "title": "chat",
+              "description": "chat <id> — one agent's status, with any pending approval above the fold"
+            },
+            {
+              "title": "log",
+              "description": "log <id> — read an agent's transcript, a page at a time"
+            },
+            {
+              "title": "say",
+              "description": "say <id> <message> — message an agent. Omit the message for a compose box"
+            },
+            {
+              "title": "help",
+              "description": "Show every command with its syntax"
+            }
+          ]
+        }
+      ]
     }
   ],
   "validDomains": ["REPLACE_WITH_TAB_HOST"]
