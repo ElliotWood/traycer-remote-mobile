@@ -50,6 +50,19 @@ export const CHAT_FIXTURE: readonly TranscriptMessage[] = [
         kind: "text",
         text: "Reading the current loader first.\n\n    const raw = process.env.VITE_HOST_WS_URL;\n    if (!raw) throw new Error(\"VITE_HOST_WS_URL is required\");\n\nThat message is the thing to preserve.",
       },
+      /*
+       * MARKDOWN-HOSTILE, deliberately. Every text block here was clean prose,
+       * so the fixture could not fail on the claim that chat renders markdown
+       * — and it did not, for as long as chat printed a plain text node and
+       * a user saw literal fences.
+       *
+       * A fence, a table and a heading: the three things the artifact renderer
+       * already handled and chat did not.
+       */
+      {
+        kind: "text",
+        text: "## Result\n\n```sh\nhostname\nwhoami\nuname -sr\n```\n\n| check | value |\n| --- | --- |\n| host | reachable |\n| user | traycer |\n",
+      },
       { kind: "other", blockType: "tool_call", label: "Tool call" },
       { kind: "other", blockType: "file_change", label: "File change" },
       { kind: "other", blockType: "todo", label: "To-do list" },
