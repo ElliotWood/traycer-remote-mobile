@@ -17,6 +17,41 @@
  * Nothing is silently dropped. Every block type is named in
  * {@link projectBlock}'s switch, so adding a sixteenth is a type error here
  * rather than a marker that quietly reads `other` in production.
+ *
+ * ─── THERE IS A SECOND PROJECTION, AND THAT IS DELIBERATE ──────────────────
+ *
+ * `clients/shared/epic/transcript.ts` projects the same transcript into
+ * `TranscriptBlock[]`. It is NOT a duplicate of this file and consolidating
+ * the two would make one of the surfaces wrong.
+ *
+ *   this file          prose + flat markers, for a CARD — a scanning surface
+ *                      where full fidelity is a drill-in concern
+ *   shared/transcript  structured blocks, for a DOCUMENT — the tab renders
+ *                      an interview's questions and distinguishes an answered
+ *                      one (history) from a live prompt
+ *
+ * Collapsing them would flatten `interview` to a marker and lose that
+ * distinction, which has already caused a defect once; and it would drop
+ * `reasoning`, which this file excludes on purpose and the tab shows on
+ * purpose. A card and a document want different shapes.
+ *
+ * What the two SHOULD share is vocabulary, not structure. The block labels
+ * live in `shared` and both read them from there.
+ *
+ * ─── THIS PROJECTION'S OUTPUT IS RAW. CONSUMERS MUST CLEAN IT. ─────────────
+ *
+ * `TranscriptPart.label` carries protocol identifiers exactly as they arrive:
+ * a tool name is `mcp__<server>__<tool>`, and a file path is absolute,
+ * including a `/srv/traycer/tenants/<name>/…` prefix that embeds A TENANT
+ * NAME.
+ *
+ * Today exactly one consumer renders these — the Teams bot's `partMarker` —
+ * and it calls shared's `humaniseToolName` and `shortenWorkspacePath` before
+ * displaying anything. So nothing leaks. But that is an accident of there
+ * being ONE consumer, and this is a CLI anyone can pipe: the safety is in the
+ * caller, not in this type. A second consumer that renders `part.label`
+ * directly puts an internal identifier and a tenant name in front of a user,
+ * and would discover it in a screenshot.
  */
 import { jsonContentToMarkdown } from "@traycer/protocol/common/json-content-serializer";
 import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
@@ -27,6 +62,14 @@ export type TranscriptPartKind =
 
 export interface TranscriptPart {
   readonly kind: TranscriptPartKind;
+  /**
+   * RAW. A protocol identifier, not display text.
+   *
+   * `kind: "tool"` carries `mcp__<server>__<tool>`; `kind: "file_change"`
+   * carries an absolute path that may embed a tenant name. Run them through
+   * `humaniseToolName` / `shortenWorkspacePath` before showing them to a
+   * person — see this file's header.
+   */
   readonly label: string;
   /** Line count where the part is line-shaped, else 0. */
   readonly lines: number;

@@ -1,8 +1,17 @@
 /**
  * Chat messages projected to what a transcript needs — pure, no UI.
  *
- * EIGHTEEN BLOCK KINDS EXIST. This renders two of them faithfully (`text`,
- * `reasoning`) and NAMES the rest rather than dropping them.
+ * FIFTEEN BLOCK KINDS EXIST — the members of `contentBlockSchema`. This
+ * renders two of them faithfully (`text`, `reasoning`) and NAMES the rest
+ * rather than dropping them.
+ *
+ * It said EIGHTEEN, which is the number of `z.literal` calls in
+ * `content-blocks.ts`. Three of those — `model_rerouted`,
+ * `model_verification`, `safety_buffering` — are provider-notice metadata and
+ * have never been block types. The old label map carried all three, and three
+ * entries for things that cannot occur are what made a map with no coverage
+ * guarantee look complete. The count is now tied to the union rather than
+ * counted by eye.
  *
  * That choice is the whole design. Silently skipping a block would make the
  * transcript lie by omission: a turn that ran three tools and wrote one
@@ -19,9 +28,36 @@
  * This is also why the bot's card surface was retired: it projected rich
  * content into text and the projection became the product. Naming what is not
  * rendered keeps the gap visible instead of letting it close over.
+ *
+ * ─── THERE IS A SECOND PROJECTION, AND THAT IS DELIBERATE ──────────────────
+ *
+ * `remote-bridge/src/transcript-projection.ts` projects the same transcript
+ * into `{ text, parts[] }`. It is NOT a duplicate and merging the two would
+ * make one surface wrong.
+ *
+ *   this file   structured blocks, for a DOCUMENT — the tab renders an
+ *               interview's questions and distinguishes an answered one
+ *               (history) from a live prompt, and shows `reasoning`
+ *   the bridge  prose + flat markers, for a CARD — a scanning surface, which
+ *               excludes `reasoning` on purpose because it would swamp one
+ *
+ * A ticket proposed replacing this projection with the bridge's, on the
+ * strength of `readText` having read the wrong field. One defect is not an
+ * architectural claim: adopting it would flatten `interview` to a marker and
+ * lose a distinction that has already caused a defect once. Structure differs
+ * because the renderers differ.
+ *
+ * What the two share is VOCABULARY. Block labels and the naming of tools,
+ * paths, plans and to-dos live here, and the bridge's richer labels were
+ * lifted into `blockDetail` rather than left on one side of the seam.
  */
 
 import { jsonContentToMarkdown } from "@traycer/protocol/common/json-content-serializer";
+// TYPE-ONLY, and load-bearing: `BLOCK_LABELS` is keyed by this union, so the
+// protocol growing a block type is a compile error here. The runtime input to
+// this module stays `unknown` — it is raw JSON off the wire — and this import
+// costs nothing at runtime.
+import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
 
 /** A block as the transcript treats it. */
 export type TranscriptBlock =
@@ -75,7 +111,33 @@ export interface TranscriptMessage {
  * what happened; "Unsupported block" tells them only that we failed. The
  * former is a transcript with a summary in it; the latter is an apology.
  */
-const BLOCK_LABELS: Readonly<Record<string, string>> = {
+/**
+ * Every block type that does not render as prose, TIED TO THE PROTOCOL.
+ *
+ * `Record<LabelledBlockType, string>` is the point: `LabelledBlockType` is
+ * derived from `ContentBlock`, so a sixteenth member added to the protocol
+ * union FAILS TO COMPILE HERE. Before, this was `Record<string, string>` with
+ * a `?? \`Block: ${type}\`` fallback — a new protocol type would have become a
+ * chip reading "Block: whatever_it_is" in front of a user, with nothing
+ * failing and nobody aware. That is the same shape as the silently cropped
+ * screenshot and the silently trimmed view list: something goes missing and
+ * says nothing.
+ *
+ * A compile error is the correct response to a protocol growing.
+ *
+ * THE OLD MAP HAD THREE KEYS THAT CANNOT OCCUR — `model_rerouted`,
+ * `model_verification`, `safety_buffering`. They are real names, which is why
+ * they looked right, but they are `providerNoticeNormalizedMetadata` kinds and
+ * have never been members of `contentBlockSchema`. Three dead entries are what
+ * made a map with no coverage guarantee look complete. Removed: binding to the
+ * union makes them a compile error too.
+ *
+ * `text` and `reasoning` are excluded because they render AS prose and return
+ * before reaching a label — an entry for them would be a label nothing shows.
+ */
+type LabelledBlockType = Exclude<ContentBlock["type"], "text" | "reasoning">;
+
+const BLOCK_LABELS: Readonly<Record<LabelledBlockType, string>> = {
   approval: "Approval request",
   artifact_operation: "Artifact change",
   autonomous_resume: "Resumed automatically",
@@ -84,18 +146,23 @@ const BLOCK_LABELS: Readonly<Record<string, string>> = {
   error: "Error",
   file_change: "File change",
   interview: "Interview question",
-  model_rerouted: "Model rerouted",
-  model_verification: "Model verification",
   plan: "Plan",
-  safety_buffering: "Safety buffering",
   steer: "Steered",
   subagent: "Subagent",
   todo: "To-do list",
   tool_call: "Tool call",
 };
 
+/**
+ * The fallback stays, and is now genuinely a last resort rather than the
+ * silent path: the map is exhaustive over the union, so reaching this means
+ * the wire carried a `type` the protocol does not declare.
+ */
 function labelFor(blockType: string): string {
-  return BLOCK_LABELS[blockType] ?? `Block: ${blockType}`;
+  return (
+    (BLOCK_LABELS as Readonly<Record<string, string>>)[blockType] ??
+    `Block: ${blockType}`
+  );
 }
 
 /**
@@ -244,6 +311,57 @@ function blockDetail(
     const path = block["path"] ?? block["filePath"] ?? block["file"];
     return typeof path === "string" && path.trim().length > 0
       ? shortenWorkspacePath(path.trim())
+      : null;
+  }
+  /*
+   * FOUR MORE, LIFTED FROM THE BRIDGE'S PROJECTION.
+   *
+   * `remote-bridge` has always named these — `todo · 3 items`,
+   * `plan: <title>`, `approval: <tool>`, `artifact: <title>` — while this
+   * projection emitted the bare category, so the tab showed four chips saying
+   * only that something happened. Same divergence as `speakerLabel` and
+   * `humaniseToolName` before it, and the same resolution: what a block is
+   * CALLED is protocol grammar, identical in every client, so it lives here
+   * and both surfaces get it.
+   *
+   * Fourth instance of a rule living where it was first needed. The two
+   * projections stay separate — see the header — but their vocabulary should
+   * not.
+   */
+  if (type === "subagent") {
+    const name = block["name"] ?? block["agentType"];
+    return typeof name === "string" && name.trim().length > 0
+      ? name.trim()
+      : null;
+  }
+  if (type === "command") {
+    const command = block["command"];
+    return typeof command === "string" && command.trim().length > 0
+      ? command.trim()
+      : null;
+  }
+  if (type === "error") {
+    const message = block["message"];
+    return typeof message === "string" && message.trim().length > 0
+      ? message.trim()
+      : null;
+  }
+  if (type === "todo") {
+    const items = block["items"];
+    // The COUNT, not the items — a to-do list is a document and this is a
+    // chip. "3 items" is what a reader can act on at a glance.
+    return Array.isArray(items) ? `${String(items.length)} items` : null;
+  }
+  if (type === "plan" || type === "artifact_operation" || type === "interview") {
+    const title = block["title"];
+    return typeof title === "string" && title.trim().length > 0
+      ? title.trim()
+      : null;
+  }
+  if (type === "approval") {
+    const tool = block["toolName"];
+    return typeof tool === "string" && tool.trim().length > 0
+      ? humaniseToolName(tool.trim())
       : null;
   }
   return null;
