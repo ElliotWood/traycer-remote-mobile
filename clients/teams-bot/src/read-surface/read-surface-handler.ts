@@ -11,6 +11,11 @@ import { parseCommand } from "./commands";
 import { dispatchCommand, type DispatchDeps } from "./dispatch";
 import { dispatchActionInvoke } from "./dispatch-action";
 import { logInfo, logWarn } from "../logger";
+import { stripMentions, type MentionEntity } from "../intake/mention";
+import {
+  captureRawAttachments,
+  RAW_ATTACHMENT_LOG_FLAG,
+} from "../intake/attachment-capture";
 
 /**
  * The activity handler — messages and card actions.
@@ -33,7 +38,28 @@ class ReadSurfaceHandler extends ActivityHandler {
   }
 
   private async handleMessage(context: TurnContext): Promise<void> {
-    const command = parseCommand(context.activity.text ?? "");
+    // R2 GROUNDWORK, and a measurement rather than a feature: record what an
+    // attachment actually looks like in each conversation scope. Off unless
+    // the flag is set — a payload carries a customer file name and a
+    // pre-authorised download URL. Runs BEFORE parsing, so a message that
+    // carries only a file and no text is still observed.
+    captureRawAttachments({
+      attachments: context.activity.attachments,
+      conversationType: context.activity.conversation?.conversationType,
+      enabled: process.env[RAW_ATTACHMENT_LOG_FLAG] === "1",
+    });
+
+    // Mentions come off via the ENTITIES, which are the contract; the old
+    // `<at>` regex in `parseCommand` is a rendering assumption and stays only
+    // as a fallback. This matters more than it used to: the text is becoming
+    // classifier input rather than a verb lookup, so a stray "Traycer" at the
+    // front is a token in a decision about a customer document.
+    const spoken = stripMentions(
+      context.activity.text ?? "",
+      context.activity.entities as readonly MentionEntity[] | undefined,
+      context.activity.recipient?.id,
+    );
+    const command = parseCommand(spoken.text);
     const conversationId = context.activity.conversation?.id ?? "";
 
     if (conversationId === "") {
