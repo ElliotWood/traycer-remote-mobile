@@ -131,38 +131,38 @@ const VIEWS = [
   // EMPTY FIRST, deliberately: on this surface "nothing is waiting" is the
   // success state and the one most users see most often, so it is reviewed
   // first rather than last.
-  { name: "approvals", q: "preview=approvals", path: "/epics" },
-  { name: "artifact", q: "preview=artifact", path: "/epics" },
-  { name: "comments", q: "preview=comments", path: "/epics" },
-  { name: "authoring", q: "preview=authoring", path: "/epics" },
-  { name: "authoring-nohost", q: "preview=authoring&state=nohost", path: "/epics" },
+  { name: "approvals", q: "preview=approvals", path: "/epics", expects: ["Approval states", "The host declined this", "Reconnecting to your host"] },
+  { name: "artifact", q: "preview=artifact", path: "/epics", expects: ["Decision", "Couldn’t render this diagram", "and a link"] },
+  { name: "comments", q: "preview=comments", path: "/epics", expects: ["These words are inside an unknown node. They must still appear."] },
+  { name: "authoring", q: "preview=authoring", path: "/epics", expects: ["New epic", "Create epic", "can’t read your repository"] },
+  { name: "authoring-nohost", q: "preview=authoring&state=nohost", path: "/epics", expects: ["can’t create anything that has to run on one"] },
   // The EPIC form's own refusal — `createdBy` not yet resolved. Added here as
   // well as to the app, because a preview state absent from this list is one
   // no full run ever photographs: the URL exists and the gallery silently
   // skips it, which is how a state gets called "previewable" without ever
   // having been looked at.
-  { name: "authoring-noidentity", q: "preview=authoring&state=noidentity", path: "/epics" },
+  { name: "authoring-noidentity", q: "preview=authoring&state=noidentity", path: "/epics", expects: ["Still confirming who you’re signed in as"] },
   // Both creates failed. The only view where the retry-safety difference is
   // visible: same failure, opposite instruction.
-  { name: "authoring-unconfirmed", q: "preview=authoring&state=unconfirmed", path: "/epics" },
-  { name: "chat", q: "preview=chat", path: "/epics" },
-  { name: "chat-pending", q: "preview=chat&state=pending", path: "/epics" },
-  { name: "chat-unconfirmed", q: "preview=chat&state=unconfirmed", path: "/epics" },
-  { name: "waiting-empty", q: "preview=waiting&state=empty", path: "/waiting" },
-  { name: "waiting", q: "preview=waiting", path: "/waiting" },
-  { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting" },
-  { name: "waiting-error", q: "preview=waiting&state=error", path: "/waiting" },
-  { name: "epics", q: "preview=epics", path: "/epics" },
-  { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics" },
-  { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics" },
-  { name: "epics-error", q: "preview=epics&state=error", path: "/epics" },
-  { name: "epics-stale", q: "preview=epics&state=disconnected", path: "/epics" },
-  { name: "agents", q: "preview=agents", path: "/epics/e1000000-0000-4000-8000-000000000001" },
-  { name: "agents-loading", q: "preview=agents&state=loading", path: "/epics/e1000000-0000-4000-8000-000000000001" },
-  { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001" },
-  { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001" },
-  { name: "agents-deep", q: "preview=agents&state=deep", path: "/epics/e1000000-0000-4000-8000-000000000001" },
-  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001" },
+  { name: "authoring-unconfirmed", q: "preview=authoring&state=unconfirmed", path: "/epics", expects: ["it can’t make a second agent", "creating another artifact", "creating another epic"] },
+  { name: "chat", q: "preview=chat", path: "/epics", expects: ["Tool call: traycer send message", "File change: clients/teams-tab/src/config.ts", "Result"] },
+  { name: "chat-pending", q: "preview=chat&state=pending", path: "/epics", expects: ["Tool call: traycer send message"] },
+  { name: "chat-unconfirmed", q: "preview=chat&state=unconfirmed", path: "/epics", expects: ["Couldn’t confirm"] },
+  { name: "waiting-empty", q: "preview=waiting&state=empty", path: "/waiting", expects: ["Nothing is waiting on you"] },
+  { name: "waiting", q: "preview=waiting", path: "/waiting", expects: ["Streaming Transport Reconnect"] },
+  { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting", expects: [] },
+  { name: "waiting-error", q: "preview=waiting&state=error", path: "/waiting", expects: ["Couldn’t check what’s waiting"] },
+  { name: "epics", q: "preview=epics", path: "/epics", expects: ["Streaming Transport Reconnect", "Dependency Licence Audit"] },
+  { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics", expects: [] },
+  { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics", expects: [] },
+  { name: "epics-error", q: "preview=epics&state=error", path: "/epics", expects: ["Couldn’t load"] },
+  { name: "epics-stale", q: "preview=epics&state=disconnected", path: "/epics", expects: [] },
+  { name: "agents", q: "preview=agents", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Migrate config loader to zod", "Artifacts"] },
+  { name: "agents-loading", q: "preview=agents&state=loading", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Connecting to your host"] },
+  { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: [] },
+  { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Couldn’t load"] },
+  { name: "agents-deep", q: "preview=agents&state=deep", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Untitled agent (d1000000)", "Host not known yet"] },
+  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: [] },
 ];
 
 /**
@@ -196,6 +196,7 @@ mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({ executablePath });
 const written = new Set();
 let shots = 0;
+let expectationFailures = 0;
 try {
   for (const view of selected) {
     for (const theme of THEMES) {
@@ -276,6 +277,60 @@ try {
           await page.setViewportSize({ width: width.px, height });
           await page.waitForTimeout(120);
         }
+        /**
+         * THE DECLARED EXPECTATION, asserted against the rendered DOM before
+         * the image is written.
+         *
+         * Presence in the DOM is NOT the check. The text must land inside the
+         * region about to be captured — `bottom <= viewport height` — because
+         * the defect this exists to catch was text that was present, correct,
+         * and below the fold. `innerText.includes(...)` would have passed
+         * happily through the entire cropped window.
+         *
+         * What it closes, all of it demonstrated on this project:
+         *   silent truncation  expected text outside the captured region
+         *   polite fixture     a view claiming to test markdown with no fence
+         *                      cannot state an expectation it meets
+         *   stale fixture      `chat` expecting "Tool call: traycer send
+         *                      message" reddens the moment the client stops
+         *                      emitting that label
+         *
+         * A view with no expectation is NOT silently fine — it is counted and
+         * named at the end. "Look at the screen" is not a test, and this
+         * audit is what that cost.
+         */
+        for (const phrase of view.expects) {
+          const where = await page.evaluate((needle) => {
+            const walker = document.createTreeWalker(
+              document.body,
+              NodeFilter.SHOW_TEXT,
+            );
+            let node = walker.nextNode();
+            while (node !== null) {
+              if ((node.textContent ?? "").includes(needle)) {
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                const rect = range.getBoundingClientRect();
+                return { found: true, bottom: Math.ceil(rect.bottom) };
+              }
+              node = walker.nextNode();
+            }
+            return { found: false, bottom: null };
+          }, phrase);
+          const label = `${view.name}--${theme}--${width.name}`;
+          if (!where.found) {
+            console.error(`  EXPECTATION MISSING ${label}: ${JSON.stringify(phrase)} is not on the page`);
+            expectationFailures += 1;
+          } else {
+            const viewportHeight = page.viewportSize().height;
+            if (where.bottom > viewportHeight) {
+              console.error(
+                `  EXPECTATION CROPPED ${label}: ${JSON.stringify(phrase)} ends at ${String(where.bottom)}px, capture is ${String(viewportHeight)}px`,
+              );
+              expectationFailures += 1;
+            }
+          }
+        }
         // EVERY axis in the filename. A previous run wrote "6 images" and
         // produced 3, because the theme was missing from the name and each
         // shot overwrote its predecessor — and the false claim reached the
@@ -303,6 +358,23 @@ console.log(
       ? " (all views)"
       : ` — FILTERED to ${only.join(",")}, ${String(VIEWS.length - selected.length)} views not shot`),
 );
+/**
+ * Views with NOTHING to assert, named rather than tolerated.
+ *
+ * These are the ones to be suspicious of: a view that cannot state what it
+ * would show is a view that cannot fail, and the whole gallery was that until
+ * an hour ago.
+ */
+const undeclared = selected.filter((v) => v.expects.length === 0).map((v) => v.name);
+if (undeclared.length > 0) {
+  console.log(
+    `NO DECLARED EXPECTATION (${String(undeclared.length)} views, not a test): ${undeclared.join(", ")}`,
+  );
+}
+if (expectationFailures > 0) {
+  console.error(`FAILED: ${String(expectationFailures)} expectation(s) missing or outside the captured region`);
+  process.exit(1);
+}
 if (onDisk !== shots) {
   console.error("MISMATCH: images written != images shot");
   process.exit(1);
