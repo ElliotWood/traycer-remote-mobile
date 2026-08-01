@@ -35,9 +35,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/constants.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/constants.js
 var require_constants = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/constants.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/constants.js"(exports2, module2) {
     "use strict";
     var BINARY_TYPES = ["nodebuffer", "arraybuffer", "fragments"];
     var hasBlob = typeof Blob !== "undefined";
@@ -58,9 +58,9 @@ var require_constants = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/buffer-util.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/buffer-util.js
 var require_buffer_util = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/buffer-util.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/buffer-util.js"(exports2, module2) {
     "use strict";
     var { EMPTY_BUFFER } = require_constants();
     var FastBuffer = Buffer[Symbol.species];
@@ -133,9 +133,9 @@ var require_buffer_util = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/limiter.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/limiter.js
 var require_limiter = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/limiter.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/limiter.js"(exports2, module2) {
     "use strict";
     var kDone = /* @__PURE__ */ Symbol("kDone");
     var kRun = /* @__PURE__ */ Symbol("kRun");
@@ -183,9 +183,9 @@ var require_limiter = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/permessage-deflate.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/permessage-deflate.js
 var require_permessage_deflate = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/permessage-deflate.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/permessage-deflate.js"(exports2, module2) {
     "use strict";
     var zlib = require("zlib");
     var bufferUtil = require_buffer_util();
@@ -566,9 +566,9 @@ var require_permessage_deflate = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/validation.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/validation.js
 var require_validation = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/validation.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/validation.js"(exports2, module2) {
     "use strict";
     var { isUtf8 } = require("buffer");
     var { hasBlob } = require_constants();
@@ -767,9 +767,9 @@ var require_validation = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/receiver.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/receiver.js
 var require_receiver = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/receiver.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/receiver.js"(exports2, module2) {
     "use strict";
     var { Writable } = require("stream");
     var PerMessageDeflate2 = require_permessage_deflate();
@@ -1390,9 +1390,9 @@ var require_receiver = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/sender.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/sender.js
 var require_sender = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/sender.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/sender.js"(exports2, module2) {
     "use strict";
     var { Duplex } = require("stream");
     var { randomFillSync } = require("crypto");
@@ -1883,9 +1883,9 @@ var require_sender = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/event-target.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/event-target.js
 var require_event_target = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/event-target.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/event-target.js"(exports2, module2) {
     "use strict";
     var { kForOnEventAttribute, kListener } = require_constants();
     var kCode = /* @__PURE__ */ Symbol("kCode");
@@ -2112,9 +2112,9 @@ var require_event_target = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/extension.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/extension.js
 var require_extension = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/extension.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/extension.js"(exports2, module2) {
     "use strict";
     var { tokenChars } = require_validation();
     function push(dest, name, elem) {
@@ -2265,9 +2265,9 @@ var require_extension = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket.js
 var require_websocket = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket.js"(exports2, module2) {
     "use strict";
     var EventEmitter2 = require("events");
     var https = require("https");
@@ -3161,9 +3161,9 @@ var require_websocket = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/stream.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/stream.js
 var require_stream = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/stream.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/stream.js"(exports2, module2) {
     "use strict";
     var WebSocket2 = require_websocket();
     var { Duplex } = require("stream");
@@ -3259,9 +3259,9 @@ var require_stream = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/subprotocol.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/subprotocol.js
 var require_subprotocol = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/subprotocol.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/subprotocol.js"(exports2, module2) {
     "use strict";
     var { tokenChars } = require_validation();
     function parse3(header) {
@@ -3304,9 +3304,9 @@ var require_subprotocol = __commonJS({
   }
 });
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket-server.js
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket-server.js
 var require_websocket_server = __commonJS({
-  "node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket-server.js"(exports2, module2) {
+  "../../node_modules/.bun/ws@8.21.1/node_modules/ws/lib/websocket-server.js"(exports2, module2) {
     "use strict";
     var EventEmitter2 = require("events");
     var http = require("http");
@@ -3705,14 +3705,14 @@ var require_websocket_server = __commonJS({
   }
 });
 
-// clients/remote-bridge/src/index.ts
+// src/index.ts
 var index_exports = {};
 __export(index_exports, {
   BridgeClient: () => BridgeClient
 });
 module.exports = __toCommonJS(index_exports);
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/error.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
   /**
    * Constructs the CommanderError class
@@ -3741,7 +3741,7 @@ var InvalidArgumentError = class extends CommanderError {
   }
 };
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/argument.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/argument.js
 var Argument = class {
   /**
    * Initialize a new command argument with the given name and description.
@@ -3862,7 +3862,7 @@ function humanReadableArgName(arg) {
   return arg.required ? "<" + nameOutput + ">" : "[" + nameOutput + "]";
 }
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/command.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/command.js
 var import_node_events = require("node:events");
 var import_node_child_process = __toESM(require("node:child_process"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
@@ -3870,7 +3870,7 @@ var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_process = __toESM(require("node:process"), 1);
 var import_node_util2 = require("node:util");
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/help.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/help.js
 var import_node_util = require("node:util");
 var Help = class {
   constructor() {
@@ -4462,7 +4462,7 @@ ${itemIndentStr}`);
   }
 };
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/option.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/option.js
 var Option = class {
   /**
    * Initialize a new `Option` with the given `flags` and `description`.
@@ -4768,7 +4768,7 @@ function splitOptionFlags(flags) {
   return { shortFlag, longFlag };
 }
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/suggestSimilar.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/suggestSimilar.js
 var maxDistance = 3;
 function editDistance(a, b) {
   if (Math.abs(a.length - b.length) > maxDistance)
@@ -4843,7 +4843,7 @@ function suggestSimilar(word, candidates) {
   return "";
 }
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/lib/command.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/lib/command.js
 var Command = class _Command extends import_node_events.EventEmitter {
   /**
    * Initialize a new `Command`.
@@ -7077,13 +7077,13 @@ function useColor() {
   return void 0;
 }
 
-// node_modules/.bun/commander@15.0.0/node_modules/commander/index.js
+// ../../node_modules/.bun/commander@15.0.0/node_modules/commander/index.js
 var program = new Command();
 
-// clients/remote-bridge/src/bridge-client.ts
+// src/bridge-client.ts
 var import_node_crypto6 = require("node:crypto");
 
-// protocol/src/framework/versioned-rpc-types.ts
+// ../../protocol/src/framework/versioned-rpc-types.ts
 var RPC_ERROR_CODES = [
   "RPC_ERROR",
   "DOWNGRADE_UNSUPPORTED",
@@ -7106,7 +7106,7 @@ function isRpcErrorCode(value) {
   return RPC_ERROR_CODES.includes(value);
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -7349,7 +7349,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -7628,7 +7628,7 @@ __export(core_exports2, {
   version: () => version
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -7705,7 +7705,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -8401,7 +8401,7 @@ var Class = class {
   }
 };
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -8540,7 +8540,7 @@ function prettifyError(error51) {
   return lines.join("\n");
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -8628,7 +8628,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   base64: () => base64,
@@ -8787,7 +8787,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -9335,7 +9335,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -9371,14 +9371,14 @@ var Doc = class {
   }
 };
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -11471,7 +11471,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -11528,7 +11528,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -11635,7 +11635,7 @@ function ar_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -11741,7 +11741,7 @@ function az_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11898,7 +11898,7 @@ function be_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -12019,7 +12019,7 @@ function bg_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -12128,7 +12128,7 @@ function ca_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -12240,7 +12240,7 @@ function cs_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -12356,7 +12356,7 @@ function da_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -12465,7 +12465,7 @@ function de_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/el.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -12575,7 +12575,7 @@ function el_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/en.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -12688,7 +12688,7 @@ function en_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/eo.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -12798,7 +12798,7 @@ function eo_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/es.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -12931,7 +12931,7 @@ function es_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fa.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -13046,7 +13046,7 @@ function fa_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fi.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -13159,7 +13159,7 @@ function fi_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -13285,7 +13285,7 @@ function fr_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/fr-CA.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -13393,7 +13393,7 @@ function fr_CA_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/he.js
 var error17 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -13588,7 +13588,7 @@ function he_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hr.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -13711,7 +13711,7 @@ function hr_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -13820,7 +13820,7 @@ function hu_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -13968,7 +13968,7 @@ function hy_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/id.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -14075,7 +14075,7 @@ function id_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/is.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -14185,7 +14185,7 @@ function is_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/it.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -14294,7 +14294,7 @@ function it_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ja.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -14402,7 +14402,7 @@ function ja_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ka.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -14515,7 +14515,7 @@ function ka_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/km.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -14626,12 +14626,12 @@ function km_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ko.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -14743,7 +14743,7 @@ function ko_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -14947,7 +14947,7 @@ function lt_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/mk.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -15057,7 +15057,7 @@ function mk_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ms.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -15165,7 +15165,7 @@ function ms_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/nl.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -15276,7 +15276,7 @@ function nl_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/no.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -15385,7 +15385,7 @@ function no_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ota.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -15495,7 +15495,7 @@ function ota_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ps.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -15610,7 +15610,7 @@ function ps_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pl.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -15720,7 +15720,7 @@ function pl_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/pt.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -15829,7 +15829,7 @@ function pt_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ro.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -15949,7 +15949,7 @@ function ro_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -16106,7 +16106,7 @@ function ru_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sl.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -16216,7 +16216,7 @@ function sl_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/sv.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -16327,7 +16327,7 @@ function sv_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ta.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -16438,7 +16438,7 @@ function ta_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/th.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -16549,7 +16549,7 @@ function th_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/tr.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -16655,7 +16655,7 @@ function tr_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uk.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -16764,12 +16764,12 @@ function uk_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/ur.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -16880,7 +16880,7 @@ function ur_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/uz.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -16991,7 +16991,7 @@ function uz_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/vi.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -17100,7 +17100,7 @@ function vi_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-CN.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -17210,7 +17210,7 @@ function zh_CN_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/zh-TW.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -17318,7 +17318,7 @@ function zh_TW_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/locales/yo.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -17426,7 +17426,7 @@ function yo_default() {
   };
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -17476,7 +17476,7 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
 // @__NO_SIDE_EFFECTS__
 function _string(Class2, params) {
   return new Class2({
@@ -18515,7 +18515,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -18874,7 +18874,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -19418,7 +19418,7 @@ function toJSONSchema(input, params) {
   return finalize(ctx, input);
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -19493,10 +19493,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -19667,7 +19667,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -19701,7 +19701,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19742,7 +19742,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -19782,7 +19782,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -19796,7 +19796,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap();
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -21086,7 +21086,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -21112,7 +21112,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -21592,7 +21592,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -21617,10 +21617,10 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
+// ../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/external.js
 config(en_default());
 
-// protocol/src/framework/json-schema-fingerprint.ts
+// ../../protocol/src/framework/json-schema-fingerprint.ts
 function toJsonSchemaFingerprint(schema, context) {
   return convertJsonSchemaShape(
     external_exports.toJSONSchema(schema, { unrepresentable: "any" }),
@@ -21833,7 +21833,7 @@ function describeAdditivityViolation(violation) {
   }
 }
 
-// protocol/src/framework/versioned-rpc.ts
+// ../../protocol/src/framework/versioned-rpc.ts
 function defineRpcContract(contract) {
   return contract;
 }
@@ -22214,7 +22214,7 @@ function assertBackwardMajorOrder(fromMajor, toMajor) {
   }
 }
 
-// protocol/src/framework/versioned-record.ts
+// ../../protocol/src/framework/versioned-record.ts
 function defineRecordContract(contract) {
   return contract;
 }
@@ -22425,7 +22425,7 @@ function getVersionEntry2(registry2, major, minor) {
   return entry;
 }
 
-// protocol/src/framework/ws-protocol.ts
+// ../../protocol/src/framework/ws-protocol.ts
 var schemaVersionSchema = external_exports.object({
   major: external_exports.number().int().nonnegative(),
   minor: external_exports.number().int().nonnegative()
@@ -22508,7 +22508,7 @@ var hostFrameSchema = external_exports.discriminatedUnion("kind", [
   hostFatalErrorFrameSchema
 ]);
 
-// protocol/src/framework/compat-helpers.ts
+// ../../protocol/src/framework/compat-helpers.ts
 function canonicalForMethodVersionLine(methodRegistry, method) {
   let latestMajor = null;
   for (const key of Object.keys(methodRegistry)) {
@@ -22594,7 +22594,7 @@ function buildIncompatibleReason(methods) {
   return `Incompatible methods: ${names.join(", ")}`;
 }
 
-// protocol/src/framework/capability-manifest.ts
+// ../../protocol/src/framework/capability-manifest.ts
 function buildConnectionManifest(registry2) {
   const manifest = {};
   for (const method of Object.keys(registry2)) {
@@ -22619,7 +22619,7 @@ function mergeConnectionManifests(manifest, optionalManifest) {
   return { ...manifest, ...optionalManifest };
 }
 
-// protocol/src/framework/compatibility-checker.ts
+// ../../protocol/src/framework/compatibility-checker.ts
 function check2(myRegistry, myManifest, theirManifest, selfRole) {
   const methodNames = collectManifestMethods(myManifest, theirManifest);
   const incompatibleMethods = [];
@@ -22710,7 +22710,7 @@ function getMajorLine3(myRegistry, method, major) {
   return methodRegistry[major];
 }
 
-// protocol/src/framework/versioned-stream-rpc.ts
+// ../../protocol/src/framework/versioned-stream-rpc.ts
 function defineStreamRpcContract(contract) {
   return contract;
 }
@@ -22917,7 +22917,7 @@ function getHighestInstalledNumber3(values) {
   return latest;
 }
 
-// protocol/src/common/schemas.ts
+// ../../protocol/src/common/schemas.ts
 var jsonContentMarkSchema = external_exports.object({
   type: external_exports.string(),
   attrs: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
@@ -22929,7 +22929,7 @@ var accountContextSchema = external_exports.discriminatedUnion("type", [
 ]);
 var DEFAULT_ACCOUNT_CONTEXT = { type: "PERSONAL" };
 
-// protocol/src/common/_internal/schemas.ts
+// ../../protocol/src/common/_internal/schemas.ts
 var attachmentMentionAttrsSchema = external_exports.object({
   contextType: external_exports.literal("attachment"),
   fileName: external_exports.string(),
@@ -22973,7 +22973,7 @@ var harnessIdSchema = external_exports.enum([
   "hermes"
 ]);
 
-// protocol/src/common/registry.ts
+// ../../protocol/src/common/registry.ts
 var jsonContentSchema = external_exports.lazy(
   () => external_exports.object({
     type: external_exports.string().optional(),
@@ -23105,7 +23105,7 @@ var commonRecordRegistry = defineVersionedRecordRegistry({
   }
 });
 
-// protocol/src/persistence/epic/foundation.ts
+// ../../protocol/src/persistence/epic/foundation.ts
 var parentArtifactReferenceSchema = external_exports.object({
   parentId: external_exports.string().nullable()
 });
@@ -23191,7 +23191,7 @@ var chatRunSettingsStrictSchema = external_exports.object({
   profileId: external_exports.string().nullable()
 });
 
-// protocol/src/host/agent/shared.ts
+// ../../protocol/src/host/agent/shared.ts
 var harnessIdSchema2 = getRecordSchema(
   commonRecordRegistry,
   "harness-id",
@@ -23538,7 +23538,7 @@ var stopAgentResponseSchema = external_exports.object({
   stoppedAgentIds: external_exports.array(external_exports.string())
 });
 
-// protocol/src/host/agent/contracts.ts
+// ../../protocol/src/host/agent/contracts.ts
 var agentCreateV10 = defineRpcContract({
   method: "agent.create",
   schemaVersion: { major: 1, minor: 0 },
@@ -23943,7 +23943,7 @@ var agentStopV10 = defineRpcContract({
   responseSchema: stopAgentResponseSchema
 });
 
-// protocol/src/host/provider-schemas.ts
+// ../../protocol/src/host/provider-schemas.ts
 var providerIdSchema = external_exports.enum([
   "claude-code",
   "codex",
@@ -24655,7 +24655,7 @@ function upgradeProviderCliStateV10ToMutationV20(state) {
   });
 }
 
-// protocol/src/host/rate-limit/schemas.ts
+// ../../protocol/src/host/rate-limit/schemas.ts
 var rateLimitUsageRequestSchemaV10 = external_exports.object({});
 var rateLimitUsageRequestSchemaV11 = rateLimitUsageRequestSchemaV10.extend({
   accountContext: accountContextSchema.default(DEFAULT_ACCOUNT_CONTEXT)
@@ -24904,7 +24904,7 @@ var providersConsumeRateLimitResetCreditResponseSchema = external_exports.object
   outcome: codexRateLimitResetOutcomeSchema
 });
 
-// protocol/src/host/agent/profiles.ts
+// ../../protocol/src/host/agent/profiles.ts
 var agentListProviderProfilesRequestSchema = external_exports.object({
   epicId: external_exports.string(),
   senderAgentId: external_exports.string(),
@@ -25102,7 +25102,7 @@ var agentConfigureDowngradeV20ToV10 = defineDowngradePath({
   }
 });
 
-// protocol/src/host/agent/inbox.ts
+// ../../protocol/src/host/agent/inbox.ts
 var textFrameFields = {
   hasBinaryPayload: external_exports.literal(false)
 };
@@ -25269,7 +25269,7 @@ var agentInboxReadV10 = defineRpcContract({
   responseSchema: agentInboxReadResponseSchema
 });
 
-// protocol/src/common/workspace-association.ts
+// ../../protocol/src/common/workspace-association.ts
 var workspaceDirectoriesSchema = {
   primaryWorkspace: external_exports.string(),
   secondaryWorkspaces: external_exports.array(external_exports.string()).default([])
@@ -25283,7 +25283,7 @@ var sessionWorkspaceSnapshotSchema = external_exports.object({
   ...workspaceDirectoriesSchema
 });
 
-// protocol/src/persistence/epic/senders.ts
+// ../../protocol/src/persistence/epic/senders.ts
 var userSenderSchema = external_exports.object({
   type: external_exports.literal("user"),
   userId: external_exports.string()
@@ -25557,7 +25557,7 @@ var chatSessionAnchorSchema = external_exports.discriminatedUnion("harnessId", [
   hermesChatSessionAnchorSchema
 ]);
 
-// protocol/src/persistence/epic/content-blocks.ts
+// ../../protocol/src/persistence/epic/content-blocks.ts
 var baseBlockFields = {
   blockId: external_exports.string(),
   status: external_exports.enum(["streaming", "completed", "errored"]),
@@ -26133,7 +26133,7 @@ var contentBlockSchema = external_exports.discriminatedUnion("type", [
   artifactOperationBlockSchema
 ]);
 
-// protocol/src/host/agent/gui/unary-schemas.ts
+// ../../protocol/src/host/agent/gui/unary-schemas.ts
 var harnessSurfaceSchema = external_exports.enum(["gui", "tui"]);
 var guiHarnessOptionSchema = external_exports.object({
   id: guiHarnessIdSchema2,
@@ -26292,7 +26292,7 @@ var getGuiAgentPlanResponseSchema = external_exports.object({
   unavailableReason: getGuiAgentPlanUnavailableReasonSchema.nullable()
 });
 
-// protocol/src/persistence/epic/messages.ts
+// ../../protocol/src/persistence/epic/messages.ts
 var jsonContentSchema3 = getRecordSchema(
   commonRecordRegistry,
   "json-content",
@@ -26411,7 +26411,7 @@ var messageSchemaPreInReplyTo = external_exports.discriminatedUnion("role", [
   assistantMessageSchemaPreInReplyTo
 ]);
 
-// protocol/src/persistence/epic/chat-events.ts
+// ../../protocol/src/persistence/epic/chat-events.ts
 var chatEventTypeSchema = external_exports.enum([
   "send.accepted",
   "send.failed",
@@ -26483,7 +26483,7 @@ var chatEventSchemaPreInReplyTo = external_exports.object({
   metadata: external_exports.record(external_exports.string(), external_exports.unknown()).nullable()
 });
 
-// protocol/src/persistence/epic/chat.ts
+// ../../protocol/src/persistence/epic/chat.ts
 var claudePendingWakeSchema = external_exports.object({
   sessionId: external_exports.string(),
   toolUseId: external_exports.string(),
@@ -26527,7 +26527,7 @@ var chatSchemaPreInReplyTo = external_exports.object({
   events: external_exports.array(chatEventSchemaPreInReplyTo).default([])
 });
 
-// protocol/src/persistence/epic/artifacts.ts
+// ../../protocol/src/persistence/epic/artifacts.ts
 var ticketStatusSchema2 = getRecordSchema(
   commonRecordRegistry,
   "ticket-status",
@@ -26605,7 +26605,7 @@ var deletedEpicArtifactSchema = external_exports.discriminatedUnion("kind", [
   deletedReviewArtifactSchema
 ]);
 
-// protocol/src/host/worktree-schemas.ts
+// ../../protocol/src/host/worktree-schemas.ts
 var repoIdentifierSchema = external_exports.object({
   owner: external_exports.string(),
   repo: external_exports.string()
@@ -27106,7 +27106,7 @@ var worktreeSetRepoScriptsResponseSchema = external_exports.object({
   updated: external_exports.boolean()
 });
 
-// protocol/src/persistence/epic/tui-agents.ts
+// ../../protocol/src/persistence/epic/tui-agents.ts
 var baseTuiAgentFields = {
   id: external_exports.string(),
   parentId: external_exports.string().nullable(),
@@ -27165,7 +27165,7 @@ var tuiAgentSchema = external_exports.discriminatedUnion("harnessId", [
   cursorTuiAgentSchema
 ]);
 
-// protocol/src/persistence/epic/checkpoint-manifests.ts
+// ../../protocol/src/persistence/epic/checkpoint-manifests.ts
 var checkpointFileOperationSchema = external_exports.enum([
   "edit",
   "create",
@@ -27224,7 +27224,7 @@ var restoreResultManifestSchema = external_exports.object({
   results: external_exports.array(restoreResultEntrySchema)
 });
 
-// protocol/src/host/agent/gui/agent-runtime.ts
+// ../../protocol/src/host/agent/gui/agent-runtime.ts
 var attachmentMentionAttrsSchema2 = getRecordSchema(
   commonRecordRegistry,
   "attachment-mention-attrs",
@@ -28015,7 +28015,7 @@ var runtimeEventSchemaPreInReplyTo = external_exports.discriminatedUnion("type",
   providerNoticeUpsertEventSchema
 ]);
 
-// protocol/src/host/agent/gui/subscribe.ts
+// ../../protocol/src/host/agent/gui/subscribe.ts
 var jsonContentSchema5 = getRecordSchema(
   commonRecordRegistry,
   "json-content",
@@ -29179,7 +29179,7 @@ var chatSubscribeV14 = defineStreamRpcContract({
   clientFrameSchema: chatSubscribeClientFrameSchema
 });
 
-// protocol/src/host/agent/gui/contracts.ts
+// ../../protocol/src/host/agent/gui/contracts.ts
 var agentGuiListHarnessesV10 = defineRpcContract({
   method: "agent.gui.listHarnesses",
   schemaVersion: { major: 1, minor: 0 },
@@ -29437,7 +29437,7 @@ var agentGuiGetPlanV10 = defineRpcContract({
   responseSchema: getGuiAgentPlanResponseSchema
 });
 
-// protocol/src/host/search-text-preview-schema.ts
+// ../../protocol/src/host/search-text-preview-schema.ts
 var SEARCH_TEXT_PREVIEW_MAX_BYTES = 512;
 var searchTextPreviewRangeSchema = external_exports.object({
   startByte: external_exports.number().int().nonnegative(),
@@ -29449,7 +29449,7 @@ var searchTextPreviewRangeSchema = external_exports.object({
   }
 );
 
-// protocol/src/host/epic/unary-schemas.ts
+// ../../protocol/src/host/epic/unary-schemas.ts
 var LatestEpicArtifactKindSchema = getRecordSchema(
   commonRecordRegistry,
   "epic-artifact-kind",
@@ -30253,7 +30253,7 @@ var searchArtifactsResponseSchema = external_exports.object({
   truncated: external_exports.boolean()
 });
 
-// protocol/src/host/agent/tui/unary-schemas.ts
+// ../../protocol/src/host/agent/tui/unary-schemas.ts
 var tuiHarnessOptionSchema = external_exports.object({
   id: tuiHarnessIdSchema2,
   label: external_exports.string(),
@@ -30368,7 +30368,7 @@ var recordTuiAgentActivityRequestSchemaV11 = recordTuiAgentActivityRequestSchema
   observedHarnessSessionId: external_exports.string().nullable().default(null)
 });
 
-// protocol/src/host/agent/tui/contracts.ts
+// ../../protocol/src/host/agent/tui/contracts.ts
 var agentTuiListHarnessesV10 = defineRpcContract({
   method: "agent.tui.listHarnesses",
   schemaVersion: { major: 1, minor: 0 },
@@ -30415,7 +30415,7 @@ var agentTuiRecordActivityUpgradeV10ToV11 = defineUpgradePath({
   upgradeResponse: (response) => response
 });
 
-// protocol/src/host/comments/schemas.ts
+// ../../protocol/src/host/comments/schemas.ts
 var commentThreadStatusFilterSchema = external_exports.enum([
   "all",
   "open",
@@ -30467,7 +30467,7 @@ var commentsSetThreadStatusResponseSchema = external_exports.object({
   failed: external_exports.array(commentsFailedThreadStatusSchema)
 });
 
-// protocol/src/host/comments/contracts.ts
+// ../../protocol/src/host/comments/contracts.ts
 var commentsListThreadsV10 = defineRpcContract({
   method: "comments.listThreads",
   schemaVersion: { major: 1, minor: 0 },
@@ -30481,7 +30481,7 @@ var commentsSetThreadStatusV10 = defineRpcContract({
   responseSchema: commentsSetThreadStatusResponseSchema
 });
 
-// protocol/src/host/status/contracts.ts
+// ../../protocol/src/host/status/contracts.ts
 var hostStatusV10 = defineRpcContract({
   method: "host.status",
   schemaVersion: { major: 1, minor: 0 },
@@ -30496,7 +30496,7 @@ var hostStatusV10 = defineRpcContract({
   })
 });
 
-// protocol/src/host/runtime-capabilities/schemas.ts
+// ../../protocol/src/host/runtime-capabilities/schemas.ts
 var runtimeCapabilitiesRequestSchema = external_exports.object({}).strict();
 var chatMessageListCapabilityProviderSchema = external_exports.literal(
   "virtuoso-message-list"
@@ -30533,7 +30533,7 @@ var runtimeCapabilitiesResponseSchema = external_exports.object({
   chatMessageList: chatMessageListCapabilitySchema
 });
 
-// protocol/src/host/runtime-capabilities/contracts.ts
+// ../../protocol/src/host/runtime-capabilities/contracts.ts
 var hostGetRuntimeCapabilitiesV10 = defineRpcContract({
   method: "host.getRuntimeCapabilities",
   schemaVersion: { major: 1, minor: 0 },
@@ -30541,7 +30541,7 @@ var hostGetRuntimeCapabilitiesV10 = defineRpcContract({
   responseSchema: runtimeCapabilitiesResponseSchema
 });
 
-// protocol/src/host/rate-limit/contracts.ts
+// ../../protocol/src/host/rate-limit/contracts.ts
 function mapUsageFetchFailedToNotAvailable(providerRateLimits) {
   if (providerRateLimits !== null && providerRateLimits.available === false && providerRateLimits.reason === "usage_fetch_failed") {
     return { ...providerRateLimits, reason: "rate_limits_not_available" };
@@ -30665,7 +30665,7 @@ var hostGetRateLimitUsageDowngradeV3ToV1 = defineDowngradePath({
   })
 });
 
-// protocol/src/host/epic/snapshot-meta.ts
+// ../../protocol/src/host/epic/snapshot-meta.ts
 var permissionRoleSchema2 = getRecordSchema(
   commonRecordRegistry,
   "permission-role",
@@ -30703,7 +30703,7 @@ var earlyMetaEpicSchema = external_exports.object({
   unresolvedRepos: external_exports.array(taskRepoIdentifierSchema)
 });
 
-// protocol/src/host/epic/subscribe.ts
+// ../../protocol/src/host/epic/subscribe.ts
 var permissionRoleSchema3 = getRecordSchema(
   commonRecordRegistry,
   "permission-role",
@@ -30936,7 +30936,7 @@ var epicSubscribeV10 = defineStreamRpcContract({
   clientFrameSchema: epicSubscribeClientFrameSchema
 });
 
-// protocol/src/host/epic/contracts.ts
+// ../../protocol/src/host/epic/contracts.ts
 var epicListTasksV10 = defineRpcContract({
   method: "epic.listTasks",
   schemaVersion: { major: 1, minor: 0 },
@@ -31199,7 +31199,7 @@ var epicSearchArtifactsV10 = defineRpcContract({
   responseSchema: searchArtifactsResponseSchema
 });
 
-// protocol/src/host/workspace/unary-schemas.ts
+// ../../protocol/src/host/workspace/unary-schemas.ts
 var workspaceMentionGitTypeSchema = external_exports.enum([
   "against_uncommitted_changes",
   "against_branch",
@@ -31492,7 +31492,7 @@ var workspaceSearchTextResponseSchema = external_exports.union([
   workspaceSearchTextEpicArtifactsResponseSchema
 ]);
 
-// protocol/src/host/workspace/contracts.ts
+// ../../protocol/src/host/workspace/contracts.ts
 var workspacePrepareFoldersV10 = defineRpcContract({
   method: "workspace.prepareFolders",
   schemaVersion: { major: 1, minor: 0 },
@@ -31572,7 +31572,7 @@ var workspaceSearchTextV10 = defineRpcContract({
   responseSchema: workspaceSearchTextResponseSchema
 });
 
-// protocol/src/host/terminal/unary-schemas.ts
+// ../../protocol/src/host/terminal/unary-schemas.ts
 var terminalSessionStatusSchema = external_exports.enum(["running", "exited"]);
 var terminalSessionKindSchema = external_exports.enum(["terminal", "terminal-agent"]);
 var terminalSessionExitReasonSchema = external_exports.enum([
@@ -31694,7 +31694,7 @@ var renameTerminalResponseSchema = external_exports.object({
   updated: external_exports.boolean()
 });
 
-// protocol/src/host/terminal/subscribe.ts
+// ../../protocol/src/host/terminal/subscribe.ts
 var textFrameFields3 = {
   hasBinaryPayload: external_exports.literal(false)
 };
@@ -31941,7 +31941,7 @@ var terminalSubscribeV10 = defineStreamRpcContract({
   clientFrameSchema: terminalSubscribeClientFrameSchemaV10
 });
 
-// protocol/src/host/terminal/contracts.ts
+// ../../protocol/src/host/terminal/contracts.ts
 var terminalCreateV10 = defineRpcContract({
   method: "terminal.create",
   schemaVersion: { major: 1, minor: 0 },
@@ -32078,7 +32078,7 @@ var terminalRenameV10 = defineRpcContract({
   responseSchema: renameTerminalResponseSchema
 });
 
-// protocol/src/host/notifications/subscribe.ts
+// ../../protocol/src/host/notifications/subscribe.ts
 var notificationsSubscribeOpenRequestSchema = external_exports.object({});
 var notificationsSnapshotMetaSchema = external_exports.object({
   schemaVersion: external_exports.string()
@@ -32122,7 +32122,7 @@ var notificationsSubscribeV10 = defineStreamRpcContract({
   clientFrameSchema: notificationsSubscribeClientFrameSchema
 });
 
-// protocol/src/host/notifications/host-notifications.ts
+// ../../protocol/src/host/notifications/host-notifications.ts
 var textFrameFields4 = {
   hasBinaryPayload: external_exports.literal(false)
 };
@@ -32676,7 +32676,7 @@ var hostNotificationHooksSave = defineRpcContract({
   responseSchema: notificationHooksStatusResponseSchema
 });
 
-// protocol/src/host/notifications/payloads.ts
+// ../../protocol/src/host/notifications/payloads.ts
 var idSchema = external_exports.string().min(1);
 var hostNotificationChatStoppedPayloadSchema = external_exports.object({
   kind: external_exports.literal("chat"),
@@ -32755,7 +32755,7 @@ var hostNotificationKnownPayloadSchema = external_exports.discriminatedUnion("ki
   hostNotificationInterviewPayloadSchema
 ]);
 
-// protocol/src/host/released-floor.ts
+// ../../protocol/src/host/released-floor.ts
 var RELEASED_FLOOR_METHOD_NAMES = [
   "agent.create",
   "agent.getTranscript",
@@ -32872,7 +32872,7 @@ var RELEASED_FLOOR_METHOD_NAMES = [
   "worktree.setRepoScripts"
 ];
 
-// protocol/src/host/resources/subscribe.ts
+// ../../protocol/src/host/resources/subscribe.ts
 var resourcesSubscribeOpenRequestV10Schema = external_exports.object({
   epicId: external_exports.string()
 });
@@ -33077,7 +33077,7 @@ var resourcesKillV10 = defineRpcContract({
   responseSchema: resourcesKillResponseSchema
 });
 
-// protocol/src/host/speech/schemas.ts
+// ../../protocol/src/host/speech/schemas.ts
 var speechDownloadStateSchema = external_exports.enum([
   "absent",
   "downloading",
@@ -33099,7 +33099,7 @@ var speechModelStatusSchema = speechModelDiskStatusSchema.extend({
   engineAvailable: external_exports.boolean()
 });
 
-// protocol/src/host/speech/contracts.ts
+// ../../protocol/src/host/speech/contracts.ts
 var speechGetModelStatusRequestSchema = external_exports.object({
   modelId: external_exports.string().nullable()
 });
@@ -33121,7 +33121,7 @@ var speechEnsureModelV10 = defineRpcContract({
   responseSchema: speechEnsureModelResponseSchema
 });
 
-// protocol/src/host/speech/subscribe.ts
+// ../../protocol/src/host/speech/subscribe.ts
 var textFrameFields5 = {
   hasBinaryPayload: external_exports.literal(false)
 };
@@ -33184,7 +33184,7 @@ var speechDictateV10 = defineStreamRpcContract({
   clientFrameSchema: speechDictateClientFrameSchema
 });
 
-// protocol/src/host/migration/unary-schemas.ts
+// ../../protocol/src/host/migration/unary-schemas.ts
 var migratePhaseToEpicRequestSchema = external_exports.object({
   phaseId: external_exports.string()
 });
@@ -33192,7 +33192,7 @@ var migratePhaseToEpicResponseSchema = external_exports.object({
   epicId: external_exports.string()
 });
 
-// protocol/src/host/migration/run.ts
+// ../../protocol/src/host/migration/run.ts
 var migrationRunOpenRequestSchema = external_exports.object({});
 var taskChainOutcomeSchema = external_exports.enum(["complete", "skipped", "failed"]);
 var epicOutcomeSchema = external_exports.enum(["complete", "failed"]);
@@ -33261,7 +33261,7 @@ var migrationRunV10 = defineStreamRpcContract({
   clientFrameSchema: migrationRunClientFrameSchema
 });
 
-// protocol/src/host/migration/contracts.ts
+// ../../protocol/src/host/migration/contracts.ts
 var phaseMigrateToEpicV10 = defineRpcContract({
   method: "phase.migrateToEpic",
   schemaVersion: { major: 1, minor: 0 },
@@ -33269,7 +33269,7 @@ var phaseMigrateToEpicV10 = defineRpcContract({
   responseSchema: migratePhaseToEpicResponseSchema
 });
 
-// protocol/src/host/worktree-delete-stream.ts
+// ../../protocol/src/host/worktree-delete-stream.ts
 var worktreeDeleteByPathOpenRequestSchema = external_exports.object({
   worktreePath: external_exports.string(),
   scripts: worktreeEntryScriptsSchema.nullable().default(null)
@@ -33328,7 +33328,7 @@ var worktreeDeleteByPathStreamV10 = defineStreamRpcContract({
   clientFrameSchema: worktreeDeleteByPathClientFrameSchema
 });
 
-// protocol/src/host/worktree-changed-stream.ts
+// ../../protocol/src/host/worktree-changed-stream.ts
 var worktreeChangedOpenRequestSchema = external_exports.object({});
 var worktreeChangedScopeSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({
@@ -33365,7 +33365,7 @@ var worktreeChangedV10 = defineStreamRpcContract({
   clientFrameSchema: worktreeChangedClientFrameSchema
 });
 
-// protocol/src/host/editor/unary-schemas.ts
+// ../../protocol/src/host/editor/unary-schemas.ts
 var EDITORS = [
   { id: "vscode", label: "VS Code", urlScheme: "vscode" },
   { id: "cursor", label: "Cursor", urlScheme: "cursor" },
@@ -33380,7 +33380,7 @@ var openPathsRequestSchema = external_exports.object({
 });
 var openPathsResponseSchema = external_exports.object({});
 
-// protocol/src/host/editor/contracts.ts
+// ../../protocol/src/host/editor/contracts.ts
 var editorOpenPathsV10 = defineRpcContract({
   method: "editor.openPaths",
   schemaVersion: { major: 1, minor: 0 },
@@ -33388,11 +33388,11 @@ var editorOpenPathsV10 = defineRpcContract({
   responseSchema: openPathsResponseSchema
 });
 
-// protocol/src/host/git-constants.ts
+// ../../protocol/src/host/git-constants.ts
 var DEFAULT_GIT_FILE_DIFF_BYTE_BUDGET = 256 * 1024;
 var DEFAULT_GIT_FILE_DIFFS_BYTE_BUDGET = 1048576;
 
-// protocol/src/host/git-schemas.ts
+// ../../protocol/src/host/git-schemas.ts
 var gitFileStatusSchema = external_exports.enum([
   "modified",
   "added",
@@ -33676,7 +33676,7 @@ var gitSubscribeStatusEventSchemaV12 = external_exports.discriminatedUnion("type
   })
 ]);
 
-// protocol/src/host/git-contracts.ts
+// ../../protocol/src/host/git-contracts.ts
 var gitListChangedFilesV10 = defineRpcContract({
   method: "git.listChangedFiles",
   schemaVersion: { major: 1, minor: 0 },
@@ -33742,7 +33742,7 @@ var gitSubscribeStatusV12 = defineStreamRpcContract({
   clientFrameSchema: noClientFramesSchema
 });
 
-// protocol/src/host/snapshot-schemas.ts
+// ../../protocol/src/host/snapshot-schemas.ts
 var snapshotsGetLocalStorageSizeRequestSchema = external_exports.object({});
 var snapshotsGetLocalStorageSizeResponseSchema = external_exports.object({
   bytes: external_exports.number().int().nonnegative()
@@ -33761,7 +33761,7 @@ var snapshotsReadSnapshotDiffResponseSchema = external_exports.object({
   reason: fileEditReasonSchema
 });
 
-// protocol/src/host/registry.ts
+// ../../protocol/src/host/registry.ts
 var snapshotsGetLocalStorageSizeV10 = defineRpcContract({
   method: "snapshots.getLocalStorageSize",
   schemaVersion: { major: 1, minor: 0 },
@@ -37314,7 +37314,7 @@ var hostStreamRpcRegistry = defineVersionedStreamRpcRegistry({
   }
 });
 
-// protocol/src/auth/request-context.ts
+// ../../protocol/src/auth/request-context.ts
 var CredentialLeaseReleasedError = class extends Error {
   constructor(message) {
     super(message ?? "Credential lease has been released");
@@ -37322,7 +37322,7 @@ var CredentialLeaseReleasedError = class extends Error {
   }
 };
 
-// clients/shared/host-transport/host-messenger.ts
+// ../shared/host-transport/host-messenger.ts
 var HostRpcError = class _HostRpcError extends Error {
   code;
   requestId;
@@ -37379,7 +37379,7 @@ function isTransientHostRpcFailure(error51) {
   return error51 instanceof HostTransportFailureError || error51.fatalDetails?.retryable === true;
 }
 
-// clients/shared/host-transport/ws-rpc-client.ts
+// ../shared/host-transport/ws-rpc-client.ts
 var WsRpcClient = class {
   registry;
   requestIdProvider;
@@ -38088,7 +38088,7 @@ function throwIfAuthorityAborted(authority, requestId, method) {
   });
 }
 
-// protocol/src/framework/stream-compat.ts
+// ../../protocol/src/framework/stream-compat.ts
 function buildStreamManifest(registry2) {
   return buildConnectionManifest(registry2);
 }
@@ -38157,7 +38157,7 @@ function canBridgeStream(registry2, method, mine, theirs) {
   return Object.prototype.hasOwnProperty.call(line.versions, theirs.minor);
 }
 
-// clients/shared/auth/jwt-exp.ts
+// ../shared/auth/jwt-exp.ts
 function readAccessTokenExpiryMs(token) {
   const segments = token.split(".");
   if (segments.length < 2) {
@@ -38189,7 +38189,7 @@ function readExpSeconds(value) {
   return typeof exp === "number" && Number.isFinite(exp) ? exp : null;
 }
 
-// protocol/src/framework/stream-ws-protocol.ts
+// ../../protocol/src/framework/stream-ws-protocol.ts
 var STREAM_CAPABILITY_CREDENTIAL_UPDATE = "credentialUpdate";
 var clientStreamOpenFrameSchema = external_exports.object({
   kind: external_exports.literal("open"),
@@ -38227,7 +38227,7 @@ var streamMethodFrameEnvelopeSchema = external_exports.object({
   hasBinaryPayload: external_exports.boolean()
 }).passthrough();
 
-// clients/shared/host-transport/backoff.ts
+// ../shared/host-transport/backoff.ts
 function backoffFor(attempt, initialMs, maxMs) {
   if (attempt <= 0) {
     return initialMs;
@@ -38240,7 +38240,7 @@ function backoffFor(attempt, initialMs, maxMs) {
   return Math.min(candidate, maxMs);
 }
 
-// clients/shared/host-transport/ws-stream-client.ts
+// ../shared/host-transport/ws-stream-client.ts
 function createInertStreamSession(closedReason) {
   let closed = false;
   let statusHandler = null;
@@ -39267,7 +39267,7 @@ function pickFirst(a, b) {
   return Math.min(a, b);
 }
 
-// clients/remote-bridge/src/transient-retry.ts
+// src/transient-retry.ts
 async function withTransientRetry(opts) {
   const sleep3 = opts.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   try {
@@ -39284,7 +39284,7 @@ async function withTransientRetry(opts) {
   }
 }
 
-// node_modules/.bun/ws@8.21.1/node_modules/ws/wrapper.mjs
+// ../../node_modules/.bun/ws@8.21.1/node_modules/ws/wrapper.mjs
 var import_stream = __toESM(require_stream(), 1);
 var import_extension = __toESM(require_extension(), 1);
 var import_permessage_deflate = __toESM(require_permessage_deflate(), 1);
@@ -39294,7 +39294,7 @@ var import_subprotocol = __toESM(require_subprotocol(), 1);
 var import_websocket = __toESM(require_websocket(), 1);
 var import_websocket_server = __toESM(require_websocket_server(), 1);
 
-// clients/shared/host-transport/node-ws-factory.ts
+// ../shared/host-transport/node-ws-factory.ts
 var NodeWebSocketAdapter = class {
   onopen = null;
   onmessage = null;
@@ -39341,7 +39341,7 @@ function createNodeWebSocketFactory() {
   };
 }
 
-// clients/shared/host-transport/node-ws-stream-factory.ts
+// ../shared/host-transport/node-ws-stream-factory.ts
 var NodeStreamWebSocket = class {
   onopen = null;
   onmessage = null;
@@ -39394,10 +39394,10 @@ function createNodeStreamWebSocketFactory() {
   };
 }
 
-// clients/shared/host-transport/transport-config.ts
+// ../shared/host-transport/transport-config.ts
 var DEFAULT_DIAL_TIMEOUT_MS = 1e4;
 
-// clients/shared/auth/token-refresh-scheduler.ts
+// ../shared/auth/token-refresh-scheduler.ts
 var DEFAULT_REFRESH_LEAD_MS = 10 * 6e4;
 var DEFAULT_REFRESH_MIN_DELAY_MS = 6e4;
 var MAX_TIMER_DELAY_MS = 2147483647;
@@ -39480,10 +39480,10 @@ function createProactiveRefreshScheduler(options) {
   };
 }
 
-// clients/remote-bridge/src/chat-session.ts
+// src/chat-session.ts
 var import_node_crypto = require("node:crypto");
 
-// clients/remote-bridge/src/action-tracker.ts
+// ../shared/host-client/action-tracker.ts
 var DEFAULT_MAX_RECONCILE_ATTEMPTS = 5;
 var DEFAULT_UNCONFIRMED_TIMEOUT_MS = 45e3;
 var ActionTracker = class {
@@ -39635,7 +39635,7 @@ var ActionTracker = class {
   }
 };
 
-// protocol/src/common/json-content-serializer.ts
+// ../../protocol/src/common/json-content-serializer.ts
 function createContext(options) {
   return {
     options: {
@@ -40220,7 +40220,7 @@ function jsonContentToMarkdown(content, options) {
   return normalizeMarkdown(raw);
 }
 
-// clients/remote-bridge/src/transcript-projection.ts
+// src/transcript-projection.ts
 var part = (kind, label, lines) => ({ text: "", parts: [{ kind, label, lines }] });
 function countLines(value) {
   if (value === null || value.length === 0) return 0;
@@ -40295,7 +40295,7 @@ function selectWindow(messages, offset, limit) {
   return messages.slice(start, end);
 }
 
-// clients/remote-bridge/src/chat-session.ts
+// src/chat-session.ts
 var AUTH_RETRY_DELAY_MS = 5e3;
 var FIRST_SNAPSHOT_TIMEOUT_MS = 8e3;
 var ChatSession = class {
@@ -40747,16 +40747,16 @@ var ChatSession = class {
   }
 };
 
-// clients/remote-bridge/src/host-endpoint.ts
+// src/host-endpoint.ts
 var import_promises5 = require("node:fs/promises");
 var import_node_path5 = require("node:path");
 
-// protocol/src/config/credentials.ts
+// ../../protocol/src/config/credentials.ts
 var import_node_crypto3 = require("node:crypto");
 var import_promises2 = require("node:fs/promises");
 var import_node_path2 = require("node:path");
 
-// protocol/src/config/credentials-fs.ts
+// ../../protocol/src/config/credentials-fs.ts
 var import_node_crypto2 = require("node:crypto");
 var import_promises = require("node:fs/promises");
 function errorCode(error51) {
@@ -40817,7 +40817,7 @@ async function writeJsonFileAtomic(path2, value, mode) {
   }
 }
 
-// protocol/src/config/credentials.ts
+// ../../protocol/src/config/credentials.ts
 function serializeCredentials(credentials) {
   return JSON.stringify(credentials, null, 2) + "\n";
 }
@@ -40887,7 +40887,7 @@ async function deleteCredentialsFile(path2) {
   }
 }
 
-// protocol/src/config/paths.ts
+// ../../protocol/src/config/paths.ts
 var import_node_os = require("node:os");
 var import_node_path3 = require("node:path");
 function cliConfigDir() {
@@ -40899,7 +40899,7 @@ function cliCredentialsPath(environment) {
   return (0, import_node_path3.join)(dir, "credentials");
 }
 
-// clients/shared/auth/bearer-source.ts
+// ../shared/auth/bearer-source.ts
 var MutableBearerLease = class {
   identity;
   token;
@@ -40920,7 +40920,7 @@ var MutableBearerLease = class {
   }
 };
 
-// protocol/src/config/credentials-lock.ts
+// ../../protocol/src/config/credentials-lock.ts
 var import_node_child_process2 = require("node:child_process");
 var import_node_crypto4 = require("node:crypto");
 var import_node_fs2 = require("node:fs");
@@ -41189,7 +41189,7 @@ function sleepAbortable(ms, signal) {
   });
 }
 
-// protocol/src/config/credentials-wal.ts
+// ../../protocol/src/config/credentials-wal.ts
 var import_node_crypto5 = require("node:crypto");
 var import_promises4 = require("node:fs/promises");
 var SIDECAR_MODE = 384;
@@ -41396,7 +41396,7 @@ function sleep(ms) {
   });
 }
 
-// protocol/src/config/credentials-mutation.ts
+// ../../protocol/src/config/credentials-mutation.ts
 var CredentialsStoreUnavailableError = class extends Error {
   constructor(message) {
     super(message);
@@ -41750,7 +41750,7 @@ function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
 
-// protocol/src/auth/_internal/schemas.ts
+// ../../protocol/src/auth/_internal/schemas.ts
 var providerTypeSchema = external_exports.enum([
   "GITHUB",
   "GOOGLE",
@@ -41995,7 +41995,7 @@ var executeMcpServerToolResponseSchema = external_exports.discriminatedUnion("ok
   })
 ]);
 
-// protocol/src/auth/registry.ts
+// ../../protocol/src/auth/registry.ts
 var userRecordV100 = defineRecordContract({
   name: "user",
   schemaVersion: { major: 1, minor: 0 },
@@ -42412,7 +42412,7 @@ var authRecordRegistry = defineVersionedRecordRegistry({
   }
 });
 
-// clients/shared/auth/auth-validation.ts
+// ../shared/auth/auth-validation.ts
 var authenticatedUserResponseSchema = getRecordSchema(
   authRecordRegistry,
   "authenticated-user-response",
@@ -42495,7 +42495,7 @@ function authnApiUrl(authnBaseUrl, path2) {
   ).toString();
 }
 
-// clients/shared/auth/host-credentials-store.ts
+// ../shared/auth/host-credentials-store.ts
 var LOCK_WAIT_MS = 12e3;
 var LOCK_POLL_INTERVAL_MS = 50;
 var CONTINUATION_RETRY_MS = 1e3;
@@ -42578,7 +42578,7 @@ function delay(ms) {
   });
 }
 
-// clients/remote-bridge/src/host-auth.ts
+// src/host-auth.ts
 function requireHomeEnv() {
   const home = process.platform === "win32" ? process.env.USERPROFILE ?? process.env.HOME : process.env.HOME;
   if (home === void 0 || home.length === 0) {
@@ -42632,7 +42632,7 @@ async function resolveHostAuth() {
   };
 }
 
-// clients/remote-bridge/src/host-endpoint.ts
+// src/host-endpoint.ts
 function hostPidMetadataPath() {
   const home = requireHomeEnv();
   return (0, import_node_path5.join)(home, ".traycer", "host", "pid.json");
@@ -42731,7 +42731,7 @@ var HostEndpointPoller = class _HostEndpointPoller {
   }
 };
 
-// clients/remote-bridge/src/bridge-client.ts
+// src/bridge-client.ts
 var OPEN_ACK_TIMEOUT_MS = 1e4;
 var PING_INTERVAL_MS = 25e3;
 var PONG_TIMEOUT_MS = 6e4;
@@ -42894,6 +42894,48 @@ var BridgeClient = class _BridgeClient {
   async sendMessage(chatId, text) {
     return this.ensureChatSession(chatId).sendMessage(text);
   }
+  /**
+   * Shaped like {@link listAgents}, deliberately: same unary client, same
+   * endpoint poll, same bearer lease, same transient retry. A create is not a
+   * reason to invent a second mechanism for reaching the host.
+   *
+   * NOT routed through `ensureChatSession` — that opens a stream subscription
+   * for a chat, and this is the call that brings the chat into existence.
+   * Asking for a session first would subscribe to something that does not
+   * exist yet, which the host answers with `connected: false` and a null
+   * title: a plausible-looking status for a chat nobody made. That is exactly
+   * the defect a real user hit with `say hi`.
+   */
+  async createChat(input) {
+    const endpoint = this.endpointPoller.get();
+    if (endpoint === null) {
+      throw new Error("remote-bridge: no host endpoint available yet");
+    }
+    const response = await withTransientRetry({
+      label: "epic.createChat",
+      call: () => this.rpcClient.request(
+        "epic.createChat",
+        {
+          epicId: this.epicId,
+          parentId: input.parentId ?? null,
+          hostId: input.hostId,
+          title: input.title,
+          // Client-supplied and idempotent — see the action-surface
+          // docblock. The retry below is safe ONLY because this id is
+          // fixed by the caller and does not change between attempts.
+          chatId: input.chatId
+        },
+        {
+          endpoint,
+          bearer: this.auth.lease,
+          abortSignal: new AbortController().signal
+        }
+      ),
+      onDiagnostic: (message) => this.logger.warn(message, null),
+      delayMs: TRANSIENT_RETRY_DELAY_MS
+    });
+    return { chatId: response.chatId };
+  }
   async getTranscript(chatId, offset, limit) {
     return this.ensureChatSession(chatId).getTranscript(offset, limit);
   }
@@ -42996,7 +43038,7 @@ var BridgeClient = class _BridgeClient {
   }
 };
 
-// clients/remote-bridge/src/logger.ts
+// src/logger.ts
 var SENSITIVE_TEXT_PATTERNS = [
   {
     pattern: /Bearer\s+[A-Za-z0-9._~+/-]+=*/gi,
@@ -43041,7 +43083,7 @@ function createLogger(threshold) {
   };
 }
 
-// clients/remote-bridge/src/adapters/cli-adapter.ts
+// src/adapters/cli-adapter.ts
 var WATCH_POLL_MS = 4e3;
 async function runList(bridge, logger) {
   const agents = await bridge.listAgents();
@@ -43165,7 +43207,7 @@ function runWatch(bridge, logger) {
   });
 }
 
-// clients/remote-bridge/src/index.ts
+// src/index.ts
 function requireEnv(name) {
   const value = process.env[name];
   if (value === void 0 || value.length === 0) {
@@ -43250,6 +43292,23 @@ program2.command("send <chatId> <text>").description("Send a message to a chat")
   async (chatId, text, opts) => {
     const logger = createLogger("info");
     await withBridge(opts, (bridge) => runSend(bridge, chatId, text, logger));
+  }
+);
+program2.command("create-chat <chatId> <title>").description("Create a new agent (chat) in the epic. Idempotent on chatId.").requiredOption("--host-id <id>", "Host the chat is bound to FOR LIFE").option("--parent-id <id>", "Parent chat id, for a sub-agent").option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)").option(
+  "--sender-agent-id <id>",
+  "Sender agent id (defaults to $TRAYCER_AGENT_ID)"
+).action(
+  async (chatId, title, opts) => {
+    await withBridge(opts, async (bridge) => {
+      const result = await bridge.createChat({
+        chatId,
+        title,
+        hostId: opts.hostId,
+        parentId: opts.parentId ?? null
+      });
+      process.stdout.write(`${JSON.stringify(result)}
+`);
+    });
   }
 );
 program2.command("transcript <chatId>").description("Print a window of a chat's transcript (newest first)").option("--offset <n>", "Messages to skip from the NEWEST end", "0").option("--limit <n>", "Window size", "5").option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)").option(
