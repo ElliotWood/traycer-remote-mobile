@@ -632,7 +632,7 @@ class StreamSession<
     const selected = this.config.endpoint();
     if (selected === null || selected.websocketUrl === null) {
       this.transitionTo("reconnecting", null);
-      this.scheduleReconnect();
+      this.scheduleReconnect(false);
       return;
     }
 
@@ -646,7 +646,7 @@ class StreamSession<
     } catch (cause) {
       if (cause instanceof MissingBearerTokenForOpenFrameError) {
         this.transitionTo("reconnecting", null);
-        this.scheduleReconnect();
+        this.scheduleReconnect(false);
         return;
       }
       throw cause;
@@ -1070,7 +1070,7 @@ class StreamSession<
       // in reconnect backoff; the next cycle revalidates again once
       // connectivity returns.
       this.noProgressUnauthorizedReconnects = 0;
-      this.scheduleReconnect();
+      this.scheduleReconnect(false);
       return;
     }
     // outcome === "rotated": authn accepts the credential. If the bearer the
@@ -1098,7 +1098,7 @@ class StreamSession<
     } else {
       this.noProgressUnauthorizedReconnects = 0;
     }
-    this.scheduleReconnect();
+    this.scheduleReconnect(false);
   }
 
   /**
@@ -1223,7 +1223,7 @@ class StreamSession<
     }
     this.lastCloseWasSlowClient = false;
     this.resetForReconnect();
-    this.scheduleReconnect();
+    this.scheduleReconnect(false);
   }
 
   /**
@@ -1258,7 +1258,7 @@ class StreamSession<
    * fails resumes normal exponential escalation from there, same as any
    * other drop.
    */
-  private scheduleReconnect(immediate = false): void {
+  private scheduleReconnect(immediate: boolean): void {
     if (this.disposed) {
       return;
     }
