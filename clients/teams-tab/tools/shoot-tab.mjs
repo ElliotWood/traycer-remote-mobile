@@ -136,6 +136,12 @@ const VIEWS = [
   { name: "comments", q: "preview=comments", path: "/epics" },
   { name: "authoring", q: "preview=authoring", path: "/epics" },
   { name: "authoring-nohost", q: "preview=authoring&state=nohost", path: "/epics" },
+  // The EPIC form's own refusal — `createdBy` not yet resolved. Added here as
+  // well as to the app, because a preview state absent from this list is one
+  // no full run ever photographs: the URL exists and the gallery silently
+  // skips it, which is how a state gets called "previewable" without ever
+  // having been looked at.
+  { name: "authoring-noidentity", q: "preview=authoring&state=noidentity", path: "/epics" },
   // Both creates failed. The only view where the retry-safety difference is
   // visible: same failure, opposite instruction.
   { name: "authoring-unconfirmed", q: "preview=authoring&state=unconfirmed", path: "/epics" },
@@ -159,12 +165,39 @@ const VIEWS = [
   { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001" },
 ];
 
+/**
+ * `SHOOT_ONLY=authoring,chat` shoots a subset — the alternative to editing
+ * VIEWS by hand, which is how a trimmed config once shipped and made a
+ * fraction of the coverage look complete.
+ *
+ * It ANNOUNCES what it dropped, on both stdout and in the final line. A
+ * filtered run that prints the same summary as a full one is the same defect
+ * in a different place.
+ */
+const only = (process.env.SHOOT_ONLY ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0);
+const selected =
+  only.length === 0
+    ? VIEWS
+    : VIEWS.filter((v) => only.some((prefix) => v.name.startsWith(prefix)));
+if (only.length > 0) {
+  console.log(
+    `SHOOT_ONLY=${only.join(",")} — ${String(selected.length)} of ${String(VIEWS.length)} views, ${String(VIEWS.length - selected.length)} SKIPPED`,
+  );
+  if (selected.length === 0) {
+    console.error("SHOOT_ONLY matched no views — nothing would be shot");
+    process.exit(1);
+  }
+}
+
 mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({ executablePath });
 const written = new Set();
 let shots = 0;
 try {
-  for (const view of VIEWS) {
+  for (const view of selected) {
     for (const theme of THEMES) {
       for (const width of WIDTHS) {
         const page = await browser.newPage({
@@ -214,7 +247,12 @@ try {
 // Assert the OUTPUT, not the operation: count files on disk rather than
 // trusting the loop counter that just ran.
 const onDisk = readdirSync(outDir).filter((f) => f.endsWith(".png")).length;
-console.log(`shot ${String(shots)} images, ${String(onDisk)} files on disk`);
+console.log(
+  `shot ${String(shots)} images, ${String(onDisk)} files on disk` +
+    (only.length === 0
+      ? " (all views)"
+      : ` — FILTERED to ${only.join(",")}, ${String(VIEWS.length - selected.length)} views not shot`),
+);
 if (onDisk !== shots) {
   console.error("MISMATCH: images written != images shot");
   process.exit(1);

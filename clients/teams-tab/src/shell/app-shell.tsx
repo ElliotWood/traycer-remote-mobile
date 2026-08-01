@@ -87,9 +87,20 @@ const useStyles = makeStyles({
   /** Takes the remaining height and is the ONLY thing that scrolls. */
   body: {
     flexGrow: 1,
-    // The containment desktop uses 197 times and we used zero. Without it a
-    // flex child refuses to shrink below its content, the frame grows, and
-    // the header scrolls away — which is the defect this file exists to fix.
+    // The containment desktop uses 197 times and we used zero.
+    //
+    // BELT AND BRACES HERE, not load-bearing on its own — and that correction
+    // came from a mutation that was supposed to turn the shell probe red and
+    // didn't. Deleting this line changes nothing on this element, because
+    // `overflow` other than `visible` already sets a flex item's automatic
+    // minimum size to zero.
+    //
+    // `overflowY` below is what actually carries it: flipped to `visible` the
+    // body grows past the frame, the frame's `overflow: hidden` clips it, and
+    // the bottom of the content becomes unreachable — probe red, 368px below
+    // the fold and scrollTop stuck at 0. This line stays because the pair is
+    // the intent, and it is what keeps a later change to `overflowY` from
+    // silently re-arming the defect.
     minHeight: 0,
     display: "flex",
     flexDirection: "column",
