@@ -1496,7 +1496,6 @@ function registerAgentCommands(
       .option("--name <name>", "Display name for the child agent")
       .option("--harness <id>", harnessHelp)
       .option("--model <id>", "Model id for the child agent")
-      .option("--agent-mode <mode>", "Agent mode: regular or epic")
       .option(
         "--reasoning-effort <effort>",
         "Reasoning effort for supported models",
@@ -1536,7 +1535,6 @@ function registerAgentCommands(
         surface: typeof opts.surface === "string" ? opts.surface : null,
         harness: typeof opts.harness === "string" ? opts.harness : null,
         model: typeof opts.model === "string" ? opts.model : null,
-        agentMode: typeof opts.agentMode === "string" ? opts.agentMode : null,
         reasoningEffort:
           typeof opts.reasoningEffort === "string"
             ? opts.reasoningEffort

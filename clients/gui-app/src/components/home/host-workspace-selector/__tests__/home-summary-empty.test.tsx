@@ -325,7 +325,6 @@ function DelayedBranchValidationHarness() {
               reasoning: "high",
               serviceTier: "",
               permission: "supervised",
-              agentMode: "regular",
             },
           });
         }}

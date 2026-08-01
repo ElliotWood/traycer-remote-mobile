@@ -5,10 +5,7 @@ import type {
   ResponseOfMethod,
 } from "@traycer-clients/shared/host-transport/host-messenger";
 import type { HostClient } from "@traycer-clients/shared/host-client/host-client";
-import type {
-  AgentMode,
-  TuiHarnessId,
-} from "@traycer/protocol/persistence/epic/schemas";
+import type { TuiHarnessId } from "@traycer/protocol/persistence/epic/schemas";
 import type {
   WorktreeBindingWorkspaceMode,
   WorktreeIntent,
@@ -157,7 +154,6 @@ export interface CreateTuiAgentInput {
   readonly harnessId: TuiHarnessId;
   readonly model: string | null;
   readonly reasoningEffort: string | null;
-  readonly agentMode: AgentMode;
   readonly forkSourceHarnessSessionId: string | null;
   readonly onStatusChange: ((status: CreateTuiAgentStatus) => void) | null;
   /**
@@ -319,7 +315,9 @@ export function useCreateTuiAgentForClient(
           epicId: input.epicId,
           model: input.model,
           reasoningEffort: input.reasoningEffort,
-          agentMode: input.agentMode,
+          // Epic Mode was removed from the product; the protocol still carries
+          // the field, so state the one remaining mode.
+          agentMode: "regular",
           tuiAgentId,
           harnessSessionId: null,
           forkSourceHarnessSessionId: input.forkSourceHarnessSessionId,
@@ -361,7 +359,7 @@ export function useCreateTuiAgentForClient(
           workspaceMode: input.workspaceMode,
           model: input.model,
           reasoningEffort: input.reasoningEffort,
-          agentMode: input.agentMode,
+          agentMode: "regular",
           tuiAgentId,
           profileId: input.profileId,
         });

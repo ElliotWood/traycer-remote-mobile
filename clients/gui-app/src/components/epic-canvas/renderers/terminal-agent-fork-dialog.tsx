@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { HarnessModelPicker } from "@/components/home/pickers/harness-model-picker";
-import { AgentModeToggle } from "@/components/home/pickers/agent-mode-toggle";
 import { ActiveHostWorkspaceControls } from "@/components/home/host-workspace-selector/host-workspace-selector";
 import { SurfaceActivityProvider } from "@/components/home/composer/surface-activity-context";
 import { useFocusedPaneModalOpen } from "@/components/epic-tabs/pane-visibility-context";
@@ -120,8 +119,6 @@ function TerminalAgentForkDialogBody(props: TerminalAgentForkDialogProps) {
     toolbarStore,
     (s) => s.selection.modelSlug.length > 0,
   );
-  const agentMode = useStore(toolbarStore, (s) => s.agentMode);
-  const setAgentMode = useStore(toolbarStore, (s) => s.setAgentMode);
   const defaultTitle =
     target === null ? "" : terminalForkDefaultTitle(target.sourceAgent);
   if (open !== titleState.open) {
@@ -235,7 +232,6 @@ function TerminalAgentForkDialogBody(props: TerminalAgentForkDialogProps) {
             : null,
         reasoningEffort:
           toolbar.reasoning.length > 0 ? toolbar.reasoning : null,
-        agentMode: toolbar.agentMode,
         profileId: toolbar.selection.profileId,
         forkSourceHarnessSessionId: sourceSessionId,
         onStatusChange: setStatus,
@@ -428,8 +424,9 @@ function terminalForkSettingsSeed(agent: TuiAgentProjection): ChatRunSettings {
     model: agent.model ?? "",
     permissionMode: "supervised",
     reasoningEffort: agent.reasoningEffort,
+    // Epic Mode was removed; the protocol still carries the field.
+    agentMode: "regular",
     serviceTier: null,
-    agentMode: agent.agentMode,
     // Seed from the source agent's profile - `useComposerToolbarStore`
     // validates it against the target host's live provider profiles; the
     // harness stays locked (see `lockedHarnessId` below) but the user can
@@ -453,7 +450,6 @@ function terminalForkModelPickerKey(
     agent.harnessId,
     agent.model ?? "",
     agent.reasoningEffort ?? "",
-    agent.agentMode,
     agent.profileId ?? "",
   ].join("\u0000");
 }

@@ -46,7 +46,6 @@ describe("useTerminalAgentWorktreeGate", () => {
         harnessId: "claude",
         model: null,
         reasoningEffort: null,
-        agentMode: "regular",
         workspaceMode: "inherit",
         worktreeIntent: null,
         terminalAgentArgs: null,
@@ -63,7 +62,6 @@ describe("useTerminalAgentWorktreeGate", () => {
       harnessId: "claude",
       model: null,
       reasoningEffort: null,
-      agentMode: "regular",
       workspaceMode: "inherit",
       worktreeIntent: null,
       terminalAgentArgs: null,
@@ -104,7 +102,6 @@ describe("useTerminalAgentWorktreeGate", () => {
         harnessId: "codex",
         model: "gpt-5",
         reasoningEffort: "high",
-        agentMode: "regular",
         workspaceMode: "inherit",
         worktreeIntent: intent,
         terminalAgentArgs: "--full-auto",
@@ -114,7 +111,6 @@ describe("useTerminalAgentWorktreeGate", () => {
 
     expect(gateMocks.create).toHaveBeenCalledTimes(1);
     expect(gateMocks.create.mock.calls[0][0]).toMatchObject({
-      agentMode: "regular",
       model: "gpt-5",
       reasoningEffort: "high",
       workspaceMode: "inherit",
@@ -147,7 +143,6 @@ describe("useTerminalAgentWorktreeGate", () => {
         harnessId: "claude",
         model: null,
         reasoningEffort: null,
-        agentMode: "epic",
         workspaceMode: "folderless",
         worktreeIntent: { entries: [] },
         terminalAgentArgs: null,

@@ -295,8 +295,6 @@ function OwnerSettingsHarnessMark(props: {
 }): ReactNode {
   const { view } = props;
   const accentDot = view.profileAccentDot;
-  return (
-    <span
       role="img"
       aria-label={
         accentDot === null
@@ -305,7 +303,6 @@ function OwnerSettingsHarnessMark(props: {
       }
       className="relative flex shrink-0 items-center"
       data-testid="owner-settings-harness-mark"
-    >
       <HarnessIcon harnessId={view.harnessId} className="size-4 shrink-0" />
       {accentDot === null ? null : (
         <AccentDot
@@ -317,10 +314,6 @@ function OwnerSettingsHarnessMark(props: {
           className={undefined}
         />
       )}
-    </span>
-  );
-}
-
 /**
  * Permission mode with the icon the rest of the app already uses for it -
  * `ShieldCheck` / `FileCheck2` / `UnlockKeyhole`, resolved through the shared
