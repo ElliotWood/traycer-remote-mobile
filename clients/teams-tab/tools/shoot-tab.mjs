@@ -162,7 +162,7 @@ const VIEWS = [
   { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["No agents in this epic yet.", "No artifacts in this epic yet."] },
   { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Couldn’t load your agents", "stream closed — host unreachable"] },
   { name: "agents-deep", q: "preview=agents&state=deep", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Untitled agent (d1000000)", "Host not known yet"] },
-  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Reconnecting"] },
+  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Still waiting on your host"] },
 ];
 
 /**
@@ -301,21 +301,33 @@ try {
          */
         for (const phrase of view.expects) {
           const where = await page.evaluate((needle) => {
-            const walker = document.createTreeWalker(
-              document.body,
-              NodeFilter.SHOW_TEXT,
-            );
-            let node = walker.nextNode();
-            while (node !== null) {
-              if ((node.textContent ?? "").includes(needle)) {
-                const range = document.createRange();
-                range.selectNodeContents(node);
-                const rect = range.getBoundingClientRect();
-                return { found: true, bottom: Math.ceil(rect.bottom) };
-              }
-              node = walker.nextNode();
+            /*
+             * ELEMENTS, not text nodes, and whitespace-normalised.
+             *
+             * The first version walked TEXT NODES, so any expectation
+             * spanning an inline element was never found — the staleness
+             * banner is `<strong>Disconnected.</strong> Showing what we last
+             * read 4m ago`, three text nodes, and the assertion reported
+             * "not on the page" for copy that was on the page and correct.
+             *
+             * A FALSE NEGATIVE is the mirror of the failure this gate exists
+             * to prevent, and arguably worse: it reads as a product defect
+             * and sends someone hunting for a bug that is not there.
+             *
+             * The LAST match in document order is the deepest one containing
+             * the whole phrase — a descendant always follows its ancestor —
+             * which keeps the rect tight around the text rather than around
+             * some outer container that would always be near the top.
+             */
+            const want = needle.replace(/\s+/g, " ").trim();
+            let deepest = null;
+            for (const el of document.body.querySelectorAll("*")) {
+              const text = (el.textContent ?? "").replace(/\s+/g, " ");
+              if (text.includes(want)) deepest = el;
             }
-            return { found: false, bottom: null };
+            if (deepest === null) return { found: false, bottom: null };
+            const rect = deepest.getBoundingClientRect();
+            return { found: true, bottom: Math.ceil(rect.bottom) };
           }, phrase);
           const label = `${view.name}--${theme}--${width.name}`;
           if (!where.found) {
