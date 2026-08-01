@@ -58998,6 +58998,14 @@ var ADAPTIVE_CARD_VERSION = "1.2";
 var APPROVE_VERB = "traycer/approve";
 var REJECT_VERB = "traycer/reject";
 var OPEN_CHAT_VERB = "traycer/openChat";
+var REPLY_VERB = "traycer/reply";
+var LOG_VERB = "traycer/log";
+var WAITING_VERB = "traycer/waiting";
+var NEW_AGENT_VERB = "traycer/newAgent";
+var SHOW_ALL_VERB = "traycer/showAll";
+var FLEET_VERB = "traycer/fleet";
+var CONFIRM_ROUTE_VERB = "traycer/confirmRoute";
+var CLARIFY_OTHER_VERB = "traycer/clarifyOther";
 var SEND_VERB = "traycer/send";
 var APPROVE_TITLE = "\u2713 Approve";
 var REJECT_TITLE = "\u2715 Reject";
@@ -59023,6 +59031,9 @@ function buildCard(body, actions) {
   });
 }
 var card = (body) => buildCard(body, []);
+function actionSet(actions) {
+  return { type: "ActionSet", actions, spacing: "small" };
+}
 var TEXT_DEFAULTS = {
   weight: "default",
   size: "default",
@@ -59157,7 +59168,24 @@ function buildFleetCard(agents) {
           presentation.label,
           presentation.color,
           `${agent.harnessId ?? "unknown"} \xB7 ${agent.surface}`
-        )
+        ),
+        // The row's actions, carrying the id so nobody has to see it.
+        // `Reply` is the one that matters: it was `say <guid> <text>`.
+        //
+        // GATED ON `capabilities.sendMessage`, for the same reason the tab
+        // gates Approve/Reject on `canAct`: offering an action this host
+        // cannot perform is a promise the next tap breaks. `Activity` is
+        // always offered because reading is not the same permission.
+        actionSet([
+          ...agent.capabilities.sendMessage ? [
+            submitAction("Reply", REPLY_VERB, { chatId: agent.agentId }, {
+              associateInputs: false
+            })
+          ] : [],
+          submitAction("Activity", LOG_VERB, { chatId: agent.agentId }, {
+            associateInputs: false
+          })
+        ])
       ],
       {
         style: presentation.emphasised ? "emphasis" : "default",
@@ -59174,12 +59202,20 @@ function buildFleetCard(agents) {
     );
   });
   const overflow = agents.length > FLEET_ROW_LIMIT ? [
-    text(
-      `+${String(agents.length - FLEET_ROW_LIMIT)} more not shown \u2014 use "chat <id>" for a specific one.`,
-      { isSubtle: true, size: "small", separator: true }
-    )
+    actionSet([
+      submitAction(
+        `Show all ${String(agents.length)}`,
+        SHOW_ALL_VERB,
+        {},
+        { associateInputs: false }
+      )
+    ])
   ] : [];
-  return card([...header, ...rows, ...overflow]);
+  const next = actionSet([
+    submitAction("Waiting on you", WAITING_VERB, {}, { associateInputs: false }),
+    submitAction("New agent", NEW_AGENT_VERB, {}, { associateInputs: false })
+  ]);
+  return card([...header, ...rows, ...overflow, next]);
 }
 function runStatusColor(runStatus) {
   switch (runStatus) {
@@ -59786,24 +59822,64 @@ function buildMessageOutcomeCard(outcome, chat) {
 }
 function buildHelpCard() {
   return card([
-    text("Traycer Remote", { weight: "bolder", size: "medium" }),
-    text("Answer a blocked agent, or check what your fleet is doing.", {
+    text("Traycer", { weight: "bolder", size: "medium" }),
+    text("Ask in your own words, or pick one of these.", {
       isSubtle: true,
       size: "small",
       spacing: "none"
     }),
+    /*
+     * ONLY BUTTONS THAT WORK.
+     *
+     * The first version of this card also offered "Waiting on you" — and the
+     * bot has no waiting surface at all; that is the TAB's feature. Pressing
+     * it would have returned "Unknown card action", which is a card promising
+     * something that does not exist. Exactly the defect this whole pass is
+     * about, introduced by the change meant to fix it.
+     *
+     * Add it back in the same change that builds the surface behind it.
+     */
+    actionSet([
+      submitAction("My agents", FLEET_VERB, {}, { associateInputs: false })
+    ]),
     container(
       [
-        facts([
-          ["fleet", "agents in the current epic"],
-          ["chat <id>", "status, approvals, and a reply box"],
-          ["say <id> <text>", "message an agent"],
-          ["log <id>", "read a chat's history"],
-          ["epic <id>", "switch this chat to another epic"]
-        ])
+        text("Assess a document", { weight: "bolder", spacing: "none" }),
+        text(
+          "Attach an RFI or RFP and ask whether it fits \u2014 for example, \u201Cdoes this work with SensorMine?\u201D",
+          { isSubtle: true, size: "small", spacing: "none" }
+        )
       ],
       { style: "emphasis", separator: true }
     )
+  ]);
+}
+function buildClarifyCard(options) {
+  const canSuggest = options.suggestionLabel !== null && options.product !== null && options.intent !== null;
+  return card([
+    text("Before I start", { weight: "bolder", size: "medium" }),
+    text(
+      canSuggest ? `Looks like ${options.suggestionLabel}. Is that right?` : "I'm not sure what you'd like me to do with that.",
+      { spacing: "none" }
+    ),
+    actionSet([
+      ...canSuggest ? [
+        submitAction(
+          "Yes, go ahead",
+          CONFIRM_ROUTE_VERB,
+          {
+            // Explicit, so the handler never re-derives the route.
+            product: options.product ?? "",
+            intent: options.intent ?? "",
+            skill: options.skill ?? ""
+          },
+          { associateInputs: false }
+        )
+      ] : [],
+      submitAction("Something else", CLARIFY_OTHER_VERB, {}, {
+        associateInputs: false
+      })
+    ])
   ]);
 }
 function buildEpicPickerCard(epics) {
@@ -60482,6 +60558,21 @@ async function dispatchActionInvoke(request, deps) {
   if (request.verb === OLDER_VERB || request.verb === NEWER_VERB || request.verb === FULL_HISTORY_VERB) {
     return dispatchPage(request, deps);
   }
+  if (request.verb === FLEET_VERB) {
+    const cards = await dispatchCommand(
+      { kind: "fleet" },
+      request.conversationId,
+      deps
+    );
+    const card2 = cards[0];
+    if (card2 === void 0) {
+      return {
+        card: buildUsageCard("That didn't return anything to show."),
+        acted: false
+      };
+    }
+    return { card: card2, acted: true };
+  }
   if (request.verb !== APPROVE_VERB && request.verb !== REJECT_VERB) {
     return {
       card: buildUsageCard(`Unknown card action "${request.verb}".`),
@@ -60528,6 +60619,181 @@ async function dispatchActionInvoke(request, deps) {
   }
 }
 
+// src/intake/mention.ts
+function stripMentions(rawText, entities, botId) {
+  let text2 = rawText;
+  let strippedByEntity = false;
+  let sawMentionEntity = false;
+  for (const entity of entities ?? []) {
+    if (entity.type.toLowerCase() !== "mention") continue;
+    if (entity.text === void 0 || entity.text === "") continue;
+    sawMentionEntity = true;
+    if (!text2.includes(entity.text)) continue;
+    const addressesBot = botId === void 0 || entity.mentioned?.id === void 0 || entity.mentioned.id === botId;
+    if (addressesBot) {
+      text2 = text2.split(entity.text).join(" ");
+    } else {
+      text2 = text2.split(entity.text).join(entity.mentioned?.name ?? " ");
+    }
+    strippedByEntity = true;
+  }
+  let usedFallback = false;
+  if (!sawMentionEntity) {
+    const beforeFallback = text2;
+    text2 = text2.replace(/<at>[^<]*<\/at>/gi, " ");
+    usedFallback = text2 !== beforeFallback;
+  }
+  return {
+    text: text2.trim().replace(/\s+/g, " "),
+    strippedByEntity,
+    usedFallback
+  };
+}
+
+// src/intake/classify.ts
+var PRODUCT_TERMS = [
+  { product: "sensormine", terms: ["sensormine", "sensor mine", "smv4", "sm v4"] },
+  {
+    product: "dr-migrate",
+    terms: ["dr migrate", "dr-migrate", "drmigrate", "dr_migrate"]
+  }
+];
+var INTENT_TERMS = [
+  {
+    intent: "new-opportunity",
+    terms: [
+      "rfi",
+      "rfp",
+      "tender",
+      "does this work with",
+      "does this fit",
+      "match fit",
+      "can we do this",
+      "can we deliver",
+      "opportunity",
+      "bid"
+    ]
+  },
+  {
+    intent: "feature-request",
+    terms: ["feature request", "can you add", "would be good if", "roadmap"]
+  },
+  {
+    intent: "support",
+    terms: ["not working", "broken", "error", "bug", "support ticket", "issue with"]
+  },
+  {
+    intent: "product-query",
+    terms: ["how does", "what is", "does it have", "can it", "question about"]
+  }
+];
+var SKILLS = [
+  {
+    product: "sensormine",
+    intent: "new-opportunity",
+    skill: "smv4-new-opportunity"
+  }
+];
+function findProduct(lower) {
+  for (const entry of PRODUCT_TERMS) {
+    if (entry.terms.some((term) => lower.includes(term))) return entry.product;
+  }
+  return null;
+}
+function findIntent(lower) {
+  for (const entry of INTENT_TERMS) {
+    if (entry.terms.some((term) => lower.includes(term))) return entry.intent;
+  }
+  return null;
+}
+function skillFor(product, intent) {
+  return SKILLS.find((s) => s.product === product && s.intent === intent)?.skill ?? null;
+}
+function classify(input) {
+  const lower = input.text.toLowerCase();
+  const product = findProduct(lower);
+  const intent = findIntent(lower);
+  if (product !== null && intent !== null) {
+    return {
+      kind: "routed",
+      route: { product, intent, skill: skillFor(product, intent) }
+    };
+  }
+  if (product === null && intent === null) {
+    return { kind: "uncertain", suggestion: null, reason: "nothing-recognised" };
+  }
+  if (product === null) {
+    return { kind: "uncertain", suggestion: null, reason: "no-product" };
+  }
+  return {
+    kind: "uncertain",
+    // We know the product; offer the most likely intent as a QUESTION. An
+    // attachment makes an opportunity more plausible than a casual query,
+    // which is the one place attachments touch routing — and only to shape
+    // what we ask, never to decide without asking.
+    suggestion: {
+      product,
+      intent: input.hasAttachments ? "new-opportunity" : "product-query",
+      skill: skillFor(
+        product,
+        input.hasAttachments ? "new-opportunity" : "product-query"
+      )
+    },
+    reason: "no-intent"
+  };
+}
+
+// src/intake/route-labels.ts
+var PRODUCT_LABELS = {
+  sensormine: "SensorMine",
+  "dr-migrate": "DR Migrate"
+};
+var INTENT_LABELS = {
+  "new-opportunity": "a new opportunity",
+  "product-query": "a product question",
+  "feature-request": "a feature request",
+  support: "a support issue"
+};
+function describeRoute(route) {
+  const product = PRODUCT_LABELS[route.product];
+  const intent = INTENT_LABELS[route.intent];
+  if (route.intent === "new-opportunity") return `a new ${product} opportunity`;
+  return `${intent} about ${product}`;
+}
+
+// src/intake/attachment-capture.ts
+var RAW_ATTACHMENT_LOG_FLAG = "TRAYCER_TEAMS_LOG_RAW_ATTACHMENTS";
+function captureRawAttachments(input) {
+  const attachments = input.attachments ?? [];
+  if (attachments.length === 0) return 0;
+  if (!input.enabled) {
+    logInfo("attachments received", {
+      count: attachments.length,
+      conversationType: input.conversationType ?? "unknown",
+      raw: `disabled \u2014 set ${RAW_ATTACHMENT_LOG_FLAG}=1 to capture shapes`
+    });
+    return attachments.length;
+  }
+  logWarn("RAW ATTACHMENT CAPTURE IS ON \u2014 this logs customer file metadata", {
+    flag: RAW_ATTACHMENT_LOG_FLAG,
+    count: attachments.length
+  });
+  attachments.forEach((attachment, index) => {
+    let serialised;
+    try {
+      serialised = JSON.stringify(attachment);
+    } catch (error51) {
+      serialised = `<unserialisable: ${error51 instanceof Error ? error51.message : String(error51)}>`;
+    }
+    logInfo("raw attachment", {
+      index,
+      conversationType: input.conversationType ?? "unknown",
+      attachment: serialised
+    });
+  });
+  return attachments.length;
+}
+
 // src/read-surface/read-surface-handler.ts
 var ReadSurfaceHandler = class extends import_agents_hosting2.ActivityHandler {
   deps;
@@ -60540,8 +60806,53 @@ var ReadSurfaceHandler = class extends import_agents_hosting2.ActivityHandler {
     });
   }
   async handleMessage(context2) {
-    const command = parseCommand(context2.activity.text ?? "");
+    captureRawAttachments({
+      attachments: context2.activity.attachments,
+      conversationType: context2.activity.conversation?.conversationType,
+      enabled: process.env[RAW_ATTACHMENT_LOG_FLAG] === "1"
+    });
+    const actionValue = context2.activity.value;
+    const actionVerb = typeof actionValue?.["verb"] === "string" ? actionValue["verb"] : null;
+    if (actionVerb !== null) {
+      const convId = context2.activity.conversation?.id ?? "";
+      const result = await dispatchActionInvoke(
+        { verb: actionVerb, conversationId: convId, data: actionValue ?? {} },
+        this.deps
+      );
+      if (!result.acted) {
+        logWarn("card action did not complete", { verb: actionVerb });
+      }
+      logInfo("card action", { verb: actionVerb, acted: result.acted });
+      await context2.sendActivity(import_agents_hosting2.MessageFactory.attachment(result.card));
+      return;
+    }
+    const spoken = stripMentions(
+      context2.activity.text ?? "",
+      context2.activity.entities,
+      context2.activity.recipient?.id
+    );
+    const command = parseCommand(spoken.text);
     const conversationId = context2.activity.conversation?.id ?? "";
+    if (command.kind === "help" && spoken.text.trim().length > 0) {
+      const classified = classify({
+        text: spoken.text,
+        hasAttachments: (context2.activity.attachments?.length ?? 0) > 0
+      });
+      if (classified.kind === "uncertain" && classified.suggestion !== null) {
+        await context2.sendActivity(
+          import_agents_hosting2.MessageFactory.attachment(
+            buildClarifyCard({
+              suggestionLabel: describeRoute(classified.suggestion),
+              product: classified.suggestion.product,
+              intent: classified.suggestion.intent,
+              skill: classified.suggestion.skill
+            })
+          )
+        );
+        logInfo("asked for clarification", { reason: classified.reason });
+        return;
+      }
+    }
     if (conversationId === "") {
       logWarn("activity has no conversation id", { command: command.kind });
       await context2.sendActivity(
