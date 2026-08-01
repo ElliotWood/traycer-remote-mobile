@@ -1,0 +1,62 @@
+# REFERENCE ONLY - describes the intended final state after certbot has
+# run. The file actually deployed by bootstrap.sh is generated inline
+# there (its phase-1 heredoc), then edited in place by `certbot --nginx`
+# to add the TLS server block - not this file directly. Kept here so the
+# end state is reviewable in one place without reading bootstrap.sh's
+# shell/certbot interaction; if this ever drifts from what bootstrap.sh
+# actually produces, bootstrap.sh is the source of truth.
+#
+# nginx reverse-proxy config for the Traycer public ingress (A0). Templated
+# by bootstrap.sh (__TRAYCER_PUBLIC_HOSTNAME__ substituted at provision
+# time) - not deployed as-is.
+#
+# This is the SECOND of A0's two enforcement layers (see
+# infra/azure/bicep/modules/network.bicep's module doc for the first - the
+# NSG, which cannot see request bodies). The 64 MB body cap and rate limit
+# below are the actual enforcement; the NSG only gets traffic this far.
+#
+# Upstream routing is intentionally NOT tenant-aware in this delivery: A0's
+# ticket is public ingress + TLS termination, not per-tenant HTTP routing.
+# `client_max_body_size`/`limit_req` apply uniformly to every request that
+# reaches this VM, regardless of which tenant's process eventually serves
+# it (host discovery/routing to the correct tenant process is out of this
+# ticket's scope - see main.bicep's top-of-file comment on what A0/A1 do
+# and do not provision).
+
+limit_req_zone $binary_remote_addr zone=traycer_ingress:10m rate=10r/s;
+
+server {
+    listen 80;
+    server_name __TRAYCER_PUBLIC_HOSTNAME__;
+
+    # ACME HTTP-01 challenge path only - certbot writes/serves this itself.
+    # Everything else on :80 redirects to :443 so this port never carries
+    # plaintext service traffic (see network.bicep's AllowHttpForAcmeChallenge
+    # rule comment - that NSG rule is only safe because of this redirect).
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name __TRAYCER_PUBLIC_HOSTNAME__;
+
+    ssl_certificate     /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/privkey.pem;
+
+    client_max_body_size 64m;
+    limit_req zone=traycer_ingress burst=20 nodelay;
+
+    location / {
+        # Placeholder upstream - A0 terminates TLS and enforces the body
+        # cap/rate limit; wiring this to the correct tenant process's port
+        # is explicitly out of scope here (see module doc above) and
+        # returns 502 until a later ticket adds real routing.
+        return 502 "traycer ingress: no upstream routing configured yet (see infra/azure/nginx/traycer.conf.template)";
+    }
+}

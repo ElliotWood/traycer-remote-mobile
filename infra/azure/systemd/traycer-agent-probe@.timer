@@ -1,0 +1,10 @@
+[Unit]
+Description=A6 agent-execution probe timer for tenant %i
+
+[Timer]
+OnBootSec=120s
+OnUnitActiveSec=300s
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

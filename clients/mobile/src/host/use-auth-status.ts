@@ -8,7 +8,7 @@
  * re-renders precisely on sign-in / sign-out / device-flow progress.
  */
 import { useSyncExternalStore } from "react";
-import type { MobileAuthStatus } from "./auth-service";
+import type { MobileAuthStatus } from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 interface AuthStatusSource {
   status(): MobileAuthStatus;

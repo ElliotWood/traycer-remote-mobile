@@ -15,7 +15,13 @@
  * teardown (which the browser reclaims), and disposing in an effect cleanup
  * would wrongly tear the connection down under StrictMode's simulated remount.
  */
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   defaultShouldDehydrateQuery,
   QueryClient,
@@ -25,9 +31,13 @@ import {
 } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import {
+  isStorageDurable,
+  safeStorage,
+} from "@traycer-clients/shared/platform/safe-storage";
 import { AUTHN_BASE_URL, AUTHN_CONFIGURED, HOST_WS_URL } from "@/config";
 import { computeConfigProblems } from "@/config-diagnostics";
-import { MobileAuthService } from "@/host/auth-service";
+import { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { AuthServiceProvider } from "@/host/auth-service-context";
 import { CACHE_MAX_AGE_MS, CACHE_SCHEMA_VERSION } from "@/host/cache-config";
 import { createHostConnection } from "@/host/connection";
@@ -53,7 +63,9 @@ const PERSISTED_QUERY_NAMES: ReadonlySet<string> = new Set([
   "epic.listCommentThreads",
 ]);
 
-export const shouldDehydrateQuery: DehydrateOptions["shouldDehydrateQuery"] = (query) =>
+export const shouldDehydrateQuery: DehydrateOptions["shouldDehydrateQuery"] = (
+  query,
+) =>
   defaultShouldDehydrateQuery(query) &&
   query.queryKey[0] === "mobile" &&
   typeof query.queryKey[1] === "string" &&
@@ -69,7 +81,11 @@ export const shouldDehydrateQuery: DehydrateOptions["shouldDehydrateQuery"] = (q
  * until restore settles; restoring `null` for that one tick is invisible
  * (nothing has painted yet), unlike a loading string would be.
  */
-function RestoreGate({ children }: { readonly children: ReactNode }): ReactElement | null {
+function RestoreGate({
+  children,
+}: {
+  readonly children: ReactNode;
+}): ReactElement | null {
   const isRestoring = useIsRestoring();
   return isRestoring ? null : <>{children}</>;
 }
@@ -123,11 +139,18 @@ export function AppRoot(): ReactElement {
         },
       }),
   );
+  // `!("localStorage" in window)` was the guard here and it does not work:
+  // in a context that DENIES storage the property still exists, so the guard
+  // passed and `window.localStorage` on the next line threw a SecurityError
+  // during startup — React never mounted and the app rendered a blank page.
+  // `safeStorage()` probes once inside try/catch and always returns something
+  // usable. When it isn't durable there is nothing worth persisting a query
+  // cache into, so the persister stays null exactly as before.
   const [persister] = useState(() =>
-    typeof window === "undefined" || !("localStorage" in window)
+    typeof window === "undefined" || !isStorageDurable()
       ? null
       : createSyncStoragePersister({
-          storage: window.localStorage,
+          storage: safeStorage() as Storage,
           key: QUERY_CACHE_STORAGE_KEY,
         }),
   );

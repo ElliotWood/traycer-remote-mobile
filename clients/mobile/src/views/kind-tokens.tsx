@@ -30,12 +30,25 @@ import { colors } from "./ui";
 import { theme } from "./design-tokens";
 
 /** Backend artifact kinds that get the full kind-card treatment. */
-export type CardKind = "spec" | "ticket" | "story" | "review";
+/**
+ * Re-exported, not re-declared.
+ *
+ * The kinds and the status integers are DATA — they live in
+ * `@traycer-clients/shared/epic/epic-doc-artifacts` with the projection that
+ * reads them. Declaring them again here would be two copies of one closed
+ * set, free to drift, with nothing to notice if they did.
+ *
+ * What stays in this file is presentation and only presentation: which icon a
+ * kind gets, what colour a status dot is, what word a status is called. Those
+ * are decisions a client is entitled to make differently; the set of kinds is
+ * not.
+ */
+export type { ArtifactKind as CardKind, ArtifactStatus } from "@traycer-clients/shared/epic/epic-doc-artifacts";
+import type { ArtifactKind as CardKind, ArtifactStatus } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 /** Every node kind the mobile client shows an icon+color identity for. */
 export type NodeKind = CardKind | "chat";
 
 /** Status codes as the epic doc reports them: 0 todo, 1 in-progress, 2 done. */
-export type ArtifactStatus = 0 | 1 | 2;
 
 export const KIND_ICONS: Readonly<Record<NodeKind, LucideIcon>> = {
   spec: FileText,

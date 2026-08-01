@@ -17,6 +17,8 @@
  * `updatedAt` (not `Date.now()`), so only activity that happens AFTER the
  * seed reads as unread.
  */
+import { safeStorage } from "@traycer-clients/shared/platform/safe-storage";
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -28,9 +30,17 @@ function storageKey(epicId: string, nodeId: string): string {
   return `${KEY_PREFIX}.${epicId}.${nodeId}`;
 }
 
-/** The real backing store — every production call site passes this explicitly; tests pass a fake instead. */
+/**
+ * The real backing store — every production call site passes this explicitly;
+ * tests pass a fake instead.
+ *
+ * Never a bare `globalThis.localStorage`: the PROPERTY ACCESS itself throws
+ * when storage is denied, so obtaining the object is what crashes, not
+ * `getItem`. `safeStorage()` probes with a real round-trip and falls back to
+ * an in-memory store.
+ */
 export function defaultStorage(): StorageLike {
-  return globalThis.localStorage;
+  return safeStorage();
 }
 
 /** The stored last-seen timestamp for one node, or `null` if never recorded. */

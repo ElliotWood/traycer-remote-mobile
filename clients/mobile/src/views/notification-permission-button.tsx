@@ -17,7 +17,7 @@ import {
 } from "@/host/notifications";
 import { subscribeToPush, type PushSubscribeOutcome } from "@/host/push-subscription";
 import { useAuthServiceOrNull } from "@/host/auth-service-context";
-import type { MobileAuthService } from "@/host/auth-service";
+import type { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { radius, theme } from "./design-tokens";
 import { secondaryButton } from "./ui";
 

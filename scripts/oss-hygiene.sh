@@ -47,9 +47,36 @@ PATTERNS=(
   "tailscale CGNAT address|\b100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b(?!/[0-9])"
 
   # Home paths whose username is NOT a known placeholder.
-  "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)\\\\)[A-Za-z0-9._-]+"
+  #
+  # The placeholder may be followed by a separator OR end the line: prose and
+  # docs write `C:\Users\example` as a terminal path, and requiring a trailing
+  # backslash flagged it as a real username. A gate that cries wolf gets
+  # disabled — see the header — so this false positive is a correctness bug in
+  # the gate, not cosmetics. `\s|$` and not `\b`, because `\b` would fail for
+  # the `...` placeholder, whose last character is not a word character.
+  "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)(\\\\|\\s|$))[A-Za-z0-9._-]+"
   "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+/\.traycer"
+
+  # Any RFC-4122 GUID. Narrowed by the synthetic-fixture filter below, and
+  # scoped to shipping source only — see the scope note.
+  "GUID that is not a house fixture|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b"
 )
+
+# A GUID that is not one of our fixtures.
+#
+# The rule names tenant ids, bot ids and a person's Entra object id — all
+# GUIDs — and this gate had no shape for any of them. It went clean over a
+# real host id sitting in `teams-tab/src/app.tsx`, because every pattern above
+# looks for hostnames, addresses and paths. A host id identifies a machine
+# just as surely as a hostname does.
+#
+# The tell was not the value, it was the SHAPE: every deliberate fixture in
+# this repo is `a1000000-0000-4000-8000-000000000001`, and the leak was the
+# only GUID nearby with real random entropy. So the gate encodes the
+# convention rather than trying to detect entropy — a regex cannot tell a
+# real GUID from a well-authored fake, but it can tell either from the house
+# pattern. Synthetic ids use the house pattern; anything else is asked about.
+SYNTHETIC_GUID='(-0000-4000-8000-|00000000-0000|-0000-0000-)'
 
 EXCLUDES=(':!*.lock' ':!**/dist/**' ':!**/node_modules/**' ':!**/*.snap' ':!scripts/oss-hygiene.sh')
 
@@ -69,20 +96,58 @@ for entry in "${PATTERNS[@]}"; do
   desc="${entry%%|*}"
   rx="${entry#*|}"
   # Infrastructure identifiers are always wrong; home paths only in owned code.
+  #
+  # GUIDs are checked in SHIPPING SOURCE ONLY, and that limit is deliberate
+  # rather than convenient. Test files carry ~20 hand-authored GUIDs that are
+  # plainly synthetic to a human (`0b8f1c2e-…-1e2f3a4b5c6d`) but identical in
+  # shape to a real one. Firing on all of them would make this gate the thing
+  # people pass with `--no-verify` — the header already says a gate that cries
+  # wolf gets disabled. So the covered set is stated below instead of quietly
+  # widened, and tests remain a reviewer's job.
   case "$desc" in
     *"home path"*) scope=("${OWNED[@]}") ;;
+    *GUID*)        scope=("${OWNED[@]}" 'clients/teams-tab' 'clients/shared') ;;
     *)             scope=(.) ;;
   esac
+  extra=(':!**/__tests__/**' ':!**/*.test.*')
+  case "$desc" in
+    *GUID*) : ;;
+    *)      extra=() ;;
+  esac
   # -P for lookahead (the placeholder exclusion); tracked files only.
-  if hits=$(git grep -nIP "$rx" -- "${scope[@]}" "${EXCLUDES[@]}" 2>/dev/null); then
+  if hits=$(git grep -nIP "$rx" -- "${scope[@]}" "${EXCLUDES[@]}" "${extra[@]}" 2>/dev/null \
+              | { case "$desc" in *GUID*) grep -vE "$SYNTHETIC_GUID" ;; *) cat ;; esac; }) \
+     && [ -n "$hits" ]; then
     printf '\n✗ %s\n' "$desc"
     printf '%s\n' "$hits" | sed 's/^/    /'
     fail=1
   fi
 done
 
+# WHAT WAS ACTUALLY CHECKED, always printed — pass or fail.
+#
+# Three separate leaks got through a sweep that reported clean because the
+# sweep's BOUNDARY was wrong, not its patterns: a username prefix that didn't
+# match, a package scope that excluded the offending package, and a directory
+# scope of `*/src` that silently skipped `tools/`. Each time the output said
+# "clean" and the scope it was clean WITHIN was invisible.
+#
+# So the boundary is stated. "clean" is not a claim anyone can check; "checked
+# 1,204 files, home paths within 7 paths" is one you can look at and say
+# that's the wrong set. The point is not a wider glob — it is a boundary the
+# reader can falsify.
+files_scanned=$(git grep -lI '' -- . "${EXCLUDES[@]}" 2>/dev/null | wc -l | tr -d ' ')
+printf '\noss-hygiene: scanned %s tracked files\n' "$files_scanned"
+printf '  infrastructure patterns  repo-wide\n'
+printf '  home-path patterns       %s\n' "${OWNED[*]}"
+printf '  GUID patterns            shipping source only, NOT tests\n'
+printf '  NOT covered              internal work titles — no distinguishing\n'
+printf '                           shape exists; see the fixture docblocks\n'
+printf '                           GUIDs in tests — synthetic and real are the\n'
+printf '                           same shape; a reviewer decides, not a regex\n'
+
 if [ "$fail" -eq 0 ]; then
-  echo "oss-hygiene: clean — no machine-identifying strings in tracked files"
+  echo "oss-hygiene: clean within the scope above"
   exit 0
 fi
 

@@ -1,0 +1,180 @@
+/**
+ * D3 — reference adapter proving {@link RemoteBridgeActions} is
+ * implementable without touching the bridge's internals. No external
+ * service, no network listener: `bridge watch` polls status on the agents
+ * the bridge already knows about and prints pending approvals to stdout;
+ * `bridge approve <id>` / `bridge reject <id>` act on one by approval id
+ * (searched across every chat the bridge is currently tracking — the CLI's
+ * only bridge-specific convenience beyond the plain {@link RemoteBridgeActions}
+ * surface, kept out of that interface itself so a channel adapter with its
+ * own chat-id context never needs it).
+ */
+import type { BridgeClient } from "../bridge-client";
+import type { ILogger } from "../logger";
+
+const WATCH_POLL_MS = 4_000;
+
+export async function runList(
+  bridge: BridgeClient,
+  logger: ILogger,
+): Promise<void> {
+  const agents = await bridge.listAgents();
+  process.stdout.write(`${JSON.stringify(agents, null, 2)}\n`);
+  logger.info("listed agents", { count: agents.length });
+}
+
+export async function runStatus(
+  bridge: BridgeClient,
+  chatId: string,
+): Promise<void> {
+  const status = await bridge.getStatus(chatId);
+  process.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
+}
+
+export async function runApprove(
+  bridge: BridgeClient,
+  approvalId: string,
+  logger: ILogger,
+): Promise<void> {
+  const chatId = await bridge.findChatForApproval(approvalId);
+  if (chatId === null) {
+    process.stderr.write(
+      `[bridge] approval ${approvalId} is not currently pending on any tracked chat\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const outcome = await bridge.approve(chatId, approvalId);
+  logger.info("approve outcome", { chatId, approvalId, outcome });
+  process.stdout.write(`${JSON.stringify(outcome)}\n`);
+  if (outcome.kind !== "applied") process.exitCode = 1;
+}
+
+export async function runReject(
+  bridge: BridgeClient,
+  approvalId: string,
+  reason: string | null,
+  logger: ILogger,
+): Promise<void> {
+  const chatId = await bridge.findChatForApproval(approvalId);
+  if (chatId === null) {
+    process.stderr.write(
+      `[bridge] approval ${approvalId} is not currently pending on any tracked chat\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const outcome = await bridge.reject(chatId, approvalId, reason);
+  logger.info("reject outcome", { chatId, approvalId, outcome });
+  process.stdout.write(`${JSON.stringify(outcome)}\n`);
+  if (outcome.kind !== "applied") process.exitCode = 1;
+}
+
+/**
+ * Sends a message to a chat, addressed by chat id.
+ *
+ * Unlike `approve`/`reject` this takes an EXPLICIT `chatId` rather than
+ * searching for one: an approval id is globally unique so finding its chat is
+ * unambiguous, whereas "send this text" has no id to search by. A caller that
+ * cannot name the destination does not have one.
+ *
+ * Note the asymmetry with approvals in the failure path: a repeated approval
+ * is deduped by the host, so a retry is safe. A repeated SEND is not — it is
+ * a second message the agent will act on. Callers must treat a non-`applied`
+ * outcome as "unknown", not as "retry me".
+ */
+export async function runSend(
+  bridge: BridgeClient,
+  chatId: string,
+  text: string,
+  logger: ILogger,
+): Promise<void> {
+  const outcome = await bridge.sendMessage(chatId, text);
+  logger.info("send outcome", { chatId, outcome });
+  process.stdout.write(`${JSON.stringify(outcome)}\n`);
+  if (outcome.kind !== "applied") process.exitCode = 1;
+}
+
+/**
+ * A window of a chat's transcript as JSON.
+ *
+ * `offset` counts from the RECENT end, so `--offset 0` is the newest page.
+ * Both bounds are validated here rather than trusted: they arrive from a
+ * command line, and a negative or non-numeric offset would silently slice
+ * from the wrong end via `Array.slice`'s negative-index behaviour.
+ */
+export async function runTranscript(
+  bridge: BridgeClient,
+  chatId: string,
+  offset: number,
+  limit: number,
+): Promise<void> {
+  if (!Number.isInteger(offset) || offset < 0) {
+    process.stderr.write(`[bridge] --offset must be a non-negative integer\n`);
+    process.exitCode = 1;
+    return;
+  }
+  if (!Number.isInteger(limit) || limit <= 0) {
+    process.stderr.write(`[bridge] --limit must be a positive integer\n`);
+    process.exitCode = 1;
+    return;
+  }
+  const transcript = await bridge.getTranscript(chatId, offset, limit);
+  process.stdout.write(`${JSON.stringify(transcript, null, 2)}\n`);
+}
+
+/** Long-running: prints every currently-pending approval/interview across tracked chats every `WATCH_POLL_MS`, until SIGINT/SIGTERM. */
+export function runWatch(bridge: BridgeClient, logger: ILogger): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let stopped = false;
+    const cleanup = (): void => {
+      if (stopped) return;
+      stopped = true;
+      process.off("SIGINT", cleanup);
+      process.off("SIGTERM", cleanup);
+      clearInterval(timer);
+      resolve();
+    };
+    process.once("SIGINT", cleanup);
+    process.once("SIGTERM", cleanup);
+
+    const tick = async (): Promise<void> => {
+      if (stopped) return;
+      try {
+        const agents = await bridge.listAgents();
+        for (const agent of agents) {
+          const status = await bridge.getStatus(agent.agentId);
+          for (const approval of status.pendingApprovals) {
+            process.stdout.write(
+              `${JSON.stringify({
+                chatId: agent.agentId,
+                chatTitle: status.title,
+                approvalId: approval.approvalId,
+                toolName: approval.toolName,
+                description: approval.description,
+              })}\n`,
+            );
+          }
+          for (const interview of status.pendingInterviews) {
+            process.stdout.write(
+              `${JSON.stringify({
+                chatId: agent.agentId,
+                chatTitle: status.title,
+                interviewBlockId: interview.blockId,
+              })}\n`,
+            );
+          }
+        }
+      } catch (err) {
+        logger.warn("watch tick failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+
+    const timer = setInterval(() => {
+      void tick();
+    }, WATCH_POLL_MS);
+    void tick();
+  });
+}

@@ -1,3 +1,20 @@
+/**
+ * KNOWN INTERMITTENT — if you are reading this because it just failed, that
+ * may not be your change.
+ *
+ * 2026-07-31: failed ONCE in a full-suite run immediately after
+ * `mermaid-runtime` moved to `@traycer-clients/shared/markdown`, then passed
+ * in isolation and on three subsequent full runs. Same code, one failure,
+ * three passes. CAUSE UNESTABLISHED.
+ *
+ * A plausible story exists — `vi.mock("mermaid")` is hoisted per file, and
+ * the re-export may change module identity across workers — and it was
+ * deliberately NOT adopted: a flake explained by a comfortable theory is a
+ * flake that returns wearing a fixed label.
+ *
+ * If it recurs: capture the failure output before re-running. A second
+ * observation is worth more than any reasoning from the first.
+ */
 // @vitest-environment jsdom
 /**
  * jsdom cannot lay out real SVG, so this proves wiring/config/error-handling

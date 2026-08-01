@@ -1,0 +1,85 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.25",
+  "version": "0.1.0",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "developer": {
+    "name": "REPLACE_WITH_DEVELOPER_NAME",
+    "websiteUrl": "https://example.invalid",
+    "privacyUrl": "https://example.invalid/privacy",
+    "termsOfUseUrl": "https://example.invalid/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Traycer Remote",
+    "full": "Traycer Remote — approve and monitor agent runs from Teams"
+  },
+  "description": {
+    "short": "Approve, reject, and monitor Traycer agent runs from Teams.",
+    "full": "Relays through the Traycer remote bridge to your own desktop host — browse the fleet, read a chat's transcript, and approve or reject pending actions without leaving Teams."
+  },
+  "accentColor": "#148A7A",
+  "staticTabs": [
+    {
+      "entityId": "traycer.waiting",
+      "name": "Waiting on you",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/tab/waiting",
+      "websiteUrl": "https://REPLACE_WITH_TAB_HOST/tab/waiting",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "traycer.epics",
+      "name": "Epics",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/tab/epics",
+      "websiteUrl": "https://REPLACE_WITH_TAB_HOST/tab/epics",
+      "scopes": ["personal"]
+    }
+  ],
+  "bots": [
+    {
+      "botId": "00000000-0000-0000-0000-000000000000",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "fleet",
+              "description": "List the agents in this conversation's epic, each row with Open, Reply and Log buttons"
+            },
+            {
+              "title": "epics",
+              "description": "List your epics, so you can bind one to this conversation"
+            },
+            {
+              "title": "epic",
+              "description": "epic <id> — bind this conversation to an epic. Sent bare, replies with the id you need"
+            },
+            {
+              "title": "chat",
+              "description": "chat <id> — one agent's status, with any pending approval above the fold"
+            },
+            {
+              "title": "log",
+              "description": "log <id> — read an agent's transcript, a page at a time"
+            },
+            {
+              "title": "say",
+              "description": "say <id> <message> — message an agent. Omit the message for a compose box"
+            },
+            {
+              "title": "help",
+              "description": "Show every command with its syntax"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "validDomains": ["REPLACE_WITH_TAB_HOST"]
+}

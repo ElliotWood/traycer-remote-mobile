@@ -13,7 +13,9 @@ import { assetsNotFoundPlugin } from "./vite/assets-not-found-plugin";
 import { collectEntryCriticalUrls } from "./vite/collect-entry-critical-urls";
 
 // Bind loopback; `tailscale serve` fronts this over real HTTPS at
-// https://tonberry.tail267a92.ts.net (secure context → SW/notifications/PWA work).
+// https://<machine>.<tailnet>.ts.net (secure context → SW/notifications/PWA work).
+// Hostname deliberately not written out: it names a specific machine on a
+// specific tailnet, and this repo is public. Run `tailscale status` for it.
 const TAILSCALE_IP = "127.0.0.1";
 const HOST_WS = "ws://127.0.0.1:55945"; // loopback host, proxied below
 

@@ -18,7 +18,7 @@
  */
 import type { ReactElement } from "react";
 import { selectAppScreen } from "@/app-screen";
-import type { MobileAuthService } from "@/host/auth-service";
+import type { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { useAuthStatus } from "@/host/use-auth-status";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { unsubscribeFromPush } from "@/host/push-subscription";

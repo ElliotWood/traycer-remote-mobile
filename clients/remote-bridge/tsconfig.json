@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@traycer-clients/shared/*": ["../shared/*"],
+      "@traycer/protocol/utils/*": ["../../protocol/utils/*"],
+      "@traycer/protocol/*": ["../../protocol/src/*"],
+      "@traycer-clients/remote-bridge/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "../shared", "../../protocol"],
+  "exclude": [
+    "node_modules",
+    // DOM-dependent modules. This is a NODE package; compiling them yields
+    // "Cannot find name document". Do not fix that by adding "dom" to lib —
+    // see clients/shared/browser/README.md.
+    "../shared/browser",
+    "dist",
+    "../shared/**/__tests__/**",
+    "../shared/**/*.test.ts",
+    "../../protocol/**/__tests__/**",
+    "../../protocol/**/*.test.ts"
+  ]
+}

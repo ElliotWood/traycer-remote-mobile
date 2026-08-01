@@ -25,15 +25,46 @@ import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport
 import type { ChatSnapshot } from "@traycer/protocol/host/agent/gui/subscribe";
 import { hostStreamRpcRegistry } from "@traycer/protocol/host/registry";
 import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
-import { MobileAuthService, type StorageLike } from "@/host/auth-service";
+import { MobileAuthService, type StorageLike } from "@traycer-clients/shared/auth/browser-device-auth-service";
 import { openChatStream, createStreamAuthRevalidator } from "@/host/stream-connection";
 import { partitionBlocks } from "@/views/chat/transcript-model";
 import { TranscriptView } from "@/views/chat/transcript-view";
 
 const HOST_WS = process.env.LIVE_HOST_WS ?? "ws://127.0.0.1:55945/rpc";
-const EPIC_ID = process.env.LIVE_EPIC_ID ?? "9c9ddaf0-99ce-412a-b4b8-49e0b1d8a4ef";
-const CHAT_ID = process.env.LIVE_CHAT_ID ?? "29feb5f0-b273-4906-a87b-a8a71038952c";
+/**
+ * NO DEFAULT TARGET, deliberately.
+ *
+ * These carried a real epic id and chat id as fallbacks. The problem was not
+ * that the ids were sensitive — they aren't secrets — it is that a live test
+ * with a default target RUNS AGAINST REAL DATA when someone sets `LIVE_HOST=1`
+ * without thinking about which chat they mean. The convenience is one line;
+ * the cost is an unguarded live target that reads someone's actual
+ * conversation.
+ *
+ * `LIVE_HOST_WS` keeps its default because loopback is not somebody's data.
+ *
+ * Resolved to "" rather than thrown at module scope: the ids appear in the
+ * test TITLE, which vitest evaluates at collection time even for a skipped
+ * suite, so throwing here would fail the ordinary `vitest run`. The demand is
+ * made inside the test body, where it only fires for someone who actually
+ * asked for a live run.
+ */
+const EPIC_ID = process.env.LIVE_EPIC_ID ?? "";
+const CHAT_ID = process.env.LIVE_CHAT_ID ?? "";
 const runIf = process.env.LIVE_HOST === "1" ? describe : describe.skip;
+
+function requireLiveTarget(): void {
+  const missing = [
+    EPIC_ID === "" ? "LIVE_EPIC_ID" : null,
+    CHAT_ID === "" ? "LIVE_CHAT_ID" : null,
+  ].filter((n): n is string => n !== null);
+  if (missing.length > 0) {
+    throw new Error(
+      `LIVE_HOST=1 needs an explicit target — set ${missing.join(" and ")}. ` +
+        "There is no default: this test opens a real chat and reads its real content.",
+    );
+  }
+}
 
 // The 11 block types the Evaluator found present with real data on this chat.
 const EXPECTED_TYPES = [
@@ -128,8 +159,11 @@ function fetchSnapshot(): Promise<ChatSnapshot> {
 
 runIf("live chat transcript — real content robustness", () => {
   it(
-    `renders the real chat ${CHAT_ID} with no throw and no silent block drop`,
+    `renders the real chat ${CHAT_ID === "" ? "named by LIVE_CHAT_ID" : CHAT_ID} with no throw and no silent block drop`,
     async () => {
+      // Before the socket, not after: the failure should name the missing
+      // variable, not surface as a connection or protocol error.
+      requireLiveTarget();
       const snapshot = await fetchSnapshot();
       const messages = snapshot.chat.messages;
       expect(messages.length).toBeGreaterThan(0);

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Traycer</title>
+    <style>
+      /*
+       * The user agent's default `body { margin: 8px }` is why the shell was
+       * not flush.
+       *
+       * MEASURED, not assumed: with the shell at `height: 100vh` inside an
+       * 8px-margined body, `document.scrollHeight` was 816 against a 800px
+       * window and the header's top sat at y=8. So the page itself could
+       * scroll 16px underneath a frame whose whole purpose is that the page
+       * does not scroll — a small wobble that the screenshot could not show
+       * and only the box measurement caught.
+       *
+       * `height: 100%` on html/body rather than another `100vh`: the frame
+       * owns the viewport height, and a second viewport unit here would be
+       * the growth problem reintroduced one level up.
+       */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      #root {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -6,7 +6,7 @@
  * without prop-drilling `auth` through every intermediate view.
  */
 import { createContext, useContext, type ReactElement, type ReactNode } from "react";
-import type { MobileAuthService } from "./auth-service";
+import type { MobileAuthService } from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 const AuthServiceContext = createContext<MobileAuthService | null>(null);
 

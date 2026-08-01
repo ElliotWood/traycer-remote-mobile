@@ -28,7 +28,6 @@
 import { useCallback, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_ACCOUNT_CONTEXT } from "@traycer/protocol/common/schemas";
-import type { JsonContent } from "@traycer/protocol/common/registry";
 import type {
   CreateChatInitialMessage,
   CreateChatRequest,
@@ -158,23 +157,19 @@ export const MISSING_HOST_ID_ERROR =
 
 /**
  * A minimal ProseMirror-style `doc` carrying the instruction as one paragraph.
- * Hand-built (not reusing gui-app's `plainTextPromptContent`) because that
- * helper lives in the `gui-app` client, which the mobile client does not — and
- * should not — import across the client boundary; there is no shared/protocol
- * plain-text→JsonContent helper. Shape matches the canonical builder exactly and
- * is validated by `createChatRequestSchema` (see the contract test).
+ *
+ * This docblock used to end "there is no shared/protocol plain-text→JsonContent
+ * helper", which is why it was hand-built here rather than reusing gui-app's
+ * across a client boundary. That is no longer true: the Teams tab needed the
+ * same shape, so it MOVED to `@traycer-clients/shared/epic/comment-content`
+ * and this re-exports it.
+ *
+ * The reasoning was right and its premise expired — worth leaving visible
+ * rather than deleting, because "no shared helper exists" is exactly the kind
+ * of justification that outlives the condition it describes.
  */
-export function plainTextContent(text: string): JsonContent {
-  return {
-    type: "doc",
-    content: [
-      {
-        type: "paragraph",
-        content: text.length === 0 ? [] : [{ type: "text", text }],
-      },
-    ],
-  };
-}
+export { plainTextContent } from "@traycer-clients/shared/epic/comment-content";
+import { plainTextContent } from "@traycer-clients/shared/epic/comment-content";
 
 /** Chat title from the instruction: its first non-empty line, trimmed + capped. */
 export function deriveChatTitle(instruction: string): string {

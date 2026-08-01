@@ -22,7 +22,8 @@
  * `resolvedAt` fields. `summary` (unreadCount/attentionCount) stays
  * server-authoritative — it is never recomputed client-side.
  */
-import { useEffect, useState } from "react";
+import { applyFeedFrame } from "@traycer-clients/shared/epic/host-notifications-feed";
+import { useEffect, useRef, useState } from "react";
 import {
   hostNotificationsSubscribeServerFrameSchema,
   type HostNotificationEntry,
@@ -56,6 +57,10 @@ export function useHostNotifications(
   const [entriesById, setEntriesById] = useState<Readonly<Record<string, HostNotificationEntry>>>({});
   const [summary, setSummary] = useState<HostNotificationsSummary>(DEFAULT_SUMMARY);
   const [connection, setConnection] = useState<StreamConnectionState>("reconnecting");
+  // The reducer is pure and the frame handler closes over its first render,
+  // so the current map is read from a ref. Without this every frame would
+  // apply to the state as it was when the subscription opened.
+  const entriesByIdRef = useRef<Readonly<Record<string, HostNotificationEntry>>>({});
 
   useEffect(() => {
     if (streamConnection === null) {
@@ -73,71 +78,18 @@ export function useHostNotifications(
       if (disposed) return;
       const parsed = hostNotificationsSubscribeServerFrameSchema.safeParse(envelope);
       if (!parsed.success) return;
-      const frame = parsed.data;
-      switch (frame.kind) {
-        case "snapshot": {
-          const merged: Record<string, HostNotificationEntry> = {};
-          for (const entry of [...frame.attention.entries, ...frame.recent.entries]) {
-            merged[entry.id] = entry;
-          }
-          setEntriesById(merged);
-          setSummary(frame.summary);
-          return;
-        }
-        case "upserted": {
-          setEntriesById((prev) => {
-            const next = { ...prev };
-            for (const id of frame.removedIds) delete next[id];
-            next[frame.entry.id] = frame.entry;
-            return next;
-          });
-          setSummary(frame.summary);
-          return;
-        }
-        case "readStateChanged": {
-          setEntriesById((prev) => {
-            const next = { ...prev };
-            for (const id of frame.removedIds) delete next[id];
-            for (const id of frame.ids) {
-              const existing = next[id];
-              if (existing === undefined) continue;
-              // `resolvedAt` only exists on the approval/interview variants
-              // of the discriminated union — spreading it onto every kind
-              // unconditionally would widen the type incorrectly.
-              next[id] =
-                "resolvedAt" in existing
-                  ? { ...existing, readAt: frame.readAt, resolvedAt: frame.resolvedAt }
-                  : { ...existing, readAt: frame.readAt };
-            }
-            return next;
-          });
-          setSummary(frame.summary);
-          return;
-        }
-        case "removed": {
-          setEntriesById((prev) => {
-            const next = { ...prev };
-            for (const id of frame.removedIds) delete next[id];
-            return next;
-          });
-          setSummary(frame.summary);
-          return;
-        }
-        case "cleared": {
-          setEntriesById((prev) => {
-            const next = { ...prev };
-            for (const id of frame.removedIds) delete next[id];
-            return next;
-          });
-          setSummary(frame.summary);
-          return;
-        }
-        case "channelEmission":
-        case "pong":
-          // External-delivery-only (toast/push/hook) and heartbeat frames —
-          // never change the in-app feed's own state.
-          return;
-      }
+      // Frame handling MOVED to
+      // `@traycer-clients/shared/epic/host-notifications-feed` when the Teams
+      // tab needed the same feed. The three subtle rules — no `resolvedAt`
+      // widening, `removedIds` on four frame kinds, and channelEmission/pong
+      // not being feed state — now exist once.
+      const next = applyFeedFrame(
+        { entriesById: entriesByIdRef.current, summary: null },
+        parsed.data,
+      );
+      entriesByIdRef.current = next.entriesById;
+      setEntriesById(next.entriesById);
+      if (next.summary !== null) setSummary(next.summary);
     });
     session.onStatusChange((status) => {
       if (disposed) return;
