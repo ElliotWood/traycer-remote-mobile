@@ -226,6 +226,41 @@ try {
           // `loading`/`empty`/`error` all render the heading; if one ever
           // doesn't, a blank shot is the finding, not a reason to bail.
         });
+        /**
+         * GROW THE VIEWPORT TO THE CONTENT, because `fullPage` stopped
+         * meaning full page the moment the shell landed.
+         *
+         * `frame` is `height: 100vh; overflow: hidden` and the body scrolls
+         * inside it. Playwright's `fullPage` extends to the DOCUMENT's
+         * scroll height, which under that layout is exactly the viewport —
+         * so every shot was silently cropped at 900px and nothing said so.
+         * Caught by reading one: the epic form's unconfirmed error line was
+         * absent from `authoring-unconfirmed`, the single sentence that shot
+         * exists to show.
+         *
+         * Resizing the viewport is the fix rather than scroll-and-stitch:
+         * the layout is responsive to WIDTH, not height, so a taller window
+         * renders the same thing with more of it visible.
+         */
+        const needed = await page.evaluate(() => {
+          const header = document.querySelector("header");
+          const body = header?.nextElementSibling ?? null;
+          if (body === null) return null;
+          return (
+            Math.ceil(header.getBoundingClientRect().height) +
+            body.scrollHeight
+          );
+        });
+        // 4000 is a guard against a runaway list, not a target. If it ever
+        // binds, the shot is truncated and SAYS so rather than looking whole.
+        if (needed !== null && needed > 900) {
+          const height = Math.min(needed + 8, 4000);
+          if (needed + 8 > 4000) {
+            console.log(`  ${view.name}/${theme}/${width.name}: content ${String(needed)}px CROPPED to 4000`);
+          }
+          await page.setViewportSize({ width: width.px, height });
+          await page.waitForTimeout(120);
+        }
         // EVERY axis in the filename. A previous run wrote "6 images" and
         // produced 3, because the theme was missing from the name and each
         // shot overwrote its predecessor — and the false claim reached the
