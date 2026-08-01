@@ -89,6 +89,7 @@ describe("notification display", () => {
       }),
       replaceKey: "host:chat:chat-1",
       deliveryKey: null,
+      foregroundAppLocal: null,
     });
     expect(toastCalls).toHaveLength(1);
     expect(toastCalls[0]?.options.id).toBe("host:chat:chat-1");
@@ -185,6 +186,7 @@ describe("notification display", () => {
       }),
       replaceKey: "notification-batch",
       deliveryKey: null,
+      foregroundAppLocal: null,
     });
 
     renderActionableToast();
@@ -262,6 +264,7 @@ describe("notification display", () => {
       payload: null,
       replaceKey: "host:id:n-1",
       deliveryKey: null,
+      foregroundAppLocal: null,
     });
   });
 

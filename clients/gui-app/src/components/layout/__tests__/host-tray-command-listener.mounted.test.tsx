@@ -216,6 +216,7 @@ function makeHost(tray: IHostTray, management: IHostManagement): IRunnerHost {
     },
     notifications: {
       show: () => Promise.resolve(),
+      onForegroundDisplay: () => ({ dispose: () => undefined }),
       onClick: () => ({ dispose: () => undefined }),
     },
     tray: {

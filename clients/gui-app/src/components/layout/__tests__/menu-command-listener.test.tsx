@@ -170,6 +170,7 @@ function createRunnerHost(menu: FakeDesktopMenu): FakeRunnerHost {
       },
       notifications: {
         show: () => Promise.resolve(),
+        onForegroundDisplay: () => ({ dispose: () => undefined }),
         onClick: () => ({ dispose: () => undefined }),
       },
       tray: {
