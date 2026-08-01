@@ -274,6 +274,7 @@ async function dispatchConfirmedRoute(
     product: readString(request.data, "product") ?? "",
     intent: readString(request.data, "intent") ?? "",
     conversationReference: request.conversationReference,
+    spokenText: readString(request.data, "text") ?? "",
   });
 
   return outcome.kind === "started"

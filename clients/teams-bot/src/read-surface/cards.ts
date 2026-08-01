@@ -1708,6 +1708,15 @@ export function buildClarifyCard(options: {
   readonly product: string | null;
   readonly intent: string | null;
   readonly skill: string | null;
+  /**
+   * The words the person used, carried through the button.
+   *
+   * Without this the confirmed dispatch starts an assessment with an EMPTY
+   * request: the card knows the route and would have forgotten the question.
+   * Capped because card payloads are relayed by Bot Service and an unbounded
+   * field is an unbounded payload.
+   */
+  readonly spokenText?: string;
 }): Attachment {
   const canSuggest =
     options.suggestionLabel !== null &&
@@ -1733,6 +1742,7 @@ export function buildClarifyCard(options: {
                 product: options.product ?? "",
                 intent: options.intent ?? "",
                 skill: options.skill ?? "",
+                text: (options.spokenText ?? "").slice(0, 900),
               },
               { associateInputs: false },
             ),

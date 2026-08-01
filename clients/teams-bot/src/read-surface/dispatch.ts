@@ -60,6 +60,9 @@ export interface DispatchDeps extends HostAccessDeps {
     readonly product: string;
     readonly intent: string;
     readonly conversationReference: unknown;
+    /** The requester's own words, carried through the button. */
+    readonly spokenText?: string;
+    readonly attachmentCount?: number;
   }) => Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }>;
   /** Injected so "requested 2m ago" labels are deterministic in tests. */
   readonly now: () => number;

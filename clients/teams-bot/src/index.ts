@@ -19,6 +19,9 @@ import {
   type EpicBindingStore,
 } from "./read-surface/epic-binding-store";
 import { createReadSurfaceHandler } from "./read-surface/read-surface-handler";
+import { createStartAssessment } from "./intake/start-assessment";
+import { DurableConversationReferenceStore } from "./state/conversation-reference-store";
+import { resolveTenantEnv } from "./read-surface/host-access";
 import type { ResolvePrincipal } from "./read-surface/principal-source";
 
 /**
@@ -103,15 +106,72 @@ async function main(): Promise<void> {
     });
   }
 
+  const bridgeCliConfig = defaultBridgeCliConfig(
+    requireEnv("TRAYCER_REMOTE_BRIDGE_BIN"),
+  );
+  const resolvePrincipal = selectPrincipalSource(process.env);
+
+  /*
+   * `startAssessment` — the last wire, and OPTIONAL by construction.
+   *
+   * Composed only when a host id and an epic are configured. Without them the
+   * confirm button refuses in words ("this deployment can't start
+   * assessments yet") rather than appearing to work — the whole point of
+   * making the dep optional rather than defaulting it to something.
+   *
+   * `TRAYCER_TEAMS_TAB_URL` is separately optional: no tab URL means the ack
+   * card renders with NO "Watch progress" button, which is better than a
+   * button that goes nowhere.
+   */
+  const assessmentHostId = process.env.TRAYCER_TEAMS_HOST_ID?.trim() ?? "";
+  const startAssessment =
+    assessmentHostId.length > 0 &&
+    defaultEpicId !== undefined &&
+    defaultEpicId.length > 0
+      ? createStartAssessment({
+          references: new DurableConversationReferenceStore(
+            process.env.TRAYCER_TEAMS_STATE_DIR !== undefined
+              ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/conversation-refs.json`
+              : "/srv/traycer/teams-bot/state/conversation-refs.json",
+            (message: string, detail: string) => {
+              logWarn(message, { detail });
+            },
+          ),
+          hostId: assessmentHostId,
+          epicId: defaultEpicId,
+          tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
+          bridgeCliConfig,
+          // Identity resolved per press, never cached — the same ordering
+          // every other action uses: resolve, then act.
+          buildEnv: async () => {
+            const identity = await resolvePrincipal();
+            if (identity.kind === "unavailable") return null;
+            return resolveTenantEnv(identity.principal, defaultEpicId, {
+              registry,
+              epicBindings,
+              bridgeCliConfig,
+              senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
+              parentEnv: process.env,
+            });
+          },
+          now: Date.now,
+        })
+      : undefined;
+
+  if (startAssessment === undefined) {
+    logWarn("assessment dispatch disabled — set TRAYCER_TEAMS_HOST_ID", {
+      hasEpic: defaultEpicId !== undefined,
+    });
+  }
+
   const handler = createReadSurfaceHandler({
     registry,
     epicBindings,
-    bridgeCliConfig: defaultBridgeCliConfig(
-      requireEnv("TRAYCER_REMOTE_BRIDGE_BIN"),
-    ),
+    bridgeCliConfig,
     senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
     parentEnv: process.env,
-    resolvePrincipal: selectPrincipalSource(process.env),
+    resolvePrincipal,
+    startAssessment,
     now: Date.now,
   });
 

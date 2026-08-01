@@ -385,3 +385,26 @@ export async function fetchEpicList(
   }
   return { kind: "ok", epics: result.value };
 }
+
+/**
+ * The tenant env for a principal, for callers outside this file.
+ *
+ * Exists so `startAssessment` does NOT build its own. `buildBridgeEnv` is
+ * private on purpose and `tenant-environment.ts` records why: two independent
+ * env constructions is the defect that file exists to prevent. A second
+ * construction in `index.ts` would drift from this one silently, and the
+ * symptom would be an agent running under the wrong HOME.
+ *
+ * `null` when the principal resolves to no tenant — the caller must refuse
+ * rather than fall back to the parent env, which would run the bridge as
+ * whoever the bot process is.
+ */
+export function resolveTenantEnv(
+  principal: VerifiedPrincipal,
+  epicId: string,
+  deps: HostAccessDeps,
+): NodeJS.ProcessEnv | null {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") return null;
+  return buildBridgeEnv(resolution.tenant, epicId, deps);
+}

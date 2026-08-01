@@ -137,6 +137,7 @@ class ReadSurfaceHandler extends ActivityHandler {
               product: classified.suggestion.product,
               intent: classified.suggestion.intent,
               skill: classified.suggestion.skill,
+              spokenText: spoken.text,
             }),
           ),
         );
