@@ -10,7 +10,7 @@
  * below it comes from the Teams theme, so light / dark / high-contrast are
  * correct without a single colour being chosen here.
  */
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import {
   FluentProvider,
   makeStyles,
@@ -43,6 +43,8 @@ import { CommentsPanel } from "./comments/comments-panel";
 import { AuthorAgent } from "./authoring/author-agent";
 import { CreateArtifact } from "./authoring/create-artifact";
 import { useCreateAgent } from "./authoring/use-create-agent";
+import { CreateEpicForm } from "./authoring/create-epic";
+import { useCreateEpic } from "./authoring/use-create-epic";
 import { useCreateArtifact } from "./authoring/use-create-artifact";
 import type { CreateChatClient } from "@traycer-clients/shared/epic/create-chat";
 import type { CreateArtifactClient } from "@traycer-clients/shared/epic/create-artifact";
@@ -286,12 +288,22 @@ function EpicScreen({
 function EpicsScreen({
   styles,
   auth,
+  userId,
   preview,
   agentsPreview,
   waitingPreview,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth & StreamConnectionAuth;
+  /**
+   * The signed-in user's id, stamped as a new epic's `createdBy`.
+   *
+   * Empty under preview and while the identity is still resolving, which
+   * REFUSES the create rather than substituting a placeholder — `createdBy` is
+   * what `epic.listTasks`' ownership filter compares against, so a wrong value
+   * makes an epic its own creator cannot see.
+   */
+  readonly userId: string;
   /**
    * Forces a state instead of talking to the host, so every state has a URL
    * that can be opened, screenshotted and argued about.
@@ -332,6 +344,19 @@ function EpicsScreen({
   // that breaks on refresh.
   const [opened, setOpened] = useState<FleetEpic | null>(null);
   const [openedChat, setOpenedChat] = useState<EpicChatEntry | null>(null);
+  // Null under preview, so no path from this screen can create against a host.
+  const epicAuthoring = useCreateEpic(
+    connection?.hostClient ?? null,
+    CONFIGURED_HOST_ID,
+    userId,
+  );
+  // The list is the confirmation. Reloading on success means the new epic
+  // appears as the HOST's row rather than as our echo of the request.
+  const createdEpicId = epicAuthoring.createdEpicId;
+  useEffect(() => {
+    if (createdEpicId === null) return;
+    reload();
+  }, [createdEpicId, reload]);
 
   if (route.name === "waiting") {
     return (
@@ -410,6 +435,23 @@ function EpicsScreen({
         onOpen={(epic) => {
           setOpened(epic);
           navigate({ name: "epic", epicId: epic.id });
+        }}
+      />
+      {/*
+        NO NAVIGATION ON SUCCESS, and no fabricated row — the same rule the
+        agent create follows, reached the same way. Jumping to the new epic
+        would mean either inventing a `FleetEpic` from the request we just sent
+        (a row claiming to be replicated state) or landing on a detail screen
+        with nothing to show. Reloading asks the host and lets its own row
+        arrive in the list above.
+      */}
+      <Subtitle1>New epic</Subtitle1>
+      <CreateEpicForm
+        configuredHostId={CONFIGURED_HOST_ID}
+        userId={userId}
+        phase={epicAuthoring.phase}
+        onCreate={(instruction) => {
+          epicAuthoring.create(instruction);
         }}
       />
     </div>
@@ -841,6 +883,10 @@ export function App(): ReactElement {
       <EpicsScreen
         styles={styles}
         auth={auth}
+        // Empty unless genuinely signed in — under preview this is "" and the
+        // create refuses, which keeps "no path from preview reaches the host"
+        // true for authoring as well as for reading.
+        userId={status.kind === "signed-in" ? status.user.user.id : ""}
         preview={previewState}
         agentsPreview={agentsPreview}
         waitingPreview={waitingPreview}
