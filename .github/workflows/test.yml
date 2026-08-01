@@ -85,6 +85,22 @@ jobs:
           - project: "@traycer-clients/teams-bot"
             name: "test (@traycer-clients/teams-bot)"
             test_args: ""
+          # THIRD drift of this hand-maintained list, found 2026-08-02 by the
+          # autobuild check-in. `teams-tab` is the newest package, owns a
+          # `test` script (129 tests), is in the bun workspaces so
+          # `nx run-many --all` reaches it — and was absent from here, so its
+          # tests ran nowhere in CI.
+          #
+          # The comment above already said "if it drifts again, prefer
+          # deriving it over re-syncing by hand." It drifted again, and this
+          # is another hand-sync. Deriving the matrix from
+          # `nx show projects --with-target test` via a generate job and
+          # `fromJSON` is the fix that stops the fourth occurrence; it is not
+          # done here only because a CI change cannot be verified from an
+          # unattended check-in. See tickets/hollow-gate-audit.
+          - project: "@traycer-clients/teams-tab"
+            name: "test (@traycer-clients/teams-tab)"
+            test_args: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2

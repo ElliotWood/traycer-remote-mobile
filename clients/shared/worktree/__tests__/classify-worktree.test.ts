@@ -12,7 +12,7 @@ import {
   provenRemovable,
   worktreeTierRank,
   type WorktreeTier,
-} from "@traycer-clients/shared/worktree/classify-worktree";
+} from "../classify-worktree";
 
 function status(over: Partial<WorktreeBranchStatus>): WorktreeBranchStatus {
   return { ahead: 0, behind: 0, mergedIntoDefault: false, ...over };
