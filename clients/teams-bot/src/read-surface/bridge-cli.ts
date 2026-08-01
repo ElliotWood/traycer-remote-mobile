@@ -260,3 +260,71 @@ export function rejectAction(
       : ["reject", approvalId, reason];
   return runAction(args, env, config);
 }
+
+/**
+ * `create-chat` — the only create the bridge exposes.
+ *
+ * Does NOT go through `runAction`: that parses an `ActionOutcome`, and this
+ * returns `{ chatId }`. Forcing it through would mean a successful create
+ * reporting as a malformed outcome.
+ *
+ * `chatId` is supplied by the CALLER and reused across retries. The host
+ * resolver is idempotent on it, so a retry either finds the chat or makes
+ * it — but only if the id is fixed. This function must never generate one.
+ */
+export async function createChatAction(
+  input: {
+    readonly chatId: string;
+    readonly title: string;
+    readonly hostId: string;
+  },
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<{ readonly chatId: string }>> {
+  const args = [
+    "create-chat",
+    input.chatId,
+    input.title,
+    "--host-id",
+    input.hostId,
+  ];
+  const result = await config.spawnFn(config.command, args, {
+    env,
+    timeoutMs: config.timeoutMs,
+  });
+
+  if (result.timedOut) {
+    return {
+      kind: "failed",
+      reason: "spawn_timed_out",
+      // Named explicitly: the create may have landed, and because the id is
+      // client-supplied the caller can safely repeat the identical request.
+      detail: `"create-chat" did not exit within ${String(config.timeoutMs)}ms — it may have been created; retrying with the same id is safe`,
+    };
+  }
+
+  const trimmed = result.stdout.trim();
+  if (trimmed.length > 0) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (
+        parsed !== null &&
+        typeof parsed === "object" &&
+        typeof (parsed as Record<string, unknown>)["chatId"] === "string"
+      ) {
+        return {
+          kind: "ok",
+          value: { chatId: (parsed as Record<string, string>)["chatId"] },
+        };
+      }
+    } catch {
+      // Fall through to the exit-code path below.
+    }
+  }
+
+  return {
+    kind: "failed",
+    reason: "nonzero_exit",
+    detail: result.stderr.trim().slice(0, 400),
+  };
+}
