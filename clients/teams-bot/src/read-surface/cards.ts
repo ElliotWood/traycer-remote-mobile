@@ -476,19 +476,47 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
     ]);
   }
 
-  const active = agents.filter((a) => a.active).length;
-  // Active first: with 55 agents the interesting rows must be at the top,
-  // because the tail is what gets truncated. Stable within each group so the
-  // order doesn't churn between refreshes.
+  // What this host can actually SEE the activity of. Replaces a count of
+  // `active`, which is local-only and so could never exceed the calling
+  // agent — see the header below.
+  const observable = agents.filter((a) => a.isLocal).length;
+  // Observable first, then active within that. Sorting by `active` alone had
+  // the same flaw as counting it: for a fleet on other hosts every value is
+  // false, so the sort was a no-op and the rows a user can actually act on
+  // were wherever the host happened to return them. Locality is the axis
+  // that varies.
   const sorted = [...agents].sort(
-    (a, b) => Number(b.active) - Number(a.active),
+    (a, b) =>
+      Number(b.isLocal) - Number(a.isLocal) || Number(b.active) - Number(a.active),
   );
   const shown = sorted.slice(0, FLEET_ROW_LIMIT);
 
   const header = [
     text("Fleet", { weight: "bolder", size: "medium", spacing: "none" }),
     text(
-      `${String(agents.length)} agent${agents.length === 1 ? "" : "s"} · ${String(active)} active`,
+      /*
+       * NO "N active". The count was structurally incapable of being right.
+       *
+       * `active` is local-only — the host's activity tracker does not
+       * replicate — so it is false for every agent running anywhere else.
+       * With a fleet spread across hosts the header read "58 agents · 0
+       * active" while more than twenty were running. Not wrong on the day:
+       * unable to be right on any day.
+       *
+       * This is the `active: false → "Idle"` finding again. We fixed it in
+       * the ROWS, which now say "Activity not visible from here" rather than
+       * claiming idle, and left the identical inference in the summary line
+       * directly above them.
+       *
+       * The replacement counts what we can actually observe: how many agents
+       * this host can see the activity of. That is a real property, it is
+       * derived from the same `isLocal` the rows use, and it degrades
+       * honestly — if none are local it says so instead of implying a dead
+       * fleet.
+       */
+      observable === agents.length
+        ? `${String(agents.length)} agent${agents.length === 1 ? "" : "s"}`
+        : `${String(agents.length)} agent${agents.length === 1 ? "" : "s"} · ${String(observable)} visible from here`,
       { isSubtle: true, size: "small", spacing: "none" },
     ),
   ];
@@ -1923,7 +1951,20 @@ export function buildUsageCard(usage: string): Attachment {
       ],
       { style: "emphasis" },
     ),
-    text('Type "help" for all commands.', {
+    /*
+     * NOT "Type help for all commands."
+     *
+     * This card is what a FAILED BUTTON PRESS renders. Telling someone whose
+     * button did not work to go and type a command sends them to the CLI we
+     * spent the day removing — and it is advice about an interface we no
+     * longer document, given at the moment the new one let them down.
+     *
+     * Elliot saw exactly this: pressing Activity returned
+     * `Unknown card action "traycer/log"` followed by an instruction to type.
+     *
+     * Say what to do instead, in the interface they are already in.
+     */
+    text("Ask me in your own words and I'll try again.", {
       isSubtle: true,
       size: "small",
     }),

@@ -121,7 +121,11 @@ describe("read-surface/cards", () => {
       ]),
     );
     expect(body).toContain("My Agent");
-    expect(body).toContain("active");
+    // "Active" — the ROW's status label, which is what this test claims to
+    // check. It previously asserted lowercase "active" and was satisfied by
+    // the header's "1 active" count, so it passed without the row status
+    // being present at all. Removing that count is what exposed it.
+    expect(body).toContain("Active");
   });
 
   it("fleet card handles an empty fleet without throwing or rendering nothing", () => {
