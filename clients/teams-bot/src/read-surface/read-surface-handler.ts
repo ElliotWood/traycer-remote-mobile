@@ -52,6 +52,41 @@ class ReadSurfaceHandler extends ActivityHandler {
       enabled: process.env[RAW_ATTACHMENT_LOG_FLAG] === "1",
     });
 
+    // A CARD BUTTON ARRIVES HERE, NOT AT `onAdaptiveCardInvoke`.
+    //
+    // Every action this bot emits is `Action.Submit` — deliberately, because
+    // `Action.Execute` renders on Teams mobile and sends no invoke at all.
+    // But Teams delivers `Action.Submit` as a MESSAGE activity carrying its
+    // `data` in `activity.value`, with no text. `onAdaptiveCardInvoke` only
+    // fires for `Action.Execute`.
+    //
+    // So until now every button on every card landed in `parseCommand("")`
+    // and returned the HELP CARD. Approve, Reject, Send — all of them. The
+    // write path in `dispatch-action.ts` was complete, tested, and connected
+    // to an ingress nothing could reach: the file even records choosing
+    // Submit over Execute on purpose, and the handler implements only the
+    // Execute route.
+    //
+    // This is the ingress the buttons actually use.
+    const actionValue = context.activity.value as
+      | Record<string, unknown>
+      | undefined;
+    const actionVerb =
+      typeof actionValue?.["verb"] === "string" ? actionValue["verb"] : null;
+    if (actionVerb !== null) {
+      const convId = context.activity.conversation?.id ?? "";
+      const result = await dispatchActionInvoke(
+        { verb: actionVerb, conversationId: convId, data: actionValue ?? {} },
+        this.deps,
+      );
+      if (!result.acted) {
+        logWarn("card action did not complete", { verb: actionVerb });
+      }
+      logInfo("card action", { verb: actionVerb, acted: result.acted });
+      await context.sendActivity(MessageFactory.attachment(result.card));
+      return;
+    }
+
     // Mentions come off via the ENTITIES, which are the contract; the old
     // `<at>` regex in `parseCommand` is a rendering assumption and stays only
     // as a fallback. This matters more than it used to: the text is becoming

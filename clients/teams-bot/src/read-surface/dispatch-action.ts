@@ -1,6 +1,7 @@
 import type { Attachment } from "@microsoft/agents-activity";
 import {
   APPROVE_VERB,
+  FLEET_VERB,
   buildActionOutcomeCard,
   buildIdentityUnavailableCard,
   buildPrincipalRefusedCard,
@@ -25,7 +26,7 @@ import {
   fetchTranscript,
   type ApprovalDecision,
 } from "./host-access";
-import type { DispatchDeps } from "./dispatch";
+import { dispatchCommand, type DispatchDeps } from "./dispatch";
 
 /**
  * T3's `Action.Execute` handler — the write path.
@@ -225,6 +226,25 @@ export async function dispatchActionInvoke(
   ) {
     return dispatchPage(request, deps);
   }
+  // Buttons that are just a command someone would otherwise have typed.
+  // Routed through the same `dispatchCommand` the text path uses, so a button
+  // and its retired command cannot diverge — one behaviour, two ingresses.
+  if (request.verb === FLEET_VERB) {
+    const cards = await dispatchCommand(
+      { kind: "fleet" },
+      request.conversationId,
+      deps,
+    );
+    const card = cards[0];
+    if (card === undefined) {
+      return {
+        card: buildUsageCard("That didn't return anything to show."),
+        acted: false,
+      };
+    }
+    return { card, acted: true };
+  }
+
   if (request.verb !== APPROVE_VERB && request.verb !== REJECT_VERB) {
     return {
       card: buildUsageCard(`Unknown card action "${request.verb}".`),

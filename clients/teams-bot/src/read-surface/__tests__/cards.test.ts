@@ -167,7 +167,7 @@ describe("read-surface/cards — help advertises only implemented commands", () 
    */
   it("CONTRACT: teaches capabilities, never an id to type", () => {
     const body = cardBody(buildHelpCard());
-    expect(body).toContain("Waiting on you");
+    expect(body).toContain("My agents");
     expect(body).toContain("Ask in your own words");
     expect(body).not.toContain("<id>");
     expect(body).not.toContain("say ");

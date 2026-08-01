@@ -1520,10 +1520,18 @@ export function buildHelpCard(): Attachment {
       size: "small",
       spacing: "none",
     }),
+    /*
+     * ONLY BUTTONS THAT WORK.
+     *
+     * The first version of this card also offered "Waiting on you" — and the
+     * bot has no waiting surface at all; that is the TAB's feature. Pressing
+     * it would have returned "Unknown card action", which is a card promising
+     * something that does not exist. Exactly the defect this whole pass is
+     * about, introduced by the change meant to fix it.
+     *
+     * Add it back in the same change that builds the surface behind it.
+     */
     actionSet([
-      submitAction("Waiting on you", WAITING_VERB, {}, {
-        associateInputs: false,
-      }),
       submitAction("My agents", FLEET_VERB, {}, { associateInputs: false }),
     ]),
     container(
