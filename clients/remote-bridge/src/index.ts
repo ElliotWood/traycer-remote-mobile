@@ -160,6 +160,53 @@ program
   );
 
 program
+  /**
+   * `chatId` is a REQUIRED ARGUMENT, not generated here, and that is the
+   * whole safety property rather than an inconvenience.
+   *
+   * The host resolver is idempotent on this id, so a caller that does not
+   * hear back re-runs the identical command and either finds the chat or
+   * makes it. Generating the id inside this process would destroy that: every
+   * retry would mint a new one and quietly create a second agent, and it
+   * would look identical from the outside.
+   *
+   * So the caller owns the id, mints it once, and reuses it. See
+   * `action-surface.ts`.
+   */
+  .command("create-chat <chatId> <title>")
+  .description("Create a new agent (chat) in the epic. Idempotent on chatId.")
+  .requiredOption("--host-id <id>", "Host the chat is bound to FOR LIFE")
+  .option("--parent-id <id>", "Parent chat id, for a sub-agent")
+  .option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)")
+  .option(
+    "--sender-agent-id <id>",
+    "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
+  )
+  .action(
+    async (
+      chatId: string,
+      title: string,
+      opts: {
+        hostId: string;
+        parentId?: string;
+        epicId?: string;
+        senderAgentId?: string;
+      },
+    ) => {
+      await withBridge(opts, async (bridge) => {
+        const result = await bridge.createChat({
+          chatId,
+          title,
+          hostId: opts.hostId,
+          parentId: opts.parentId ?? null,
+        });
+        // JSON on stdout, matching `list`: the caller is a program.
+        process.stdout.write(`${JSON.stringify(result)}\n`);
+      });
+    },
+  );
+
+program
   .command("transcript <chatId>")
   .description("Print a window of a chat's transcript (newest first)")
   .option("--offset <n>", "Messages to skip from the NEWEST end", "0")

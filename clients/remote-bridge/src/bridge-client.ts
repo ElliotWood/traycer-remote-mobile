@@ -249,6 +249,57 @@ export class BridgeClient implements RemoteBridgeActions {
     return this.ensureChatSession(chatId).sendMessage(text);
   }
 
+  /**
+   * Shaped like {@link listAgents}, deliberately: same unary client, same
+   * endpoint poll, same bearer lease, same transient retry. A create is not a
+   * reason to invent a second mechanism for reaching the host.
+   *
+   * NOT routed through `ensureChatSession` — that opens a stream subscription
+   * for a chat, and this is the call that brings the chat into existence.
+   * Asking for a session first would subscribe to something that does not
+   * exist yet, which the host answers with `connected: false` and a null
+   * title: a plausible-looking status for a chat nobody made. That is exactly
+   * the defect a real user hit with `say hi`.
+   */
+  async createChat(input: {
+    readonly chatId: string;
+    readonly title: string;
+    readonly hostId: string;
+    readonly parentId?: string | null;
+  }): Promise<{ readonly chatId: string }> {
+    const endpoint = this.endpointPoller.get();
+    if (endpoint === null) {
+      throw new Error("remote-bridge: no host endpoint available yet");
+    }
+    const response = await withTransientRetry({
+      label: "epic.createChat",
+      call: () =>
+        this.rpcClient.request(
+          "epic.createChat",
+          {
+            epicId: this.epicId,
+            parentId: input.parentId ?? null,
+            hostId: input.hostId,
+            title: input.title,
+            // Client-supplied and idempotent — see the action-surface
+            // docblock. The retry below is safe ONLY because this id is
+            // fixed by the caller and does not change between attempts.
+            chatId: input.chatId,
+          },
+          {
+            endpoint,
+            bearer: this.auth.lease,
+            abortSignal: new AbortController().signal,
+          },
+        ),
+      onDiagnostic: (message) => this.logger.warn(message, null),
+      delayMs: TRANSIENT_RETRY_DELAY_MS,
+    });
+    // Trust the host's id over the one we sent: identical today, and if they
+    // ever diverge the host's is the real one.
+    return { chatId: response.chatId };
+  }
+
   async getTranscript(
     chatId: string,
     offset: number,

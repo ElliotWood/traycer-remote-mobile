@@ -151,6 +151,21 @@ add("05c-clarify-nothing", () =>
     skill: null,
   }),
 );
+add("05d-started", () =>
+  C.buildAssessmentStartedCard({
+    title: "Assess the Acme water-network RFI",
+    deepLink: "https://example.invalid/tab/epics/e1/chats/c1",
+  }),
+);
+add("05e-started-nolink", () =>
+  C.buildAssessmentStartedCard({
+    title: "Assess the Acme water-network RFI",
+    deepLink: null,
+  }),
+);
+add("05f-start-unconfirmed", () =>
+  C.buildAssessmentUnconfirmedCard("socket closed"),
+);
 add("06-epic-not-bound", () => C.buildEpicNotBoundCard());
 add("07-access-denied", () =>
   C.buildPrincipalRefusedCard("unmapped_principal"),

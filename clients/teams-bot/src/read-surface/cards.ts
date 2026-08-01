@@ -1598,6 +1598,68 @@ export function buildClarifyCard(options: {
   ]);
 }
 
+/**
+ * "Started — watch progress here."
+ *
+ * THE LINK IS THE POINT. The use case's first expected result is *"a link to
+ * the agent epic/chats to see progress"*, so an ack without one fails the
+ * progress half at step one — a message saying work began with nowhere to
+ * look is barely better than silence.
+ *
+ * `Action.OpenUrl` rather than a markdown link: it renders as a button on
+ * every surface, and a markdown link inside a `TextBlock` is styled
+ * inconsistently across Teams clients and easy to miss on a phone.
+ *
+ * The UNCONFIRMED variant says PRESS IT AGAIN, and that wording comes from
+ * the contract rather than from optimism: `epic.createChat` is idempotent on
+ * a client-supplied `chatId`, which the dispatch mints once and reuses, so a
+ * retry cannot produce a second agent. The neighbouring artifact create takes
+ * no client id and needs the opposite advice — identical-looking states,
+ * opposite correct actions, and the only way to know is to read the contract.
+ */
+export function buildAssessmentStartedCard(options: {
+  readonly title: string;
+  readonly deepLink: string | null;
+}): Attachment {
+  return buildCard(
+    [
+      text("Assessment started", { weight: "bolder", size: "medium" }),
+      text(options.title, { isSubtle: true, spacing: "none" }),
+      text(
+        options.deepLink === null
+          ? "It's running. I'll reply here when it's done."
+          : "It's running — open it to watch progress. I'll reply here when it's done.",
+        { spacing: "small" },
+      ),
+    ],
+    options.deepLink === null
+      ? []
+      : [
+          {
+            type: "Action.OpenUrl",
+            title: "Watch progress",
+            url: options.deepLink,
+          },
+        ],
+  );
+}
+
+/** The dispatch did not confirm. Safe to retry — see the docblock above. */
+export function buildAssessmentUnconfirmedCard(reason: string): Attachment {
+  return card([
+    text("Couldn't confirm it started", {
+      weight: "bolder",
+      size: "medium",
+      color: "warning",
+    }),
+    text(
+      "Ask again the same way — it's the same request, so it can't start a second assessment.",
+      { spacing: "none" },
+    ),
+    text(reason, { isSubtle: true, size: "small", spacing: "small" }),
+  ]);
+}
+
 export function buildEpicPickerCard(epics: readonly EpicSummary[]): Attachment {
   if (epics.length === 0) {
     return card([text("No epics found for your account.", { isSubtle: true })]);

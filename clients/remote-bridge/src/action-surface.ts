@@ -50,6 +50,37 @@ export interface RemoteBridgeActions {
   sendMessage(chatId: string, text: string): Promise<ActionOutcome>;
 
   /**
+   * Creates a new agent (chat) in the bridge's epic.
+   *
+   * THE ONLY CREATE ON THIS SURFACE, and deliberately the only one for now.
+   * `epic.create` needs `workspaces: [{ workspacePath }]` — absolute paths on
+   * a specific machine — which a channel adapter cannot supply and which is
+   * recorded as blocked rather than unbuilt. This needs none of that: an epic
+   * the bridge is already bound to, and a host the caller already knows.
+   *
+   * RETURNS THE CHAT ID RATHER THAN AN {@link ActionOutcome}, breaking the
+   * pattern of every other mutating method here, and the reason is the
+   * contract rather than convenience. `chatId` is CLIENT-SUPPLIED and the
+   * host resolver is idempotent on it, so this create does not have the
+   * "acknowledged but unconfirmed" ambiguity `ActionOutcome` exists to
+   * express: a caller that does not hear back re-sends the identical request
+   * and either finds the chat or makes it. Both answers are the same answer.
+   *
+   * That is the OPPOSITE of `epic.createArtifact`, which takes no client id
+   * and where a retry is a duplicate. Do not generalise from this one.
+   *
+   * `chatId` must be minted by the caller BEFORE the first attempt and reused
+   * across retries. Minting a fresh id per attempt looks identical from here
+   * and quietly creates two agents.
+   */
+  createChat(input: {
+    readonly chatId: string;
+    readonly title: string;
+    readonly hostId: string;
+    readonly parentId?: string | null;
+  }): Promise<{ readonly chatId: string }>;
+
+  /**
    * A window of a chat's transcript, projected to prose plus non-prose
    * markers for card-shaped channels (see `transcript-projection.ts`).
    *
