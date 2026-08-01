@@ -128,7 +128,11 @@ describe("read-surface/dispatch — routing and identity gating", () => {
 
     const card = await dispatchCommand({ kind: "help" }, "conv-1", deps);
 
-    expect(bodyOf(card)).toContain("Traycer Remote");
+    // Asserts what this test is ABOUT — a card came back and no identity was
+    // resolved to produce it. It used to pin the card's title string, which
+    // made a copy change look like an identity-gating regression.
+    expect(bodyOf(card).length).toBeGreaterThan(0);
+    expect(bodyOf(card)).toContain("Ask in your own words");
     expect(resolveCalled).toBe(false);
   });
 

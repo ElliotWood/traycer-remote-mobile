@@ -99,6 +99,13 @@ export const LOG_VERB = "traycer/log";
 export const WAITING_VERB = "traycer/waiting";
 export const NEW_AGENT_VERB = "traycer/newAgent";
 export const SHOW_ALL_VERB = "traycer/showAll";
+export const FLEET_VERB = "traycer/fleet";
+/**
+ * The route the USER confirmed, carried in the button. The handler must read
+ * these fields rather than re-running `classify` — see `buildClarifyCard`.
+ */
+export const CONFIRM_ROUTE_VERB = "traycer/confirmRoute";
+export const CLARIFY_OTHER_VERB = "traycer/clarifyOther";
 export const SEND_VERB = "traycer/send";
 
 /**
@@ -1481,26 +1488,113 @@ export function buildMessageOutcomeCard(
  * and the user hit "unknown command 'epics'" three times because this card
  * listed it. Re-add the line in the same change that implements it.
  */
+/**
+ * What the bot can DO, as buttons — not what to type.
+ *
+ * This card previously listed five commands in a `FactSet`:
+ *
+ *     fleet             agents in the current epic
+ *     chat <id>         status, approvals, and a reply box
+ *     say <id> <text>   message an agent
+ *     log <id>          read a chat's history
+ *     epic <id>         switch this chat to another epic
+ *
+ * The one surface whose entire job is teaching the interface was teaching
+ * people to read a GUID off a screen and retype it. Every other card could
+ * grow buttons and this would still document the CLI as the front door.
+ *
+ * So it names capabilities and offers them. The commands still work — they
+ * are a fallback, not the interface — and are deliberately not listed, because
+ * listing them is what made them the interface.
+ *
+ * "Ask in your own words" is stated because the input is now natural language
+ * and nothing else on screen would tell you that. It applies equally in the
+ * Chat tab and in a channel with an @mention: same bot, same conversation,
+ * same rules.
+ */
 export function buildHelpCard(): Attachment {
   return card([
-    text("Traycer Remote", { weight: "bolder", size: "medium" }),
-    text("Answer a blocked agent, or check what your fleet is doing.", {
+    text("Traycer", { weight: "bolder", size: "medium" }),
+    text("Ask in your own words, or pick one of these.", {
       isSubtle: true,
       size: "small",
       spacing: "none",
     }),
+    actionSet([
+      submitAction("Waiting on you", WAITING_VERB, {}, {
+        associateInputs: false,
+      }),
+      submitAction("My agents", FLEET_VERB, {}, { associateInputs: false }),
+    ]),
     container(
       [
-        facts([
-          ["fleet", "agents in the current epic"],
-          ["chat <id>", "status, approvals, and a reply box"],
-          ["say <id> <text>", "message an agent"],
-          ["log <id>", "read a chat's history"],
-          ["epic <id>", "switch this chat to another epic"],
-        ]),
+        text("Assess a document", { weight: "bolder", spacing: "none" }),
+        text(
+          "Attach an RFI or RFP and ask whether it fits — for example, “does this work with SensorMine?”",
+          { isSubtle: true, size: "small", spacing: "none" },
+        ),
       ],
       { style: "emphasis", separator: true },
     ),
+  ]);
+}
+
+/**
+ * The clarifying question, for when routing is not confident.
+ *
+ * THE BUTTONS CARRY THE DECISION. Each action's `data` holds the product,
+ * intent and skill explicitly, so the handler acts on what was pressed rather
+ * than re-running the classifier and reading `suggestion`.
+ *
+ * That distinction is the whole point. `classify` returns `uncertain` with a
+ * suggestion, and a caller that reads the suggestion and dispatches it has
+ * quietly converted "ask" into "guess" — the exact failure `classify` has a
+ * test against. This card is the most likely place for that to happen, so the
+ * decision travels in the button rather than being re-derived after it.
+ *
+ * The second button matters as much as the first: without a way to say no,
+ * the only path forward is the one we guessed, and a confirmation with no
+ * alternative is not a question.
+ */
+export function buildClarifyCard(options: {
+  readonly suggestionLabel: string | null;
+  readonly product: string | null;
+  readonly intent: string | null;
+  readonly skill: string | null;
+}): Attachment {
+  const canSuggest =
+    options.suggestionLabel !== null &&
+    options.product !== null &&
+    options.intent !== null;
+
+  return card([
+    text("Before I start", { weight: "bolder", size: "medium" }),
+    text(
+      canSuggest
+        ? `Looks like ${options.suggestionLabel}. Is that right?`
+        : "I'm not sure what you'd like me to do with that.",
+      { spacing: "none" },
+    ),
+    actionSet([
+      ...(canSuggest
+        ? [
+            submitAction(
+              "Yes, go ahead",
+              CONFIRM_ROUTE_VERB,
+              {
+                // Explicit, so the handler never re-derives the route.
+                product: options.product ?? "",
+                intent: options.intent ?? "",
+                skill: options.skill ?? "",
+              },
+              { associateInputs: false },
+            ),
+          ]
+        : []),
+      submitAction("Something else", CLARIFY_OTHER_VERB, {}, {
+        associateInputs: false,
+      }),
+    ]),
   ]);
 }
 

@@ -12,6 +12,9 @@ import { dispatchCommand, type DispatchDeps } from "./dispatch";
 import { dispatchActionInvoke } from "./dispatch-action";
 import { logInfo, logWarn } from "../logger";
 import { stripMentions, type MentionEntity } from "../intake/mention";
+import { classify } from "../intake/classify";
+import { describeRoute } from "../intake/route-labels";
+import { buildClarifyCard } from "./cards";
 import {
   captureRawAttachments,
   RAW_ATTACHMENT_LOG_FLAG,
@@ -61,6 +64,41 @@ class ReadSurfaceHandler extends ActivityHandler {
     );
     const command = parseCommand(spoken.text);
     const conversationId = context.activity.conversation?.id ?? "";
+
+    // NATURAL LANGUAGE FIRST, commands as the fallback.
+    //
+    // `parseCommand` returns `help` for anything it does not recognise, which
+    // was correct when a verb list was the interface and is wrong now: it
+    // means "does this fit SensorMine?" gets a syntax card. So an
+    // unrecognised message goes to the classifier instead, and only falls
+    // back to help when the classifier recognises nothing either.
+    //
+    // Deliberately NOT dispatching a confident route yet — R5 owns
+    // create-epic-and-invoke, and a router wired to a half-built dispatch is
+    // the `Action.Execute` mistake again. A confident route falls through to
+    // help until R5 lands; an uncertain one is useful on its own.
+    if (command.kind === "help" && spoken.text.trim().length > 0) {
+      const classified = classify({
+        text: spoken.text,
+        hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
+      });
+      if (classified.kind === "uncertain" && classified.suggestion !== null) {
+        // The BUTTON carries the route. The handler must not re-derive it
+        // from `suggestion` when the reply comes back — see buildClarifyCard.
+        await context.sendActivity(
+          MessageFactory.attachment(
+            buildClarifyCard({
+              suggestionLabel: describeRoute(classified.suggestion),
+              product: classified.suggestion.product,
+              intent: classified.suggestion.intent,
+              skill: classified.suggestion.skill,
+            }),
+          ),
+        );
+        logInfo("asked for clarification", { reason: classified.reason });
+        return;
+      }
+    }
 
     if (conversationId === "") {
       logWarn("activity has no conversation id", { command: command.kind });

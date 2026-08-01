@@ -155,10 +155,22 @@ describe("read-surface/cards — help advertises only implemented commands", () 
     expect(cardBody(buildHelpCard())).not.toContain("epics");
   });
 
-  it("advertises the commands that do work", () => {
+  /**
+   * REPLACED. This asserted `fleet` and `chat <id>` appeared in the help card
+   * — i.e. it pinned the CLI as the interface, on the one surface whose whole
+   * job is teaching the interface.
+   *
+   * The commands still work as an undocumented fallback. What changed is that
+   * the card teaches capabilities and offers them as buttons, so the test now
+   * asserts the thing that would regress: an id syntax creeping back into the
+   * one place people read to learn how to use this.
+   */
+  it("CONTRACT: teaches capabilities, never an id to type", () => {
     const body = cardBody(buildHelpCard());
-    expect(body).toContain("fleet");
-    expect(body).toContain("chat <id>");
+    expect(body).toContain("Waiting on you");
+    expect(body).toContain("Ask in your own words");
+    expect(body).not.toContain("<id>");
+    expect(body).not.toContain("say ");
   });
 });
 

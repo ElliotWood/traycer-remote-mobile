@@ -135,6 +135,22 @@ add("02-fleet-empty", () => C.buildFleetCard([]));
 add("03-chat-live", () => C.buildChatCard(STATUS_LIVE, EPIC_ID));
 add("04-chat-disconnected", () => C.buildChatCard(STATUS_STALE, EPIC_ID));
 add("05-help", () => C.buildHelpCard());
+add("05b-clarify", () =>
+  C.buildClarifyCard({
+    suggestionLabel: "a new SensorMine opportunity",
+    product: "sensormine",
+    intent: "new-opportunity",
+    skill: "smv4-new-opportunity",
+  }),
+);
+add("05c-clarify-nothing", () =>
+  C.buildClarifyCard({
+    suggestionLabel: null,
+    product: null,
+    intent: null,
+    skill: null,
+  }),
+);
 add("06-epic-not-bound", () => C.buildEpicNotBoundCard());
 add("07-access-denied", () =>
   C.buildPrincipalRefusedCard("unmapped_principal"),
