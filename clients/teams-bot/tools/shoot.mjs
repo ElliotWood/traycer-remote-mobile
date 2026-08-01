@@ -56,6 +56,11 @@ const AGENTS = [
     harnessId: "claude",
     surface: "gui",
     active: true,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: true,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000002",
@@ -63,6 +68,11 @@ const AGENTS = [
     harnessId: "claude",
     surface: "gui",
     active: false,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: true,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000003",
@@ -70,6 +80,11 @@ const AGENTS = [
     harnessId: "claude",
     surface: "gui",
     active: false,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: false },
+    isLocal: false,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000004",
@@ -77,6 +92,11 @@ const AGENTS = [
     harnessId: "claude",
     surface: "gui",
     active: true,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: true,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000005",
@@ -84,6 +104,11 @@ const AGENTS = [
     harnessId: "codex",
     surface: "tui",
     active: false,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: true,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000006",
@@ -91,6 +116,11 @@ const AGENTS = [
     harnessId: null,
     surface: "tui",
     active: false,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: false,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000007",
@@ -98,6 +128,11 @@ const AGENTS = [
     harnessId: "claude",
     surface: "gui",
     active: true,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: true,
   },
   {
     agentId: "a1000000-0000-4000-8000-000000000008",
@@ -105,6 +140,11 @@ const AGENTS = [
     harnessId: "claude",
     surface: "gui",
     active: false,
+    // Explicit, because the CARD now offers a Reply button and must not
+    // offer it for an agent this host cannot message. Agent 3 says no, so
+    // the disabled path is in every screenshot rather than in a comment.
+    capabilities: { readTranscript: true, sendMessage: true },
+    isLocal: true,
   },
 ];
 

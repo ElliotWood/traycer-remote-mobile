@@ -84,6 +84,21 @@ const ADAPTIVE_CARD_VERSION = "1.2";
 export const APPROVE_VERB = "traycer/approve";
 export const REJECT_VERB = "traycer/reject";
 export const OPEN_CHAT_VERB = "traycer/openChat";
+/**
+ * Verbs that replace typed commands. Each one carries the id it needs in the
+ * action's `data`, so NO id is ever shown to a person or typed by one.
+ *
+ * `traycer/reply` deliberately does not open an inline `Action.ShowCard`
+ * composer: Teams does not support `ShowCard` inside an `ActionSet`, and a
+ * card that renders in our harness and not in Teams is the exact failure that
+ * shipped 1.5. It round-trips to the existing composer card instead — one
+ * more hop, and it works where it has to.
+ */
+export const REPLY_VERB = "traycer/reply";
+export const LOG_VERB = "traycer/log";
+export const WAITING_VERB = "traycer/waiting";
+export const NEW_AGENT_VERB = "traycer/newAgent";
+export const SHOW_ALL_VERB = "traycer/showAll";
 export const SEND_VERB = "traycer/send";
 
 /**
@@ -178,6 +193,27 @@ function buildCard(
 }
 
 const card = (body: readonly unknown[]): Attachment => buildCard(body, []);
+
+/**
+ * A row of buttons inside the card body.
+ *
+ * `ActionSet` is an Adaptive Cards **1.2** element, so it sits exactly at the
+ * version we declare — no schema-says-yes / Teams-says-no gamble of the kind
+ * that cost us the 1.5 install.
+ *
+ * WHY BUTTONS AT ALL, given every row already had a `selectAction`.
+ *
+ * A tappable Container is invisible. It has no affordance, no label, and no
+ * keyboard path — so the row LOOKED like a status line and the only
+ * discoverable way to act on an agent was to read its id off the screen and
+ * type `say <guid> <text>`. That is the CLI-in-a-chat-window Elliot called
+ * horrible, and it was one property away from not existing.
+ *
+ * The `selectAction` stays as the whole-row gesture. These make it visible.
+ */
+function actionSet(actions: readonly unknown[]): unknown {
+  return { type: "ActionSet", actions, spacing: "small" };
+}
 
 type SemanticColor = "default" | "good" | "warning" | "attention" | "accent";
 type ContainerStyle = "default" | "emphasis" | "good" | "warning" | "attention";
@@ -453,6 +489,25 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
           presentation.color,
           `${agent.harnessId ?? "unknown"} · ${agent.surface}`,
         ),
+        // The row's actions, carrying the id so nobody has to see it.
+        // `Reply` is the one that matters: it was `say <guid> <text>`.
+        //
+        // GATED ON `capabilities.sendMessage`, for the same reason the tab
+        // gates Approve/Reject on `canAct`: offering an action this host
+        // cannot perform is a promise the next tap breaks. `Activity` is
+        // always offered because reading is not the same permission.
+        actionSet([
+          ...(agent.capabilities.sendMessage
+            ? [
+                submitAction("Reply", REPLY_VERB, { chatId: agent.agentId }, {
+                  associateInputs: false,
+                }),
+              ]
+            : []),
+          submitAction("Activity", LOG_VERB, { chatId: agent.agentId }, {
+            associateInputs: false,
+          }),
+        ]),
       ],
       {
         style: presentation.emphasised ? "emphasis" : "default",
@@ -469,17 +524,30 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
     );
   });
 
+  // "+N more" used to read: use "chat <id>" for a specific one — an
+  // instruction to go and find a GUID. It is a button now.
   const overflow =
     agents.length > FLEET_ROW_LIMIT
       ? [
-          text(
-            `+${String(agents.length - FLEET_ROW_LIMIT)} more not shown — use "chat <id>" for a specific one.`,
-            { isSubtle: true, size: "small", separator: true },
-          ),
+          actionSet([
+            submitAction(
+              `Show all ${String(agents.length)}`,
+              SHOW_ALL_VERB,
+              {},
+              { associateInputs: false },
+            ),
+          ]),
         ]
       : [];
 
-  return card([...header, ...rows, ...overflow]);
+  // Suggested next steps, offered rather than remembered. This is the whole
+  // point of a bot surface: the next thing you'd want is on screen.
+  const next = actionSet([
+    submitAction("Waiting on you", WAITING_VERB, {}, { associateInputs: false }),
+    submitAction("New agent", NEW_AGENT_VERB, {}, { associateInputs: false }),
+  ]);
+
+  return card([...header, ...rows, ...overflow, next]);
 }
 
 function runStatusColor(runStatus: ChatStatus["runStatus"]): SemanticColor {
