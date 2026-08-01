@@ -100,6 +100,49 @@ describe("stripMentions — entities are the contract, the regex is the fallback
     expect(result.text).toBe("does this fit SensorMine?");
   });
 
+  /**
+   * THE PROPERTY THAT MATTERS, and it is not "does stripping work".
+   *
+   * The Chat tab and an @mention in a channel are the same conversation with
+   * the same bot. In PERSONAL scope Teams adds no mention at all — every
+   * message is implicitly addressed to the bot — so:
+   *
+   *   - intake that REQUIRES a mention makes the Chat tab silently dead:
+   *     every message ignored, nothing logged, because the code decided it
+   *     was not being spoken to;
+   *   - intake that strips unconditionally eats channel text.
+   *
+   * So the assertion is CONVERGENCE: the same question, asked either way,
+   * must reach the classifier as identical text and therefore take an
+   * identical route. Testing the two scopes separately would pass on a
+   * version where they diverge.
+   */
+  it("CONTRACT: personal scope and channel scope converge on the same text", () => {
+    const personal = stripMentions(
+      "does this fit SensorMine?",
+      undefined,
+      BOT_ID,
+    );
+    const channel = stripMentions(
+      "<at>Traycer</at> does this fit SensorMine?",
+      [mention("<at>Traycer</at>", BOT_ID, "Traycer")],
+      BOT_ID,
+    );
+    expect(personal.text).toBe(channel.text);
+    expect(personal.text).toBe("does this fit SensorMine?");
+  });
+
+  it("CONTRACT: a personal-scope message is never treated as unaddressed", () => {
+    // The silent-death case. No entities, no tags, nothing to strip — and the
+    // text must survive intact rather than being discarded for lack of a
+    // mention. There is deliberately no "was I addressed" signal in the
+    // result for a caller to gate on.
+    const result = stripMentions("what's waiting on me?", undefined, BOT_ID);
+    expect(result.text).toBe("what's waiting on me?");
+    expect(result.strippedByEntity).toBe(false);
+    expect(result.usedFallback).toBe(false);
+  });
+
   it("tolerates an entity whose text is not present in the message", () => {
     const result = stripMentions(
       "does this fit?",
