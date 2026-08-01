@@ -49,6 +49,7 @@ import { AuthorAgent } from "./authoring/author-agent";
 import { CreateArtifact } from "./authoring/create-artifact";
 import { useCreateAgent } from "./authoring/use-create-agent";
 import { CreateEpicForm } from "./authoring/create-epic";
+import { EPIC_CREATE_RETRY } from "./authoring/epic-create-rules";
 import { useCreateEpic } from "./authoring/use-create-epic";
 import { useCreateArtifact } from "./authoring/use-create-artifact";
 import type { CreateChatClient } from "@traycer-clients/shared/epic/create-chat";
@@ -801,6 +802,16 @@ export function App(): ReactElement {
     // pair by hand — it needs two RPCs to fail — and it is the thing most
     // worth looking at, so it gets a preview rather than a description.
     const unconfirmed = params.get("state") === "unconfirmed";
+    // `state=noidentity` is the epic form's OWN refusal, and it has no
+    // counterpart above: the other two creates need only a host, while
+    // `epic.create` also stamps `createdBy`. Empty means the identity has not
+    // resolved yet, and creating then files the epic under an owner that
+    // `epic.listTasks` will not match — an epic its own creator cannot see.
+    // Synthetic, house pattern, per the note above.
+    const userForPreview =
+      params.get("state") === "noidentity"
+        ? ""
+        : "a1000000-0000-4000-8000-000000000001";
     return shell(
         <div className={styles.screen}>
           <Subtitle1>New agent</Subtitle1>
@@ -827,6 +838,33 @@ export function App(): ReactElement {
                     // SAME failure as the agent above, opposite advice. The
                     // difference is `createArtifact` taking no client id.
                     retry: "may-duplicate",
+                  }
+                : { kind: "idle" }
+            }
+            onCreate={() => undefined}
+          />
+          {/*
+            THE THIRD ADVICE, and the reason this form belongs in the same
+            preview rather than one of its own. Under `state=unconfirmed` the
+            screen now shows three identical-looking creates failing the same
+            way: the agent says press it again, the artifact and the epic say
+            go and look. That the epic sides with the artifact is not obvious
+            from the UI — `epicLightSchema.id` simply carries no dedupe rule —
+            so the comparison is the only place it is legible.
+          */}
+          <Subtitle1>New epic</Subtitle1>
+          <CreateEpicForm
+            configuredHostId={hostForPreview}
+            userId={userForPreview}
+            phase={
+              unconfirmed
+                ? {
+                    kind: "unconfirmed",
+                    reason: "socket closed",
+                    // Not a copy of the artifact's — `EPIC_CREATE_RETRY` is
+                    // the value the hook actually sends, so this preview
+                    // cannot drift from the wording a real failure produces.
+                    retry: EPIC_CREATE_RETRY,
                   }
                 : { kind: "idle" }
             }

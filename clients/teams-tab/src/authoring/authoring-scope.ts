@@ -79,8 +79,14 @@ export function hostDisclosure(configuredHostId: string): HostDisclosure {
     return {
       hostId: null,
       canCreate: false,
+      // SURFACE-NEUTRAL, and it has to be: `epicCreateDisclosure` returns this
+      // refusal verbatim, so the epic form was telling people "a new AGENT
+      // can't be given one". Only rendering the preview showed it — the string
+      // is shared, so it type-checks and tests green while naming the wrong
+      // thing. The cause is the app's missing host, which is true whatever the
+      // reader was trying to create.
       notice:
-        "This app doesn’t know which Traycer host it’s connected to, so a new agent can’t be given one. It needs redeploying with its host configured — nothing is wrong with your account.",
+        "This app doesn’t know which Traycer host it’s connected to, so it can’t create anything that has to run on one. It needs redeploying with its host configured — nothing is wrong with your account.",
     };
   }
   return {
