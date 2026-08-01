@@ -71,7 +71,7 @@ export class DurableConversationReferenceStore
 
   constructor(
     filePath: string,
-    onWarn?: (message: string, detail: string) => void,
+    onWarn: ((message: string, detail: string) => void) | undefined,
   ) {
     this.store = new DurableJsonStore<StoredConversationReference>({
       filePath,

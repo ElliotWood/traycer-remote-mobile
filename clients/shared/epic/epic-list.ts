@@ -208,7 +208,11 @@ export function epicDisplayName(epic: FleetEpic): string {
   return `Untitled epic (${epic.id.slice(0, 8)})`;
 }
 
-function pluralize(n: number, singular: string, plural?: string): string {
+function pluralize(
+  n: number,
+  singular: string,
+  plural: string | undefined,
+): string {
   return `${n} ${n === 1 ? singular : (plural ?? `${singular}s`)}`;
 }
 
@@ -219,11 +223,11 @@ function pluralize(n: number, singular: string, plural?: string): string {
  */
 export function formatEpicMeta(epic: FleetEpic): string {
   const parts: string[] = [];
-  if (epic.ticketCount > 0) parts.push(pluralize(epic.ticketCount, "ticket"));
-  if (epic.specCount > 0) parts.push(pluralize(epic.specCount, "spec"));
+  if (epic.ticketCount > 0) parts.push(pluralize(epic.ticketCount, "ticket", undefined));
+  if (epic.specCount > 0) parts.push(pluralize(epic.specCount, "spec", undefined));
   if (epic.storyCount > 0)
     parts.push(pluralize(epic.storyCount, "story", "stories"));
-  if (epic.reviewCount > 0) parts.push(pluralize(epic.reviewCount, "review"));
+  if (epic.reviewCount > 0) parts.push(pluralize(epic.reviewCount, "review", undefined));
   const status = epic.status.trim();
   if (status.length > 0) parts.push(status);
   return parts.join(" · ");

@@ -105,9 +105,9 @@ describe("DurableConversationReferenceStore", () => {
     expect(stored).not.toBeNull();
     if (stored === null) return;
 
-    new DurableConversationReferenceStore(file).remember("work-1", stored);
+    new DurableConversationReferenceStore(file, undefined).remember("work-1", stored);
 
-    const afterRestart = new DurableConversationReferenceStore(file);
+    const afterRestart = new DurableConversationReferenceStore(file, undefined);
     expect(afterRestart.recall("work-1")).toEqual(stored);
   });
 
@@ -117,7 +117,7 @@ describe("DurableConversationReferenceStore", () => {
     const file = tempFile("refs.json");
     const stored = toStoredReference(REFERENCE, 1000);
     if (stored === null) throw new Error("fixture");
-    const store = new DurableConversationReferenceStore(file);
+    const store = new DurableConversationReferenceStore(file, undefined);
     store.remember("work-1", stored);
     store.remember("work-2", { ...stored, capturedAt: 2000 });
 
@@ -130,18 +130,18 @@ describe("DurableConversationReferenceStore", () => {
     const file = tempFile("refs.json");
     const stored = toStoredReference(REFERENCE, 1000);
     if (stored === null) throw new Error("fixture");
-    const store = new DurableConversationReferenceStore(file);
+    const store = new DurableConversationReferenceStore(file, undefined);
     store.remember("work-1", stored);
     store.forget("work-1");
     expect(store.recall("work-1")).toBeNull();
-    expect(new DurableConversationReferenceStore(file).recall("work-1")).toBeNull();
+    expect(new DurableConversationReferenceStore(file, undefined).recall("work-1")).toBeNull();
   });
 
   it("writes the state file 0600 — it carries a tenant id and an Entra oid", () => {
     const file = tempFile("refs.json");
     const stored = toStoredReference(REFERENCE, 1000);
     if (stored === null) throw new Error("fixture");
-    new DurableConversationReferenceStore(file).remember("work-1", stored);
+    new DurableConversationReferenceStore(file, undefined).remember("work-1", stored);
     // Windows does not implement POSIX modes; assert only where it means
     // something rather than asserting something untrue everywhere.
     if (process.platform !== "win32") {

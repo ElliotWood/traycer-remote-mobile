@@ -1835,7 +1835,7 @@ export function buildAssessmentStartedCard(options: {
  */
 export function buildAssessmentUnconfirmedCard(
   reason: string,
-  options?: { readonly certain?: boolean },
+  options: { readonly certain?: boolean } | undefined,
 ): Attachment {
   const certain = options?.certain === true;
   return card([

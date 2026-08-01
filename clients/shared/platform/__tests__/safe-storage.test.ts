@@ -41,14 +41,27 @@ afterEach(() => {
 
 function workingStore(): Storage {
   const map = new Map<string, string>();
-  return {
+  // A REAL `Storage`, not a cast through `unknown`. The cast said "trust me"
+  // about a shape the compiler could have checked — and `length`/`key` are
+  // exactly the members a partial fake omits, so the assertion was hiding the
+  // one thing worth verifying about the fake.
+  const store: Storage = {
     getItem: (k: string) => map.get(k) ?? null,
-    setItem: (k: string, v: string) => void map.set(k, v),
-    removeItem: (k: string) => void map.delete(k),
-    clear: () => map.clear(),
-    key: () => null,
-    length: 0,
-  } as unknown as Storage;
+    setItem: (k: string, v: string) => {
+      map.set(k, v);
+    },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
+    clear: () => {
+      map.clear();
+    },
+    key: (index: number) => Array.from(map.keys())[index] ?? null,
+    get length() {
+      return map.size;
+    },
+  };
+  return store;
 }
 
 describe("host/safe-storage", () => {

@@ -1037,7 +1037,7 @@ describe("CONTRACT: the assessment failure card must not report a certain outcom
   });
 
   it("keeps 'couldn’t confirm' for the case that genuinely does not know", () => {
-    const body = cardBody(buildAssessmentUnconfirmedCard("socket closed"));
+    const body = cardBody(buildAssessmentUnconfirmedCard("socket closed", undefined));
     expect(body).toContain("Couldn’t confirm");
   });
 
@@ -1052,7 +1052,7 @@ describe("CONTRACT: the assessment failure card must not report a certain outcom
     expect(certain).toContain("Nothing was created");
     expect(certain).not.toContain("second assessment");
 
-    const unsure = cardBody(buildAssessmentUnconfirmedCard("x"));
+    const unsure = cardBody(buildAssessmentUnconfirmedCard("x", undefined));
     expect(unsure).toContain("second assessment");
   });
 });

@@ -27,6 +27,7 @@ const REFERENCE = {
 function store() {
   return new DurableConversationReferenceStore(
     join(mkdtempSync(join(tmpdir(), "dispatch-")), "refs.json"),
+    undefined,
   );
 }
 

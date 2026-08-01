@@ -101,7 +101,7 @@ export function createStartAssessment(config: StartAssessmentConfig) {
       // the same reply target.
       return {
         kind: "unconfirmed",
-        card: buildAssessmentUnconfirmedCard(created.detail),
+        card: buildAssessmentUnconfirmedCard(created.detail, undefined),
       };
     }
 
@@ -119,6 +119,7 @@ export function createStartAssessment(config: StartAssessmentConfig) {
         kind: "unconfirmed",
         card: buildAssessmentUnconfirmedCard(
           `The agent was created but I couldn't give it the request: ${sent.detail}`,
+          undefined,
         ),
       };
     }

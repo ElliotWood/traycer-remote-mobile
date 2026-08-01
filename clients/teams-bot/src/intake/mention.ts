@@ -55,7 +55,11 @@ export interface StripMentionsResult {
 export function stripMentions(
   rawText: string,
   entities: readonly MentionEntity[] | undefined,
-  botId?: string,
+  // `| undefined`, not `botId?:`. The rule exists because an optional
+  // parameter and a parameter that may be undefined read identically at the
+  // call site and differ in what the compiler demands — and this one is read
+  // by a caller that genuinely has no bot id in a personal chat.
+  botId: string | undefined,
 ): StripMentionsResult {
   let text = rawText;
   let strippedByEntity = false;

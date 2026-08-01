@@ -55,13 +55,14 @@ describe("stripMentions — entities are the contract, the regex is the fallback
     const result = stripMentions(
       "<at>Traycer</at> assess this and copy <at>Sam</at>",
       undefined,
+      undefined,
     );
     expect(result.text).toBe("assess this and copy");
     expect(result.usedFallback).toBe(true);
   });
 
   it("falls back to the regex when no entities are supplied", () => {
-    const result = stripMentions("<at>Traycer</at> fleet", undefined);
+    const result = stripMentions("<at>Traycer</at> fleet", undefined, undefined);
     expect(result.text).toBe("fleet");
     expect(result.strippedByEntity).toBe(false);
     expect(result.usedFallback).toBe(true);
@@ -160,6 +161,9 @@ describe("stripMentions — entities are the contract, the regex is the fallback
         mention("<at>Traycer</at>", BOT_ID, "Traycer"),
         mention("<at>Sam</at>", "29:sam", "Sam"),
       ],
+      // The absent bot id, now stated. The test is named for this case and
+      // used to express it by omission — which is what the rule is about.
+      undefined,
     );
     expect(result.text).toBe("assess this and copy");
   });

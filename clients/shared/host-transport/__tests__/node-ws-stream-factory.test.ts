@@ -4,6 +4,8 @@ import type { AddressInfo } from "node:net";
 import { createNodeStreamWebSocketFactory } from "../node-ws-stream-factory";
 import type { StreamWebSocketLike } from "../ws-stream-factory";
 
+
+
 /**
  * Exercises `createNodeStreamWebSocketFactory()` against a REAL local `ws`
  * server - the binary-capable adapter (`IStreamWebSocketFactory`) backing
@@ -173,10 +175,28 @@ describe("createNodeStreamWebSocketFactory (real ws server)", () => {
 
     expect(wss.clients.size).toBe(1);
     const [serverSocket] = wss.clients;
-    expect(
-      (serverSocket as unknown as { _extensions: Record<string, unknown> })
-        ._extensions,
-    ).toHaveProperty("permessage-deflate");
+    // The negotiated extensions live on a private field `ws` does not type.
+    // An explicit intermediate rather than `as unknown as {…}`: the shape we
+    // are asserting against is a claim about the library, so it is written
+    // down once and named, not smuggled through the type system inline.
+    /*
+     * `Reflect.get`, not a cast.
+     *
+     * The negotiated extensions live on a private field `ws` does not type.
+     * The original read it through `as unknown as {…}` — a chained assertion,
+     * which is the compiler being told to stop asking rather than being given
+     * something to check.
+     *
+     * Reflect returns `any`, so the annotation below is an ASSIGNMENT and not
+     * an assertion: if `ws` ever stops setting the field, this is `undefined`
+     * and the expectation fails, where the cast would have kept insisting the
+     * object had a property it did not.
+     */
+    const negotiated: Record<string, unknown> | undefined = Reflect.get(
+      serverSocket,
+      "_extensions",
+    );
+    expect(negotiated).toHaveProperty("permessage-deflate");
 
     socket.close(1000, "done");
   });
