@@ -59455,11 +59455,34 @@ var OLDER_VERB = "traycer/older";
 var NEWER_VERB = "traycer/newer";
 var TRANSCRIPT_TEXT_LIMIT = 220;
 var CONTEXT_STRIP_TEXT_LIMIT = 100;
+function humaniseToolName(raw) {
+  const mcp = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(raw);
+  const name = mcp?.[1] ?? raw;
+  return name.replace(/_/g, " ").trim();
+}
+function speakerLabel(message2) {
+  if (message2.role === "assistant") return "Agent";
+  const author = message2.author?.trim() ?? "";
+  return author.length > 0 ? author : "You";
+}
+function modelMarker(message2) {
+  if (message2.role !== "assistant") return null;
+  const model = message2.author?.trim() ?? "";
+  return model.length > 0 ? `\u27E8model \xB7 ${model}\u27E9` : null;
+}
+function shortenWorkspacePath(raw) {
+  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
+  if (tenant?.[1] !== void 0) return tenant[1];
+  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
+  if (home?.[1] !== void 0) return home[1];
+  return raw;
+}
 function partMarker(part) {
   const noun = part.kind === "file_change" ? "file" : part.kind === "other" ? "content" : part.kind;
-  const label = part.label.trim();
+  const rawLabel = part.label.trim();
+  const label = part.kind === "tool" ? humaniseToolName(rawLabel) : part.kind === "file_change" ? shortenWorkspacePath(rawLabel) : rawLabel;
   const head = label.length > 0 ? `${noun} \xB7 ${label}` : noun;
-  return part.lines > 0 ? `\u27E8${head} \xB7 ${String(part.lines)} lines\u27E9` : `\u27E8${head}\u27E9`;
+  return part.lines > 0 ? `\u27E8${head} \xB7 ${String(part.lines)} line${part.lines === 1 ? "" : "s"}\u27E9` : `\u27E8${head}\u27E9`;
 }
 function transcriptPreview(message2, compact) {
   const limit = compact ? CONTEXT_STRIP_TEXT_LIMIT : TRANSCRIPT_TEXT_LIMIT;
@@ -59473,7 +59496,7 @@ function transcriptRow(message2, now, compact) {
   const preview = transcriptPreview(message2, compact);
   const items = [
     text(
-      `${message2.author ?? (message2.role === "user" ? "You" : "Agent")} \xB7 ${approvalAgeLabel(message2.timestamp, now)}`,
+      `${speakerLabel(message2)} \xB7 ${approvalAgeLabel(message2.timestamp, now)}`,
       {
         weight: "bolder",
         size: "small",
@@ -59486,9 +59509,15 @@ function transcriptRow(message2, now, compact) {
   if (preview.length > 0) {
     items.push(text(preview, { spacing: "small" }));
   }
-  if (message2.parts.length > 0) {
+  const markers = [
+    ...message2.parts.map(partMarker),
+    // The model belongs here — a fact about the turn — not in the speaker
+    // slot. Last, because it is the least interesting of them.
+    ...modelMarker(message2) === null ? [] : [modelMarker(message2)]
+  ];
+  if (markers.length > 0) {
     items.push(
-      text(message2.parts.map(partMarker).join("  "), {
+      text(markers.join("  "), {
         isSubtle: true,
         size: "small",
         fontType: "monospace",
@@ -60573,7 +60602,45 @@ async function dispatchPage(request, deps) {
       };
   }
 }
+async function dispatchConfirmedRoute(request, deps) {
+  const skill = readString(request.data, "skill");
+  if (skill === null) {
+    return {
+      card: buildUsageCard(
+        "There's no assessment skill configured for that yet, so I haven't started one."
+      ),
+      acted: false
+    };
+  }
+  if (deps.startAssessment === void 0) {
+    return {
+      card: buildUsageCard("This deployment can't start assessments yet."),
+      acted: false
+    };
+  }
+  const outcome = await deps.startAssessment({
+    conversationId: request.conversationId,
+    skill,
+    product: readString(request.data, "product") ?? "",
+    intent: readString(request.data, "intent") ?? "",
+    conversationReference: request.conversationReference
+  });
+  return outcome.kind === "started" ? { card: outcome.card, acted: true } : { card: outcome.card, acted: false };
+}
 async function dispatchActionInvoke(request, deps) {
+  if (request.verb === CONFIRM_ROUTE_VERB) {
+    return dispatchConfirmedRoute(request, deps);
+  }
+  if (request.verb === CLARIFY_OTHER_VERB) {
+    return {
+      card: buildUsageCard(
+        "No problem \u2014 tell me what you'd like me to do with it."
+      ),
+      // Nothing was mutated, and nothing failed. The user declined a
+      // suggestion, which is the flow working.
+      acted: true
+    };
+  }
   if (request.verb === SEND_VERB) {
     return dispatchSend(request, deps);
   }
@@ -60851,7 +60918,17 @@ var ReadSurfaceHandler = class extends import_agents_hosting2.ActivityHandler {
     if (actionVerb !== null) {
       const convId = context2.activity.conversation?.id ?? "";
       const result = await dispatchActionInvoke(
-        { verb: actionVerb, conversationId: convId, data: actionValue ?? {} },
+        {
+          verb: actionVerb,
+          conversationId: convId,
+          data: actionValue ?? {},
+          // Captured HERE because this turn is the only moment it exists.
+          // An action that starts long-running work must record where to
+          // reply before it starts; afterwards there is nothing to derive it
+          // from. Passed to every action rather than to the one that needs
+          // it, so a second such action is a handler that already has it.
+          conversationReference: context2.activity.getConversationReference()
+        },
         this.deps
       );
       if (!result.acted) {
