@@ -21,6 +21,11 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { FleetLoading } from "./fleet/fleet-state";
+import { AppShell } from "./shell/app-shell";
+import {
+  EpicStatusRow,
+  type EpicConnectionState,
+} from "./shell/epic-status-row";
 import { EpicDetail } from "./epics/epic-detail";
 import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
@@ -104,6 +109,27 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalM,
   },
   subtle: { color: tokens.colorNeutralForeground3 },
+  /**
+   * A screen INSIDE the shell. Same padding and rhythm as `page`, with the
+   * `minHeight: 100vh` removed — that is the whole difference and it is the
+   * point.
+   *
+   * Wrapping `page` in the shell without this would have looked done and not
+   * worked: a growing child inside a contained body still grows, the frame
+   * still stretches, and the header still scrolls away. The frame is
+   * necessary and not sufficient; the screens have to stop demanding a
+   * viewport each.
+   *
+   * `page` survives for the ten screens not yet migrated. It goes when they
+   * do.
+   */
+  screen: {
+    padding: tokens.spacingVerticalL,
+    display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalM,
+    boxSizing: "border-box",
+  },
 });
 
 /**
@@ -228,8 +254,33 @@ function EpicScreen({
     preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST;
   const authoring = useCreateAgent(hostClient, epicId, configuredHostId);
   const artifactAuthoring = useCreateArtifact(hostClient, epicId);
+  /*
+   * THE FIRST SCREEN IN THE SHELL, and deliberately the only one for now.
+   *
+   * This is the surface with the ~40s wait, so it is the only one where the
+   * acceptance test — the frame is on screen BEFORE the epic data is — means
+   * anything. The other ten would migrate on faith, and if the frame is wrong
+   * we unpick one screen instead of eleven.
+   *
+   * The status derives from the SAME state the body renders from, so the
+   * strip cannot say "live" while the list is still loading.
+   */
+  const connection: EpicConnectionState =
+    agents.kind === "loading"
+      ? { kind: "loading" }
+      : agents.kind === "error"
+        ? { kind: "error" }
+        : { kind: "live" };
   return (
-    <div className={styles.page}>
+    <AppShell
+      leading={
+        <Text weight="semibold" truncate wrap={false}>
+          {epic?.title ?? live.header?.title ?? "Epic"}
+        </Text>
+      }
+      trailing={<EpicStatusRow state={connection} />}
+    >
+      <div className={styles.screen}>
       <EpicDetail
         // The row that was clicked, else the header from `earlyMeta` — which
         // lands in ~543ms, so a DEEP LINK stops showing a bare id after half a
@@ -266,7 +317,8 @@ function EpicScreen({
         phase={artifactAuthoring.phase}
         onCreate={artifactAuthoring.create}
       />
-    </div>
+      </div>
+    </AppShell>
   );
 }
 
