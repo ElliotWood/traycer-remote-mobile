@@ -13,6 +13,7 @@ import type {
   TranscriptPart,
 } from "./bridge-types";
 import type { BridgeCliFailureReason } from "./bridge-cli";
+import { speakerLabel as sharedSpeakerLabel } from "@traycer-clients/shared/epic/transcript";
 
 /**
  * Adaptive Card builders.
@@ -1013,9 +1014,15 @@ export function humaniseToolName(raw: string): string {
  * a model is unambiguous.
  */
 export function speakerLabel(message: TranscriptMessage): string {
-  if (message.role === "assistant") return "Agent";
-  const author = message.author?.trim() ?? "";
-  return author.length > 0 ? author : "You";
+  // DELEGATES to `clients/shared/epic/transcript`. This rule lived only here,
+  // so fixing the model-as-speaker defect in the bot left the tab still
+  // showing `haiku` — a one-client fix for a protocol question, and nothing
+  // could have told us. "Who said this" is grammar; it belongs in shared.
+  //
+  // A thin wrapper rather than a direct call at every site: the bot's
+  // `TranscriptMessage` is its own type, so this is the one place that
+  // adapts it. The RULE is shared; the type mapping is local.
+  return sharedSpeakerLabel(message);
 }
 
 /**

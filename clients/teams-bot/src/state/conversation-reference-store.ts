@@ -172,7 +172,22 @@ export function toStoredReference(
           },
         }
       : {}),
-    ...(typeof r["tenantId"] === "string" ? { tenantId: r["tenantId"] } : {}),
+    /*
+     * FOUND BY THE SWEEP, same source as the `bot`/`agent` defect: this read
+     * `r["tenantId"]`, and the SDK's reference has no top-level `tenantId`.
+     * It returns
+     *   { activityId, user, agent, conversation, channelId, locale, serviceUrl }
+     * and Teams carries the tenant on the CONVERSATION.
+     *
+     * So this was always `undefined`, and — being optional — degraded
+     * silently. The same soft-fail shape as the field that cost a live
+     * failure: nothing throws, nothing logs, the value is simply never there.
+     * Both came from reading v4 documentation rather than the installed
+     * package's types.
+     */
+    ...(typeof conv["tenantId"] === "string"
+      ? { tenantId: conv["tenantId"] }
+      : {}),
     capturedAt,
   };
 }

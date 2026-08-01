@@ -21,6 +21,8 @@
  * rendered keeps the gap visible instead of letting it close over.
  */
 
+import { jsonContentToMarkdown } from "@traycer/protocol/common/json-content-serializer";
+
 /** A block as the transcript treats it. */
 export type TranscriptBlock =
   /** Rendered as prose. */
@@ -96,7 +98,39 @@ function labelFor(blockType: string): string {
   return BLOCK_LABELS[blockType] ?? `Block: ${blockType}`;
 }
 
+/**
+ * The body of a block or a user payload, as markdown.
+ *
+ * THIS READ `block["text"]` AND A USER'S MESSAGE RENDERED EMPTY.
+ *
+ * The protocol carries message bodies as a ProseMirror JSON document under
+ * `content`, not as a string under `text`. `remote-bridge` has always done
+ * this correctly — `jsonContentToMarkdown(message.message.content)` — and the
+ * tab reimplemented the projection reading a field that does not exist. A
+ * user typed a message, the host stored it, the bot's card showed it, and the
+ * tab showed a blank row.
+ *
+ * It also explains the literal ``` fences: a ProseMirror doc serialised
+ * properly produces markdown, and reading `.text` produced either nothing or
+ * an unserialised remnant. **Two of the reported defects were one function.**
+ *
+ * `content` first because it is the protocol's shape; `text` retained as a
+ * fallback so a block that genuinely carries a plain string still renders.
+ * Returning "" for neither is deliberate — one unreadable block must not cost
+ * the reader the rest of the conversation.
+ */
 function readText(block: Record<string, unknown>): string {
+  const content = block["content"];
+  if (content !== null && content !== undefined && typeof content === "object") {
+    try {
+      return jsonContentToMarkdown(content as never, {
+        mentionFormat: "user",
+        platform: "POSIX",
+      });
+    } catch {
+      // A malformed document degrades to the fallback rather than throwing.
+    }
+  }
   const value = block["text"];
   return typeof value === "string" ? value : "";
 }
@@ -211,4 +245,49 @@ export function toTranscript(
   }
   // Oldest first — a transcript reads forwards.
   return [...out].sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
+ * WHO authored a turn. Grammar, not palette — which is why it lives here.
+ *
+ * This existed only in `teams-bot`'s card builder. The tab has its own
+ * renderer and still showed `haiku` as the speaker after the bot was fixed,
+ * because the fix landed in one client and nothing could have told us.
+ *
+ * The seam rule says protocol questions go in `shared` and rendering choices
+ * go per-client. **"Who said this" is a question about the protocol's data** —
+ * the answer is identical in every client — so it was on the wrong side of
+ * the seam, and being on the wrong side is what made a one-client fix
+ * possible.
+ *
+ * `author` on an ASSISTANT turn is `sender.displayName`, and for an assistant
+ * that is the MODEL ALIAS — `haiku`, `default`. On a USER turn the same field
+ * is the sending agent's title. One field, two meanings, distinguished only
+ * by direction. The rule is the ROLE, never a list of names that look like
+ * models: a list would repair the instance that announced itself and preserve
+ * the class for every model whose alias reads like a person.
+ */
+export function speakerLabel(message: {
+  readonly role: "user" | "assistant";
+  readonly author: string | null;
+}): string {
+  if (message.role === "assistant") return "Agent";
+  const author = message.author?.trim() ?? "";
+  return author.length > 0 ? author : "You";
+}
+
+/**
+ * The model, when there is one to name. `null` for user turns.
+ *
+ * Kept beside {@link speakerLabel} because they are the two halves of one
+ * decision: the model is a real fact that belongs somewhere secondary, and
+ * separating them is how it drifts back into the speaker slot.
+ */
+export function modelLabel(message: {
+  readonly role: "user" | "assistant";
+  readonly author: string | null;
+}): string | null {
+  if (message.role !== "assistant") return null;
+  const model = message.author?.trim() ?? "";
+  return model.length > 0 ? model : null;
 }
