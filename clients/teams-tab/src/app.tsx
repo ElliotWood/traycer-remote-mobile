@@ -474,9 +474,41 @@ export function App(): ReactElement {
   const { auth, restoring } = useAuthService();
   const status = useAuthStatus(auth);
 
+  /**
+   * ONE frame, for every route.
+   *
+   * Before this, each of ten routes returned its own `<FluentProvider>` — nine
+   * providers and zero shells, which is "the thing that should be common is
+   * per-route and the thing that should differ is identical", one level up
+   * from the eleven `page` styles.
+   *
+   * WHY A HELPER RATHER THAN TEN `<AppShell>` WRAPPERS. Wrapping each route
+   * individually gives ten shells. Each would subtract its viewport height
+   * correctly, pass the containment gate, and screenshot perfectly — and the
+   * header would REMOUNT on every navigation, so "persistent region" would be
+   * false in exactly the way that matters. A verification agreeing with the
+   * wrong answer.
+   *
+   * Every route now renders `FluentProvider > AppShell > content` at the same
+   * position with the same element types, so React reconciles them as one
+   * instance and the header node SURVIVES navigation. That is a runtime
+   * property, not a source-count one: a single shell rendered conditionally,
+   * keyed by route, or remounted by a parent would still tear down and the
+   * count would stay 1. There is a test that navigates and asserts the header
+   * is the SAME NODE, because a remount produces an identical-looking element
+   * that passes every assertion about content.
+   */
+  const shell = (content: ReactElement | null): ReactElement => (
+    <FluentProvider theme={themeFor(ready ? themeName : "default")}>
+      <AppShell leading={<Text weight="semibold">Traycer</Text>}>
+        {content}
+      </AppShell>
+    </FluentProvider>
+  );
+
   // Nothing paints until initialize settles either way — a flash of the light
   // theme before switching to dark is the sort of thing that reads as cheap.
-  if (!ready) return <FluentProvider theme={themeFor("default")} />;
+  if (!ready) return shell(null);
 
   const params =
     typeof window === "undefined"
@@ -643,9 +675,8 @@ export function App(): ReactElement {
     showAuthoring;
   const problems = previewing ? [] : configProblems();
   if (problems.length > 0) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <Subtitle1>Traycer isn&rsquo;t configured</Subtitle1>
           {/*
             Says WHOSE problem it is and what resolves it, not just which
@@ -674,8 +705,7 @@ export function App(): ReactElement {
               <strong>{p.key}</strong> — {p.detail}
             </Text>
           ))}
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
@@ -708,12 +738,10 @@ export function App(): ReactElement {
   // Elliot ended up starting a device flow he did not need — and it is what
   // would make a reload look like a lost session when it is not.
   if (restoring && !previewing) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <FleetLoading rows={3} />
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
@@ -739,9 +767,8 @@ export function App(): ReactElement {
     // pair by hand — it needs two RPCs to fail — and it is the thing most
     // worth looking at, so it gets a preview rather than a description.
     const unconfirmed = params.get("state") === "unconfirmed";
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <Subtitle1>New agent</Subtitle1>
           <AuthorAgent
             configuredHostId={hostForPreview}
@@ -771,15 +798,13 @@ export function App(): ReactElement {
             }
             onCreate={() => undefined}
           />
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
   if (showComments) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <Subtitle1>Comments</Subtitle1>
           <CommentsPanel
             threads={COMMENTS_FIXTURE}
@@ -788,27 +813,23 @@ export function App(): ReactElement {
             onReply={() => undefined}
             onSetResolved={() => undefined}
           />
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
   if (showArtifact) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <Subtitle1>{ARTIFACT_FIXTURE_TITLE}</Subtitle1>
           <ArtifactMarkdown body={ARTIFACT_FIXTURE_BODY} />
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
   if (showChat) {
     const phase = params.get("state");
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <ChatScreen
             controller={{
               state: {
@@ -857,46 +878,39 @@ export function App(): ReactElement {
             now={CHAT_FIXTURE_NOW}
             onBack={() => undefined}
           />
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
   if (showApprovals) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
-        <div className={styles.page}>
+    return shell(
+        <div className={styles.screen}>
           <Subtitle1>Approval states</Subtitle1>
           <ApprovalsPreview />
-        </div>
-      </FluentProvider>
+        </div>,
     );
   }
 
   if (status.kind !== "signed-in" && !previewing) {
-    return (
-      <FluentProvider theme={themeFor(themeName)}>
+    return shell(
         <SignIn
           status={status}
           onSignIn={() => void auth.signIn()}
           onCancel={() => {
             auth.cancelSignIn();
           }}
-        />
-      </FluentProvider>
+        />,
     );
   }
 
 
-  return (
-    <FluentProvider theme={themeFor(themeName)}>
+  return shell(
       <EpicsScreen
         styles={styles}
         auth={auth}
         preview={previewState}
         agentsPreview={agentsPreview}
         waitingPreview={waitingPreview}
-      />
-    </FluentProvider>
+      />,
   );
 }
