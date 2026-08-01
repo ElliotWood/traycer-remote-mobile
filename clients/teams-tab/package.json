@@ -9,7 +9,8 @@
     "build": "vite build",
     "compile": "tsc -b",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.71.0",

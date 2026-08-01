@@ -224,7 +224,11 @@ export function useEpicAgents(
 
     const t0 = Date.now();
     const marks: string[] = [];
-    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    // `number`, not `ReturnType<typeof setTimeout>`. This runs in a BROWSER,
+    // where `setTimeout` returns a number; the conditional type resolves to
+    // Node's `Timeout` whenever node types are in scope, which is how a
+    // browser file silently acquires a Node shape.
+    let stallTimer: number | undefined;
     const armStallWatchdog = (): void => {
       clearTimeout(stallTimer);
       stallTimer = setTimeout(() => {

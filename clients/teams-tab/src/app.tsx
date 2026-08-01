@@ -396,6 +396,10 @@ function EpicsScreen({
     connection?.hostClient ?? null,
     CONFIGURED_HOST_ID,
     userId,
+    // The real clock, stated. The hook no longer defaults it — see its
+    // docblock; a defaulted `Date.now` is how a test ends up reading the wall
+    // clock without anyone having chosen that.
+    Date.now,
   );
   // The list is the confirmation. Reloading on success means the new epic
   // appears as the HOST's row rather than as our echo of the request.

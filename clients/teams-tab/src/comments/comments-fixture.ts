@@ -117,4 +117,4 @@ export const COMMENTS_FIXTURE: readonly CommentThreadWire[] = [
       },
     ],
   },
-] as unknown as readonly CommentThreadWire[];
+];

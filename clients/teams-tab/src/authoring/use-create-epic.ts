@@ -51,8 +51,14 @@ export function useCreateEpic(
    * so a wrong value produces an epic the user cannot see in their own fleet.
    */
   createdBy: string,
-  /** Injected so the contract test is deterministic. */
-  now: () => number = Date.now,
+  /**
+   * Injected so the contract test is deterministic.
+   *
+   * No default: the clock a hook reads is exactly the kind of thing that
+   * should be visible at the call site. A defaulted `Date.now` is how a test
+   * ends up asserting against the real clock without anyone choosing that.
+   */
+  now: () => number,
 ): CreateEpicResult {
   const [phase, setPhase] = useState<CreatePhase>({ kind: "idle" });
   const [createdEpicId, setCreatedEpicId] = useState<string | null>(null);
