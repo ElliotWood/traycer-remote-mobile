@@ -106,14 +106,26 @@ const LIST = `${base}/epics?preview=epics&theme=dark`;
 const DETAIL = `${base}/epics/${EPIC}?preview=agents&theme=dark`;
 
 /**
- * The scrolling region is found by BEHAVIOUR — the header's next sibling —
- * rather than by class name, because the class is a generated Griffel hash
- * and a probe that looks for one silently finds nothing when it changes.
+ * The scrolling region is found by `data-shell-region="body"`.
+ *
+ * It was "the header's next sibling", which was true until the shell grew a
+ * second persistent region — the epic status row — between them. A probe that
+ * navigates by STRUCTURE breaks precisely when the structure is what is being
+ * changed, and it breaks silently: the next sibling still exists, so it would
+ * have measured the 40px status strip and reported a body that never
+ * overflows.
+ *
+ * The class name is not an option either — Griffel hashes it.
+ *
+ * The distinction against the `data-` attribute that lied once before: this
+ * attribute LOCATES an element. What is measured on it is scroll geometry,
+ * which the browser owns. The discredited probe used an attribute to ASSERT
+ * that an element had persisted, which is a claim an attribute cannot make.
  */
 async function measure(page) {
   return page.evaluate(() => {
     const header = document.querySelector("header");
-    const body = header?.nextElementSibling ?? null;
+    const body = document.querySelector('[data-shell-region="body"]');
     if (body !== null) body.scrollTop = 99999;
     return {
       mounts: window.__traycerShellMounts ?? null,
@@ -127,6 +139,30 @@ async function measure(page) {
       bodyScrolled: body === null ? null : Math.round(body.scrollTop),
       headerTop:
         header === null ? null : Math.round(header.getBoundingClientRect().top),
+      /*
+       * The SECOND persistent region. Its whole purpose is to still be there
+       * once the epic's rows arrive, so measuring it before the scroll would
+       * be measuring the easy case: it was never missing at scrollTop 0, it
+       * was missing at the bottom of a long list.
+       *
+       * Expected directly under the header — compared against the header's
+       * measured BOTTOM, not against 40. Writing 40 was wrong by exactly the
+       * header's 1px bottom border, which is the kind of number that gets
+       * "fixed" by loosening the assertion to `> 0` — and `> 0` would pass
+       * for a row that had drifted halfway down the screen. The property is
+       * adjacency; measure both edges and compare them.
+       */
+      headerBottom:
+        header === null
+          ? null
+          : Math.round(header.getBoundingClientRect().bottom),
+      statusTop: (() => {
+        const status = header?.nextElementSibling ?? null;
+        if (status === null || status.hasAttribute("data-shell-region")) {
+          return null; // no status published on this screen
+        }
+        return Math.round(status.getBoundingClientRect().top);
+      })(),
     };
   });
 }
@@ -176,6 +212,31 @@ try {
   if (after.headerTop !== 0) {
     console.error(`FAIL: header moved to ${String(after.headerTop)} under scroll`);
     failed = true;
+  }
+  // The status row is the point of this commit: it must survive the scroll
+  // that used to take it away. `null` means the screen published nothing,
+  // which is a finding here because the epic screen always publishes.
+  if (after.statusTop === null) {
+    console.error("FAIL: no status row published on the epic screen");
+    failed = true;
+  } else if (after.statusTop !== after.headerBottom) {
+    console.error(
+      `FAIL: status row at ${String(after.statusTop)}px after scrolling, header ends at ${String(after.headerBottom)} — not adjacent`,
+    );
+    failed = true;
+  }
+  /*
+   * A PICTURE OF THE SCROLLED STATE, when an out path is given.
+   *
+   * The numbers above are the proof; this is the thing a person can look at.
+   * It is taken AFTER the scroll deliberately — a shot at scrollTop 0 shows
+   * the two regions in the easy case, which is the case that was never
+   * broken. The interesting frame is the one where the list has scrolled
+   * underneath a header and a status row that did not move.
+   */
+  if (process.argv[2]) {
+    await page.screenshot({ path: process.argv[2] });
+    console.log(`LIVE   shot  : ${process.argv[2]}`);
   }
   await page.close();
 

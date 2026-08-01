@@ -24,8 +24,13 @@
  * `page` style and had no shell, which is the wrong layer inverted: the frame
  * is what should be common and the contents are what should differ.
  */
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { makeStyles, tokens } from "@fluentui/react-components";
+import {
+  EpicStatusRow,
+  type EpicConnectionState,
+} from "./epic-status-row";
+import { ShellStatusProvider } from "./shell-status";
 
 /**
  * How many times this shell has MOUNTED. The persistence probe.
@@ -84,6 +89,27 @@ const useStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalM,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
   },
+  /**
+   * THE SECOND PERSISTENT REGION, which the audit found and we had one of.
+   *
+   * Desktop has two: an app header and a per-epic status row, and they are
+   * separate because what they say is scoped differently — the header is
+   * about the app, the row is about THIS epic. Ours rendered at the top of
+   * the screen content, so it scrolled away the moment the epic's rows
+   * arrived: a status pill that disappears when there is something to be
+   * status ABOUT.
+   *
+   * `flexShrink: 0` for the same reason as the header. A region that can be
+   * squeezed is not persistent, and this one sits directly above content that
+   * grows to any length.
+   *
+   * Rendered only when a screen has published a state. An empty 40px strip on
+   * every other screen would be the frame taking space to say nothing.
+   */
+  status: {
+    flexShrink: 0,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
   /** Takes the remaining height and is the ONLY thing that scrolls. */
   body: {
     flexGrow: 1,
@@ -131,6 +157,15 @@ export function AppShell({
   children,
 }: AppShellProps): React.JSX.Element {
   const styles = useStyles();
+  /**
+   * The status the current screen has published, or `null`.
+   *
+   * Held HERE rather than passed in as a prop, because the state is born
+   * below this component — `epic.subscribe` lives in `EpicScreen` — and the
+   * shell must stay a single instance at the top of the tree. See
+   * `./shell-status`.
+   */
+  const [status, setStatus] = useState<EpicConnectionState | null>(null);
   // Empty dep array: once per MOUNT, never on re-render. A remount is the
   // thing being detected, so anything that runs per-render would report the
   // opposite of the property.
@@ -145,7 +180,28 @@ export function AppShell({
         <div className={styles.spacer} />
         <div className={styles.trailing}>{trailing}</div>
       </header>
-      <div className={styles.body}>{children}</div>
+      {status === null ? null : (
+        <div className={styles.status}>
+          <EpicStatusRow state={status} />
+        </div>
+      )}
+      {/*
+        `data-shell-region` is for LOCATING this element, never for measuring
+        it. The shell probe used to find the scrolling region as "the header's
+        next sibling", which this commit breaks by inserting a region between
+        them — a probe that navigates by structure breaks when the structure
+        is the thing being changed.
+
+        The distinction that matters, and the one a `data-` attribute got
+        wrong once before: what is MEASURED here is scroll geometry, which the
+        browser owns and cannot be faked by an attribute. An attribute
+        asserting "this element persisted" was the probe that lied.
+      */}
+      <div className={styles.body} data-shell-region="body">
+        <ShellStatusProvider setStatus={setStatus}>
+          {children}
+        </ShellStatusProvider>
+      </div>
     </div>
   );
 }

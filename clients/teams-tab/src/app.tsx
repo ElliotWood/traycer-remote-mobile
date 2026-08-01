@@ -22,10 +22,8 @@ import {
 } from "@fluentui/react-components";
 import { FleetLoading } from "./fleet/fleet-state";
 import { AppShell } from "./shell/app-shell";
-import {
-  EpicStatusRow,
-  type EpicConnectionState,
-} from "./shell/epic-status-row";
+import { type EpicConnectionState } from "./shell/epic-status-row";
+import { useShellStatus } from "./shell/shell-status";
 import { EpicDetail } from "./epics/epic-detail";
 import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
@@ -262,6 +260,9 @@ function EpicScreen({
       : agents.kind === "error"
         ? { kind: "error" }
         : { kind: "live" };
+  // Into the FRAME's status region. Cleared automatically when this screen
+  // unmounts, so a "live" pill never outlives the epic it describes.
+  useShellStatus(connection);
   return (
     /*
      * NO NESTED SHELL. This rendered its own <AppShell> before the hoist,
@@ -270,13 +271,14 @@ function EpicScreen({
      * caught it; the DOM probe had reported the header as the same node
      * throughout, which is the measurement lying rather than the app.
      *
-     * The status row lives at the top of the screen content for now. That
-     * keeps ONE shell, which is the property that matters, and costs the
-     * status row its pinning — promoting it into the frame needs a slot the
-     * shell exposes to a descendant, which is its own change.
+     * The status row is PUBLISHED to the frame, not rendered here. It used to
+     * sit at the top of this screen's content, which kept one shell — the
+     * property that matters — and cost the row its pinning: it scrolled away
+     * as soon as the epic's rows arrived, so the pill vanished exactly when
+     * there was something to be status about. `useShellStatus` is the slot
+     * that debt bought.
      */
     <div className={styles.screen}>
-      <EpicStatusRow state={connection} />
       <EpicDetail
         // The row that was clicked, else the header from `earlyMeta` — which
         // lands in ~543ms, so a DEEP LINK stops showing a bare id after half a
