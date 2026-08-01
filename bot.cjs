@@ -58870,6 +58870,46 @@ function rejectAction(approvalId, reason, env2, config2) {
   const args = reason === null || reason.length === 0 ? ["reject", approvalId] : ["reject", approvalId, reason];
   return runAction(args, env2, config2);
 }
+async function createChatAction(input, env2, config2) {
+  const args = [
+    "create-chat",
+    input.chatId,
+    input.title,
+    "--host-id",
+    input.hostId
+  ];
+  const result = await config2.spawnFn(config2.command, args, {
+    env: env2,
+    timeoutMs: config2.timeoutMs
+  });
+  if (result.timedOut) {
+    return {
+      kind: "failed",
+      reason: "spawn_timed_out",
+      // Named explicitly: the create may have landed, and because the id is
+      // client-supplied the caller can safely repeat the identical request.
+      detail: `"create-chat" did not exit within ${String(config2.timeoutMs)}ms \u2014 it may have been created; retrying with the same id is safe`
+    };
+  }
+  const trimmed = result.stdout.trim();
+  if (trimmed.length > 0) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed !== null && typeof parsed === "object" && typeof parsed["chatId"] === "string") {
+        return {
+          kind: "ok",
+          value: { chatId: parsed["chatId"] }
+        };
+      }
+    } catch {
+    }
+  }
+  return {
+    kind: "failed",
+    reason: "nonzero_exit",
+    detail: result.stderr.trim().slice(0, 400)
+  };
+}
 
 // src/read-surface/demo-principal-source.ts
 var DEMO_IDENTITY_ENV_FLAG = "TRAYCER_TEAMS_DEMO_IDENTITY";
@@ -59909,7 +59949,8 @@ function buildClarifyCard(options) {
             // Explicit, so the handler never re-derives the route.
             product: options.product ?? "",
             intent: options.intent ?? "",
-            skill: options.skill ?? ""
+            skill: options.skill ?? "",
+            text: (options.spokenText ?? "").slice(0, 900)
           },
           { associateInputs: false }
         )
@@ -59918,6 +59959,39 @@ function buildClarifyCard(options) {
         associateInputs: false
       })
     ])
+  ]);
+}
+function buildAssessmentStartedCard(options) {
+  return buildCard(
+    [
+      text("Assessment started", { weight: "bolder", size: "medium" }),
+      text(options.title, { isSubtle: true, spacing: "none" }),
+      text(
+        options.deepLink === null ? "It's running. I'll reply here when it's done." : "It's running \u2014 open it to watch progress. I'll reply here when it's done.",
+        { spacing: "small" }
+      )
+    ],
+    options.deepLink === null ? [] : [
+      {
+        type: "Action.OpenUrl",
+        title: "Watch progress",
+        url: options.deepLink
+      }
+    ]
+  );
+}
+function buildAssessmentUnconfirmedCard(reason) {
+  return card([
+    text("Couldn't confirm it started", {
+      weight: "bolder",
+      size: "medium",
+      color: "warning"
+    }),
+    text(
+      "Ask again the same way \u2014 it's the same request, so it can't start a second assessment.",
+      { spacing: "none" }
+    ),
+    text(reason, { isSubtle: true, size: "small", spacing: "small" })
   ]);
 }
 function buildEpicPickerCard(epics) {
@@ -60318,6 +60392,11 @@ async function fetchEpicList(principal, deps) {
   }
   return { kind: "ok", epics: result.value };
 }
+function resolveTenantEnv(principal, epicId, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") return null;
+  return buildBridgeEnv(resolution.tenant, epicId, deps);
+}
 
 // src/read-surface/dispatch.ts
 function failureCard(failure) {
@@ -60623,7 +60702,8 @@ async function dispatchConfirmedRoute(request, deps) {
     skill,
     product: readString(request.data, "product") ?? "",
     intent: readString(request.data, "intent") ?? "",
-    conversationReference: request.conversationReference
+    conversationReference: request.conversationReference,
+    spokenText: readString(request.data, "text") ?? ""
   });
   return outcome.kind === "started" ? { card: outcome.card, acted: true } : { card: outcome.card, acted: false };
 }
@@ -60957,7 +61037,8 @@ var ReadSurfaceHandler = class extends import_agents_hosting2.ActivityHandler {
               suggestionLabel: describeRoute(classified.suggestion),
               product: classified.suggestion.product,
               intent: classified.suggestion.intent,
-              skill: classified.suggestion.skill
+              skill: classified.suggestion.skill,
+              spokenText: spoken.text
             })
           )
         );
@@ -61015,6 +61096,231 @@ function createReadSurfaceHandler(deps) {
   return new ReadSurfaceHandler(deps);
 }
 
+// src/intake/start-assessment.ts
+var import_node_crypto2 = require("node:crypto");
+
+// src/intake/deep-link.ts
+function chatDeepLink(config2, epicId, chatId) {
+  const base = config2.tabBaseUrl.trim().replace(/\/+$/, "");
+  if (base === "") return null;
+  if (epicId.trim() === "" || chatId.trim() === "") return null;
+  return `${base}/epics/${encodeURIComponent(epicId)}/chats/${encodeURIComponent(chatId)}`;
+}
+
+// src/state/durable-json-store.ts
+var import_node_fs2 = require("node:fs");
+var import_node_path = require("node:path");
+var FILE_MODE = 384;
+var DurableJsonStore = class {
+  filePath;
+  onWarn;
+  /** Written through to disk on every mutation; read on construction. */
+  cache;
+  constructor(options) {
+    this.filePath = options.filePath;
+    this.onWarn = options.onWarn ?? (() => {
+    });
+    this.cache = this.load();
+  }
+  load() {
+    let raw;
+    try {
+      raw = (0, import_node_fs2.readFileSync)(this.filePath, "utf8");
+    } catch {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        this.onWarn(
+          "state file is not a JSON object \u2014 starting empty",
+          this.filePath
+        );
+        return {};
+      }
+      return parsed;
+    } catch (error51) {
+      this.onWarn(
+        "state file could not be parsed \u2014 starting empty",
+        error51 instanceof Error ? error51.message : String(error51)
+      );
+      return {};
+    }
+  }
+  persist() {
+    (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(this.filePath), { recursive: true });
+    const temp = (0, import_node_path.join)(
+      (0, import_node_path.dirname)(this.filePath),
+      `.${String(process.pid)}.${String(this.writes)}.tmp`
+    );
+    (0, import_node_fs2.writeFileSync)(temp, JSON.stringify(this.cache), { mode: FILE_MODE });
+    (0, import_node_fs2.renameSync)(temp, this.filePath);
+    this.writes += 1;
+  }
+  /** Distinguishes temp files within one process, so two writes cannot collide. */
+  writes = 0;
+  get(key) {
+    return this.cache[key] ?? null;
+  }
+  set(key, value) {
+    this.cache = { ...this.cache, [key]: value };
+    this.persist();
+  }
+  delete(key) {
+    if (!(key in this.cache)) return;
+    const next = { ...this.cache };
+    delete next[key];
+    this.cache = next;
+    this.persist();
+  }
+  keys() {
+    return Object.keys(this.cache);
+  }
+};
+
+// src/state/conversation-reference-store.ts
+var DurableConversationReferenceStore = class {
+  store;
+  constructor(filePath, onWarn) {
+    this.store = new DurableJsonStore({
+      filePath,
+      onWarn
+    });
+  }
+  remember(workId, reference) {
+    this.store.set(workId, reference);
+  }
+  recall(workId) {
+    return this.store.get(workId);
+  }
+  forget(workId) {
+    this.store.delete(workId);
+  }
+  outstanding() {
+    return this.store.keys();
+  }
+};
+function toStoredReference(reference, capturedAt) {
+  if (reference === null || typeof reference !== "object") return null;
+  const r = reference;
+  const conversation = r["conversation"];
+  const bot = r["bot"];
+  if (typeof r["channelId"] !== "string" || typeof r["serviceUrl"] !== "string" || conversation === null || typeof conversation !== "object" || typeof conversation["id"] !== "string" || bot === null || typeof bot !== "object" || typeof bot["id"] !== "string") {
+    return null;
+  }
+  const conv = conversation;
+  const botRef = bot;
+  const user = r["user"];
+  const userRef = user !== null && typeof user === "object" ? user : null;
+  return {
+    channelId: r["channelId"],
+    serviceUrl: r["serviceUrl"],
+    conversation: {
+      id: conv["id"],
+      ...typeof conv["conversationType"] === "string" ? { conversationType: conv["conversationType"] } : {}
+    },
+    bot: {
+      id: botRef["id"],
+      ...typeof botRef["name"] === "string" ? { name: botRef["name"] } : {}
+    },
+    ...userRef !== null && typeof userRef["id"] === "string" ? {
+      user: {
+        id: userRef["id"],
+        ...typeof userRef["aadObjectId"] === "string" ? { aadObjectId: userRef["aadObjectId"] } : {}
+      }
+    } : {},
+    ...typeof r["tenantId"] === "string" ? { tenantId: r["tenantId"] } : {},
+    capturedAt
+  };
+}
+
+// src/intake/dispatch-assessment.ts
+function buildInstruction(route, spokenText, attachmentCount) {
+  const skill = route.skill ?? "(no skill configured for this route)";
+  const files = attachmentCount === 0 ? "No documents were attached." : `${String(attachmentCount)} document${attachmentCount === 1 ? "" : "s"} attached to the request.`;
+  return [
+    `Use the ${skill} skill.`,
+    "",
+    "The request, in the requester's own words:",
+    spokenText,
+    "",
+    files
+  ].join("\n");
+}
+function buildChatTitle(route, spokenText) {
+  const first = spokenText.split("\n")[0]?.trim() ?? "";
+  const trimmed = first.length > 60 ? `${first.slice(0, 59).trimEnd()}\u2026` : first;
+  if (trimmed.length > 0) return trimmed;
+  return `${route.product} \u2014 ${route.intent}`;
+}
+
+// src/intake/start-assessment.ts
+function createStartAssessment(config2) {
+  return async (input) => {
+    const chatId = (0, import_node_crypto2.randomUUID)();
+    const stored = toStoredReference(input.conversationReference, config2.now());
+    if (stored === null) {
+      return {
+        kind: "unconfirmed",
+        card: buildAssessmentUnconfirmedCard(
+          "I couldn't record where to send the result, so I haven't started."
+        )
+      };
+    }
+    config2.references.remember(chatId, stored);
+    const env2 = await config2.buildEnv();
+    if (env2 === null) {
+      return {
+        kind: "unconfirmed",
+        card: buildAssessmentUnconfirmedCard("I couldn't verify who you are.")
+      };
+    }
+    const route = {
+      product: input.product,
+      intent: input.intent,
+      skill: input.skill
+    };
+    const spoken = input.spokenText ?? "";
+    const title = buildChatTitle(route, spoken);
+    const created = await createChatAction(
+      { chatId, title, hostId: config2.hostId },
+      env2,
+      config2.bridgeCliConfig
+    );
+    if (created.kind !== "ok") {
+      return {
+        kind: "unconfirmed",
+        card: buildAssessmentUnconfirmedCard(created.detail)
+      };
+    }
+    const sent = await sendMessageAction(
+      created.value.chatId,
+      buildInstruction(route, spoken, input.attachmentCount ?? 0),
+      env2,
+      config2.bridgeCliConfig
+    );
+    if (sent.kind !== "ok") {
+      return {
+        kind: "unconfirmed",
+        card: buildAssessmentUnconfirmedCard(
+          `The agent was created but I couldn't give it the request: ${sent.detail}`
+        )
+      };
+    }
+    return {
+      kind: "started",
+      card: buildAssessmentStartedCard({
+        title,
+        deepLink: chatDeepLink(
+          { tabBaseUrl: config2.tabBaseUrl },
+          config2.epicId,
+          created.value.chatId
+        )
+      })
+    };
+  };
+}
+
 // src/index.ts
 var refuseUntilSsoLands = async () => ({
   kind: "unavailable",
@@ -61059,15 +61365,50 @@ async function main() {
       epicId: defaultEpicId
     });
   }
+  const bridgeCliConfig = defaultBridgeCliConfig(
+    requireEnv("TRAYCER_REMOTE_BRIDGE_BIN")
+  );
+  const resolvePrincipal = selectPrincipalSource(process.env);
+  const assessmentHostId = process.env.TRAYCER_TEAMS_HOST_ID?.trim() ?? "";
+  const startAssessment = assessmentHostId.length > 0 && defaultEpicId !== void 0 && defaultEpicId.length > 0 ? createStartAssessment({
+    references: new DurableConversationReferenceStore(
+      process.env.TRAYCER_TEAMS_STATE_DIR !== void 0 ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/conversation-refs.json` : "/srv/traycer/teams-bot/state/conversation-refs.json",
+      (message2, detail) => {
+        logWarn(message2, { detail });
+      }
+    ),
+    hostId: assessmentHostId,
+    epicId: defaultEpicId,
+    tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
+    bridgeCliConfig,
+    // Identity resolved per press, never cached — the same ordering
+    // every other action uses: resolve, then act.
+    buildEnv: async () => {
+      const identity = await resolvePrincipal();
+      if (identity.kind === "unavailable") return null;
+      return resolveTenantEnv(identity.principal, defaultEpicId, {
+        registry: registry2,
+        epicBindings,
+        bridgeCliConfig,
+        senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
+        parentEnv: process.env
+      });
+    },
+    now: Date.now
+  }) : void 0;
+  if (startAssessment === void 0) {
+    logWarn("assessment dispatch disabled \u2014 set TRAYCER_TEAMS_HOST_ID", {
+      hasEpic: defaultEpicId !== void 0
+    });
+  }
   const handler = createReadSurfaceHandler({
     registry: registry2,
     epicBindings,
-    bridgeCliConfig: defaultBridgeCliConfig(
-      requireEnv("TRAYCER_REMOTE_BRIDGE_BIN")
-    ),
+    bridgeCliConfig,
     senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
     parentEnv: process.env,
-    resolvePrincipal: selectPrincipalSource(process.env),
+    resolvePrincipal,
+    startAssessment,
     now: Date.now
   });
   const server = createHttpServer({
