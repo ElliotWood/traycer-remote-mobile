@@ -28,9 +28,100 @@ import { resolve } from "node:path";
 
 const TAB = resolve(import.meta.dirname, "..");
 const VITEST = resolve(TAB, "..", "..", "node_modules/vitest/vitest.mjs");
+/**
+ * `clients/shared`, for the entries below that break a behaviour the tab
+ * depends on but does not own.
+ *
+ * Those need their own `pkg`, because a shared test cannot be run by the tab's
+ * vitest: `vitest.config.ts` includes only `src/**\/*.test.ts` under this
+ * package, so pointing a mutation at a shared test path would run ZERO tests,
+ * exit 0, and be reported as SURVIVED — a mutation that was never measured,
+ * indistinguishable in the output from one the suite genuinely misses. Same
+ * failure shape the "literal, never regex" rule above exists to prevent.
+ */
+const SHARED = resolve(TAB, "..", "shared");
 
-/** @type {{label: string, file: string, from: string, to: string, test: string}[]} */
+/** @type {{label: string, file: string, from: string, to: string, test: string, pkg?: string}[]} */
 const MUTATIONS = [
+  {
+    // THE ONE THIS FILE EXISTS FOR, on the epic create. `use-create-epic` is a
+    // near-copy of `use-create-agent`, and this word is the only difference
+    // that matters. Carried across by a copy-paste it would tell someone a
+    // create they could not confirm is safe to repeat.
+    label: "epic create: retry advice copied from the idempotent chat create",
+    file: "src/authoring/epic-create-rules.ts",
+    from: 'export const EPIC_CREATE_RETRY: RetrySafety = "may-duplicate";',
+    to: 'export const EPIC_CREATE_RETRY: RetrySafety = "idempotent";',
+    test: "src/authoring/__tests__/epic-create-rules.test.ts",
+  },
+  {
+    label: "epic create: a missing user id no longer blocks the create",
+    file: "src/authoring/epic-create-rules.ts",
+    from: 'if (input.userId.trim().length === 0) return "no-user";',
+    to: "",
+    test: "src/authoring/__tests__/epic-create-rules.test.ts",
+  },
+  {
+    label: "epic create: a whitespace-only host id passes the gate",
+    file: "src/authoring/epic-create-rules.ts",
+    from: 'if (input.configuredHostId.trim().length === 0) return "no-host";',
+    to: 'if (input.configuredHostId.length === 0) return "no-host";',
+    test: "src/authoring/__tests__/epic-create-rules.test.ts",
+  },
+  {
+    // Ordering, not presence: every gate still fires, but a tab with no host
+    // configured is told to type something first — a loop that cannot
+    // terminate, because the real fault is in the build.
+    //
+    // FIRST ATTEMPT AT THIS ENTRY SURVIVED, and the test was right. It swapped
+    // `in-flight` with `no-title` — both ATTEMPT faults — and asserted a hole
+    // that does not exist: the order WITHIN a group is not load-bearing (no
+    // caller reads the reason yet; the hook uses it as a boolean), so nothing
+    // should pin it. The property that matters is deployment-before-attempt,
+    // which is what the test states and what this now breaks.
+    label: "epic create: an attempt fault is reported before the deployment fault",
+    file: "src/authoring/epic-create-rules.ts",
+    from: '  if (!input.hasClient) return "no-client";',
+    to: '  if (input.title === null) return "no-title";\n  if (!input.hasClient) return "no-client";',
+    test: "src/authoring/__tests__/epic-create-rules.test.ts",
+  },
+  {
+    pkg: SHARED,
+    // The whole basis of the create being buildable from Teams at all.
+    label: "shared: the epic create stops being folderless",
+    file: "epic/create-epic.ts",
+    from: 'export const FOLDERLESS_WORKSPACE_MODE = "folderless";',
+    to: 'export const FOLDERLESS_WORKSPACE_MODE = "worktree";',
+    test: "epic/__tests__/create-epic.test.ts",
+  },
+  {
+    pkg: SHARED,
+    label: "shared: a workspace path is invented for the host to bind",
+    file: "epic/create-epic.ts",
+    from: "    workspaces: [],",
+    to: '    workspaces: [{ workspacePath: "/" }],',
+    test: "epic/__tests__/create-epic.test.ts",
+  },
+  {
+    pkg: SHARED,
+    // Would remint on retry, forfeiting the only shape a host-side dedupe
+    // could absorb — while the UI still says the same thing.
+    label: "shared: the pending epic id is cleared after an unconfirmed create",
+    file: "epic/create-epic.ts",
+    from: 'return outcome.kind === "created" ? null : attemptedEpicId;',
+    to: "return null;",
+    test: "epic/__tests__/create-epic.test.ts",
+  },
+  {
+    pkg: SHARED,
+    // `createdBy` drives the ownership filter: the epic would exist and be
+    // invisible to the person who made it.
+    label: "shared: the epic is filed under the host id instead of the creator",
+    file: "epic/create-epic.ts",
+    from: "      createdBy: input.createdBy,",
+    to: "      createdBy: input.hostId,",
+    test: "epic/__tests__/create-epic.test.ts",
+  },
   {
     label: "route: a dangling /chats becomes a chat with an empty id",
     file: "src/router/route.ts",
@@ -194,7 +285,8 @@ const restore = (path, before) => writeFileSync(path, before);
 
 let survived = 0;
 for (const m of MUTATIONS) {
-  const path = resolve(TAB, m.file);
+  const pkg = m.pkg ?? TAB;
+  const path = resolve(pkg, m.file);
   const before = readFileSync(path, "utf8");
   if (!before.includes(m.from)) {
     console.log(`SKIPPED  (source moved)  ${m.label}`);
@@ -206,7 +298,7 @@ for (const m of MUTATIONS) {
     : before.replace(m.from, m.to);
   writeFileSync(path, after);
   const run = spawnSync(process.execPath, [VITEST, "run", m.test], {
-    cwd: TAB,
+    cwd: pkg,
     stdio: "ignore",
   });
   restore(path, before);
