@@ -59980,15 +59980,16 @@ function buildAssessmentStartedCard(options) {
     ]
   );
 }
-function buildAssessmentUnconfirmedCard(reason) {
+function buildAssessmentUnconfirmedCard(reason, options) {
+  const certain = options?.certain === true;
   return card([
-    text("Couldn't confirm it started", {
+    text(certain ? "I haven\u2019t started" : "Couldn\u2019t confirm it started", {
       weight: "bolder",
       size: "medium",
       color: "warning"
     }),
     text(
-      "Ask again the same way \u2014 it's the same request, so it can't start a second assessment.",
+      certain ? "Nothing was created, so just ask again." : "Ask again the same way \u2014 it\u2019s the same request, so it can\u2019t start a second assessment.",
       { spacing: "none" }
     ),
     text(reason, { isSubtle: true, size: "small", spacing: "small" })
@@ -61204,7 +61205,7 @@ function toStoredReference(reference, capturedAt) {
   if (reference === null || typeof reference !== "object") return null;
   const r = reference;
   const conversation = r["conversation"];
-  const bot = r["bot"];
+  const bot = r["agent"] ?? r["bot"];
   if (typeof r["channelId"] !== "string" || typeof r["serviceUrl"] !== "string" || conversation === null || typeof conversation !== "object" || typeof conversation["id"] !== "string" || bot === null || typeof bot !== "object" || typeof bot["id"] !== "string") {
     return null;
   }
@@ -61263,7 +61264,9 @@ function createStartAssessment(config2) {
       return {
         kind: "unconfirmed",
         card: buildAssessmentUnconfirmedCard(
-          "I couldn't record where to send the result, so I haven't started."
+          "I couldn't record where to send the result.",
+          // CERTAIN: we refused before creating anything, so this path knows.
+          { certain: true }
         )
       };
     }
@@ -61272,7 +61275,10 @@ function createStartAssessment(config2) {
     if (env2 === null) {
       return {
         kind: "unconfirmed",
-        card: buildAssessmentUnconfirmedCard("I couldn't verify who you are.")
+        card: buildAssessmentUnconfirmedCard(
+          "I couldn't verify who you are.",
+          { certain: true }
+        )
       };
     }
     const route = {
