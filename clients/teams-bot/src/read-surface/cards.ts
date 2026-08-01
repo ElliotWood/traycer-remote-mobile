@@ -438,8 +438,19 @@ export function agentStatusLabel(agent: AgentSummary): string {
  * A raw UUID is not a title. `title ?? agentId` used to fall through to the
  * id, so an untitled agent rendered as
  * `d0cf1e5a-0000-4000-8000-0000000000ff` — caught in a screenshot, invisible
- * in the code. Show something a human can read, and keep a short id fragment
- * so the row is still identifiable.
+ * in the code.
+ *
+ * THE SHORT FRAGMENT IS DELIBERATE AND SHOULD STAY. Its original reason —
+ * "so the row is still identifiable" — was written when reading the id off
+ * the screen and typing `chat <id>` was the only way to act on a row. That
+ * reason expired the moment rows got buttons, and a reason that has expired
+ * reads as residue to whoever finds it next.
+ *
+ * The fragment survives for a different reason: it is the only thing
+ * DISTINGUISHING two untitled agents from each other in a list. It is a
+ * label, not an input — nobody transcribes it now that Reply is a button —
+ * so it does not conflict with "don't make me type ids". Remove it only if
+ * something else makes untitled rows tellable apart.
  */
 export function agentDisplayName(agent: AgentSummary): string {
   if (agent.title !== null && agent.title.trim().length > 0) {
@@ -1767,3 +1778,4 @@ export function buildIdentityUnavailableCard(reason: string): Attachment {
     ),
   ]);
 }
+

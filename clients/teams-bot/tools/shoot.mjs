@@ -6,7 +6,7 @@
  * approximation that could drift.
  *
  * Usage:
- *   bun x esbuild src/read-surface/cards.ts --bundle --format=esm \
+ *   bun x esbuild src/read-surface/__fixtures__/shoot-entry.ts --bundle --format=esm \
  *     --platform=node --outfile=/tmp/cards.mjs \
  *     --banner:js='import{createRequire as __cr}from "node:module";const require=__cr(import.meta.url);'
  *   node tools/shoot.mjs /tmp/cards.mjs <outDir> [--dark]
@@ -49,104 +49,22 @@ const C = await import(pathToFileURL(resolve(bundlePath)).href);
  * ones. This docblock is the control, which is a weaker guarantee than a gate
  * and is written down so nobody mistakes it for one.
  */
-const AGENTS = [
-  {
-    agentId: "a1000000-0000-4000-8000-000000000001",
-    title: "Investigate flaky integration suite",
-    harnessId: "claude",
-    surface: "gui",
-    active: true,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: true,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000002",
-    title: "Review: streaming reconnect logic",
-    harnessId: "claude",
-    surface: "gui",
-    active: false,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: true,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000003",
-    title: "Research: cache invalidation strategy",
-    harnessId: "claude",
-    surface: "gui",
-    active: false,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: false },
-    isLocal: false,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000004",
-    title: "Migrate config loader to zod",
-    harnessId: "claude",
-    surface: "gui",
-    active: true,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: true,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000005",
-    title: "Audit: dependency licence report",
-    harnessId: "codex",
-    surface: "tui",
-    active: false,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: true,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000006",
-    title: null,
-    harnessId: null,
-    surface: "tui",
-    active: false,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: false,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000007",
-    title: "Prototype: offline draft sync",
-    harnessId: "claude",
-    surface: "gui",
-    active: true,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: true,
-  },
-  {
-    agentId: "a1000000-0000-4000-8000-000000000008",
-    title: "Refactor the notification queue",
-    harnessId: "claude",
-    surface: "gui",
-    active: false,
-    // Explicit, because the CARD now offers a Reply button and must not
-    // offer it for an agent this host cannot message. Agent 3 says no, so
-    // the disabled path is in every screenshot rather than in a comment.
-    capabilities: { readTranscript: true, sendMessage: true },
-    isLocal: true,
-  },
-];
+/**
+ * Fixtures live in `src/read-surface/__fixtures__/shoot-agents.ts`, TYPED as
+ * `readonly AgentSummary[]`, and are re-exported through the bundle this
+ * harness imports.
+ *
+ * They were plain literals here and silently omitted THREE fields the
+ * renderer reads — `capabilities`, `isLocal` and `hostId`. The card parses
+ * through a zod schema that `.catch`es defaults at runtime, so production was
+ * fine and only this harness could see it: `01-fleet` failed to build for a
+ * long time while 99 other images rendered successfully.
+ *
+ * Typing them moved the whole class from vigilance to the compiler — the
+ * third missing field was found by `tsc` in the same second as the first two.
+ * Do not reintroduce an untyped literal here.
+ */
+const AGENTS = C.SHOOT_AGENTS;
 
 const APPROVAL = {
   approvalId: "ap-7f3c1e",
@@ -437,10 +355,32 @@ add("20-approval-table-and-heading", () =>
   C.buildApprovalCard(CHAT_REF, EPIC_ID, APPROVAL_TABLE, Date.now()),
 );
 
-await renderCards(cards, outDir);
-
+// FAIL BEFORE RENDERING, not after.
+//
+// This check already existed and already exited 1 — the harness was not
+// broken. What hid `01-fleet` failing for weeks is that it ran AFTER
+// `renderCards`, so the output ended:
+//
+//     rendered 99 images -> /tmp/cards
+//     1 card(s) failed to build:
+//       ✗ 01-fleet: Cannot read properties of undefined (reading 'sendMessage')
+//
+// Anyone reading the tail — or skimming — sees a success line and a count
+// that looks complete. The exit code said otherwise and nobody checked it.
+//
+// Rendering 99 images and then reporting that the important one is missing is
+// the wrong order. Now the last thing printed on a failure is the failure,
+// and no images are produced at all, so a stale set cannot be mistaken for a
+// fresh one.
 if (failures.length > 0) {
-  console.error(`\n${failures.length} card(s) failed to build:`);
+  console.error(`\n${failures.length} card(s) FAILED TO BUILD — rendering nothing:`);
   for (const f of failures) console.error(`  ✗ ${f}`);
+  console.error(
+    "\nA builder that throws usually means the fixture is missing a field the\n" +
+      "renderer reads. The card parses through a zod schema that `.catch`es\n" +
+      "defaults at RUNTIME, so production is fine and only this harness sees it.",
+  );
   process.exit(1);
 }
+
+await renderCards(cards, outDir);
