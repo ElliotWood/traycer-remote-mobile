@@ -99,7 +99,13 @@ export function useEpics(client: EpicListClient | null): EpicsResult {
       const previous =
         mode === "more" && state.kind === "ready" ? state.epics : [];
 
-      fetchEpicListPage(client, mode === "more" ? cursor.current : undefined)
+      // `{}` — the tab exposes no search or sort control yet, so every page
+      // is the default query. When it does, the options belong here.
+      fetchEpicListPage(
+        client,
+        mode === "more" ? cursor.current : undefined,
+        {},
+      )
         .then((page: ListTasksResponse) => {
           if (gen !== generation.current) return;
           cursor.current = epicListNextCursor(page);
