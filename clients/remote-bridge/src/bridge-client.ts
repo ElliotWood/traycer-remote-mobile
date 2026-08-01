@@ -300,6 +300,39 @@ export class BridgeClient implements RemoteBridgeActions {
     return { chatId: response.chatId };
   }
 
+  /**
+   * Delete a chat — the only destructive verb on this client.
+   *
+   * NO TRANSIENT RETRY, and that is the difference from `createChat` directly
+   * above. A retried create is absorbed by the host's dedupe on the
+   * client-supplied `chatId`, so resending is free. A retried delete has no
+   * such property: the second attempt addresses a chat that no longer exists,
+   * and the honest answers to "did my delete land" and "did someone else's"
+   * are indistinguishable from here. An unconfirmed delete is reported as
+   * unconfirmed and handed back to the caller — the same rule the approval
+   * actions follow, for the same reason.
+   *
+   * The caller is expected to have confirmed WHICH chat this is. The id alone
+   * carries no evidence, and `epic.deleteChat` will delete whatever it is
+   * given.
+   */
+  async deleteChat(chatId: string): Promise<{ readonly deleted: boolean }> {
+    const endpoint = this.endpointPoller.get();
+    if (endpoint === null) {
+      throw new Error("remote-bridge: no host endpoint available yet");
+    }
+    const response = await this.rpcClient.request(
+      "epic.deleteChat",
+      { epicId: this.epicId, chatId },
+      {
+        endpoint,
+        bearer: this.auth.lease,
+        abortSignal: new AbortController().signal,
+      },
+    );
+    return { deleted: response.deleted };
+  }
+
   async getTranscript(
     chatId: string,
     offset: number,

@@ -8,6 +8,7 @@
 import { Command } from "commander";
 import { BridgeClient } from "./bridge-client";
 import { createLogger } from "./logger";
+import { checkDeleteTarget } from "./delete-guard";
 import {
   runApprove,
   runList,
@@ -201,6 +202,52 @@ program
           parentId: opts.parentId ?? null,
         });
         // JSON on stdout, matching `list`: the caller is a program.
+        process.stdout.write(`${JSON.stringify(result)}\n`);
+      });
+    },
+  );
+
+program
+  .command("delete-chat <chatId>")
+  .description(
+    "Delete a chat. Requires --expect-title matching the chat's current title.",
+  )
+  /**
+   * THE GUARD, and it is required rather than optional.
+   *
+   * `epic.deleteChat` takes an id and deletes whatever that id names. A chat
+   * id is a UUID: nothing about it is checkable by the person typing it, and
+   * a transposed character addresses somebody's real agent rather than
+   * failing. Every other verb here is recoverable — a wrong `send` is an
+   * embarrassing message, a wrong `create-chat` is a spare chat. This one is
+   * not, and the transcript goes with it.
+   *
+   * So the caller states what they believe they are deleting, and the bridge
+   * checks that belief against the host's own title before acting. The id
+   * says WHICH; the title says WHAT, and only the title can be wrong in a way
+   * a human notices.
+   */
+  .requiredOption(
+    "--expect-title <title>",
+    "The chat's exact current title. Refuses if it does not match.",
+  )
+  .option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)")
+  .option(
+    "--sender-agent-id <id>",
+    "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
+  )
+  .action(
+    async (
+      chatId: string,
+      opts: { expectTitle: string; epicId?: string; senderAgentId?: string },
+    ) => {
+      await withBridge(opts, async (bridge) => {
+        const agents = await bridge.listAgents();
+        const check = checkDeleteTarget(agents, chatId, opts.expectTitle);
+        if (!check.ok) {
+          throw new Error(`remote-bridge: ${check.reason}`);
+        }
+        const result = await bridge.deleteChat(chatId);
         process.stdout.write(`${JSON.stringify(result)}\n`);
       });
     },
