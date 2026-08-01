@@ -90,18 +90,6 @@ import { useAuthService, useAuthStatus } from "./auth/use-auth";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
 const useStyles = makeStyles({
-  page: {
-    // The Teams host owns the outer chrome; the tab owns its own padding and
-    // nothing else. No max-width: Teams tabs are already constrained by the
-    // host, and adding a second constraint leaves dead space on wide screens.
-    padding: tokens.spacingVerticalL,
-    display: "flex",
-    flexDirection: "column",
-    gap: tokens.spacingVerticalM,
-    minHeight: "100vh",
-    boxSizing: "border-box",
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
   header: {
     display: "flex",
     alignItems: "baseline",
@@ -120,8 +108,8 @@ const useStyles = makeStyles({
    * necessary and not sufficient; the screens have to stop demanding a
    * viewport each.
    *
-   * `page` survives for the ten screens not yet migrated. It goes when they
-   * do.
+   * All eleven screens use this now and  is deleted, so no screen
+   * demands a viewport of its own.
    */
   screen: {
     padding: tokens.spacingVerticalL,
@@ -154,7 +142,7 @@ function ChatRoute({
 }): ReactElement {
   const controller = useChat(streamConnection, epicId, chatId);
   return (
-    <div className={styles.page}>
+    <div className={styles.screen}>
       <ChatScreen
         controller={controller}
         entry={entry}
@@ -191,7 +179,7 @@ function WaitingScreen({
   );
   const state = preview ?? live;
   return (
-    <div className={styles.page}>
+    <div className={styles.screen}>
       <div className={styles.header}>
         <Subtitle1>Waiting on you</Subtitle1>
         {state.kind === "ready" && state.items.length > 0 ? (
@@ -449,7 +437,7 @@ function EpicsScreen({
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.screen}>
       <div className={styles.header}>
         <Subtitle1>Epics</Subtitle1>
         {state.kind === "ready" ? (

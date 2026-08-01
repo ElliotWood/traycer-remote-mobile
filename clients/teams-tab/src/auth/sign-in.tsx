@@ -29,12 +29,19 @@ import { isStorageDurable } from "@traycer-clients/shared/platform/safe-storage"
 import type { MobileAuthStatus } from "@traycer-clients/shared/auth/browser-device-auth-service";
 
 const useStyles = makeStyles({
-  // Fills the viewport and paints the theme background. Without this the
-  // themed panel stopped where the content did and the rest of the tab was
-  // the browser's default white — which in dark Teams is a bright slab
-  // under a dark card. Caught in the render; invisible in the markup.
+  // Fills its container and paints the theme background. Without the paint
+  // the themed panel stopped where the content did and the rest of the tab
+  // was the browser's default white — a bright slab under a dark card in
+  // dark Teams. Caught in the render; invisible in the markup.
+  //
+  // `height: 100%`, NOT `minHeight: 100vh`. The original reason for the
+  // viewport unit — fill the screen — is now the SHELL's job, and it holds
+  // the only `100vh` in the client. Keeping one here would grow the frame
+  // from inside a contained body: the header stretches off-screen and the
+  // page scrolls, which is precisely what the shell exists to prevent. The
+  // paint still matters and stays.
   page: {
-    minHeight: "100vh",
+    height: "100%",
     boxSizing: "border-box",
     backgroundColor: tokens.colorNeutralBackground1,
     padding: tokens.spacingVerticalXXL,

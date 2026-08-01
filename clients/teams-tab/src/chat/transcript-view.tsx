@@ -22,6 +22,7 @@ import type {
   TranscriptMessage,
 } from "@traycer-clients/shared/epic/transcript";
 import { terseTime } from "../fleet/fleet-grid";
+import { ArtifactMarkdown } from "../artifacts/artifact-markdown";
 
 const useStyles = makeStyles({
   list: {
@@ -122,11 +123,33 @@ function Block({ block }: { block: TranscriptBlock }): ReactElement | null {
   }
   if (block.kind === "text") {
     if (block.text.trim().length === 0) return null;
-    return <Body1 className={styles.text}>{block.text}</Body1>;
+    /*
+     * MARKDOWN, not a text node.
+     *
+     * This was `<Body1>{block.text}</Body1>`, so a message containing a fenced
+     * code block rendered its ``` markers literally — which is what Elliot
+     * photographed. Message bodies are markdown by the time they reach here:
+     * the protocol carries a ProseMirror document and the projection
+     * serialises it, so producing markdown and then printing it as plain text
+     * loses every bit of that work one layer short of the screen.
+     *
+     * `ArtifactMarkdown` ALREADY EXISTED in this client — react-markdown with
+     * remark-gfm and rehype-sanitize, rendering tables, mermaid and
+     * wireframes for artifact bodies. Chat simply never called it. The
+     * sanitiser matters more here than there, if anything: an assistant turn
+     * is agent-authored text arriving over the wire.
+     */
+    return <ArtifactMarkdown body={block.text} />;
   }
   if (block.kind === "reasoning") {
     if (block.text.trim().length === 0) return null;
-    return <Caption1 className={styles.reasoning}>{block.text}</Caption1>;
+    // Reasoning stays visually subordinate but is still markdown — it carries
+    // fences and lists as often as the answer does.
+    return (
+      <div className={styles.reasoning}>
+        <ArtifactMarkdown body={block.text} />
+      </div>
+    );
   }
   return null;
 }
