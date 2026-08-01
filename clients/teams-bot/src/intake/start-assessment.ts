@@ -64,7 +64,9 @@ export function createStartAssessment(config: StartAssessmentConfig) {
       return {
         kind: "unconfirmed",
         card: buildAssessmentUnconfirmedCard(
-          "I couldn't record where to send the result, so I haven't started.",
+          "I couldn't record where to send the result.",
+          // CERTAIN: we refused before creating anything, so this path knows.
+          { certain: true },
         ),
       };
     }
@@ -74,7 +76,10 @@ export function createStartAssessment(config: StartAssessmentConfig) {
     if (env === null) {
       return {
         kind: "unconfirmed",
-        card: buildAssessmentUnconfirmedCard("I couldn't verify who you are."),
+        card: buildAssessmentUnconfirmedCard(
+          "I couldn't verify who you are.",
+          { certain: true },
+        ),
       };
     }
 

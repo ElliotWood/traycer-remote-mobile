@@ -111,7 +111,25 @@ export function toStoredReference(
   if (reference === null || typeof reference !== "object") return null;
   const r = reference as Record<string, unknown>;
   const conversation = r["conversation"];
-  const bot = r["bot"];
+  /*
+   * `agent` FIRST, `bot` as the fallback — and this cost a live failure.
+   *
+   * This required `bot.id` and returned null for every real reference,
+   * because `@microsoft/agents-activity` returns
+   * `{ activityId, user, AGENT, conversation, channelId, locale, serviceUrl }`.
+   * The SDK renamed Bot Framework v4's `bot` to `agent`; I carried the old
+   * name in from the documentation I had read.
+   *
+   * The symptom was maximally misleading: the refusal path worked perfectly
+   * and told Elliot it could not record where to send the result — a correct
+   * message about a real absence, caused by looking for the wrong key. The
+   * check was true about a neighbouring field name.
+   *
+   * Both are accepted because the stored shape must survive an SDK that
+   * renames it back, and a reference written under one name and read under
+   * the other is unrecoverable after the fact.
+   */
+  const bot = r["agent"] ?? r["bot"];
   if (
     typeof r["channelId"] !== "string" ||
     typeof r["serviceUrl"] !== "string" ||

@@ -1801,16 +1801,43 @@ export function buildAssessmentStartedCard(options: {
   );
 }
 
-/** The dispatch did not confirm. Safe to retry — see the docblock above. */
-export function buildAssessmentUnconfirmedCard(reason: string): Attachment {
+/**
+ * The dispatch did not complete — in one of TWO states that must not share a
+ * card, because they are the two halves of the distinction this project spent
+ * a day getting right in the other direction.
+ *
+ * `certain: true` — we refused BEFORE creating anything. This path knows.
+ * Elliot saw a card headed "Couldn't confirm it started" whose body said "so
+ * I haven't started": a definite outcome dressed as an uncertain one, which is
+ * the false-success defect mirrored. We made sure `failed` never means "did
+ * not apply"; this was `did not apply` reported as `unconfirmed`.
+ *
+ * `certain: false` — the create was attempted and we did not hear back. The
+ * chat may exist.
+ *
+ * THE RETRY REASONS DIFFER AND THE WRONG ONE IS CONTAGIOUS. When nothing was
+ * created, retrying is safe because NOTHING HAPPENED. When a create was
+ * attempted, it is safe because `epic.createChat` dedupes on a client-supplied
+ * id. The old card gave the idempotency reason in both cases — correct advice
+ * with the wrong justification, and the wrong justification is exactly what
+ * gets copied to `createArtifact`, where it takes no client id and a retry
+ * duplicates.
+ */
+export function buildAssessmentUnconfirmedCard(
+  reason: string,
+  options?: { readonly certain?: boolean },
+): Attachment {
+  const certain = options?.certain === true;
   return card([
-    text("Couldn't confirm it started", {
+    text(certain ? "I haven’t started" : "Couldn’t confirm it started", {
       weight: "bolder",
       size: "medium",
       color: "warning",
     }),
     text(
-      "Ask again the same way — it's the same request, so it can't start a second assessment.",
+      certain
+        ? "Nothing was created, so just ask again."
+        : "Ask again the same way — it’s the same request, so it can’t start a second assessment.",
       { spacing: "none" },
     ),
     text(reason, { isSubtle: true, size: "small", spacing: "small" }),

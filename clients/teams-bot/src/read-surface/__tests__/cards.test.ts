@@ -14,6 +14,7 @@ import {
   buildHelpCard,
   buildPrincipalRefusedCard,
   buildTranscriptCard,
+  buildAssessmentUnconfirmedCard,
   speakerLabel,
   modelMarker,
   humaniseToolName,
@@ -1019,5 +1020,39 @@ describe("transcript rendering — facts in the slot that means them", () => {
   it("leaves a path it cannot confidently shorten intact", () => {
     expect(shortenWorkspacePath("src/index.ts")).toBe("src/index.ts");
     expect(shortenWorkspacePath("/opt/thing/x")).toBe("/opt/thing/x");
+  });
+});
+
+describe("CONTRACT: the assessment failure card must not report a certain outcome as uncertain", () => {
+  it("says plainly that nothing started when the refusal happened BEFORE the create", () => {
+    // Elliot saw "Couldn't confirm it started" over a body reading "so I
+    // haven't started". A definite outcome dressed as an uncertain one — the
+    // false-success defect mirrored, in the work that spent a day making sure
+    // `failed` never means "did not apply".
+    const body = cardBody(
+      buildAssessmentUnconfirmedCard("no reference", { certain: true }),
+    );
+    expect(body).toContain("I haven’t started");
+    expect(body).not.toContain("Couldn’t confirm");
+  });
+
+  it("keeps 'couldn’t confirm' for the case that genuinely does not know", () => {
+    const body = cardBody(buildAssessmentUnconfirmedCard("socket closed"));
+    expect(body).toContain("Couldn’t confirm");
+  });
+
+  it("CONTRACT: gives the retry the RIGHT reason, which differs between them", () => {
+    // Nothing created → safe because nothing happened.
+    // Create attempted → safe because createChat dedupes on a client id.
+    // The old card gave the idempotency reason in both, and that reason is
+    // the one that gets copied to createArtifact, where a retry duplicates.
+    const certain = cardBody(
+      buildAssessmentUnconfirmedCard("x", { certain: true }),
+    );
+    expect(certain).toContain("Nothing was created");
+    expect(certain).not.toContain("second assessment");
+
+    const unsure = cardBody(buildAssessmentUnconfirmedCard("x"));
+    expect(unsure).toContain("second assessment");
   });
 });

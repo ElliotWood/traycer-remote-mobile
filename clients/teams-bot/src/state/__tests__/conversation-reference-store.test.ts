@@ -157,3 +157,43 @@ describe("DurableJsonStore — a corrupt file must not stop the bot booting", ()
     expect(b.get("k")).toEqual({ n: 1 });
   });
 });
+
+describe("toStoredReference — the SDK's field name, which cost a live failure", () => {
+  /**
+   * `@microsoft/agents-activity` returns `agent`, not `bot`:
+   *
+   *   { activityId, user, agent, conversation, channelId, locale, serviceUrl }
+   *
+   * This required `bot.id`, so it returned null for EVERY real reference, and
+   * the symptom was maximally misleading — the refusal path worked perfectly
+   * and told a user it could not record where to send the result. A true
+   * message about a real absence, caused by reading the wrong key.
+   */
+  const SDK_SHAPE = {
+    activityId: "a1",
+    channelId: "msteams",
+    serviceUrl: "https://smba.example.invalid/au/",
+    conversation: { id: "conv-1", conversationType: "personal" },
+    agent: { id: "28:bot-app-id", name: "Traycer" },
+    user: { id: "user-1" },
+  };
+
+  it("CONTRACT: accepts the SDK's `agent` field", () => {
+    const stored = toStoredReference(SDK_SHAPE, 1000);
+    expect(stored).not.toBeNull();
+    expect(stored?.bot.id).toBe("28:bot-app-id");
+  });
+
+  it("still accepts `bot`, so a rename back cannot strand stored references", () => {
+    const { agent: _omitted, ...rest } = SDK_SHAPE;
+    const stored = toStoredReference({ ...rest, bot: { id: "b1" } }, 1000);
+    expect(stored?.bot.id).toBe("b1");
+  });
+
+  it("CONTRACT: still refuses when NEITHER is present", () => {
+    // The guard must keep working — the fix widens what counts as the bot,
+    // it does not remove the requirement.
+    const { agent: _omitted, ...rest } = SDK_SHAPE;
+    expect(toStoredReference(rest, 1000)).toBeNull();
+  });
+});
