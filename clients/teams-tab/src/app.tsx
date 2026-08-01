@@ -272,15 +272,20 @@ function EpicScreen({
         ? { kind: "error" }
         : { kind: "live" };
   return (
-    <AppShell
-      leading={
-        <Text weight="semibold" truncate wrap={false}>
-          {epic?.title ?? live.header?.title ?? "Epic"}
-        </Text>
-      }
-      trailing={<EpicStatusRow state={connection} />}
-    >
-      <div className={styles.screen}>
+    /*
+     * NO NESTED SHELL. This rendered its own <AppShell> before the hoist,
+     * so after it there were TWO — App's and this one, nested — and
+     * navigating mounted the inner one. The mount counter read 1 -> 2 and
+     * caught it; the DOM probe had reported the header as the same node
+     * throughout, which is the measurement lying rather than the app.
+     *
+     * The status row lives at the top of the screen content for now. That
+     * keeps ONE shell, which is the property that matters, and costs the
+     * status row its pinning — promoting it into the frame needs a slot the
+     * shell exposes to a descendant, which is its own change.
+     */
+    <div className={styles.screen}>
+      <EpicStatusRow state={connection} />
       <EpicDetail
         // The row that was clicked, else the header from `earlyMeta` — which
         // lands in ~543ms, so a DEEP LINK stops showing a bare id after half a
@@ -317,8 +322,7 @@ function EpicScreen({
         phase={artifactAuthoring.phase}
         onCreate={artifactAuthoring.create}
       />
-      </div>
-    </AppShell>
+    </div>
   );
 }
 

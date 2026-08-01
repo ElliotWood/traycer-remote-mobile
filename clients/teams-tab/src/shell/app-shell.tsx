@@ -24,8 +24,33 @@
  * `page` style and had no shell, which is the wrong layer inverted: the frame
  * is what should be common and the contents are what should differ.
  */
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { makeStyles, tokens } from "@fluentui/react-components";
+
+/**
+ * How many times this shell has MOUNTED. The persistence probe.
+ *
+ * A `data-` attribute on the header could not answer this. Three ways it
+ * fails: a stale reference survives detachment, a portal can duplicate the
+ * element, and `querySelector` may not return the node you mean — so "same
+ * node" came back true even against a control forcing a remount on every
+ * render, which is impossible if the probe measured what I thought.
+ *
+ * This is a signal REACT OWNS. `useEffect(…, [])` runs exactly once per
+ * mount, and there is no way to remount and still read 1. The rule the old
+ * probe broke: measure a signal the framework controls, never one you plant.
+ *
+ * Left in the shipped build deliberately. It is a counter and a name; it
+ * makes the frame's central property observable in production rather than
+ * only under a harness, and the alternative — instrumenting for a test and
+ * shipping something different — is how a verified build stops being the
+ * build that runs.
+ */
+declare global {
+  interface Window {
+    __traycerShellMounts?: number;
+  }
+}
 
 const useStyles = makeStyles({
   /**
@@ -95,6 +120,13 @@ export function AppShell({
   children,
 }: AppShellProps): React.JSX.Element {
   const styles = useStyles();
+  // Empty dep array: once per MOUNT, never on re-render. A remount is the
+  // thing being detected, so anything that runs per-render would report the
+  // opposite of the property.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.__traycerShellMounts = (window.__traycerShellMounts ?? 0) + 1;
+  }, []);
   return (
     <div className={styles.frame}>
       <header className={styles.header}>
