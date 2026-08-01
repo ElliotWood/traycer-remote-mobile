@@ -2,6 +2,9 @@ import type { Attachment } from "@microsoft/agents-activity";
 import {
   APPROVE_VERB,
   FLEET_VERB,
+  OPEN_CHAT_VERB,
+  REPLY_VERB,
+  LOG_VERB,
   buildActionOutcomeCard,
   buildIdentityUnavailableCard,
   buildPrincipalRefusedCard,
@@ -229,9 +232,34 @@ export async function dispatchActionInvoke(
   // Buttons that are just a command someone would otherwise have typed.
   // Routed through the same `dispatchCommand` the text path uses, so a button
   // and its retired command cannot diverge — one behaviour, two ingresses.
-  if (request.verb === FLEET_VERB) {
+  if (
+    request.verb === FLEET_VERB ||
+    request.verb === REPLY_VERB ||
+    request.verb === LOG_VERB ||
+    request.verb === OPEN_CHAT_VERB
+  ) {
+    // Each button is exactly the command it replaced, so the two ingresses
+    // cannot drift: `Reply` is `chat <id>` (whose card carries the composer)
+    // and `Activity` is `log <id>`. The id travels in the button's data, so
+    // nobody reads or types it.
+    let command: Parameters<typeof dispatchCommand>[0];
+    if (request.verb === FLEET_VERB) {
+      command = { kind: "fleet" };
+    } else {
+      const chatId = readString(request.data, "chatId");
+      if (chatId === null) {
+        return {
+          card: buildUsageCard("That button was missing its chat id."),
+          acted: false,
+        };
+      }
+      command =
+        request.verb === REPLY_VERB || request.verb === OPEN_CHAT_VERB
+          ? { kind: "chat", chatId }
+          : { kind: "log", chatId, offset: 0 };
+    }
     const cards = await dispatchCommand(
-      { kind: "fleet" },
+      command,
       request.conversationId,
       deps,
     );

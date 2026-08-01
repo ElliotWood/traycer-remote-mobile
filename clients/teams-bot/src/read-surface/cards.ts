@@ -542,30 +542,34 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
     );
   });
 
-  // "+N more" used to read: use "chat <id>" for a specific one — an
-  // instruction to go and find a GUID. It is a button now.
+  /*
+   * NO "Show all", NO "Waiting on you", NO "New agent".
+   *
+   * All three were here, and none had a handler — pressing any of them
+   * returned "Unknown card action". I removed the same button from the help
+   * card and left these, which is fixing the instance rather than the class,
+   * and they shipped.
+   *
+   * The rule this card now follows, and the reason `buildFleetCard` has a
+   * test asserting it: EVERY verb a card emits must be one
+   * `dispatchActionInvoke` handles. A button with no handler is the
+   * `Action.Execute` failure — it renders, it is pressable, and it does
+   * nothing useful.
+   *
+   * "+N more" is plain text again rather than a button that lies. It reads as
+   * a limit, which it is, instead of an affordance that isn't.
+   */
   const overflow =
     agents.length > FLEET_ROW_LIMIT
       ? [
-          actionSet([
-            submitAction(
-              `Show all ${String(agents.length)}`,
-              SHOW_ALL_VERB,
-              {},
-              { associateInputs: false },
-            ),
-          ]),
+          text(
+            `+${String(agents.length - FLEET_ROW_LIMIT)} more not shown.`,
+            { isSubtle: true, size: "small", separator: true },
+          ),
         ]
       : [];
 
-  // Suggested next steps, offered rather than remembered. This is the whole
-  // point of a bot surface: the next thing you'd want is on screen.
-  const next = actionSet([
-    submitAction("Waiting on you", WAITING_VERB, {}, { associateInputs: false }),
-    submitAction("New agent", NEW_AGENT_VERB, {}, { associateInputs: false }),
-  ]);
-
-  return card([...header, ...rows, ...overflow, next]);
+  return card([...header, ...rows, ...overflow]);
 }
 
 function runStatusColor(runStatus: ChatStatus["runStatus"]): SemanticColor {

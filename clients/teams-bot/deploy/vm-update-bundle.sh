@@ -12,7 +12,15 @@
 # files it replaces, and needs no identifiers at all.
 #
 # Use `vm-deploy.sh` when the unit itself changes; use this for a code update.
-set -euo pipefail
+# `set -e -u` only, NOT `-o pipefail`. `az vm run-command` executes this with
+# /bin/sh, which on this VM is dash, and pipefail is a bashism that aborts the
+# whole script at line 1 with "Illegal option" — producing an empty stdout and
+# a deploy that did nothing while looking like it ran.
+#
+# Fixed in `teams-tab/deploy/vm-install-tab.sh` first and not here, because
+# that one was being run and this one was not. Same defect, same family, found
+# the second time by running it rather than by reading it.
+set -eu
 
 BOT_DIR="${BOT_DIR:-/srv/traycer/teams-bot}"
 BUNDLE_BRANCH="${BUNDLE_BRANCH:-demo/teams-bot-bundle}"

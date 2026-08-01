@@ -857,3 +857,82 @@ describe("CONTRACT: cards stay within the version they declare", () => {
     }
   });
 });
+
+/**
+ * THE CLASS, not the instances.
+ *
+ * Three separate times this session a card shipped a button with no handler:
+ * "Waiting on you" on the help card, then the same button plus "New agent"
+ * and "Show all" on the fleet card — the second set left behind by fixing
+ * the first. Before the Action.Submit ingress existed, EVERY button was
+ * dead; after it, an unhandled verb renders "Unknown card action".
+ *
+ * A button that renders, is pressable, and does nothing is the
+ * `Action.Execute` failure. This walks the real cards, collects every verb
+ * they emit, and requires each to be one the dispatcher handles — so the
+ * next unhandled button fails here rather than in front of a user.
+ */
+describe("CONTRACT: every verb a card emits has a handler", () => {
+  const HANDLED = new Set([
+    "traycer/approve",
+    "traycer/reject",
+    "traycer/send",
+    "traycer/older",
+    "traycer/newer",
+    "traycer/history",
+    "traycer/fleet",
+    "traycer/reply",
+    "traycer/log",
+    // Emitted by every fleet row's `selectAction` — tapping the row. It was
+    // in this list before it had a handler, on the strength of a comment I
+    // wrote saying it was "handled by the same reply path". It wasn't. An
+    // allow-list is only as good as the claim behind each entry, and the
+    // entry that lies is invisible: the test passes either way.
+    "traycer/openChat",
+  ]);
+
+  function verbsIn(node: unknown): string[] {
+    const found: string[] = [];
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (const item of value) walk(item);
+        return;
+      }
+      if (typeof value !== "object" || value === null) return;
+      const record = value as Record<string, unknown>;
+      if (typeof record["verb"] === "string") found.push(record["verb"]);
+      for (const key of Object.keys(record)) walk(record[key]);
+    };
+    walk(node);
+    return found;
+  }
+
+  const AGENT = {
+    agentId: "a1000000-0000-4000-8000-000000000001",
+    title: "An agent",
+    harnessId: "claude",
+    surface: "gui" as const,
+    active: true,
+    isLocal: true,
+    hostId: "h1",
+    capabilities: { readTranscript: true, sendMessage: true },
+  };
+
+  it("fleet card emits only handled verbs", () => {
+    const emitted = verbsIn(buildFleetCard([AGENT]).content);
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const verb of emitted) expect(HANDLED.has(verb)).toBe(true);
+  });
+
+  it("help card emits only handled verbs", () => {
+    for (const verb of verbsIn(buildHelpCard().content)) {
+      expect(HANDLED.has(verb)).toBe(true);
+    }
+  });
+
+  it("CONTROL: the check can fail — an invented verb is not in the handled set", () => {
+    // Without this, a walker that silently found nothing would pass both
+    // assertions above and prove the checker works when it doesn't.
+    expect(HANDLED.has("traycer/notAThing")).toBe(false);
+  });
+});
