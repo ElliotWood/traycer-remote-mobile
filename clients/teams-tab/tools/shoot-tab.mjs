@@ -150,19 +150,19 @@ const VIEWS = [
   { name: "chat-unconfirmed", q: "preview=chat&state=unconfirmed", path: "/epics", expects: ["Couldn’t confirm"] },
   { name: "waiting-empty", q: "preview=waiting&state=empty", path: "/waiting", expects: ["Nothing is waiting on you"] },
   { name: "waiting", q: "preview=waiting", path: "/waiting", expects: ["Streaming Transport Reconnect"] },
-  { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting", expects: [] },
+  { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting", expects: [], exempt: "a spinner and no copy of its own" },
   { name: "waiting-error", q: "preview=waiting&state=error", path: "/waiting", expects: ["Couldn’t check what’s waiting"] },
   { name: "epics", q: "preview=epics", path: "/epics", expects: ["Streaming Transport Reconnect", "Dependency Licence Audit"] },
-  { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics", expects: [] },
-  { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics", expects: [] },
+  { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics", expects: [], exempt: "skeleton rows, no copy" },
+  { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics", expects: ["No epics yet", "Create one from this tab"] },
   { name: "epics-error", q: "preview=epics&state=error", path: "/epics", expects: ["Couldn’t load"] },
-  { name: "epics-stale", q: "preview=epics&state=disconnected", path: "/epics", expects: [] },
+  { name: "epics-stale", q: "preview=epics&state=disconnected", path: "/epics", expects: ["Disconnected.", "Showing what we last read 4m ago"] },
   { name: "agents", q: "preview=agents", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Migrate config loader to zod", "Artifacts"] },
   { name: "agents-loading", q: "preview=agents&state=loading", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Connecting to your host"] },
-  { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: [] },
-  { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Couldn’t load"] },
+  { name: "agents-empty", q: "preview=agents&state=empty", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["No agents in this epic yet.", "No artifacts in this epic yet."] },
+  { name: "agents-error", q: "preview=agents&state=error", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Couldn’t load your agents", "stream closed — host unreachable"] },
   { name: "agents-deep", q: "preview=agents&state=deep", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Untitled agent (d1000000)", "Host not known yet"] },
-  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: [] },
+  { name: "agents-retrying", q: "preview=agents&state=retrying", path: "/epics/e1000000-0000-4000-8000-000000000001", expects: ["Reconnecting"] },
 ];
 
 /**
@@ -365,10 +365,16 @@ console.log(
  * would show is a view that cannot fail, and the whole gallery was that until
  * an hour ago.
  */
-const undeclared = selected.filter((v) => v.expects.length === 0).map((v) => v.name);
+const undeclared = selected.filter(
+  (v) => v.expects.length === 0 && v.exempt === undefined,
+);
+const exempt = selected.filter((v) => v.exempt !== undefined);
+for (const v of exempt) {
+  console.log(`EXEMPT BY NATURE ${v.name}: ${v.exempt}`);
+}
 if (undeclared.length > 0) {
   console.log(
-    `NO DECLARED EXPECTATION (${String(undeclared.length)} views, not a test): ${undeclared.join(", ")}`,
+    `NO DECLARED EXPECTATION (${String(undeclared.length)} views, not a test): ${undeclared.map((v) => v.name).join(", ")}`,
   );
 }
 if (expectationFailures > 0) {

@@ -169,14 +169,34 @@ function State({
 /**
  * A confident answer: the host responded and has nothing to show.
  *
- * Says WHICH host, because "no agents" from the wrong host is the same words
- * as "no agents" from the right one, and the difference is the whole problem.
+ * Says WHICH host, because "nothing here" from the wrong host is the same
+ * words as "nothing here" from the right one, and the difference is the whole
+ * problem.
+ *
+ * ─── SAID "No agents yet" ON THE EPICS LIST, under a heading reading
+ * "Epics · 0 epics". ────────────────────────────────────────────────────────
+ *
+ * A leftover from when this client showed a fleet of agents. It has exactly
+ * ONE caller — the epics list — so it was never shared copy at all; the
+ * wording simply never followed the rename, and nothing pointed at it.
+ *
+ * The noun was the smaller half. The RECOVERY was wrong: "start an agent from
+ * Traycer on your desktop" is not how you fill an epics list, and this build
+ * now carries a New epic form on the same screen. So the empty state was
+ * sending people to another machine to do a thing that would not have worked,
+ * past a control that does.
+ *
+ * Third instance today of one surface's words appearing on its neighbour —
+ * after the epic form saying "a new agent can't be given one", and the chips
+ * the client had stopped emitting. Copy has no type checker; the only thing
+ * that finds this is rendering the state and reading it.
  */
-export function FleetEmpty({ hostId }: { hostId?: string }): ReactElement {
+export function EpicsEmpty({ hostId }: { hostId?: string }): ReactElement {
   return (
-    <State title="No agents yet">
-      Nothing is running on {hostId ? <strong>{hostId}</strong> : "this host"}.
-      Start an agent from Traycer on your desktop and it will appear here.
+    <State title="No epics yet">
+      Nothing has been started on {hostId ? <strong>{hostId}</strong> : "this host"}.
+      Create one from this tab, or start it in Traycer on your desktop, and it
+      will appear here.
     </State>
   );
 }

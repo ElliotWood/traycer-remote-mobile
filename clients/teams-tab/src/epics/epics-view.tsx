@@ -36,7 +36,7 @@ import {
   type FleetEpic,
 } from "@traycer-clients/shared/epic/epic-list";
 import {
-  FleetEmpty,
+  EpicsEmpty,
   FleetError,
   FleetLoading,
   FleetStale,
@@ -189,7 +189,7 @@ export function EpicsView({
   if (state.kind === "error") {
     return <FleetError detail={state.detail} onRetry={onReload} />;
   }
-  if (state.epics.length === 0) return <FleetEmpty hostId="this host" />;
+  if (state.epics.length === 0) return <EpicsEmpty hostId="this host" />;
 
   return (
     <>
