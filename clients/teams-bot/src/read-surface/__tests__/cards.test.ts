@@ -14,6 +14,11 @@ import {
   buildHelpCard,
   buildPrincipalRefusedCard,
   buildTranscriptCard,
+  speakerLabel,
+  modelMarker,
+  humaniseToolName,
+  partMarker,
+  shortenWorkspacePath,
   buildContextStripCard,
   CONTEXT_STRIP_SIZE,
 } from "../cards";
@@ -938,5 +943,81 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     // Without this, a walker that silently found nothing would pass both
     // assertions above and prove the checker works when it doesn't.
     expect(HANDLED.has("traycer/notAThing")).toBe(false);
+  });
+});
+
+describe("transcript rendering — facts in the slot that means them", () => {
+  const assistant = {
+    messageId: "m1",
+    role: "assistant" as const,
+    author: "haiku",
+    timestamp: 0,
+    text: "done",
+    parts: [],
+  };
+  const fromAgent = {
+    messageId: "m2",
+    role: "user" as const,
+    author: "Teams P0 — Generator",
+    timestamp: 0,
+    text: "do it",
+    parts: [],
+  };
+
+  it("CONTRACT: an assistant turn is attributed to the agent, not to the model", () => {
+    // `author` on an assistant turn is the MODEL alias. Rendering it as the
+    // speaker put a true fact about a neighbouring subject in the slot a
+    // reader parses as "who said this".
+    expect(speakerLabel(assistant)).toBe("Agent");
+    expect(speakerLabel(assistant)).not.toBe("haiku");
+  });
+
+  it("CONTRACT: 'default' is not special-cased — the rule is the ROLE", () => {
+    // My first fix mapped "default" to "Agent" as if it were a placeholder.
+    // That looks correct on the transcript that exposed it and preserves the
+    // defect for every model whose alias reads like a name. This asserts the
+    // general rule instead: `haiku` and `default` are treated identically.
+    expect(speakerLabel({ ...assistant, author: "default" })).toBe(
+      speakerLabel({ ...assistant, author: "haiku" }),
+    );
+  });
+
+  it("an incoming message keeps its sender's title", () => {
+    expect(speakerLabel(fromAgent)).toBe("Teams P0 — Generator");
+  });
+
+  it("the model moves to the metadata line, where being a model is unambiguous", () => {
+    expect(modelMarker(assistant)).toBe("⟨model · haiku⟩");
+    expect(modelMarker(fromAgent)).toBeNull();
+  });
+
+  it("humanises an MCP tool identifier and leaves other labels alone", () => {
+    expect(humaniseToolName("mcp__traycer_a2a__traycer_send_message")).toBe(
+      "traycer send message",
+    );
+    expect(humaniseToolName("Bash")).toBe("Bash");
+  });
+
+  it("CONTRACT: pluralises lines — '1 lines' reached a user", () => {
+    const one = partMarker({ kind: "other", label: "reasoning", lines: 1 });
+    expect(one).toContain("1 line");
+    expect(one).not.toContain("1 lines");
+    expect(partMarker({ kind: "other", label: "reasoning", lines: 3 })).toContain(
+      "3 lines",
+    );
+  });
+
+  it("CONTRACT: strips the tenant prefix from a file path", () => {
+    // `/srv/traycer/tenants/<name>` embeds a tenant name, and this product is
+    // heading for users looking at hosts they do not own.
+    expect(
+      shortenWorkspacePath("/srv/traycer/tenants/someone/work/proj/FILE.md"),
+    ).toBe("work/proj/FILE.md");
+    expect(shortenWorkspacePath("/home/someone/work/x.ts")).toBe("work/x.ts");
+  });
+
+  it("leaves a path it cannot confidently shorten intact", () => {
+    expect(shortenWorkspacePath("src/index.ts")).toBe("src/index.ts");
+    expect(shortenWorkspacePath("/opt/thing/x")).toBe("/opt/thing/x");
   });
 });

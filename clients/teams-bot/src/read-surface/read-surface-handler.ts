@@ -76,7 +76,17 @@ class ReadSurfaceHandler extends ActivityHandler {
     if (actionVerb !== null) {
       const convId = context.activity.conversation?.id ?? "";
       const result = await dispatchActionInvoke(
-        { verb: actionVerb, conversationId: convId, data: actionValue ?? {} },
+        {
+          verb: actionVerb,
+          conversationId: convId,
+          data: actionValue ?? {},
+          // Captured HERE because this turn is the only moment it exists.
+          // An action that starts long-running work must record where to
+          // reply before it starts; afterwards there is nothing to derive it
+          // from. Passed to every action rather than to the one that needs
+          // it, so a second such action is a handler that already has it.
+          conversationReference: context.activity.getConversationReference(),
+        },
         this.deps,
       );
       if (!result.acted) {

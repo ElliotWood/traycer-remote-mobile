@@ -963,6 +963,98 @@ const TRANSCRIPT_TEXT_LIMIT = 220;
 /** The `chat <id>` strip's tighter cap — see `transcriptRow`'s `compact`. */
 const CONTEXT_STRIP_TEXT_LIMIT = 100;
 
+/**
+ * A tool's name as a person should read it.
+ *
+ * Elliot's transcript rendered `⟨tool · mcp__traycer_a2a__traycer_send_message⟩`
+ * — an internal MCP identifier in a product surface. That is the same defect
+ * as the error card printing raw subprocess output: the label was correct
+ * about WHICH tool and told a reader nothing except that we leaked an
+ * internal.
+ *
+ * MCP tools are named `mcp__<server>__<tool>`. The tool half is the part with
+ * meaning; the server prefix is routing. Underscores become spaces because
+ * `traycer_send_message` is not a phrase either.
+ *
+ * Anything unrecognised is returned as-is rather than mangled — a label we
+ * cannot improve is better than one we corrupt.
+ */
+export function humaniseToolName(raw: string): string {
+  const mcp = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(raw);
+  const name = mcp?.[1] ?? raw;
+  return name.replace(/_/g, " ").trim();
+}
+
+/**
+ * WHO said it. Not what model produced it.
+ *
+ * A live transcript rendered `default · 15s ago` and, in another chat,
+ * `haiku · 50h ago`. Neither is a placeholder: `author` on an ASSISTANT turn
+ * is `sender.displayName`, and for an assistant that is the MODEL ALIAS. On a
+ * USER turn the same field is the sending agent's title
+ * ("Teams P0 — Generator"). So one column carried two different meanings,
+ * distinguished only by message direction, with nothing to tell them apart.
+ *
+ * That is the `active: false` family precisely: a value that is TRUE ABOUT A
+ * NEIGHBOURING SUBJECT — `haiku` really is the model — rendered in the slot a
+ * reader parses as "who is speaking". And it failed silently for the same
+ * reason, because `haiku` reads enough like a name that nothing looks wrong.
+ * Only `default` gave it away, and only because that word is obviously not a
+ * person.
+ *
+ * MY FIRST FIX WAS WRONG and worth recording: I treated "default" as a
+ * placeholder and mapped it to "Agent". That would have looked correct on
+ * this transcript and hidden the defect on every agent whose model happens to
+ * read like a name — repairing the one instance that announced itself while
+ * preserving the class.
+ *
+ * So: assistant turns are the agent, and say so. The model is a real fact and
+ * moves to the metadata line with the other facts about the turn, where being
+ * a model is unambiguous.
+ */
+export function speakerLabel(message: TranscriptMessage): string {
+  if (message.role === "assistant") return "Agent";
+  const author = message.author?.trim() ?? "";
+  return author.length > 0 ? author : "You";
+}
+
+/**
+ * The model, as a metadata chip rather than a speaker.
+ *
+ * `null` when unknown, so the caller renders nothing rather than a chip
+ * saying "unknown".
+ */
+export function modelMarker(message: TranscriptMessage): string | null {
+  if (message.role !== "assistant") return null;
+  const model = message.author?.trim() ?? "";
+  return model.length > 0 ? `⟨model · ${model}⟩` : null;
+}
+
+/**
+ * A file path a reader can use, without the server's plumbing.
+ *
+ * A live transcript rendered
+ * `⟨file · /srv/traycer/tenants/elliot/work/altra-proof/PROOF.md⟩`. Today
+ * that is Elliot's own host in his own client, so nothing is disclosed — but
+ * `/srv/traycer/tenants/<name>` embeds a TENANT NAME, and the product's whole
+ * direction is Teams users looking at hosts they do not own. The prefix also
+ * tells the reader nothing: they cannot open it, and it costs a third of the
+ * line on a phone.
+ *
+ * Trims to the workspace when the shape is recognised, and otherwise returns
+ * the path unchanged — a path we cannot confidently shorten is better whole
+ * than truncated at a guess.
+ */
+export function shortenWorkspacePath(raw: string): string {
+  // `/srv/traycer/tenants/<tenant>/<rest>` → `<rest>`
+  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
+  if (tenant?.[1] !== undefined) return tenant[1];
+  // A home directory is the same problem with a different prefix.
+  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
+  if (home?.[1] !== undefined) return home[1];
+  return raw;
+}
+
 export function partMarker(part: TranscriptPart): string {
   const noun =
     part.kind === "file_change"
@@ -970,10 +1062,19 @@ export function partMarker(part: TranscriptPart): string {
       : part.kind === "other"
         ? "content"
         : part.kind;
-  const label = part.label.trim();
+  const rawLabel = part.label.trim();
+  // Only tool labels are identifiers; a heading is already human and must not
+  // be run through the humaniser. File paths get their own treatment.
+  const label =
+    part.kind === "tool"
+      ? humaniseToolName(rawLabel)
+      : part.kind === "file_change"
+        ? shortenWorkspacePath(rawLabel)
+        : rawLabel;
   const head = label.length > 0 ? `${noun} · ${label}` : noun;
+  // "1 lines" appeared in front of a user. Pluralise.
   return part.lines > 0
-    ? `⟨${head} · ${String(part.lines)} lines⟩`
+    ? `⟨${head} · ${String(part.lines)} line${part.lines === 1 ? "" : "s"}⟩`
     : `⟨${head}⟩`;
 }
 
@@ -1029,7 +1130,7 @@ function transcriptRow(
   const preview = transcriptPreview(message, compact);
   const items: unknown[] = [
     text(
-      `${message.author ?? (message.role === "user" ? "You" : "Agent")} · ${approvalAgeLabel(message.timestamp, now)}`,
+      `${speakerLabel(message)} · ${approvalAgeLabel(message.timestamp, now)}`,
       {
         weight: "bolder",
         size: "small",
@@ -1042,12 +1143,18 @@ function transcriptRow(
   if (preview.length > 0) {
     items.push(text(preview, { spacing: "small" }));
   }
-  if (message.parts.length > 0) {
+  const markers = [
+    ...message.parts.map(partMarker),
+    // The model belongs here — a fact about the turn — not in the speaker
+    // slot. Last, because it is the least interesting of them.
+    ...(modelMarker(message) === null ? [] : [modelMarker(message) as string]),
+  ];
+  if (markers.length > 0) {
     // Markers on their own line: they are metadata about the message, not
     // part of its prose, and running them together reads as if the agent
     // wrote "⟨code · 24 lines⟩".
     items.push(
-      text(message.parts.map(partMarker).join("  "), {
+      text(markers.join("  "), {
         isSubtle: true,
         size: "small",
         fontType: "monospace",

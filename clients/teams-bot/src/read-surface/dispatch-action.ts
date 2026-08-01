@@ -1,6 +1,8 @@
 import type { Attachment } from "@microsoft/agents-activity";
 import {
   APPROVE_VERB,
+  CONFIRM_ROUTE_VERB,
+  CLARIFY_OTHER_VERB,
   FLEET_VERB,
   OPEN_CHAT_VERB,
   REPLY_VERB,
@@ -48,6 +50,21 @@ export interface ActionInvokeRequest {
   readonly conversationId: string;
   /** The card's `data` merged with any `Input.*` values Teams collected. */
   readonly data: Readonly<Record<string, unknown>>;
+  /**
+   * Where to send a LATER reply, for actions that start long-running work.
+   *
+   * `unknown` and optional on purpose. This is the raw Bot Framework
+   * conversation reference, and it is DATA rather than SDK machinery — R3
+   * writes it to a file and reads it back in a different process, which is
+   * the proof. What would break this boundary is a `TurnContext`: a live
+   * turn with methods, unmockable. A plain serialisable record is the same
+   * kind of thing every other field here already is.
+   *
+   * Optional because most actions answer within the turn. Anything that
+   * replies later needs it — R7's completion delivery and proactive
+   * notification both will — so this widens once rather than per feature.
+   */
+  readonly conversationReference?: unknown;
 }
 
 export type ActionInvokeResult = {
@@ -215,10 +232,72 @@ async function dispatchPage(
   }
 }
 
+/**
+ * The user confirmed a route we were not confident enough to take.
+ *
+ * READS THE ROUTE FROM THE BUTTON, never from `classify`. The card put
+ * `product`, `intent` and `skill` in the action's data precisely so this
+ * cannot re-derive them — a handler that re-runs the classifier and reads
+ * `suggestion` has silently converted "ask" back into "guess", which is the
+ * failure `classify` has a dedicated test against.
+ *
+ * A missing skill is REFUSED rather than dispatched. `classify` reports a
+ * known route with `skill: null` when no skill is built for it — a DR Migrate
+ * RFP, today — and starting an agent with no skill named would spend real
+ * time producing nothing anyone asked for.
+ */
+async function dispatchConfirmedRoute(
+  request: ActionInvokeRequest,
+  deps: DispatchDeps,
+): Promise<ActionInvokeResult> {
+  const skill = readString(request.data, "skill");
+  if (skill === null) {
+    return {
+      card: buildUsageCard(
+        "There's no assessment skill configured for that yet, so I haven't started one.",
+      ),
+      acted: false,
+    };
+  }
+  if (deps.startAssessment === undefined) {
+    // Wired at composition time. Absent means the deployment cannot start
+    // assessments, and saying so beats a button that appears to work.
+    return {
+      card: buildUsageCard("This deployment can't start assessments yet."),
+      acted: false,
+    };
+  }
+
+  const outcome = await deps.startAssessment({
+    conversationId: request.conversationId,
+    skill,
+    product: readString(request.data, "product") ?? "",
+    intent: readString(request.data, "intent") ?? "",
+    conversationReference: request.conversationReference,
+  });
+
+  return outcome.kind === "started"
+    ? { card: outcome.card, acted: true }
+    : { card: outcome.card, acted: false };
+}
+
 export async function dispatchActionInvoke(
   request: ActionInvokeRequest,
   deps: DispatchDeps,
 ): Promise<ActionInvokeResult> {
+  if (request.verb === CONFIRM_ROUTE_VERB) {
+    return dispatchConfirmedRoute(request, deps);
+  }
+  if (request.verb === CLARIFY_OTHER_VERB) {
+    return {
+      card: buildUsageCard(
+        "No problem — tell me what you'd like me to do with it.",
+      ),
+      // Nothing was mutated, and nothing failed. The user declined a
+      // suggestion, which is the flow working.
+      acted: true,
+    };
+  }
   if (request.verb === SEND_VERB) {
     return dispatchSend(request, deps);
   }

@@ -47,6 +47,20 @@ import type { ResolvePrincipal } from "./principal-source";
 
 export interface DispatchDeps extends HostAccessDeps {
   readonly resolvePrincipal: ResolvePrincipal;
+  /**
+   * Starts a long-running assessment. OPTIONAL: a deployment without it
+   * refuses the button in words rather than appearing to work.
+   *
+   * Takes the conversation reference because the reply arrives hours later
+   * and this turn is the only moment it exists.
+   */
+  readonly startAssessment?: (input: {
+    readonly conversationId: string;
+    readonly skill: string;
+    readonly product: string;
+    readonly intent: string;
+    readonly conversationReference: unknown;
+  }) => Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }>;
   /** Injected so "requested 2m ago" labels are deterministic in tests. */
   readonly now: () => number;
 }
