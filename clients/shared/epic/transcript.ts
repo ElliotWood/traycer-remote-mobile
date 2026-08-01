@@ -181,7 +181,81 @@ export function toTranscriptBlock(raw: unknown): TranscriptBlock {
       answered: rawAnswers.length > 0,
     };
   }
-  return { kind: "other", blockType: type, label: labelFor(type) };
+  /*
+   * NAME THE THING, not just its category.
+   *
+   * This returned `labelFor(type)` alone, so a turn that ran three tools
+   * rendered `[Tool call] [Tool call] [File change]` — three chips saying
+   * only that something happened. `File change` names a category where the
+   * file is the information.
+   *
+   * The bot's card builder learned to humanise a tool name today; the tab
+   * has its own renderer and did not, which is the same divergence as
+   * `speakerLabel`. **What a tool call is called is protocol grammar, not
+   * palette** — the answer is identical in every client — so the naming
+   * lives here and both clients get it.
+   */
+  const detail = blockDetail(block, type);
+  return {
+    kind: "other",
+    blockType: type,
+    label: detail === null ? labelFor(type) : `${labelFor(type)}: ${detail}`,
+  };
+}
+
+/**
+ * A tool's name as a person should read it.
+ *
+ * MCP tools arrive as `mcp__<server>__<tool>`: the tool half carries the
+ * meaning and the server prefix is routing. A raw
+ * `mcp__traycer_a2a__traycer_send_message` in a product surface is the same
+ * defect as printing subprocess output — correct about which tool, and
+ * telling the reader nothing except that we leaked an internal.
+ *
+ * Anything unrecognised is returned unchanged. A label we cannot improve
+ * beats one we corrupt, and it stays searchable.
+ */
+export function humaniseToolName(raw: string): string {
+  const mcp = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(raw);
+  const name = mcp?.[1] ?? raw;
+  return name.replace(/_/g, " ").trim();
+}
+
+/**
+ * The specific thing a non-rendered block is about — a tool's name, a file's
+ * path — or `null` when the block carries nothing more than its category.
+ *
+ * Paths are trimmed to the workspace: `/srv/traycer/tenants/<name>/…` embeds
+ * a TENANT NAME, and this product is heading for people looking at hosts they
+ * do not own. The prefix also costs a third of a phone line to say something
+ * the reader cannot act on.
+ */
+function blockDetail(
+  block: Record<string, unknown>,
+  type: string,
+): string | null {
+  if (type === "tool_call" || type === "tool_result") {
+    const name = block["toolName"] ?? block["name"] ?? block["tool"];
+    return typeof name === "string" && name.trim().length > 0
+      ? humaniseToolName(name.trim())
+      : null;
+  }
+  if (type === "file_change") {
+    const path = block["path"] ?? block["filePath"] ?? block["file"];
+    return typeof path === "string" && path.trim().length > 0
+      ? shortenWorkspacePath(path.trim())
+      : null;
+  }
+  return null;
+}
+
+/** Drops a server-specific prefix from a path; returns it whole otherwise. */
+export function shortenWorkspacePath(raw: string): string {
+  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
+  if (tenant?.[1] !== undefined) return tenant[1];
+  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
+  if (home?.[1] !== undefined) return home[1];
+  return raw;
 }
 
 /**

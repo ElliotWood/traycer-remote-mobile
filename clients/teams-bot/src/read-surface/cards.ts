@@ -13,7 +13,11 @@ import type {
   TranscriptPart,
 } from "./bridge-types";
 import type { BridgeCliFailureReason } from "./bridge-cli";
-import { speakerLabel as sharedSpeakerLabel } from "@traycer-clients/shared/epic/transcript";
+import {
+  speakerLabel as sharedSpeakerLabel,
+  humaniseToolName as sharedHumaniseToolName,
+  shortenWorkspacePath as sharedShortenWorkspacePath,
+} from "@traycer-clients/shared/epic/transcript";
 
 /**
  * Adaptive Card builders.
@@ -981,9 +985,12 @@ const CONTEXT_STRIP_TEXT_LIMIT = 100;
  * cannot improve is better than one we corrupt.
  */
 export function humaniseToolName(raw: string): string {
-  const mcp = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(raw);
-  const name = mcp?.[1] ?? raw;
-  return name.replace(/_/g, " ").trim();
+  // DELEGATES to `clients/shared`. Written here first; the tab has its own
+  // renderer and kept showing bare `[Tool call]` chips afterwards — the same
+  // divergence as `speakerLabel`, from the same cause. What a tool call is
+  // called is protocol grammar, so the rule lives in shared and this stays
+  // as the bot's entry point to it.
+  return sharedHumaniseToolName(raw);
 }
 
 /**
@@ -1053,13 +1060,9 @@ export function modelMarker(message: TranscriptMessage): string | null {
  * than truncated at a guess.
  */
 export function shortenWorkspacePath(raw: string): string {
-  // `/srv/traycer/tenants/<tenant>/<rest>` → `<rest>`
-  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
-  if (tenant?.[1] !== undefined) return tenant[1];
-  // A home directory is the same problem with a different prefix.
-  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
-  if (home?.[1] !== undefined) return home[1];
-  return raw;
+  // DELEGATES — same reason as the tool name: a path shown to a person is
+  // grammar, and the tenant-prefix rule must not exist twice.
+  return sharedShortenWorkspacePath(raw);
 }
 
 export function partMarker(part: TranscriptPart): string {
