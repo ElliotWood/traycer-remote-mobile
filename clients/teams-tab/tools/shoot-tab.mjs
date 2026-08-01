@@ -251,6 +251,21 @@ try {
             body.scrollHeight
           );
         });
+        /**
+         * THE RETROACTIVE AUDIT, printed by every run from now on.
+         *
+         * `needed > 900` is exactly the condition under which the OLD harness
+         * silently cropped this shot — 900 was the fixed viewport height and
+         * `fullPage` could not exceed it. So every line here names an image
+         * that, before this fix, was a plausible photograph of a screen that
+         * does not exist. Anything concluded by looking at one of these
+         * between the shell landing and this fix needs re-checking.
+         */
+        if (needed !== null && needed > 900) {
+          console.log(
+            `  WAS-CROPPED ${view.name}--${theme}--${width.name}: content ${String(needed)}px, old harness showed 900px`,
+          );
+        }
         // 4000 is a guard against a runaway list, not a target. If it ever
         // binds, the shot is truncated and SAYS so rather than looking whole.
         if (needed !== null && needed > 900) {

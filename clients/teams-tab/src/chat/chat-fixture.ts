@@ -63,8 +63,35 @@ export const CHAT_FIXTURE: readonly TranscriptMessage[] = [
         kind: "text",
         text: "## Result\n\n```sh\nhostname\nwhoami\nuname -sr\n```\n\n| check | value |\n| --- | --- |\n| host | reachable |\n| user | traycer |\n",
       },
-      { kind: "other", blockType: "tool_call", label: "Tool call" },
-      { kind: "other", blockType: "file_change", label: "File change" },
+      /*
+       * LABELS AS `toTranscript` PRODUCES THEM, not as they used to read.
+       *
+       * These said "Tool call" and "File change" flat, which is what the
+       * projection emitted before `blockDetail` landed in shared. It now
+       * appends the tool's name and the file's path, so the fixture was
+       * showing a state the live client can no longer produce — a preview
+       * that under-reports the product rather than over-reports it, which is
+       * the rarer direction and just as wrong.
+       *
+       * Found in the gallery only after `fullPage` was fixed: the chips sit
+       * at the bottom of a 1533px transcript and every previous shot stopped
+       * at 900.
+       *
+       * The path is deliberately one the shortener acts on — the tenant
+       * prefix is gone here because `shortenWorkspacePath` removes it, and a
+       * fixture that skipped the prefix would agree with the renderer without
+       * testing it.
+       */
+      {
+        kind: "other",
+        blockType: "tool_call",
+        label: "Tool call: traycer send message",
+      },
+      {
+        kind: "other",
+        blockType: "file_change",
+        label: "File change: clients/teams-tab/src/config.ts",
+      },
       { kind: "other", blockType: "todo", label: "To-do list" },
     ],
   },
