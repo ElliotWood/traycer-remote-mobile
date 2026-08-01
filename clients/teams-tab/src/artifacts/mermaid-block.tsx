@@ -17,7 +17,7 @@ import { Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import {
   deriveMermaidErrorMessage,
   renderMermaidSvg,
-} from "@traycer-clients/shared/markdown/mermaid-runtime";
+} from "@traycer-clients/shared/browser/mermaid-runtime";
 
 type State =
   | { readonly status: "loading" }

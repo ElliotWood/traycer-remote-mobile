@@ -22,6 +22,10 @@
   "include": ["src", "../shared", "../../protocol"],
   "exclude": [
     "node_modules",
+    // DOM-dependent modules. This is a NODE package; compiling them yields
+    // "Cannot find name document". Do not fix that by adding "dom" to lib —
+    // see clients/shared/browser/README.md.
+    "../shared/browser",
     "dist",
     "../shared/**/__tests__/**",
     "../shared/**/*.test.ts",

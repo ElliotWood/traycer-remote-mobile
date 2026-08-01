@@ -1,5 +1,5 @@
 /**
- * MOVED to `@traycer-clients/shared/markdown/css-color`.
+ * MOVED to `@traycer-clients/shared/browser/css-color`.
  * Re-exported so no call site moved.
  */
-export * from "@traycer-clients/shared/markdown/css-color";
+export * from "@traycer-clients/shared/browser/css-color";

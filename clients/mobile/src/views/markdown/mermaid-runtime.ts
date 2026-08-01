@@ -1,5 +1,5 @@
 /**
- * MOVED to `@traycer-clients/shared/markdown/mermaid-runtime`.
+ * MOVED to `@traycer-clients/shared/browser/mermaid-runtime`.
  * Re-exported so no call site moved.
  */
-export * from "@traycer-clients/shared/markdown/mermaid-runtime";
+export * from "@traycer-clients/shared/browser/mermaid-runtime";
