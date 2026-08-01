@@ -15,9 +15,31 @@ function tempFile(name: string): string {
 const REFERENCE = {
   channelId: "msteams",
   serviceUrl: "https://smba.example.invalid/au/",
-  conversation: { id: "conv-1", conversationType: "personal" },
+  // `tenantId` sits on the CONVERSATION, which is where Teams puts it. This
+  // fixture carried it at the top level — the shape the code wrongly read —
+  // so the fixture AGREED with the defect and could not have exposed it.
+  conversation: {
+    id: "conv-1",
+    conversationType: "personal",
+    tenantId: "tenant-1",
+  },
   bot: { id: "bot-1", name: "Traycer" },
   user: { id: "user-1", aadObjectId: "0b8f1c2e-8f3a-4a1b-9c2d-1e2f3a4b5c6d" },
+};
+
+/**
+ * The shape the SDK does NOT send, kept as a specimen rather than a comment.
+ *
+ * Moving the fixture was necessary and not sufficient: with no assertion on
+ * the extracted value, `tenantId` is optional, so reverting the code to
+ * `r["tenantId"]` would make it silently `undefined` again and every test
+ * here would stay green. The pair below is what makes the fix load-bearing —
+ * one proves it is read from the right place, the other proves the wrong
+ * place is not also accepted.
+ */
+const REFERENCE_WITH_TOP_LEVEL_TENANT = {
+  ...REFERENCE,
+  conversation: { id: "conv-1", conversationType: "personal" },
   tenantId: "tenant-1",
 };
 
@@ -51,6 +73,21 @@ describe("toStoredReference", () => {
     const stored = toStoredReference(withoutUser, 1000);
     expect(stored).not.toBeNull();
     expect(stored?.user).toBeUndefined();
+  });
+
+  it("reads tenantId off the CONVERSATION, where Teams puts it", () => {
+    expect(toStoredReference(REFERENCE, 1000)?.tenantId).toBe("tenant-1");
+  });
+
+  it("does not read tenantId off the top level, where v4 docs put it", () => {
+    // The defect this pins: `r["tenantId"]` looked right, matched the
+    // documentation, and degraded to `undefined` without throwing or logging
+    // — the same soft-fail as the `bot`/`agent` rename one field over. An
+    // optional field that is silently never populated is indistinguishable
+    // from a tenant that genuinely has none.
+    expect(
+      toStoredReference(REFERENCE_WITH_TOP_LEVEL_TENANT, 1000)?.tenantId,
+    ).toBeUndefined();
   });
 
   it("refuses a non-object", () => {
