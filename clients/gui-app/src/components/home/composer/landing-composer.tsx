@@ -492,6 +492,7 @@ export function LandingComposer(props: LandingComposerProps) {
       // draft and strand the one already holding the user's content.
       draftId: draftId ?? createdUnboundDraftIdRef.current,
       editor: editorRef.current,
+      slashCatalog: pickerStore.getState().knownSlashCommands,
       toolbar: {
         selection: toolbar.selection,
         reasoning: toolbar.reasoning,
@@ -499,7 +500,7 @@ export function LandingComposer(props: LandingComposerProps) {
         permission: toolbar.permission,
       },
     });
-  }, [actions, canSubmit, draftId, toolbarStore]);
+  }, [actions, canSubmit, draftId, pickerStore, toolbarStore]);
 
   const handleStartTerminal = useCallback(
     (launch: TerminalAgentLaunch) => {
