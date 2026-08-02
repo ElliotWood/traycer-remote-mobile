@@ -433,7 +433,31 @@ async function chatChecks(page, baseUrl, epicId) {
     return false;
   }
   await row.click();
-  await page.waitForTimeout(15_000);
+  /*
+   * WAIT FOR THE TRANSCRIPT, not for fifteen seconds.
+   *
+   * This was `waitForTimeout(15_000)` and it produced `chars=148 pre=0` —
+   * the chat's chrome before any message had arrived, which is
+   * indistinguishable in shape from the sign-in screen and satisfies
+   * `literalFences=0` for free. The SAME defect as the fixed sleep on the
+   * agent row, left in place one call below the one I fixed.
+   *
+   * 10,000 characters is a floor, not a target: the observed chrome is ~150
+   * and a real transcript is millions, so nothing sits near the line. If it
+   * is never reached the run REFUSES rather than measuring an empty page.
+   */
+  try {
+    await page.waitForFunction(
+      () => (document.body.innerText ?? "").length > 10_000,
+      undefined,
+      { timeout: 120_000 },
+    );
+  } catch {
+    console.error(
+      "chat: the transcript never loaded (still under 10k chars after 120s) — NOT a pass",
+    );
+    return false;
+  }
   const r = await page.evaluate(() => {
     const text = document.body.innerText || "";
     return {
@@ -487,6 +511,9 @@ async function chatChecks(page, baseUrl, epicId) {
       pre: document.querySelectorAll("pre").length,
       table: document.querySelectorAll("table").length,
       chars: text.length,
+      signedOut: Array.from(document.querySelectorAll("button")).some((b) =>
+        /^sign in$/i.test((b.textContent ?? "").trim()),
+      ),
       /*
        * A rendered tool call names its tool. `humaniseToolName` turns
        * `mcp__traycer_a2a__traycer_send_message` into "traycer send message",
@@ -502,6 +529,17 @@ async function chatChecks(page, baseUrl, epicId) {
       bareChips: (text.match(/Tool call(?![:\w])/g) ?? []).length,
     };
   });
+  /*
+   * ASSERT THE SESSION ON THE PAGE BEING MEASURED, not on an earlier one.
+   * `pre=0` with a few hundred characters is what a sign-in screen looks
+   * like, and `literalFences=0` is trivially true there.
+   */
+  if (r.signedOut) {
+    console.error(
+      "REFUSING: the chat page is SIGNED OUT — every count below is a sign-in screen",
+    );
+    return false;
+  }
   console.log(
     `chat: url=${r.url} literalFences=${String(r.literalFences)} pre=${String(r.pre)} table=${String(r.table)} chars=${String(r.chars)}`,
   );
@@ -685,10 +723,22 @@ async function run() {
       failed = true;
     }
     if (CHAT && EPIC !== null) {
-      const chatPage = await context.newPage();
-      const ok = await chatChecks(chatPage, baseUrl, EPIC);
+      /*
+       * THE SAME PAGE, not a second one.
+       *
+       * This opened `context.newPage()` and the run reported
+       * `literalFences=0 pre=0 chars=148` against a tab that was working —
+       * the withdrawn run's exact signature. Two pages in one context both
+       * rehydrate the session, both REFRESH, and the refresh ROTATES the
+       * token: the loser of that race lands on the sign-in screen, which
+       * satisfies every assertion in this file.
+       *
+       * The session gate guarded the first page while the measurement ran on
+       * the second — a guard positioned one object away from the thing it
+       * protects. One page removes the race rather than detecting it.
+       */
+      const ok = await chatChecks(page, baseUrl, EPIC);
       if (!ok) failed = true;
-      await chatPage.close();
     }
     await page.close();
     /*
