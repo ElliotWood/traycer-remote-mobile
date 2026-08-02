@@ -22,6 +22,7 @@ import {
 } from "@fluentui/react-components";
 import { FleetLoading } from "./fleet/fleet-state";
 import { AppShell } from "./shell/app-shell";
+import { ErrorBoundary } from "./shell/error-boundary";
 import { type EpicConnectionState } from "./shell/epic-status-row";
 import { useShellStatus } from "./shell/shell-status";
 import { EpicDetail } from "./epics/epic-detail";
@@ -542,7 +543,25 @@ export function App(): ReactElement {
   const shell = (content: ReactElement | null): ReactElement => (
     <FluentProvider theme={themeFor(ready ? themeName : "default")}>
       <AppShell leading={<Text weight="semibold">Traycer</Text>}>
-        {content}
+        {/*
+          THE IN-FRAME BOUNDARY, and it belongs here rather than around each
+          returned screen for the same reason the shell itself does.
+          Twelve wrappers would be twelve boundaries at twelve positions;
+          this is ONE, at one reconciled position, so the header still
+          survives navigation and `shell-contract`'s property is untouched.
+
+          What it buys over the root boundary in `main.tsx`: a screen that
+          throws loses the SCREEN, not the frame. The header, the theme and
+          the status region stay, so the tab still looks like Traycer and the
+          user can see where they are — where the root boundary replaces the
+          entire document with a message on a bare background.
+
+          The root one is still the backstop for this one: its fallback is
+          plain DOM but it renders inside `FluentProvider`, so if the throw
+          came from the provider or the theme, this boundary goes down with
+          it and `main.tsx` catches what is left.
+        */}
+        <ErrorBoundary label="this screen">{content}</ErrorBoundary>
       </AppShell>
     </FluentProvider>
   );
