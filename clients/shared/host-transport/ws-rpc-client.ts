@@ -14,7 +14,7 @@ import {
 } from "@traycer/protocol/framework/index";
 import { RELEASED_FLOOR_METHOD_NAMES } from "@traycer/protocol/host/released-floor";
 import { CredentialLeaseReleasedError } from "@traycer/protocol/auth/request-context";
-import type { OpenFrameBearerSource } from "@traycer-clients/shared/auth/bearer-source";
+import type { OpenFrameBearerSource } from "../auth/bearer-source";
 import {
   HostRequestAbortedError,
   HostRpcError,

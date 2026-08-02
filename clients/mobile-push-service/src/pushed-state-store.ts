@@ -23,8 +23,8 @@ export class PushedStateStore implements PushedStateReader {
   private state: Record<string, boolean> = {};
   private loaded = false;
 
-  /** `path` defaults to the real `~/.traycer/push-service/pushed-state.json`; tests inject a temp path so they never touch real runtime state. */
-  constructor(path: string = pushedStatePath()) {
+  /** Callers pass `pushedStatePath()` for the real `~/.traycer/push-service/pushed-state.json`; tests inject a temp path so they never touch real runtime state. */
+  constructor(path: string) {
     this.path = path;
   }
 

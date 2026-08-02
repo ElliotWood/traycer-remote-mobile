@@ -54,6 +54,12 @@ const BlockNode = memo(function BlockNode({
   readonly chatId: string;
 }): ReactElement | null {
   const { block } = node;
+  // Captured BEFORE the switch narrows `block` itself to `never` in the
+  // `default` case below (exhaustive over the 15 known types) — widened by
+  // the `: string` annotation, not narrowed away, so the runtime safety net
+  // can still report whatever type string an actually-unrecognized future
+  // block shape arrives with.
+  const blockType: string = block.type;
   switch (block.type) {
     case "text":
       return <TextBlock block={block} />;
@@ -87,12 +93,10 @@ const BlockNode = memo(function BlockNode({
       // Never reaches here — filtered upstream (routed to a user bubble).
       // Guarded for defense-in-depth, not expected to execute.
       return <UnsupportedBlock typeName={block.type} />;
-    default: {
+    default:
       // Runtime safety net beyond the 15 known types: a future/unrecognized
       // block shape renders a labeled fallback, never throws (rubric §4).
-      const unknownBlock = block as unknown as { readonly type: string };
-      return <UnsupportedBlock typeName={unknownBlock.type} />;
-    }
+      return <UnsupportedBlock typeName={blockType} />;
   }
 });
 

@@ -37,7 +37,7 @@ function epicRow(
     createdAt: number;
     updatedAt: number;
     pinned: boolean;
-  }> = {},
+  }>,
 ): ListTaskLight {
   return {
     epic: {
@@ -66,7 +66,7 @@ function epicRow(
 
 function response(
   tasks: ListTaskLight[],
-  extra: Partial<ListTasksResponse> = {},
+  extra: Partial<ListTasksResponse>,
 ): ListTasksResponse {
   return { tasks, hasMore: false, ...extra };
 }
@@ -83,13 +83,13 @@ describe("EPIC_LIST_REQUEST / buildEpicListRequest / fetchEpicListPage", () => {
   });
 
   it("omits cursor on the first page and includes it on later pages", () => {
-    expect(buildEpicListRequest(undefined)).not.toHaveProperty("cursor");
-    expect(buildEpicListRequest("c1")).toMatchObject({ cursor: "c1" });
+    expect(buildEpicListRequest(undefined, {})).not.toHaveProperty("cursor");
+    expect(buildEpicListRequest("c1", {})).toMatchObject({ cursor: "c1" });
   });
 
   it("invokes epic.listTasks on the host client with the built request", async () => {
-    const request = vi.fn().mockResolvedValue(response([]));
-    await fetchEpicListPage({ request }, undefined);
+    const request = vi.fn().mockResolvedValue(response([], {}));
+    await fetchEpicListPage({ request }, undefined, {});
     expect(request).toHaveBeenCalledWith("epic.listTasks", {
       limit: 20,
       filters: null,
@@ -98,7 +98,7 @@ describe("EPIC_LIST_REQUEST / buildEpicListRequest / fetchEpicListPage", () => {
       extensionEpicVersion: "2.0.0",
     });
 
-    await fetchEpicListPage({ request }, "next-cursor");
+    await fetchEpicListPage({ request }, "next-cursor", {});
     expect(request).toHaveBeenLastCalledWith("epic.listTasks", {
       limit: 20,
       filters: null,

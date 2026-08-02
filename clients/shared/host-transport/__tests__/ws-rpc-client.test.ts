@@ -18,7 +18,7 @@ import {
   type RequestOfMethod,
   type ResponseOfMethod,
 } from "../host-messenger";
-import { MutableBearerLease } from "@traycer-clients/shared/auth/bearer-source";
+import { MutableBearerLease } from "../../auth/bearer-source";
 import {
   createRequestContext,
   identityFromAuthenticatedUser,

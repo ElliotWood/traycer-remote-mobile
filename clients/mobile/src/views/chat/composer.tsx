@@ -18,7 +18,7 @@
  * @-mention/slash pickers and mic input stay deferred per the accepted P2
  * contract (no file-search/command-list RPC, no STT infra).
  */
-import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from "react";
+import { useRef, useState, type ChangeEvent, type ReactElement } from "react";
 import {
   ArrowUp,
   Camera,
@@ -37,6 +37,7 @@ import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persiste
 import type { AgentMode } from "@traycer/protocol/common/schemas";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useHarnessModels } from "@/host/use-harness-models";
+import { chatDraftKey, useDraft } from "@/router/drafts";
 import {
   AttachmentTooLargeError,
   MAX_ATTACHMENTS_PER_MESSAGE,
@@ -74,6 +75,8 @@ const DEFAULT_HARNESS = "claude" as const;
 
 export interface ComposerProps {
   readonly epicId: string;
+  /** Scopes the preserved draft, so backing out of two chats keeps two separate unsent messages. */
+  readonly chatId: string;
   readonly client: MobileHostClient | null;
   /**
    * Perf fix: the composer owns its OWN draft text internally now (below) —
@@ -81,8 +84,9 @@ export interface ComposerProps {
    * whole chat screen (transcript included) on every character. These two
    * props are the ONLY way a parent can still push text in from outside
    * (the "edit a queued item" flow): bump `prefillNonce` alongside a new
-   * `prefillText` and the effect below adopts it. A stable `prefillNonce`
-   * across renders means "nothing to adopt" — typing never touches these.
+   * `prefillText` and it's adopted during render (not an effect — see the
+   * comment at the adjustment site). A stable `prefillNonce` across renders
+   * means "nothing to adopt" — typing never touches these.
    */
   readonly prefillText: string | null;
   readonly prefillNonce: number;
@@ -98,6 +102,7 @@ export interface ComposerProps {
 
 export function Composer({
   epicId,
+  chatId,
   client,
   prefillText,
   prefillNonce,
@@ -110,7 +115,12 @@ export function Composer({
   onSend,
   onStop,
 }: ComposerProps): ReactElement {
-  const [draftText, setDraftText] = useState("");
+  // Draft-backed rather than `useState("")`: popping the chat route unmounts
+  // this component, and a half-typed message must survive that round trip. The
+  // store is keyed per chat and cleared on a successful send — see `drafts.ts`.
+  const draft = useDraft(chatDraftKey(chatId));
+  const draftText = draft.value;
+  const setDraftText = draft.set;
   const [attachments, setAttachments] = useState<readonly AttachmentDraft[]>([]);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
     chatSettings?.permissionMode ?? "full_access",
@@ -122,13 +132,24 @@ export function Composer({
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Only fires when the PARENT explicitly bumps the nonce (queue-edit) — a
-  // stable nonce across re-renders (typing, transcript updates, anything
-  // else) never re-triggers this, so it can't fight the user's own typing.
-  useEffect(() => {
+  // Adjusted DURING render, not in an effect that fires after commit — an
+  // effect here means the render that bumps `prefillNonce` still paints the
+  // OLD `draftText` for one frame before the correction lands (mild version
+  // of the same class of mistake that crashed the interview form on this
+  // sprint: reconciling a prop-driven value post-commit instead of before
+  // paint). Comparing against `lastPrefillNonce` (React's documented
+  // "adjust state when a prop changes" pattern) lets this fire exactly once
+  // per bump, still cannot fight the user's own typing (a stable nonce
+  // across renders never re-triggers it), with no intermediate frame.
+  // `null` (never a real nonce value) so the FIRST render always counts as
+  // "changed" — matching the effect this replaced, which always ran once on
+  // mount too. Seeding from `prefillNonce` itself would silently skip
+  // adoption on a mount that starts with an already-bumped nonce.
+  const [lastPrefillNonce, setLastPrefillNonce] = useState<number | null>(null);
+  if (prefillNonce !== lastPrefillNonce) {
+    setLastPrefillNonce(prefillNonce);
     if (prefillNonce > 0 && prefillText !== null) setDraftText(prefillText);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillNonce]);
+  }
 
   const handleFilesPicked = (event: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(event.target.files ?? []);
@@ -201,7 +222,9 @@ export function Composer({
       },
       readyAttachments.map((a) => a.prepared),
     );
-    setDraftText("");
+    // The text is now a real message: drop the preserved draft, or returning to
+    // this chat would show the sent message still sitting in the composer.
+    draft.clear();
     setAttachments([]);
   };
 

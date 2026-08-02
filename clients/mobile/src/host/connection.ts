@@ -60,7 +60,7 @@ export interface HostConnectionDeps {
 
 export function createHostConnection(
   auth: HostConnectionAuth,
-  deps: HostConnectionDeps = {},
+  deps: HostConnectionDeps,
 ): HostConnection | null {
   // Explicit-null must survive: `deps.hostWsUrl = null` means "no host", so
   // only an ABSENT field falls back to config (a `??` would swallow the null).

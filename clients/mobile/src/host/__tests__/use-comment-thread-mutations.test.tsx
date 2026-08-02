@@ -6,7 +6,7 @@
  * onSuccess-invalidate pattern, no optimistic updates).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type MockInstance } from "vitest";
 import type { ReactNode } from "react";
 import { commentThreadsQueryKey } from "../use-comment-threads";
 import {
@@ -20,7 +20,7 @@ const SCOPE = { epicId: "e1", artifactType: "ticket" as const, artifactId: "a1" 
 
 function makeWrapper(): {
   readonly wrapper: ({ children }: { children: ReactNode }) => ReactNode;
-  readonly invalidateSpy: ReturnType<typeof vi.spyOn>;
+  readonly invalidateSpy: MockInstance;
 } {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },

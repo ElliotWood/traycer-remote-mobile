@@ -321,7 +321,9 @@ export function useEpicAgents(
         mark("early-meta");
         if (disposed) return;
         if (meta.epicLight !== null) {
-          setHeader(fleetEpicFromLight(meta.epicLight));
+          // `false` — `earlyMeta` carries no pin state, so the header cannot
+          // know it. The list row is where a pin is rendered.
+          setHeader(fleetEpicFromLight(meta.epicLight, false));
         }
         armStallWatchdog();
         setState((prev) =>

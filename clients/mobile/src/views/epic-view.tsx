@@ -25,14 +25,15 @@ import {
   useState,
   type ReactElement,
 } from "react";
+import { useDismissLayer } from "@/router/nav-host";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useCurrentEpicDoc } from "@/host/current-epic-context";
 import { useArtifactNav } from "@/host/artifact-nav-context";
 import { useChatBadges, type ChatBadgeState } from "@/host/use-chat-badges";
-import { useSettledConnectionState } from "@/host/use-settled-connection-state";
+import { DEFAULT_THRESHOLD_MS, useSettledConnectionState } from "@/host/use-settled-connection-state";
 import { detectBlockedTransitions, notifyBlocked } from "@/host/notifications";
-import { seedUnseen } from "@/host/read-tracking-store";
+import { defaultStorage, seedUnseen } from "@/host/read-tracking-store";
 import { DEFAULT_SORT_MODE, describeSortMode, nextSortMode, type SortMode } from "@/host/tree-sort";
 import { AuthorView } from "./author-view";
 import { CreateArtifactView } from "./create-artifact-view";
@@ -67,7 +68,7 @@ export function EpicView({
   const { openArtifact } = useArtifactNav();
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
-  const connection = useSettledConnectionState(rawConnection);
+  const connection = useSettledConnectionState(rawConnection, DEFAULT_THRESHOLD_MS);
   const connectionLive = connection === "live";
 
   // The badge streams follow the exact chat-id set the doc reports.
@@ -94,16 +95,20 @@ export function EpicView({
   useEffect(() => {
     const updatedAtById: Record<string, number> = {};
     for (const c of chats) updatedAtById[c.chatId] = c.updatedAt;
-    seedUnseen(epicId, updatedAtById);
+    seedUnseen(epicId, updatedAtById, defaultStorage());
   }, [epicId, chats]);
   useEffect(() => {
     const updatedAtById: Record<string, number> = {};
     for (const a of artifacts) updatedAtById[a.id] = a.updatedAt;
-    seedUnseen(epicId, updatedAtById);
+    seedUnseen(epicId, updatedAtById, defaultStorage());
   }, [epicId, artifacts]);
 
   const [drill, setDrill] = useState<Drill>(null);
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT_MODE);
+  // A drill covers the tree full-screen, so the OS back gesture must close it
+  // and land back on the tree — NOT pop the epic route out from underneath it.
+  // One hook call is the entire contract; see `nav-host.tsx`.
+  const dismissDrill = useDismissLayer(drill !== null, () => setDrill(null));
 
   if (drill?.kind === "author" && hostClient !== null) {
     return (
@@ -112,7 +117,7 @@ export function EpicView({
         client={hostClient}
         parentId={drill.parentId}
         onCreated={(chatId) => onOpenChat(chatId, null)}
-        onCancel={() => setDrill(null)}
+        onCancel={dismissDrill}
       />
     );
   }
@@ -123,11 +128,15 @@ export function EpicView({
         epicId={epicId}
         parentId={drill.parentId}
         client={hostClient}
+        /* A REPLACE, not a dismissal: the drill closes as the artifact route is
+           pushed, leaving total back-depth unchanged, so one back returns to the
+           tree rather than to the form. Routing this through history instead
+           would pop the artifact straight back off. */
         onCreated={(artifactId) => {
           setDrill(null);
           openArtifact(epicId, artifactId);
         }}
-        onCancel={() => setDrill(null)}
+        onCancel={dismissDrill}
       />
     );
   }

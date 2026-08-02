@@ -6,7 +6,7 @@
  *   - opening/observing an already-blocked chat fires ZERO notifications;
  *   - a later real false→true transition fires exactly one.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import * as Y from "yjs";
 import type { ChatSubscribeServerFrame } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { SnapshotMetaEpic } from "@traycer/protocol/host/epic/snapshot-meta";
@@ -52,7 +52,7 @@ const toolApproval = (approvalId: string): unknown => ({
   kind: "tool",
 });
 
-let showNotification: ReturnType<typeof vi.fn>;
+let showNotification: Mock;
 const originalNotification = (globalThis as { Notification?: unknown }).Notification;
 const originalNavigator = globalThis.navigator;
 

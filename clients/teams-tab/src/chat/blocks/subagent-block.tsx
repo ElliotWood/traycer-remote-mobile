@@ -1,0 +1,120 @@
+/**
+ * `subagent` — and the only block that renders OTHER blocks.
+ *
+ * Its children arrive already nested by `buildBlockTree` (via
+ * `parentBlockId`), at any depth, and render inside an indented rail. This is
+ * the structural half of transcript parity: a flat list of a subagent's tool
+ * calls beside the parent's own reads as one agent doing everything.
+ *
+ * The tree also suppresses the `tool_call` that SPAWNED this subagent — this
+ * card replaces it. Rendering both would show the spawn twice.
+ */
+import type { ReactElement } from "react";
+import { Body1, Caption1, makeStyles, tokens } from "@fluentui/react-components";
+import type { SubAgentBlock as SubAgentBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
+import type { RenderableBlock } from "@traycer-clients/shared/epic/transcript-tree";
+import { CollapsibleCard, StatusBadge } from "./block-card";
+import { BlockList } from "./block-list";
+import type { SnapshotDiffClient } from "./use-snapshot-diff";
+
+const useStyles = makeStyles({
+  name: { fontWeight: tokens.fontWeightSemibold, flexShrink: 0 },
+  type: { color: tokens.colorNeutralForeground3, flexShrink: 0 },
+  summary: {
+    color: tokens.colorNeutralForeground3,
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  task: { margin: `0 0 ${tokens.spacingVerticalXS}` },
+  meta: {
+    color: tokens.colorNeutralForeground3,
+    display: "block",
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  updates: {
+    margin: `0 0 ${tokens.spacingVerticalXS}`,
+    paddingLeft: tokens.spacingHorizontalXXL,
+    color: tokens.colorNeutralForeground3,
+  },
+  rail: {
+    borderLeft: `2px solid ${tokens.colorNeutralStroke2}`,
+    paddingLeft: tokens.spacingHorizontalM,
+    marginTop: tokens.spacingVerticalS,
+  },
+  result: { margin: `${tokens.spacingVerticalXS} 0 0` },
+});
+
+/** The most recent thing it said, or its result once it has one. */
+function summaryLine(block: SubAgentBlockType): string {
+  if (block.result !== null) return block.result;
+  return block.progressUpdates[block.progressUpdates.length - 1] ?? "Starting…";
+}
+
+export function SubagentBlock({
+  block,
+  childNodes,
+  client,
+}: {
+  readonly block: SubAgentBlockType;
+  /** Named `childNodes`, not `children`: these are transcript blocks the tree nested here, not this component's React children. */
+  readonly childNodes: readonly RenderableBlock[];
+  readonly client: SnapshotDiffClient | null;
+}): ReactElement {
+  const styles = useStyles();
+  const name = block.name ?? "Sub-agent";
+  const meta = block.workflowMeta;
+
+  return (
+    <CollapsibleCard
+      accent="brand"
+      label={`Sub-agent: ${name}`}
+      header={
+        <>
+          <Body1 className={styles.name}>{name}</Body1>
+          {block.agentType !== null ? (
+            <Caption1 className={styles.type}>{block.agentType}</Caption1>
+          ) : null}
+          <Caption1 className={styles.summary}>{summaryLine(block)}</Caption1>
+          <StatusBadge status={block.status} />
+        </>
+      }
+    >
+      {block.task !== null ? (
+        <Body1 as="p" className={styles.task}>
+          <strong>Task: </strong>
+          {block.task}
+        </Body1>
+      ) : null}
+      {meta !== null ? (
+        <Caption1 className={styles.meta}>
+          {meta.intent !== null ? `${meta.intent} · ` : ""}
+          {meta.agentsStarted ?? 0} agents started · {meta.agentsFinished ?? 0}{" "}
+          finished
+          {meta.totalTokens !== null ? ` · ${meta.totalTokens} tokens` : ""}
+        </Caption1>
+      ) : null}
+      {block.progressUpdates.length > 0 ? (
+        <ul className={styles.updates}>
+          {block.progressUpdates.map((update, index) => (
+            <li key={index}>
+              <Caption1>{update}</Caption1>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {childNodes.length > 0 ? (
+        <div className={styles.rail}>
+          <BlockList nodes={childNodes} client={client} />
+        </div>
+      ) : null}
+      {block.result !== null ? (
+        <Body1 as="p" className={styles.result}>
+          {block.result}
+        </Body1>
+      ) : null}
+    </CollapsibleCard>
+  );
+}

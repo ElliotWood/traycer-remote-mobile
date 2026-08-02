@@ -8,10 +8,17 @@
  * the models one, so this stays the one place that catches "Send is
  * disabled with no hint" for any of them.
  */
-import { describe, expect, it } from "vitest";
-import { Composer } from "@/views/chat/composer";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Composer, type ComposerProps } from "@/views/chat/composer";
+import { resetDraftsForTest } from "@/router/drafts";
 import { createFakeHostClient, type FakeHostClient } from "@/test-utils/fakes";
-import { render, screen, waitFor } from "@/test-utils/dom";
+import { fireEvent, render, screen, waitFor } from "@/test-utils/dom";
+
+// The composer's draft text now outlives its component (see `drafts.ts`), so
+// the store is module state one test could otherwise leak into the next.
+beforeEach(() => {
+  resetDraftsForTest();
+});
 
 function renderComposer(props: {
   readonly client: FakeHostClient["client"] | null;
@@ -22,6 +29,7 @@ function renderComposer(props: {
   render(
     <Composer
       epicId="e1"
+      chatId="c1"
       client={props.client}
       prefillText={null}
       prefillNonce={0}
@@ -35,6 +43,29 @@ function renderComposer(props: {
       onStop={() => {}}
     />,
   );
+}
+
+function fullProps(overrides: Partial<ComposerProps>): ComposerProps {
+  return {
+    epicId: "e1",
+    chatId: "c1",
+    client: null,
+    prefillText: null,
+    prefillNonce: 0,
+    chatSettings: null,
+    canStop: false,
+    stopping: false,
+    accessRole: "owner",
+    connectionLive: true,
+    sendDisabledHint: null,
+    onSend: () => {},
+    onStop: () => {},
+    ...overrides,
+  };
+}
+
+function textarea(): HTMLTextAreaElement {
+  return screen.getByPlaceholderText("Message this agent…") as HTMLTextAreaElement;
 }
 
 function sendButton(): HTMLElement {
@@ -85,5 +116,37 @@ describe("Composer — a disabled Send always says why", () => {
 
     const button = sendButton();
     expect(button.getAttribute("title")).toBe("Reconnecting to the host…");
+  });
+});
+
+describe("Composer — prefill (queue-edit)", () => {
+  it("adopts a new prefillText when prefillNonce bumps", () => {
+    const { rerender } = render(<Composer {...fullProps({ prefillText: null, prefillNonce: 0 })} />);
+    expect(textarea().value).toBe("");
+
+    rerender(<Composer {...fullProps({ prefillText: "edited queue item", prefillNonce: 1 })} />);
+    expect(textarea().value).toBe("edited queue item");
+  });
+
+  it("does not clobber the user's own typing on a re-render with a STABLE nonce", () => {
+    const { rerender } = render(<Composer {...fullProps({ prefillText: "first", prefillNonce: 1 })} />);
+    expect(textarea().value).toBe("first");
+
+    fireEvent.change(textarea(), { target: { value: "user is typing something else" } });
+    expect(textarea().value).toBe("user is typing something else");
+
+    // Same props, same nonce, re-rendered for an unrelated reason (e.g. a
+    // parent state change) — must not re-adopt prefillText and stomp on
+    // what the user just typed.
+    rerender(<Composer {...fullProps({ prefillText: "first", prefillNonce: 1 })} />);
+    expect(textarea().value).toBe("user is typing something else");
+  });
+
+  it("adopts a SECOND prefill bump even if the user typed in between", () => {
+    const { rerender } = render(<Composer {...fullProps({ prefillText: "first", prefillNonce: 1 })} />);
+    fireEvent.change(textarea(), { target: { value: "user edit" } });
+
+    rerender(<Composer {...fullProps({ prefillText: "second edit", prefillNonce: 2 })} />);
+    expect(textarea().value).toBe("second edit");
   });
 });

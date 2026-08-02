@@ -24,8 +24,8 @@ export class SubscriptionStore {
   private subscriptions: StoredPushSubscription[] = [];
   private loaded = false;
 
-  /** `path` defaults to the real `~/.traycer/push-service/subscriptions.json`; tests inject a temp path so they never touch real runtime state. */
-  constructor(path: string = subscriptionsPath()) {
+  /** Callers pass `subscriptionsPath()` for the real `~/.traycer/push-service/subscriptions.json`; tests inject a temp path so they never touch real runtime state. */
+  constructor(path: string) {
     this.path = path;
   }
 

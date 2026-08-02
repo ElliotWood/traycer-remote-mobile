@@ -12,7 +12,7 @@ import {
   type EpicArtifactEntry,
 } from "@/host/use-epic-doc";
 import { anyDescendantUnread, collectDescendantIds } from "@/host/agent-ladder";
-import { isUnread } from "@/host/read-tracking-store";
+import { defaultStorage, isUnread } from "@/host/read-tracking-store";
 import { resortTree, type SortMode } from "@/host/tree-sort";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useRenameArtifact, useDeleteArtifact } from "@/host/use-node-mutations";
@@ -77,7 +77,7 @@ export function ArtifactsSection({
   );
   const unreadById = useMemo(() => {
     const out: Record<string, boolean> = {};
-    for (const a of artifacts) out[a.id] = isUnread(epicId, a.id, a.updatedAt);
+    for (const a of artifacts) out[a.id] = isUnread(epicId, a.id, a.updatedAt, defaultStorage());
     return out;
   }, [artifacts, epicId]);
 

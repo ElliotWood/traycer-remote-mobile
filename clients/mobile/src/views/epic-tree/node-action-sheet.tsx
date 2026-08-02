@@ -11,6 +11,7 @@
  */
 import { useState, type ReactElement } from "react";
 import { FilePenLine, FolderPlus, Trash2, type LucideIcon } from "lucide-react";
+import { useDismissLayer } from "@/router/nav-host";
 import { Button, radius, theme, type } from "@/views/design-tokens";
 import { ROW_MIN_HEIGHT } from "./tree-primitives";
 
@@ -93,18 +94,24 @@ function ActionRow({
 
 export function NodeActionSheet(props: NodeActionSheetProps): ReactElement {
   const [step, setStep] = useState<"menu" | "confirm-delete">("menu");
+  // Two layers, because this sheet really is two levels deep: back from the
+  // confirm step returns to the menu, and only a second back closes the sheet.
+  // Registered in that order, and consumed newest-first, so the nesting falls
+  // out of the model rather than needing a special case.
+  const dismiss = useDismissLayer(true, props.onClose);
+  const backToMenu = useDismissLayer(step === "confirm-delete", () => setStep("menu"));
 
   return (
-    <div role="dialog" aria-modal="true" style={overlayStyle} onClick={props.onClose}>
+    <div role="dialog" aria-modal="true" style={overlayStyle} onClick={dismiss}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         <p style={{ ...type.bodySm, color: theme.mutedText, margin: "0 0 8px", padding: "0 8px" }}>
           {props.title}
         </p>
 
         {step === "menu" ? (
-          <MenuStep {...props} onDeleteTapped={() => setStep("confirm-delete")} />
+          <MenuStep {...props} onCancel={dismiss} onDeleteTapped={() => setStep("confirm-delete")} />
         ) : (
-          <ConfirmDeleteStep {...props} onBack={() => setStep("menu")} />
+          <ConfirmDeleteStep {...props} onBack={backToMenu} onDismiss={dismiss} />
         )}
       </div>
     </div>
@@ -112,7 +119,10 @@ export function NodeActionSheet(props: NodeActionSheetProps): ReactElement {
 }
 
 function MenuStep(
-  props: NodeActionSheetProps & { readonly onDeleteTapped: () => void },
+  props: NodeActionSheetProps & {
+    readonly onCancel: () => void;
+    readonly onDeleteTapped: () => void;
+  },
 ): ReactElement {
   return (
     <>
@@ -141,7 +151,7 @@ function MenuStep(
         onClick={props.onDeleteTapped}
       />
       <div style={{ height: 8 }} />
-      <Button variant="ghost" fullWidth onClick={props.onClose}>
+      <Button variant="ghost" fullWidth onClick={props.onCancel}>
         Cancel
       </Button>
     </>
@@ -176,9 +186,10 @@ export function RenamePrompt({
 }: RenamePromptProps): ReactElement {
   const [value, setValue] = useState(initialTitle);
   const canSubmit = value.trim().length > 0 && !submitting;
+  const dismiss = useDismissLayer(true, onClose);
 
   return (
-    <div role="dialog" aria-modal="true" style={overlayStyle} onClick={onClose}>
+    <div role="dialog" aria-modal="true" style={overlayStyle} onClick={dismiss}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         <p style={{ ...type.titleSm, color: theme.text, margin: "0 0 12px", padding: "0 8px" }}>Rename</p>
         <input
@@ -212,7 +223,7 @@ export function RenamePrompt({
           <Button variant="primary" fullWidth disabled={!canSubmit} onClick={() => onSubmit(value)}>
             {submitting ? "Saving…" : "Save"}
           </Button>
-          <Button variant="ghost" fullWidth onClick={onClose} disabled={submitting}>
+          <Button variant="ghost" fullWidth onClick={dismiss} disabled={submitting}>
             Cancel
           </Button>
         </div>
@@ -228,8 +239,11 @@ function ConfirmDeleteStep({
   deleteError,
   onDeleteConfirmed,
   onBack,
-  onClose,
-}: NodeActionSheetProps & { readonly onBack: () => void }): ReactElement {
+  onDismiss,
+}: NodeActionSheetProps & {
+  readonly onBack: () => void;
+  readonly onDismiss: () => void;
+}): ReactElement {
   return (
     <>
       <p style={{ ...type.titleSm, color: theme.text, margin: "0 0 8px", padding: "0 8px" }}>
@@ -256,7 +270,7 @@ function ConfirmDeleteStep({
       <div style={{ height: 4 }} />
       <button
         type="button"
-        onClick={onClose}
+        onClick={onDismiss}
         style={{
           width: "100%",
           minHeight: 40,

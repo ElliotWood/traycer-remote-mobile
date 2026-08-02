@@ -6,6 +6,7 @@ import { buildPushPayload } from "./push-payload";
 import { createPushSender } from "./push-sender";
 import { PushedStateStore } from "./pushed-state-store";
 import { SubscriptionStore } from "./subscription-store";
+import { pushedStatePath, subscriptionsPath, vapidKeysPath } from "./storage/paths";
 import { loadOrCreateVapidKeys } from "./vapid-keys";
 
 /** `127.0.0.1` only — `tailscale serve` fronts it on the tailnet at `/push`; this process never binds a public interface itself. */
@@ -13,12 +14,12 @@ const HTTP_PORT = 5276;
 const HTTP_HOST = "127.0.0.1";
 
 async function main(): Promise<void> {
-  const vapidKeys = await loadOrCreateVapidKeys();
+  const vapidKeys = await loadOrCreateVapidKeys(vapidKeysPath());
 
-  const subscriptionStore = new SubscriptionStore();
+  const subscriptionStore = new SubscriptionStore(subscriptionsPath());
   await subscriptionStore.load();
 
-  const pushedStateStore = new PushedStateStore();
+  const pushedStateStore = new PushedStateStore(pushedStatePath());
   await pushedStateStore.load();
 
   const pushSender = createPushSender({ vapidKeys, subscriptionStore });

@@ -1,4 +1,4 @@
-import type { StreamFrameEnvelope } from "@traycer-clients/shared/host-transport/i-stream-session";
+import type { StreamFrameEnvelope } from "../host-transport/i-stream-session";
 /**
  * Tracks an owner action until a REAL signal resolves it.
  *

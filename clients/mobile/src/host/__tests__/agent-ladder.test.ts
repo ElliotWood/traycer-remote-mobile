@@ -8,16 +8,17 @@ import {
   resolveLadderTier,
   rollupOutranksSelf,
   summarizeChatDescendantRollup,
+  type DescendantStatusKind,
   type LadderTier,
 } from "../agent-ladder";
 
-function badge(overrides: Partial<ChatBadgeState> = {}): ChatBadgeState {
+function badge(overrides: Partial<ChatBadgeState>): ChatBadgeState {
   return { ...DEFAULT_CHAT_BADGE, ...overrides };
 }
 
 describe("resolveLadderTier — precedence (failed > interview > approval > running > background > done-unread > read-only > idle)", () => {
   it("idle by default", () => {
-    expect(resolveLadderTier({ badge: badge(), hasUnreadFailure: false, hasUnreadDone: false })).toBe(
+    expect(resolveLadderTier({ badge: badge({}), hasUnreadFailure: false, hasUnreadDone: false })).toBe(
       "idle",
     );
   });
@@ -97,7 +98,7 @@ describe("resolveLadderTier — precedence (failed > interview > approval > runn
 
 describe("ladderTierToDescendantKind", () => {
   it("maps the six urgency tiers and returns null for read-only/idle", () => {
-    const cases: readonly [LadderTier, ReturnType<typeof ladderTierToDescendantKind>][] = [
+    const cases: readonly [LadderTier, DescendantStatusKind | null][] = [
       ["failed", "failure"],
       ["needs-interview", "interview"],
       ["needs-approval", "approval"],

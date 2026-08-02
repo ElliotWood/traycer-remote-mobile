@@ -17,7 +17,7 @@
  * fail; delete the `onChange` subscription and the "reacts to onChange" test MUST
  * fail. (Verified by hand-removing each line.)
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import type { HostRpcRegistry } from "@traycer/protocol/host/index";
 import type { IHostMessenger } from "@traycer-clients/shared/host-transport/host-messenger";
 import type { RequestContext } from "@traycer/protocol/auth/request-context";
@@ -86,7 +86,7 @@ function fakeAuth(initial: RequestContext | null): HostConnectionAuth & {
 /** Mock raw messenger that records calls and resolves — stands in for `WsRpcClient`. */
 function mockMessenger(): {
   messenger: IHostMessenger<HostRpcRegistry>;
-  request: ReturnType<typeof vi.fn>;
+  request: Mock;
 } {
   const request = vi.fn().mockResolvedValue({ ok: true });
   const messenger = {

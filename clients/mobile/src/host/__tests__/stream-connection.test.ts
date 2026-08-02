@@ -8,7 +8,7 @@
  * `StreamConnectionStateStore` notifies subscribers only on a real change. Also
  * pins `createStreamAuthRevalidator`'s outcome mapping.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import type {
   IStreamSession,
   ServerFrameHandler,
@@ -20,6 +20,7 @@ import type { WsStreamClient } from "@traycer-clients/shared/host-transport/ws-s
 import type { HostStreamRpcRegistry } from "@traycer/protocol/host/registry";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
 import type { AuthIdentityValidationResult } from "@traycer-clients/shared/auth/auth-validation";
+import type { StreamAuthRevalidator } from "@traycer-clients/shared/auth/bearer-revalidator";
 import {
   createStreamAuthRevalidator,
   openChatStream,
@@ -55,7 +56,7 @@ class MockStreamSession implements IStreamSession {
  */
 function mockWsStreamClient(session: MockStreamSession): {
   readonly client: WsStreamClient<HostStreamRpcRegistry>;
-  readonly subscribe: ReturnType<typeof vi.fn>;
+  readonly subscribe: Mock;
 } {
   const subscribe = vi.fn(() => session);
   const client = { subscribe } as unknown as WsStreamClient<HostStreamRpcRegistry>;
@@ -150,7 +151,7 @@ describe("createStreamAuthRevalidator", () => {
   // The revalidator reads only `outcome.kind`, so a cast stub is faithful.
   function revalidatorOver(
     outcome: AuthIdentityValidationResult | null,
-  ): ReturnType<typeof createStreamAuthRevalidator> {
+  ): StreamAuthRevalidator {
     const auth = {
       revalidateCurrentContext: () => Promise.resolve(outcome),
     } as unknown as MobileAuthService;

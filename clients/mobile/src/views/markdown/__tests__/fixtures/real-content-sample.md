@@ -40,9 +40,14 @@ graph TD
 | 1 In Progress | amber `#f59e0b` |
 | 2 Done | emerald `#10b981` |
 
-## Risks
+## What this fixture is for
 
-1. **Diagram fidelity** — the mermaid fence must survive nested brackets and
-   punctuation inside node labels (`[epic Y.Doc: chats + artifacts map]`).
-2. **Table fidelity** — a cell can mix inline code, a hex value, *and* plain
-   text on one line, which is exactly what the icon table above does.
+1. **Parse survival, not diagram rendering.** The mermaid fence must not
+   throw on nested brackets and colons inside node labels
+   (`[epic Y.Doc: chats + artifacts map]`) as it's routed to `MermaidBlock`.
+   Whether the diagram itself renders correctly is NOT covered by
+   `real-content.test.tsx` — real mermaid can't render in jsdom at all, so
+   that's a live-browser concern, not this fixture's.
+2. **Mixed-content table cells.** A cell mixing inline code, a hex value,
+   *and* plain text on one line — the icon table above — IS asserted
+   directly (`real-content.test.tsx` counts cells shaped like this).

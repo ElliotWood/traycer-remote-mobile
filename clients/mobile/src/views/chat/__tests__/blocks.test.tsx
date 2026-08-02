@@ -26,7 +26,10 @@ function Providers({
   );
 }
 
-function renderBlocks(blocks: ContentBlock[], request?: (method: string, params: unknown) => Promise<unknown>) {
+function renderBlocks(
+  blocks: ContentBlock[],
+  request: ((method: string, params: unknown) => Promise<unknown>) | null,
+) {
   const nodes: readonly RenderableBlock[] = buildBlockTree(blocks);
   const req = request ?? (() => Promise.reject(new Error("unexpected request")));
   return render(
@@ -47,7 +50,7 @@ describe("mandatory collapsed-by-default (reasoning/tool_call/file_change/subage
       content: "because the tests failed",
       startedAt: 0,
     };
-    renderBlocks([block]);
+    renderBlocks([block], null);
     expect(screen.queryByText("because the tests failed")).toBeNull();
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     expect(screen.getByText("because the tests failed")).toBeTruthy();
@@ -73,7 +76,7 @@ describe("mandatory collapsed-by-default (reasoning/tool_call/file_change/subage
       backgroundTask: false,
       stopped: false,
     };
-    renderBlocks([block]);
+    renderBlocks([block], null);
     expect(screen.getByText("ls -la /tmp")).toBeTruthy();
     expect(screen.queryByText("$ ls -la /tmp")).toBeNull();
     fireEvent.click(screen.getByRole("button", { expanded: false }));
@@ -109,7 +112,7 @@ describe("mandatory collapsed-by-default (reasoning/tool_call/file_change/subage
         exitCode: 0,
       },
     ];
-    renderBlocks(blocks);
+    renderBlocks(blocks, null);
     expect(screen.queryByText(/grep -r foo/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     expect(screen.getByText(/grep -r foo/)).toBeTruthy();
@@ -186,7 +189,7 @@ describe("artifact_operation — null title fallback", () => {
       beforeHash: null,
       afterHash: null,
     };
-    renderBlocks([block]);
+    renderBlocks([block], null);
     // The title falls back to the kind label AND a separate kind badge also
     // shows it — two matches is the expected (non-blank) rendering.
     expect(screen.getAllByText("Ticket").length).toBeGreaterThan(0);
@@ -209,7 +212,7 @@ describe("resolved interview/approval — real content, not the pending reply fo
       error: null,
       metadata: null,
     };
-    renderBlocks([block]);
+    renderBlocks([block], null);
     expect(screen.getByText("Answered 1 of 1 questions")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     expect(screen.getByText("Rewrite")).toBeTruthy();
@@ -228,7 +231,7 @@ describe("resolved interview/approval — real content, not the pending reply fo
       inputDetail: null,
       decision: null,
     };
-    const { container } = renderBlocks([block]);
+    const { container } = renderBlocks([block], null);
     expect(container.textContent).toBe("");
   });
 });
@@ -236,7 +239,7 @@ describe("resolved interview/approval — real content, not the pending reply fo
 describe("no-throw fallback", () => {
   it("renders a labeled placeholder for an unrecognized block shape, never throws", () => {
     const malformed = { type: "some_future_block", blockId: "x1" } as unknown as ContentBlock;
-    expect(() => renderBlocks([malformed])).not.toThrow();
+    expect(() => renderBlocks([malformed], null)).not.toThrow();
     expect(screen.getByTestId("unsupported-block")).toBeTruthy();
   });
 });

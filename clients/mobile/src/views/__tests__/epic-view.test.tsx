@@ -86,7 +86,7 @@ function chatSnapshot(opts: {
 
 function renderEpicView(
   fake: FakeStreamConnection,
-  onOpenChat: (chatId: string) => void = () => {},
+  onOpenChat: (chatId: string) => void,
 ): { readonly unmount: () => void } {
   const result = render(
     <StreamConnectionProvider connection={fake.connection}>
@@ -112,7 +112,7 @@ function chatSessionFor(
 describe("EpicView — Agents section (P1)", () => {
   it("renders chats with a live-state icon, blocked outranking running in the accessible label", async () => {
     const fake = createFakeStreamConnection();
-    renderEpicView(fake);
+    renderEpicView(fake, () => {});
 
     // 1) Epic stream delivers the chat enumeration + goes live.
     act(() => {
@@ -164,7 +164,7 @@ describe("EpicView — Agents section (P1)", () => {
 
   it("tears down the epic stream and every per-chat stream on unmount", async () => {
     const fake = createFakeStreamConnection();
-    const { unmount } = renderEpicView(fake);
+    const { unmount } = renderEpicView(fake, () => {});
 
     act(() => {
       fake.epicSessions[0].callbacks.onSnapshot(
@@ -191,7 +191,7 @@ describe("EpicView — Agents section (P1)", () => {
 describe("EpicView — Artifacts section (P1)", () => {
   it("renders inline from the SAME epic session — no second epic.subscribe", async () => {
     const fake = createFakeStreamConnection();
-    renderEpicView(fake);
+    renderEpicView(fake, () => {});
 
     act(() => {
       fake.epicSessions[0].callbacks.onSnapshot(
@@ -211,7 +211,7 @@ describe("EpicView — Artifacts section (P1)", () => {
 
   it("opens the artifact body inline on tap", async () => {
     const fake = createFakeStreamConnection();
-    renderEpicView(fake);
+    renderEpicView(fake, () => {});
 
     act(() => {
       fake.epicSessions[0].callbacks.onSnapshot(

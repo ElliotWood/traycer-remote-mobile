@@ -130,7 +130,8 @@ export function useAttention(
      * failure state over a cosmetic lookup.
      */
     if (listClient !== null) {
-      void fetchEpicListPage(listClient, undefined)
+      // `{}` — unsearched, default sort. This join only needs id → title.
+      void fetchEpicListPage(listClient, undefined, {})
         .then((page) => {
           if (disposed) return;
           const next: Record<string, string> = { ...titlesRef.current };

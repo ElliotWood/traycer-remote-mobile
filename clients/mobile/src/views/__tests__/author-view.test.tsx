@@ -11,7 +11,7 @@
  * navigating, and — the strongest guard — that the built body parses against the
  * REAL `createChatRequestSchema`.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { createChatRequestSchema } from "@traycer/protocol/host/epic/unary-schemas";
 import type { ListHarnessModelsResponse } from "@traycer/protocol/host/agent/shared";
@@ -19,6 +19,30 @@ import { AuthorView } from "@/views/author-view";
 import { buildCreateChatRequest } from "@/host/use-create-chat";
 import { createFakeHostClient, type FakeHostClient } from "@/test-utils/fakes";
 import { render, screen, waitFor } from "@/test-utils/dom";
+
+/**
+ * HA-1: the host's REAL id, as `VITE_HOST_ID` supplies it. This test used to
+ * assert `hostId === "mobile-host"` — baking the synthetic fallback in as the
+ * EXPECTED value, which made the suite structurally blind to the defect where
+ * every phone-authored chat became a permanently unreachable tile on desktop.
+ * Asserting the configured id means collapsing back to the fallback goes red.
+ */
+const CONFIGURED_HOST_ID = "85a4a272-315f-4953-a282-9a33fe24c815";
+
+const configMock = { hostId: CONFIGURED_HOST_ID as string | null };
+vi.mock("@/config", () => ({
+  get CONFIGURED_HOST_ID() {
+    return configMock.hostId;
+  },
+  HOST_WS_URL: null,
+  AUTHN_CONFIGURED: false,
+  AUTHN_BASE_URL: "https://authn.example.test",
+  PUSH_BASE_URL: null,
+}));
+
+beforeEach(() => {
+  configMock.hostId = CONFIGURED_HOST_ID;
+});
 
 const MODELS_RESPONSE: ListHarnessModelsResponse = {
   harnessId: "claude",
@@ -51,7 +75,7 @@ function requestImpl(opts: {
 
 function renderAuthor(
   fake: FakeHostClient,
-  onCreated: (chatId: string) => void = () => {},
+  onCreated: (chatId: string) => void,
 ): void {
   render(
     <AuthorView
@@ -75,7 +99,7 @@ function createChatBody(fake: FakeHostClient): Record<string, unknown> {
 describe("AuthorView", () => {
   it("resolves a model then dispatches epic.createChat with the instruction and no workspace/settings", async () => {
     const fake = createFakeHostClient(requestImpl({}));
-    renderAuthor(fake);
+    renderAuthor(fake, () => {});
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "Add a health check");
@@ -98,7 +122,9 @@ describe("AuthorView", () => {
     // Required top-level fields all present.
     expect(body.epicId).toBe("e1");
     expect(body.parentId).toBeNull();
-    expect(body.hostId).toBe("mobile-host");
+    // The REAL configured id — never the shared synthetic placeholder.
+    expect(body.hostId).toBe(CONFIGURED_HOST_ID);
+    expect(body.hostId).not.toBe("mobile-host");
     expect(typeof body.title).toBe("string");
     expect((body.title as string).length).toBeGreaterThan(0);
     expect(typeof body.chatId).toBe("string");
@@ -171,6 +197,23 @@ describe("AuthorView", () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
+  it("refuses to create a chat when the host's real id is not configured (HA-1)", async () => {
+    configMock.hostId = null;
+    const fake = createFakeHostClient(requestImpl({}));
+    const onCreated = vi.fn();
+    renderAuthor(fake, onCreated);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Instruction"), "Would be unreachable");
+    await user.click(screen.getByRole("button", { name: "Start agent" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent ?? "").toMatch(/VITE_HOST_ID is unset/i);
+    // Nothing durable was stamped: no chat exists to be unreachable.
+    expect(fake.request.mock.calls.some((c) => c[0] === "epic.createChat")).toBe(false);
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
   it("builds a request body that parses against the real createChatRequestSchema", () => {
     const request = buildCreateChatRequest({
       epicId: "e1",
@@ -180,6 +223,7 @@ describe("AuthorView", () => {
       userId: "user-1",
       model: "test-model",
       instruction: "First line of the instruction\nsecond line",
+      hostId: CONFIGURED_HOST_ID,
     });
 
     // The strongest contract guard: the real schema accepts the body verbatim.

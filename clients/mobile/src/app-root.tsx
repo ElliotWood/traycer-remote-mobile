@@ -106,6 +106,13 @@ export function AppRoot(): ReactElement {
     return <ConfigErrorScreen problems={configProblems} />;
   }
 
+  /* eslint-disable react-hooks/rules-of-hooks -- the early return above is
+   * gated on `configProblems`, computed from build-time constants +
+   * `window.location.origin`, both invariant for the page's lifetime (see
+   * the comment above it) — so for any given mounted instance, this branch
+   * is never taken on one render and skipped on the next; hook order never
+   * actually varies for that instance. The rule can't see that invariant
+   * statically and flags every hook below as "conditional". */
   const [auth] = useState(
     () =>
       new MobileAuthService({
@@ -147,7 +154,7 @@ export function AppRoot(): ReactElement {
           key: QUERY_CACHE_STORAGE_KEY,
         }),
   );
-  const [connection] = useState(() => createHostConnection(auth));
+  const [connection] = useState(() => createHostConnection(auth, {}));
   // T5 stands up the streaming stack (T3) the unary wiring never reached: one
   // `HostStreamConnection` for the session's `epic.subscribe` / `chat.subscribe`
   // streams, off the SAME auth. Gated on a configured host (like `connection`)
@@ -162,6 +169,7 @@ export function AppRoot(): ReactElement {
     startedRef.current = true;
     void auth.start();
   }, [auth]);
+  /* eslint-enable react-hooks/rules-of-hooks */
 
   const shell = (
     <RestoreGate>

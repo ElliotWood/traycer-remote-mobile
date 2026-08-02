@@ -1,8 +1,8 @@
 import type {
   AuthorityBoundAuthRevalidator,
   RevalidateOutcome,
-} from "@traycer-clients/shared/auth/bearer-revalidator";
-import type { OpenFrameBearerSource } from "@traycer-clients/shared/auth/bearer-source";
+} from "../auth/bearer-revalidator";
+import type { OpenFrameBearerSource } from "../auth/bearer-source";
 import type { VersionedRpcRegistry } from "@traycer/protocol/framework/index";
 import {
   HostRpcError,

@@ -9,7 +9,7 @@
 import { useEffect, type ReactElement } from "react";
 import { useCurrentEpicDoc } from "@/host/current-epic-context";
 import { useArtifactNav } from "@/host/artifact-nav-context";
-import { markSeen } from "@/host/read-tracking-store";
+import { defaultStorage, markSeen } from "@/host/read-tracking-store";
 import { ArtifactBodyView } from "./artifact-body-view";
 import { screen } from "./design-tokens";
 import { colors } from "./ui";
@@ -25,7 +25,7 @@ export function ArtifactRouteView({ epicId, artifactId }: ArtifactRouteViewProps
   const artifact = artifacts.find((a) => a.id === artifactId);
 
   useEffect(() => {
-    if (artifact !== undefined) markSeen(epicId, artifact.id);
+    if (artifact !== undefined) markSeen(epicId, artifact.id, Date.now(), defaultStorage());
   }, [epicId, artifact]);
 
   if (artifact === undefined) {

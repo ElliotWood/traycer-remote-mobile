@@ -19,9 +19,10 @@ import {
   resolveLadderTier,
   rollupOutranksSelf,
   summarizeChatDescendantRollup,
+  type DescendantStatusKind,
   type LadderTier,
 } from "@/host/agent-ladder";
-import { getLastSeenAt, isUnread } from "@/host/read-tracking-store";
+import { defaultStorage, getLastSeenAt, isUnread } from "@/host/read-tracking-store";
 import { resortTree, type SortMode } from "@/host/tree-sort";
 import { useHostClientOrNull } from "@/host/host-client-context";
 import { useRenameChat, useDeleteChat } from "@/host/use-node-mutations";
@@ -57,9 +58,9 @@ function tierFor(
   badge: ChatBadgeState,
   epicId: string,
 ): LadderTier {
-  const lastSeenAt = getLastSeenAt(epicId, chat.chatId);
-  const hasUnreadFailure = badge.lastErrorAt !== null && isUnread(epicId, chat.chatId, badge.lastErrorAt);
-  const hasUnreadDone = lastSeenAt !== null && isUnread(epicId, chat.chatId, chat.updatedAt);
+  const lastSeenAt = getLastSeenAt(epicId, chat.chatId, defaultStorage());
+  const hasUnreadFailure = badge.lastErrorAt !== null && isUnread(epicId, chat.chatId, badge.lastErrorAt, defaultStorage());
+  const hasUnreadDone = lastSeenAt !== null && isUnread(epicId, chat.chatId, chat.updatedAt, defaultStorage());
   return resolveLadderTier({ badge, hasUnreadFailure, hasUnreadDone });
 }
 
@@ -302,7 +303,7 @@ function ChatNodeImpl({
 const ChatNode = memo(ChatNodeImpl);
 
 /** The rollup only ever carries the six urgency kinds — mapped back to a displayable tier for the muted glyph. */
-function descendantKindToTier(kind: ReturnType<typeof computeChatDescendantRollup>["kind"]): LadderTier {
+function descendantKindToTier(kind: DescendantStatusKind | null): LadderTier {
   switch (kind) {
     case "failure":
       return "failed";

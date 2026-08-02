@@ -38,7 +38,7 @@ describe("useEpicList — self-refresh options (S5)", () => {
     const client = new QueryClient();
     const request = vi.fn().mockResolvedValue({ tasks: [], hasMore: false });
 
-    renderHook(() => useEpicList({ request }), { wrapper: wrapper(client) });
+    renderHook(() => useEpicList({ request }, {}), { wrapper: wrapper(client) });
 
     // Wait for the query to register itself on the cache.
     await vi.waitFor(() => {

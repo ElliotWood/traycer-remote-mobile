@@ -74,7 +74,7 @@ export const EPIC_LIST_REQUEST: Omit<ListTasksRequest, "cursor"> =
 
 export function buildEpicListRequest(
   cursor: string | undefined,
-  options: EpicListOptions = {},
+  options: EpicListOptions,
 ): ListTasksRequest {
   const base = buildBaseRequest(options);
   return cursor === undefined ? { ...base } : { ...base, cursor };
@@ -83,7 +83,7 @@ export function buildEpicListRequest(
 export function fetchEpicListPage(
   client: EpicListClient,
   cursor: string | undefined,
-  options: EpicListOptions = {},
+  options: EpicListOptions,
 ): Promise<ListTasksResponse> {
   return client.request(
     "epic.listTasks",
@@ -161,7 +161,7 @@ export function fleetEpicFromLight(
     readonly createdAt: number;
     readonly updatedAt: number;
   },
-  pinned = false,
+  pinned: boolean,
 ): FleetEpic {
   return {
     id: light.id,

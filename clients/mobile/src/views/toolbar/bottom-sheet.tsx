@@ -7,19 +7,34 @@
  */
 import { X } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
+import { useDismissLayer } from "@/router/nav-host";
 import { radius, theme, type } from "@/views/design-tokens";
 
 export interface BottomSheetProps {
   readonly title: string;
+  /**
+   * Called when the sheet has been dismissed — by the ✕, a backdrop tap, OR the
+   * OS back gesture, which all arrive here through the same path. Callers set
+   * their `open` state false here; they should not treat this as the only
+   * trigger and wire a second, history-bypassing close of their own.
+   */
   readonly onClose: () => void;
   readonly children: ReactNode;
 }
 
 export function BottomSheet({ title, onClose, children }: BottomSheetProps): ReactElement {
+  /**
+   * Back-dismissal by construction: every bottom sheet in the app — present and
+   * future — participates in back navigation for free, because callers already
+   * mount this conditionally, so "mounted" IS "open" and `active` is constant.
+   * Registering here rather than in each caller is the difference between a
+   * model a new screen joins automatically and one that needs remembering.
+   */
+  const dismiss = useDismissLayer(true, onClose);
   return (
     <div
       role="presentation"
-      onClick={onClose}
+      onClick={dismiss}
       style={{
         position: "fixed",
         inset: 0,
@@ -63,7 +78,7 @@ export function BottomSheet({ title, onClose, children }: BottomSheetProps): Rea
           <button
             type="button"
             aria-label="Close"
-            onClick={onClose}
+            onClick={dismiss}
             style={{
               display: "flex",
               alignItems: "center",

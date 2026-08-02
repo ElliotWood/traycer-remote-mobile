@@ -42,7 +42,10 @@ export function VersionPromptBanner(): ReactElement | null {
   // to clear it. Tracked in a ref so the effect below can clear it on
   // unmount, and so a defensive re-registration can never stack a second
   // interval on top of the first.
-  const updateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Browser-only — `number`, not `ReturnType<typeof setInterval>`, which
+  // resolves to Node's ambient `Timeout` type when `@types/node` is also in
+  // scope.
+  const updateIntervalRef = useRef<number | null>(null);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -52,9 +55,9 @@ export function VersionPromptBanner(): ReactElement | null {
         return;
       }
       if (updateIntervalRef.current !== null) {
-        clearInterval(updateIntervalRef.current);
+        window.clearInterval(updateIntervalRef.current);
       }
-      updateIntervalRef.current = setInterval(() => {
+      updateIntervalRef.current = window.setInterval(() => {
         void registration.update();
       }, SW_UPDATE_CHECK_INTERVAL_MS);
     },
@@ -63,7 +66,7 @@ export function VersionPromptBanner(): ReactElement | null {
   useEffect(() => {
     return () => {
       if (updateIntervalRef.current !== null) {
-        clearInterval(updateIntervalRef.current);
+        window.clearInterval(updateIntervalRef.current);
       }
     };
   }, []);

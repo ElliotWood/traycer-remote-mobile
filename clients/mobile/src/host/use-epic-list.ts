@@ -53,13 +53,18 @@ import {
   type EpicListClient,
   type EpicListOptions,
   type FleetEpic,
+  // Re-exporting a type above does NOT bind it locally, and `EpicListQueryKey`
+  // below uses it — so it needs a real import as well as the re-export.
+  type FleetSort,
 } from "@traycer-clients/shared/epic/epic-list";
 
 /** Shared prefix every fleet-list query key starts with, regardless of search/sort — TanStack's partial-key matching lets `use-epic-set-pinned-mutation.ts` invalidate every variant with one call. */
 export const EPIC_LIST_QUERY_KEY_PREFIX = ["mobile", "epic.listTasks", "fleet"] as const;
 
-function epicListQueryKey(options: EpicListOptions) {
-  return [...EPIC_LIST_QUERY_KEY_PREFIX, options.query ?? "", options.sort ?? DEFAULT_FLEET_SORT] as const;
+type EpicListQueryKey = readonly [...typeof EPIC_LIST_QUERY_KEY_PREFIX, string, FleetSort];
+
+function epicListQueryKey(options: EpicListOptions): EpicListQueryKey {
+  return [...EPIC_LIST_QUERY_KEY_PREFIX, options.query ?? "", options.sort ?? DEFAULT_FLEET_SORT];
 }
 
 export interface EpicListResult {
@@ -95,12 +100,12 @@ export interface EpicListResult {
  */
 const FLEET_REFETCH_INTERVAL_MS = 20_000;
 
-export function useEpicList(client: EpicListClient, options: EpicListOptions = {}): EpicListResult {
+export function useEpicList(client: EpicListClient, options: EpicListOptions): EpicListResult {
   const query = useInfiniteQuery<
     ListTasksResponse,
     Error,
     InfiniteData<ListTasksResponse, string | undefined>,
-    ReturnType<typeof epicListQueryKey>,
+    EpicListQueryKey,
     string | undefined
   >({
     queryKey: epicListQueryKey(options),

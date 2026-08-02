@@ -50,7 +50,7 @@ function epicRow(
     storyCount: number;
     reviewCount: number;
     status: string;
-  }> = {},
+  }>,
 ): ListTaskLight {
   return {
     epic: {
@@ -78,7 +78,7 @@ function epicRow(
 
 function page(
   tasks: ListTaskLight[],
-  extra: Partial<ListTasksResponse> = {},
+  extra: Partial<ListTasksResponse>,
 ): ListTasksResponse {
   return { tasks, hasMore: false, ...extra };
 }
@@ -86,14 +86,14 @@ function page(
 describe("App gate → view render", () => {
   it("(a) signed-out renders the sign-in screen", () => {
     const auth = createFakeAuth(SIGNED_OUT);
-    const { client } = createFakeHostClient(() => Promise.resolve(page([])));
+    const { client } = createFakeHostClient(() => Promise.resolve(page([], {})));
     renderApp({ auth: auth.service, client });
     expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
   });
 
   it("(b) signing-in shows userCode + verification link; Cancel calls cancelSignIn", async () => {
     const auth = createFakeAuth({ kind: "signing-in", progress: PROGRESS });
-    const { client } = createFakeHostClient(() => Promise.resolve(page([])));
+    const { client } = createFakeHostClient(() => Promise.resolve(page([], {})));
     renderApp({ auth: auth.service, client });
 
     expect(screen.getByText("WDJB-MJHT")).toBeTruthy();
@@ -109,13 +109,16 @@ describe("App gate → view render", () => {
     const auth = createFakeAuth(SIGNED_IN);
     const { client, request } = createFakeHostClient(() =>
       Promise.resolve(
-        page([
-          epicRow("e1", "Auth refactor", {
-            ticketCount: 6,
-            specCount: 2,
-            status: "in progress",
-          }),
-        ]),
+        page(
+          [
+            epicRow("e1", "Auth refactor", {
+              ticketCount: 6,
+              specCount: 2,
+              status: "in progress",
+            }),
+          ],
+          {},
+        ),
       ),
     );
     renderApp({ auth: auth.service, client });
@@ -135,8 +138,8 @@ describe("App gate → view render", () => {
       call += 1;
       return Promise.resolve(
         call === 1
-          ? page([epicRow("e1", "Alpha")], { hasMore: true, nextCursor: "c1" })
-          : page([epicRow("e2", "Beta")]),
+          ? page([epicRow("e1", "Alpha", {})], { hasMore: true, nextCursor: "c1" })
+          : page([epicRow("e2", "Beta", {})], {}),
       );
     });
     renderApp({ auth: auth.service, client });
@@ -156,7 +159,7 @@ describe("App gate → view render", () => {
 
   it("(e1) a terminal empty result shows the empty state", async () => {
     const auth = createFakeAuth(SIGNED_IN);
-    const { client } = createFakeHostClient(() => Promise.resolve(page([])));
+    const { client } = createFakeHostClient(() => Promise.resolve(page([], {})));
     renderApp({ auth: auth.service, client });
     expect(await screen.findByText(/No epics yet/i)).toBeTruthy();
   });
@@ -176,7 +179,7 @@ describe("App gate → view render", () => {
   it("(f) tapping an epic row routes to the epic slot; Back returns to the fleet", async () => {
     const auth = createFakeAuth(SIGNED_IN);
     const { client } = createFakeHostClient(() =>
-      Promise.resolve(page([epicRow("e1", "Alpha", { status: "planning" })])),
+      Promise.resolve(page([epicRow("e1", "Alpha", { status: "planning" })], {})),
     );
     renderApp({ auth: auth.service, client });
     const user = userEvent.setup();

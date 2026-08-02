@@ -7,7 +7,7 @@
  * (rubric §2).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mock } from "vitest";
 import type { CommentThreadWire } from "@traycer/protocol/host/epic/unary-schemas";
 import { CommentsPanel } from "../comments-panel";
 import { HostClientProvider } from "@/host/host-client-context";
@@ -22,7 +22,7 @@ function isDisabled(el: HTMLElement): boolean {
   return (el as HTMLButtonElement).disabled;
 }
 
-function thread(overrides: Partial<CommentThreadWire> = {}): CommentThreadWire {
+function thread(overrides: Partial<CommentThreadWire>): CommentThreadWire {
   return {
     threadId: "t1",
     resolved: false,
@@ -42,7 +42,7 @@ function thread(overrides: Partial<CommentThreadWire> = {}): CommentThreadWire {
 }
 
 function mount(requestImpl: (method: string, params: unknown) => Promise<unknown>): {
-  readonly request: ReturnType<typeof vi.fn>;
+  readonly request: Mock;
 } {
   const { client, request } = createFakeHostClient(requestImpl);
   const queryClient = new QueryClient({
@@ -181,7 +181,7 @@ describe("CommentsPanel", () => {
   });
 
   it("disables Reply on empty text and calls the RPC with plainTextContent on submit", async () => {
-    const { request } = mount(() => Promise.resolve({ threads: [thread()] }));
+    const { request } = mount(() => Promise.resolve({ threads: [thread({})] }));
     await screen.findAllByTestId("comment-thread-card");
     const user = userEvent.setup();
 
@@ -242,7 +242,7 @@ describe("CommentsPanel", () => {
   });
 
   it("every Resolve/Reopen/Reply/Add-comment button carries an explicit ≥44px minHeight", async () => {
-    mount(() => Promise.resolve({ threads: [thread()] }));
+    mount(() => Promise.resolve({ threads: [thread({})] }));
     await screen.findAllByTestId("comment-thread-card");
 
     const names = ["Resolve", "Reply", "Add comment"];

@@ -15,9 +15,12 @@
  * `window` for a headless Playwright driver (`tests/layout/measure.mjs`) to
  * push snapshots and read real, browser-computed bounding boxes.
  */
-import { useEffect, useRef, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { ChatStreamCallbacks } from "@traycer-clients/shared/host-transport/chat-stream-client";
-import type { ChatSubscribeServerFrame } from "@traycer/protocol/host/agent/gui/subscribe";
+import {
+  chatSubscribeServerFrameSchema,
+  type ChatSubscribeServerFrame,
+} from "@traycer/protocol/host/agent/gui/subscribe";
 import { HostStreamConnection, StreamConnectionStateStore } from "@/host/stream-connection";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { ChatView } from "@/views/chat-view";
@@ -34,10 +37,15 @@ export interface ReproScenario {
   readonly fileEditCount?: number;
 }
 
-function interviewMessage(blockId: string, questionCount: number): unknown {
+function interviewMessage(blockId: string, questionCount: number): object {
   return {
     role: "assistant",
     messageId: `msg-${blockId}`,
+    sender: { type: "agent", harnessId: "claude", agentId: "layout-repro", displayName: null },
+    startedAt: null,
+    timestamp: 0,
+    turnId: null,
+    usage: null,
     blocks: [
       {
         type: "interview",
@@ -66,6 +74,15 @@ function interviewMessage(blockId: string, questionCount: number): unknown {
   };
 }
 
+/**
+ * Validated through the REAL wire-protocol schema (`.parse`, not an
+ * assertion) — `ChatSubscribeServerFrame`'s snapshot variant is a large,
+ * versioned, discriminated union; the fields this harness doesn't care
+ * about (`turnId`, `usage`, …) get real defaults from the schema itself
+ * instead of being hand-typed for a case that's irrelevant to a layout
+ * test. A malformed fixture throws here, loudly, at the call site — never
+ * silently mistyped past a cast.
+ */
 function snapshotFrame(scenario: ReproScenario): SnapshotFrame {
   const interviews = scenario.interviews ?? [];
   const approvalCount = scenario.approvalCount ?? 0;
@@ -91,15 +108,29 @@ function snapshotFrame(scenario: ReproScenario): SnapshotFrame {
     requestedAt: 0,
   }));
 
-  return {
+  const frame = chatSubscribeServerFrameSchema.parse({
     kind: "snapshot",
+    hasBinaryPayload: false,
+    epicId: EPIC_ID,
+    chatId: CHAT_ID,
     snapshot: {
       // Idle, not running — the composer shows Send (not Stop), matching
       // the reported scenario: the agent stopped to ask and the user is
       // trying to type a reply or send a new message.
       runStatus: "idle",
-      chat: { title: "Layout repro", messages, settings: null },
-      access: { role: "owner", ownerUserId: "u1" },
+      chat: {
+        id: CHAT_ID,
+        parentId: null,
+        userId: "u1",
+        hostId: "layout-repro-host",
+        title: "Layout repro",
+        messages,
+        settings: null,
+        createdAt: 0,
+        updatedAt: 0,
+        isTitleEditedByUser: false,
+      },
+      access: { role: "owner", ownerUserId: "u1", canAct: true },
       queue: { status: "idle", items: [] },
       pendingApprovals,
       pendingFileEditApprovals,
@@ -109,7 +140,9 @@ function snapshotFrame(scenario: ReproScenario): SnapshotFrame {
       worktreeBinding: null,
       missingWorktreePaths: [],
     },
-  } as unknown as SnapshotFrame;
+  });
+  if (frame.kind !== "snapshot") throw new Error("unreachable — just built a snapshot frame");
+  return frame;
 }
 
 /**
@@ -149,25 +182,30 @@ declare global {
 }
 
 export function LayoutReproView(): ReactElement {
-  const connectionRef = useRef<HostStreamConnection | null>(null);
-  if (connectionRef.current === null) {
-    connectionRef.current = createFakeConnection((callbacks) => {
-      window.__layoutRepro = {
-        ready: true,
-        setScenario: (scenario: ReproScenario) => callbacks.onSnapshot(snapshotFrame(scenario)),
-      };
-      callbacks.onSnapshot(snapshotFrame({ interviews: [2] }));
-    });
-  }
+  // `openChat` is called from `ChatView`'s own `useChat` effect (a CHILD
+  // effect, committed before this component's), which is where the fake
+  // connection actually hands back its callbacks — asynchronous relative to
+  // this component's render, so captured via a state setter (safe to call
+  // from anywhere) rather than a ref (flagged as accessed-during-render by
+  // static analysis, since the closure that calls it is itself created
+  // inside the `useState` lazy initializer, which runs during render).
+  const [callbacks, setCallbacks] = useState<ChatStreamCallbacks | null>(null);
+  const [connection] = useState<HostStreamConnection>(() => createFakeConnection(setCallbacks));
 
   useEffect(() => {
+    if (callbacks === null) return;
+    window.__layoutRepro = {
+      ready: true,
+      setScenario: (scenario: ReproScenario) => callbacks.onSnapshot(snapshotFrame(scenario)),
+    };
+    callbacks.onSnapshot(snapshotFrame({ interviews: [2] }));
     return () => {
       delete window.__layoutRepro;
     };
-  }, []);
+  }, [callbacks]);
 
   return (
-    <StreamConnectionProvider connection={connectionRef.current}>
+    <StreamConnectionProvider connection={connection}>
       <ChatView epicId={EPIC_ID} chatId={CHAT_ID} initialTitle={null} onTitleChange={() => {}} />
     </StreamConnectionProvider>
   );

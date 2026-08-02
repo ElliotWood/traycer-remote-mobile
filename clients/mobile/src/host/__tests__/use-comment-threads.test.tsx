@@ -23,7 +23,7 @@ function wrapper(): ({ children }: { children: ReactNode }) => ReactNode {
 function thread(
   threadId: string,
   createdAt: number,
-  overrides: Partial<CommentThreadWire> = {},
+  overrides: Partial<CommentThreadWire>,
 ): CommentThreadWire {
   return {
     threadId,
@@ -51,7 +51,7 @@ describe("useCommentThreads", () => {
   it("transitions loading -> success and calls the RPC with the exact params", async () => {
     const request = vi
       .fn()
-      .mockResolvedValue({ threads: [thread("t1", 100)] });
+      .mockResolvedValue({ threads: [thread("t1", 100, {})] });
     const { result } = renderHook(
       () =>
         useCommentThreads(
@@ -73,7 +73,7 @@ describe("useCommentThreads", () => {
 
   it("sorts threads oldest-created-first without touching comment order within a thread", async () => {
     const request = vi.fn().mockResolvedValue({
-      threads: [thread("newer", 200), thread("older", 100)],
+      threads: [thread("newer", 200, {}), thread("older", 100, {})],
     });
     const { result } = renderHook(
       () =>

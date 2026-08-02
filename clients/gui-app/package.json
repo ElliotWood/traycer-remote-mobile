@@ -11,7 +11,8 @@
   },
   "scripts": {
     "compile": "tsc -b",
-    "lint": "eslint . --cache --fix --max-warnings 0",
+    "lint": "eslint . --cache --max-warnings 0",
+    "lint:fix": "eslint . --cache --fix --max-warnings 0",
     "react-doctor": "npx -y react-doctor@latest . --verbose --offline --blocking warning",
     "format": "bun x prettier --write .",
     "test": "vitest run --config vitest.config.ts",

@@ -105,7 +105,8 @@
     "compile": "tsc --noEmit",
     "prepack": "bun run build",
     "test": "vitest run",
-    "lint": "eslint . --cache --fix --max-warnings 0"
+    "lint": "eslint . --cache --max-warnings 0",
+    "lint:fix": "eslint . --cache --fix --max-warnings 0"
   },
   "dependencies": {
     "y-utility": "^0.1.4",

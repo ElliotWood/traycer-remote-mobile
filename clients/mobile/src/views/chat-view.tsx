@@ -49,14 +49,14 @@ import type {
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { InterviewAnswer, InterviewQuestion } from "@traycer/protocol/persistence/epic/content-blocks";
 import { TranscriptView } from "./chat/transcript-view";
-import { useSettledConnectionState } from "@/host/use-settled-connection-state";
+import { DEFAULT_THRESHOLD_MS, useSettledConnectionState } from "@/host/use-settled-connection-state";
 import {
   detectBlockedTransitions,
   notifyBlocked,
   type BlockedState,
 } from "@/host/notifications";
 import { NotificationPermissionButton } from "./notification-permission-button";
-import { markSeen } from "@/host/read-tracking-store";
+import { defaultStorage, markSeen } from "@/host/read-tracking-store";
 import { radius, theme, type } from "./design-tokens";
 import { ConnectionPill } from "./epic-tree/connection-pill";
 import { BranchChip } from "./chat/branch-chip";
@@ -90,14 +90,14 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   }, [chatId, liveTitle, onTitleChange]);
   // S5 (A, M1b): debounce the indicator so a fast healthy re-dial (forced by
   // liveness-recovery on focus/visibility/online) never visibly flickers.
-  const displayConnection = useSettledConnectionState(chat.connection);
+  const displayConnection = useSettledConnectionState(chat.connection, DEFAULT_THRESHOLD_MS);
   const connectionLive = displayConnection === "live";
 
   // P1 (Epic tree unread markers): the moment this chat is actually opened,
   // it reads as seen — clears any `done-unread`/`failed` ladder tier the
   // Agents-tree row was showing for it. See `read-tracking-store.ts`.
   useEffect(() => {
-    markSeen(epicId, chatId);
+    markSeen(epicId, chatId, Date.now(), defaultStorage());
   }, [epicId, chatId]);
 
   const hasPending =
@@ -347,6 +347,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
         />
         <Composer
           epicId={epicId}
+          chatId={chatId}
           client={hostClient}
           prefillText={prefill?.text ?? null}
           prefillNonce={prefill?.nonce ?? 0}

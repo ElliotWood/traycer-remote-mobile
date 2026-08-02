@@ -30,8 +30,16 @@ function storageKey(epicId: string, nodeId: string): string {
   return `${KEY_PREFIX}.${epicId}.${nodeId}`;
 }
 
-/** Never a bare `globalThis.localStorage` — the access itself throws when storage is denied. */
-function defaultStorage(): StorageLike {
+/**
+ * The real backing store — every production call site passes this explicitly;
+ * tests pass a fake instead.
+ *
+ * Never a bare `globalThis.localStorage`: the PROPERTY ACCESS itself throws
+ * when storage is denied, so obtaining the object is what crashes, not
+ * `getItem`. `safeStorage()` probes with a real round-trip and falls back to
+ * an in-memory store.
+ */
+export function defaultStorage(): StorageLike {
   return safeStorage();
 }
 
@@ -39,7 +47,7 @@ function defaultStorage(): StorageLike {
 export function getLastSeenAt(
   epicId: string,
   nodeId: string,
-  storage: StorageLike = defaultStorage(),
+  storage: StorageLike,
 ): number | null {
   const raw = storage.getItem(storageKey(epicId, nodeId));
   if (raw === null) {
@@ -60,7 +68,7 @@ export function getLastSeenAt(
 export function seedUnseen(
   epicId: string,
   updatedAtById: Readonly<Record<string, number>>,
-  storage: StorageLike = defaultStorage(),
+  storage: StorageLike,
 ): void {
   for (const [nodeId, updatedAt] of Object.entries(updatedAtById)) {
     if (getLastSeenAt(epicId, nodeId, storage) === null) {
@@ -73,8 +81,8 @@ export function seedUnseen(
 export function markSeen(
   epicId: string,
   nodeId: string,
-  at: number = Date.now(),
-  storage: StorageLike = defaultStorage(),
+  at: number,
+  storage: StorageLike,
 ): void {
   storage.setItem(storageKey(epicId, nodeId), String(at));
 }
@@ -89,7 +97,7 @@ export function isUnread(
   epicId: string,
   nodeId: string,
   updatedAt: number,
-  storage: StorageLike = defaultStorage(),
+  storage: StorageLike,
 ): boolean {
   const lastSeenAt = getLastSeenAt(epicId, nodeId, storage);
   if (lastSeenAt === null) {

@@ -12,12 +12,12 @@ import {
   MissingBearerTokenForOpenFrameError,
   type HostEndpointProvider,
 } from "./ws-rpc-client";
-import type { BearerSourceProvider } from "@traycer-clients/shared/auth/bearer-source";
-import { readAccessTokenExpiryMs } from "@traycer-clients/shared/auth/jwt-exp";
+import type { BearerSourceProvider } from "../auth/bearer-source";
+import { readAccessTokenExpiryMs } from "../auth/jwt-exp";
 import type {
   RevalidateOutcome,
   StreamAuthRevalidator,
-} from "@traycer-clients/shared/auth/bearer-revalidator";
+} from "../auth/bearer-revalidator";
 import type { FatalErrorDetails } from "@traycer/protocol/framework/ws-protocol";
 import {
   hostStreamOpenAckFrameSchema,
