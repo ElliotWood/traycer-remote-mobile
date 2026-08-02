@@ -59033,6 +59033,27 @@ function parseCommand(rawText) {
 
 // src/read-surface/cards.ts
 var import_agents_hosting = __toESM(require_src7(), 1);
+
+// ../shared/epic/transcript.ts
+function humaniseToolName(raw) {
+  const mcp = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(raw);
+  const name = mcp?.[1] ?? raw;
+  return name.replace(/_/g, " ").trim();
+}
+function shortenWorkspacePath(raw) {
+  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
+  if (tenant?.[1] !== void 0) return tenant[1];
+  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
+  if (home?.[1] !== void 0) return home[1];
+  return raw;
+}
+function speakerLabel(message2) {
+  if (message2.role === "assistant") return "Agent";
+  const author = message2.author?.trim() ?? "";
+  return author.length > 0 ? author : "You";
+}
+
+// src/read-surface/cards.ts
 var ADAPTIVE_CARD_SCHEMA = "http://adaptivecards.io/schemas/adaptive-card.json";
 var ADAPTIVE_CARD_VERSION = "1.2";
 var APPROVE_VERB = "traycer/approve";
@@ -59495,32 +59516,24 @@ var OLDER_VERB = "traycer/older";
 var NEWER_VERB = "traycer/newer";
 var TRANSCRIPT_TEXT_LIMIT = 220;
 var CONTEXT_STRIP_TEXT_LIMIT = 100;
-function humaniseToolName(raw) {
-  const mcp = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(raw);
-  const name = mcp?.[1] ?? raw;
-  return name.replace(/_/g, " ").trim();
+function humaniseToolName2(raw) {
+  return humaniseToolName(raw);
 }
-function speakerLabel(message2) {
-  if (message2.role === "assistant") return "Agent";
-  const author = message2.author?.trim() ?? "";
-  return author.length > 0 ? author : "You";
+function speakerLabel2(message2) {
+  return speakerLabel(message2);
 }
 function modelMarker(message2) {
   if (message2.role !== "assistant") return null;
   const model = message2.author?.trim() ?? "";
   return model.length > 0 ? `\u27E8model \xB7 ${model}\u27E9` : null;
 }
-function shortenWorkspacePath(raw) {
-  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
-  if (tenant?.[1] !== void 0) return tenant[1];
-  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
-  if (home?.[1] !== void 0) return home[1];
-  return raw;
+function shortenWorkspacePath2(raw) {
+  return shortenWorkspacePath(raw);
 }
 function partMarker(part) {
   const noun = part.kind === "file_change" ? "file" : part.kind === "other" ? "content" : part.kind;
   const rawLabel = part.label.trim();
-  const label = part.kind === "tool" ? humaniseToolName(rawLabel) : part.kind === "file_change" ? shortenWorkspacePath(rawLabel) : rawLabel;
+  const label = part.kind === "tool" ? humaniseToolName2(rawLabel) : part.kind === "file_change" ? shortenWorkspacePath2(rawLabel) : rawLabel;
   const head = label.length > 0 ? `${noun} \xB7 ${label}` : noun;
   return part.lines > 0 ? `\u27E8${head} \xB7 ${String(part.lines)} line${part.lines === 1 ? "" : "s"}\u27E9` : `\u27E8${head}\u27E9`;
 }
@@ -59536,7 +59549,7 @@ function transcriptRow(message2, now, compact) {
   const preview = transcriptPreview(message2, compact);
   const items = [
     text(
-      `${speakerLabel(message2)} \xB7 ${approvalAgeLabel(message2.timestamp, now)}`,
+      `${speakerLabel2(message2)} \xB7 ${approvalAgeLabel(message2.timestamp, now)}`,
       {
         weight: "bolder",
         size: "small",
@@ -60946,6 +60959,51 @@ function describeRoute(route) {
 
 // src/intake/attachment-capture.ts
 var RAW_ATTACHMENT_LOG_FLAG = "TRAYCER_TEAMS_LOG_RAW_ATTACHMENTS";
+var ENUM_VALUE_KEYS = /* @__PURE__ */ new Set([
+  "contenttype",
+  "type",
+  "@type",
+  "filetype",
+  "mimetype"
+]);
+var MAX_DEPTH = 6;
+function describeValue(key, value, depth) {
+  if (value === null) return null;
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (isUrlLike(value)) return describeUrl(value);
+    if (ENUM_VALUE_KEYS.has(key.toLowerCase())) return value;
+    return `string(${String(value.length)})`;
+  }
+  if (Array.isArray(value)) {
+    if (depth >= MAX_DEPTH) return `array(${String(value.length)}) <depth cap>`;
+    return value.map((item, i) => describeValue(String(i), item, depth + 1));
+  }
+  if (typeof value === "object") {
+    if (depth >= MAX_DEPTH) return "<depth cap>";
+    return describeObject(value, depth + 1);
+  }
+  return typeof value;
+}
+function describeObject(value, depth) {
+  const out = {};
+  for (const [key, item] of Object.entries(value)) {
+    out[key] = describeValue(key, item, depth);
+  }
+  return out;
+}
+function isUrlLike(value) {
+  return /^https?:\/\//i.test(value);
+}
+function describeUrl(value) {
+  try {
+    const url2 = new URL(value);
+    const segments = url2.pathname.split("/").filter((s) => s.length > 0).length;
+    return `url(${url2.protocol}//${url2.host}, pathSegments=${String(segments)}, query=${url2.search.length > 0 ? "yes" : "no"})`;
+  } catch {
+    return `url(unparseable, ${String(value.length)} chars)`;
+  }
+}
 function captureRawAttachments(input) {
   const attachments = input.attachments ?? [];
   if (attachments.length === 0) return 0;
@@ -60957,24 +61015,30 @@ function captureRawAttachments(input) {
     });
     return attachments.length;
   }
-  logWarn("RAW ATTACHMENT CAPTURE IS ON \u2014 this logs customer file metadata", {
+  logWarn("attachment SHAPE capture is on \u2014 keys and sizes, never values", {
     flag: RAW_ATTACHMENT_LOG_FLAG,
     count: attachments.length
   });
   attachments.forEach((attachment, index) => {
-    let serialised;
-    try {
-      serialised = JSON.stringify(attachment);
-    } catch (error51) {
-      serialised = `<unserialisable: ${error51 instanceof Error ? error51.message : String(error51)}>`;
-    }
-    logInfo("raw attachment", {
+    logInfo("attachment shape", {
       index,
       conversationType: input.conversationType ?? "unknown",
-      attachment: serialised
+      // `JSON.stringify` of the DESCRIBED shape, not of the attachment. The
+      // logger takes primitives, and the ordering matters more than the type
+      // error that forced it: the redaction happens first, so what is
+      // serialised here has already had every value replaced by its size.
+      // Stringifying the attachment and redacting the string afterwards is
+      // the same mistake in the other order, and it is the one that ships.
+      shape: JSON.stringify(describeAttachment(attachment))
     });
   });
   return attachments.length;
+}
+function describeAttachment(attachment) {
+  if (attachment === null || typeof attachment !== "object") {
+    return describeValue("", attachment, 0);
+  }
+  return describeObject(attachment, 0);
 }
 
 // src/read-surface/read-surface-handler.ts
@@ -61230,7 +61294,20 @@ function toStoredReference(reference, capturedAt) {
         ...typeof userRef["aadObjectId"] === "string" ? { aadObjectId: userRef["aadObjectId"] } : {}
       }
     } : {},
-    ...typeof r["tenantId"] === "string" ? { tenantId: r["tenantId"] } : {},
+    /*
+     * FOUND BY THE SWEEP, same source as the `bot`/`agent` defect: this read
+     * `r["tenantId"]`, and the SDK's reference has no top-level `tenantId`.
+     * It returns
+     *   { activityId, user, agent, conversation, channelId, locale, serviceUrl }
+     * and Teams carries the tenant on the CONVERSATION.
+     *
+     * So this was always `undefined`, and — being optional — degraded
+     * silently. The same soft-fail shape as the field that cost a live
+     * failure: nothing throws, nothing logs, the value is simply never there.
+     * Both came from reading v4 documentation rather than the installed
+     * package's types.
+     */
+    ...typeof conv["tenantId"] === "string" ? { tenantId: conv["tenantId"] } : {},
     capturedAt
   };
 }
@@ -61296,7 +61373,7 @@ function createStartAssessment(config2) {
     if (created.kind !== "ok") {
       return {
         kind: "unconfirmed",
-        card: buildAssessmentUnconfirmedCard(created.detail)
+        card: buildAssessmentUnconfirmedCard(created.detail, void 0)
       };
     }
     const sent = await sendMessageAction(
@@ -61309,7 +61386,8 @@ function createStartAssessment(config2) {
       return {
         kind: "unconfirmed",
         card: buildAssessmentUnconfirmedCard(
-          `The agent was created but I couldn't give it the request: ${sent.detail}`
+          `The agent was created but I couldn't give it the request: ${sent.detail}`,
+          void 0
         )
       };
     }
