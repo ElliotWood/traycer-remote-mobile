@@ -1,21 +1,34 @@
 /**
- * "Waiting on you" — `host.notifications.feed.subscribe`, user-scoped.
+ * The app-level notification feed — `host.notifications.feed.subscribe`,
+ * user-scoped, ONE subscription for the whole tab.
+ *
+ * MOVED HERE from `attention/use-attention.ts`, which opened this stream
+ * itself. That was correct while "Waiting on you" was the only consumer and
+ * became wrong the moment the bell existed: the bell lives in the frame and
+ * must carry a count on EVERY screen, while `useAttention` only ran on the one
+ * route that rendered it. Leaving it there and adding a second subscription
+ * for the bell would put two streams on one feed, paged independently — two
+ * readers of the same data that can disagree, which is the defect this
+ * client's own `host-notifications-feed` docblock exists to prevent.
+ *
+ * So the subscription is hoisted to the screen that owns the connection, and
+ * both surfaces project from one state. `attention/attention-state.ts` is that
+ * projection for the waiting screen; the bell reads `summary` directly.
  *
  * NO Y.DOC on this surface. The feed sends typed JSON frames, so the epic
- * doc's 50.6 MB / ~40s host-side serialisation cannot repeat here. Phases are
- * still logged on first load: the shape says it should be fast, and "should"
- * is what put the last estimate 12x out.
+ * doc's 50.6 MB / ~40s host-side serialisation cannot repeat here. The first
+ * snapshot is still logged, because the shape saying "this should be fast" is
+ * what put the last estimate 12x out.
  *
  * THE TITLE JOIN IS NON-BLOCKING, and that is the design point. The feed
  * answers the question — what needs me. Epic titles are context. Rows render
  * the moment the feed lands and upgrade in place when the join resolves, so a
  * slow or failed `epic.listTasks` costs a nicer label and never the answer.
- * Same principle as consuming `earlyMeta`: show what you have when you have
- * it.
  */
 import { useEffect, useRef, useState } from "react";
 import {
   hostNotificationsSubscribeServerFrameSchema,
+  type HostNotificationEntry,
   type HostNotificationsSummary,
 } from "@traycer/protocol/host/notifications/host-notifications";
 import type { StreamFrameEnvelope } from "@traycer-clients/shared/host-transport/i-stream-session";
@@ -27,32 +40,33 @@ import {
   type FeedState,
 } from "@traycer-clients/shared/epic/host-notifications-feed";
 import {
-  toAttentionItems,
-  type AttentionItem,
-} from "@traycer-clients/shared/epic/attention";
-import {
   fetchEpicListPage,
   toFleetEpics,
   type EpicListClient,
 } from "@traycer-clients/shared/epic/epic-list";
 
 /**
- * How many attention rows to ask for.
+ * How many rows to ask for on the first snapshot.
  *
- * Generous, because this list is the reason the screen exists and a truncated
- * one silently understates what is waiting. `recent` is asked for at the
- * minimum the schema allows — v1 does not render it, and requesting a large
- * slice we discard would cost the host work for nothing.
+ * `attention` is generous because that list is the reason the feature exists
+ * and a truncated one silently understates what is waiting.
+ *
+ * `recent` WAS 1. That was right when the only consumer rendered the attention
+ * slice and discarded the rest — asking for a large slice we throw away costs
+ * the host work for nothing. The notifications screen renders `recent`, so the
+ * number is now a real bound on what that screen can show, and 100 matches
+ * what the mobile client asks for on the identical surface.
  */
 const INITIAL_ATTENTION_LIMIT = 200;
-const INITIAL_RECENT_LIMIT = 1;
+const INITIAL_RECENT_LIMIT = 100;
 
-export type AttentionState =
+export type NotificationsState =
   /** Subscribed, no snapshot yet. NOT "nothing is waiting". */
   | { readonly kind: "loading" }
   | {
       readonly kind: "ready";
-      readonly items: readonly AttentionItem[];
+      /** Every entry the feed has sent, newest-first. */
+      readonly entries: readonly HostNotificationEntry[];
       /** From the host's own `summary`, never derived here. */
       readonly summary: HostNotificationsSummary | null;
       /** `epicId` → title, filled in as the join resolves. May be empty. */
@@ -60,11 +74,11 @@ export type AttentionState =
     }
   | { readonly kind: "error"; readonly detail: string };
 
-export function useAttention(
+export function useNotifications(
   streamConnection: HostStreamConnection | null,
   listClient: EpicListClient | null,
-): AttentionState {
-  const [state, setState] = useState<AttentionState>({ kind: "loading" });
+): NotificationsState {
+  const [state, setState] = useState<NotificationsState>({ kind: "loading" });
   const feedRef = useRef<FeedState>(EMPTY_FEED_STATE);
   const titlesRef = useRef<Record<string, string>>({});
 
@@ -88,7 +102,13 @@ export function useAttention(
       if (disposed) return;
       setState({
         kind: "ready",
-        items: toAttentionItems(feedEntries(feedRef.current)),
+        // Newest-first, matching mobile's ordering on the same feed. The
+        // waiting screen re-sorts oldest-first for its own reason (see
+        // `shared/epic/attention.ts`), which is a property of that projection
+        // rather than of the feed.
+        entries: [...feedEntries(feedRef.current)].sort(
+          (a, b) => b.updatedAt - a.updatedAt,
+        ),
         summary: feedRef.current.summary,
         epicTitles: { ...titlesRef.current },
       });
@@ -116,7 +136,7 @@ export function useAttention(
         // eslint-disable-next-line no-console -- a Teams tab has no timeline
         // anyone will open; this is the channel that produced the 47s answer.
         console.info(
-          `[attention] snapshot=${String(Date.now() - t0)}ms attention=${String(parsed.data.attention.entries.length)}`,
+          `[notifications] snapshot=${String(Date.now() - t0)}ms attention=${String(parsed.data.attention.entries.length)} recent=${String(parsed.data.recent.entries.length)}`,
         );
       }
       publish();

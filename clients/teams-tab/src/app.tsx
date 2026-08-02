@@ -10,7 +10,7 @@
  * below it comes from the Teams theme, so light / dark / high-contrast are
  * correct without a single colour being chosen here.
  */
-import { useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import {
   FluentProvider,
   makeStyles,
@@ -80,7 +80,17 @@ import {
 import { CONFIGURED_HOST_ID, HOST_WS_URL } from "./config";
 import { useRoute } from "./router/use-route";
 import { AttentionView } from "./attention/attention-view";
-import { useAttention, type AttentionState } from "./attention/use-attention";
+import {
+  toAttentionState,
+  type AttentionState,
+} from "./attention/attention-state";
+import {
+  useNotifications,
+  type NotificationsState,
+} from "./notifications/use-notifications";
+import { NotificationsScreen } from "./notifications/notifications-screen";
+import { NOTIFICATIONS_FIXTURE, NOTIFICATIONS_NOW } from "./notifications/notifications-fixture";
+import { useShellNotifications } from "./shell/shell-notifications";
 import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import {
   createTabHostConnection,
@@ -163,29 +173,24 @@ function ChatRoute({
 }
 
 /**
- * "Waiting on you" — the cross-epic attention feed.
+ * "Waiting on you" — the cross-epic attention slice.
  *
- * Its own component for the same reason as the epic screen: the subscription
- * is a hook, and the route that selects it is a conditional.
+ * NO LONGER OWNS A SUBSCRIPTION. It used to open
+ * `host.notifications.feed.subscribe` itself, which was right while it was the
+ * only consumer and became wrong when the frame's bell arrived: the bell needs
+ * a count on every screen, and this component only mounts on one route. The
+ * stream is hoisted to `EpicsScreen` and this is now a projection of it — see
+ * `notifications/use-notifications.ts`.
  */
 function WaitingScreen({
   styles,
-  streamConnection,
-  listClient,
+  state,
   now,
-  preview,
 }: {
   readonly styles: Record<string, string>;
-  readonly streamConnection: HostStreamConnection | null;
-  readonly listClient: EpicListClient | null;
+  readonly state: AttentionState;
   readonly now: number;
-  readonly preview: AttentionState | null;
 }): ReactElement {
-  const live = useAttention(
-    preview === null ? streamConnection : null,
-    preview === null ? listClient : null,
-  );
-  const state = preview ?? live;
   return (
     <div className={styles.screen}>
       <div className={styles.header}>
@@ -346,6 +351,7 @@ function EpicsScreen({
   preview,
   agentsPreview,
   waitingPreview,
+  notificationsPreview,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth & StreamConnectionAuth;
@@ -370,6 +376,7 @@ function EpicsScreen({
   readonly preview: EpicsState | null;
   readonly agentsPreview: EpicAgentsState | null;
   readonly waitingPreview: AttentionState | null;
+  readonly notificationsPreview: NotificationsState | null;
 }): ReactElement {
   const [connection] = useState(() =>
     preview === null ? createTabHostConnection(auth) : null,
@@ -416,19 +423,71 @@ function EpicsScreen({
     reload();
   }, [createdEpicId, reload]);
 
+  /**
+   * THE ONE notification subscription, opened here rather than on the screens
+   * that render it.
+   *
+   * Here because this is the component that owns the connection AND outlives
+   * every route below it — which is what an app-level bell requires. Opening
+   * it on the waiting screen (where it used to live) gave the bell a count
+   * only while you were already looking at the list.
+   *
+   * Null connection under preview, so no path from a preview reaches the host.
+   */
+  const notificationsLive = useNotifications(
+    preview === null ? streamConnection : null,
+    preview === null ? (connection?.hostClient ?? null) : null,
+  );
+  const notifications: NotificationsState =
+    notificationsPreview ?? notificationsLive;
+
+  /**
+   * Stable, and it has to be: it sits in the publishing effect's dependency
+   * list, so a fresh closure each render would republish each render. See
+   * `shell/shell-notifications.tsx`.
+   */
+  const openNotifications = useCallback(() => {
+    navigate({ name: "notifications" });
+  }, [navigate]);
+
+  // Into the FRAME's trailing cluster. Under preview there is no feed to
+  // report, so the bell is absent rather than permanently blank.
+  useShellNotifications(
+    notifications.kind === "ready" ? notifications.summary : null,
+    preview === null ? openNotifications : null,
+  );
+
   if (route.name === "waiting") {
     return (
       <WaitingScreen
         styles={styles}
-        streamConnection={streamConnection}
-        listClient={connection?.hostClient ?? null}
+        state={waitingPreview ?? toAttentionState(notifications)}
         // The FIXTURE clock under preview. Passing the real one floors every
         // age to "now" — the fixture timestamps sit ahead of it, so
         // `max(0, now - at)` is zero for all of them and the oldest-first
         // sort becomes unverifiable. Caught in the image, not the types.
         now={waitingPreview === null ? now : ATTENTION_NOW}
-        preview={waitingPreview}
       />
+    );
+  }
+
+  if (route.name === "notifications") {
+    return (
+      <div className={styles.screen}>
+        <NotificationsScreen
+          state={notifications}
+          // Null under preview, which DISABLES the writes rather than faking
+          // them — the same property every other preview surface holds.
+          client={preview === null ? (connection?.hostClient ?? null) : null}
+          now={notificationsPreview === null ? now : NOTIFICATIONS_NOW}
+          onOpenChat={(epicId, chatId) => {
+            navigate({ name: "chat", epicId, chatId });
+          }}
+          onOpenEpic={(epicId) => {
+            navigate({ name: "epic", epicId });
+          }}
+        />
+      </div>
     );
   }
 
@@ -662,6 +721,45 @@ export function App(): ReactElement {
     }
   })();
 
+  /**
+   * `?preview=notifications[&state=…]` renders the bell surface without a host.
+   *
+   * The states that ship broken are the ones that are hard to reach: `empty`
+   * needs an account nothing has happened on, `loading` lasts a moment, and
+   * the four severities together need four different things to go wrong at
+   * once. A query param turns each into a URL — the loop that has caught
+   * nearly every UI defect on this project.
+   */
+  const notificationsPreview = ((): NotificationsState | null => {
+    if (inTeams || params.get("preview") !== "notifications") return null;
+    switch (params.get("state")) {
+      case "loading":
+        return { kind: "loading" };
+      case "error":
+        return { kind: "error", detail: "stream closed — host unreachable" };
+      case "empty":
+        // A summary of ZEROES, not null: this is the "you're all caught up"
+        // shot, and null would render the still-loading bell instead.
+        return {
+          kind: "ready",
+          entries: [],
+          summary: { unreadCount: 0, attentionCount: 0 },
+          epicTitles: {},
+        };
+      // The bell before the first snapshot — the state that must NOT read as
+      // "nothing waiting", and the reason `summary` is nullable at all.
+      case "unknown":
+        return { kind: "ready", entries: [], summary: null, epicTitles: {} };
+      default:
+        return {
+          kind: "ready",
+          entries: NOTIFICATIONS_FIXTURE,
+          summary: { unreadCount: 4, attentionCount: 2 },
+          epicTitles: {},
+        };
+    }
+  })();
+
   const agentsPreview = ((): EpicAgentsState | null => {
     if (inTeams || params.get("preview") !== "agents") return null;
     switch (params.get("state")) {
@@ -761,6 +859,7 @@ export function App(): ReactElement {
     previewState !== null ||
     agentsPreview !== null ||
     waitingPreview !== null ||
+    notificationsPreview !== null ||
     showApprovals ||
     showChat ||
     showArtifact ||
@@ -1049,6 +1148,7 @@ export function App(): ReactElement {
         preview={previewState}
         agentsPreview={agentsPreview}
         waitingPreview={waitingPreview}
+        notificationsPreview={notificationsPreview}
       />,
   );
 }

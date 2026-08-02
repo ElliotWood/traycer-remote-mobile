@@ -31,8 +31,18 @@ export type Route =
       readonly epicId: string;
       readonly chatId: string;
     }
-  /** Reserved for the notifications surface; parsed now so the URL is stable. */
-  | { readonly name: "waiting" };
+  /**
+   * "Waiting on you" — the cross-epic ATTENTION slice, per-feed.
+   *
+   * Kept distinct from `notifications` below, and the distinction is the one
+   * the parity contract had to spell out: this screen answers "what is blocked
+   * on me right now", the other is the app-level bell with read state and
+   * recent activity. Related, not the same row, and collapsing them would lose
+   * the short list that is the reason this one exists.
+   */
+  | { readonly name: "waiting" }
+  /** The app-level notifications screen, reached from the frame's bell. */
+  | { readonly name: "notifications" };
 
 /**
  * The path prefix the tab is served under.
@@ -58,6 +68,7 @@ export function parseRoute(pathname: string): Route {
   const segments = rest.split("/").filter((s) => s.length > 0);
 
   if (segments[0] === "waiting") return { name: "waiting" };
+  if (segments[0] === "notifications") return { name: "notifications" };
   if (segments[0] === "epics" && typeof segments[1] === "string") {
     if (segments[2] === "chats" && typeof segments[3] === "string") {
       return { name: "chat", epicId: segments[1], chatId: segments[3] };
@@ -75,6 +86,8 @@ export function routeToPath(route: Route): string {
       return `${BASE}/epics/${route.epicId}`;
     case "waiting":
       return `${BASE}/waiting`;
+    case "notifications":
+      return `${BASE}/notifications`;
     case "epics":
       return `${BASE}/epics`;
   }
