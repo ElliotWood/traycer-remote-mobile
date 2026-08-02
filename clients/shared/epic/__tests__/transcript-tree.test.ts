@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
-import { buildBlockTree, partitionBlocks } from "@/views/chat/transcript-model";
+import { buildBlockTree, partitionBlocks } from "../transcript-tree";
 
 function toolCall(blockId: string, parentBlockId: string | null): ContentBlock {
   return {
