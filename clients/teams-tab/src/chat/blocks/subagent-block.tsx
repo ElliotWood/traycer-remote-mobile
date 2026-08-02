@@ -47,6 +47,11 @@ const useStyles = makeStyles({
     marginTop: tokens.spacingVerticalS,
   },
   result: { margin: `${tokens.spacingVerticalXS} 0 0` },
+  taskLabel: {
+    display: "block",
+    color: tokens.colorNeutralForeground3,
+    marginBottom: tokens.spacingVerticalXXS,
+  },
 });
 
 /** The most recent thing it said, or its result once it has one. */
@@ -87,10 +92,20 @@ export function SubagentBlock({
       }
     >
       {block.task !== null ? (
-        <Body1 as="p" className={styles.task}>
-          <strong>Task: </strong>
-          {block.task}
-        </Body1>
+        <div className={styles.task}>
+          {/*
+            THE TASK IS MARKDOWN TOO, and it was the other half of this
+            defect. The result was fixed and the live count went 72 -> 50
+            rather than to 0: a sub-agent's task is the PROMPT it was given,
+            which on this project is a full instruction with headings, rules
+            and fences.
+            A `div` and a separate label rather than `Body1 as="p"` with the
+            text inline, because the markdown renderer emits block elements
+            and a `<pre>` inside a `<p>` is invalid HTML.
+          */}
+          <Caption1 className={styles.taskLabel}>Task</Caption1>
+          <ArtifactMarkdown body={block.task} />
+        </div>
       ) : null}
       {meta !== null ? (
         <Caption1 className={styles.meta}>

@@ -600,6 +600,18 @@ async function run() {
       const signedOut = await page
         .getByRole("button", { name: /^sign in$/i })
         .count();
+      /*
+       * PERSIST IMMEDIATELY, not at the end of the run.
+       *
+       * The refresh rotates during rehydration, which has already happened by
+       * the time this gate passes. If the run then crashes, the file still
+       * holds the retired token and the next run reports SIGNED OUT — and a
+       * human is asked to approve again for a crash that had nothing to do
+       * with them. Two approvals have already been spent on my mistakes.
+       */
+      if (STATE !== null && signedOut === 0) {
+        await context.storageState({ path: STATE });
+      }
       if (signedOut > 0) {
         console.error(
           "REFUSING: the tab is SIGNED OUT — the stored credential is expired or rotated.",
