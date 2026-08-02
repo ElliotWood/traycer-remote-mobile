@@ -12,6 +12,7 @@ import type { ReactElement } from "react";
 import { Body1, Caption1, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import type { TodoBlock as TodoBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { StaticCard } from "./block-card";
+import { plainSummary } from "./plain-summary";
 
 type TodoStatus = TodoBlockType["items"][number]["status"];
 
@@ -64,7 +65,7 @@ export function TodoBlock({
             )}
           >
             <span aria-hidden="true">{STATUS_ICON[item.status]}</span>
-            <Body1>{item.text}</Body1>
+            <Body1>{plainSummary(item.text)}</Body1>
           </li>
         ))}
       </ul>

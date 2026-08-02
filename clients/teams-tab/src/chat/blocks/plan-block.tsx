@@ -17,6 +17,7 @@ import { Body1, Caption1, makeStyles, tokens } from "@fluentui/react-components"
 import type { PlanBlock as PlanBlockType } from "@traycer/protocol/persistence/epic/content-blocks";
 import { ArtifactMarkdown } from "../../artifacts/artifact-markdown";
 import { StaticCard } from "./block-card";
+import { plainSummary } from "./plain-summary";
 
 const STEP_PREVIEW_LIMIT = 5;
 
@@ -53,15 +54,27 @@ export function PlanBlock({
         <Caption1 className={styles.status}>{block.planStatus}</Caption1>
       </div>
       {block.summary !== null ? (
-        <Body1 as="p" className={styles.summary}>
-          {block.summary}
-        </Body1>
+        /*
+          MARKDOWN, for the same reason the subagent's result is. A plan's
+          summary is a PARAGRAPH the harness wrote — the body half of the two
+          transformations, not the one-line half — so it renders rather than
+          being stripped. It was the sibling this fix nearly left behind:
+          `step.text` was corrected while the field directly above it went on
+          printing `#` and fences into a `<p>`.
+
+          A `div` rather than `Body1 as="p"`: the markdown renderer emits its
+          own block elements, and a `<pre>` inside a `<p>` is invalid HTML the
+          browser silently re-parents.
+        */
+        <div className={styles.summary}>
+          <ArtifactMarkdown body={block.summary} />
+        </div>
       ) : null}
       {shown.length > 0 ? (
         <ul className={styles.steps}>
           {shown.map((step, index) => (
             <li key={step.id ?? String(index)}>
-              <Body1>{step.text}</Body1>
+              <Body1>{plainSummary(step.text)}</Body1>
             </li>
           ))}
         </ul>
