@@ -42936,6 +42936,38 @@ var BridgeClient = class _BridgeClient {
     });
     return { chatId: response.chatId };
   }
+  /**
+   * Delete a chat — the only destructive verb on this client.
+   *
+   * NO TRANSIENT RETRY, and that is the difference from `createChat` directly
+   * above. A retried create is absorbed by the host's dedupe on the
+   * client-supplied `chatId`, so resending is free. A retried delete has no
+   * such property: the second attempt addresses a chat that no longer exists,
+   * and the honest answers to "did my delete land" and "did someone else's"
+   * are indistinguishable from here. An unconfirmed delete is reported as
+   * unconfirmed and handed back to the caller — the same rule the approval
+   * actions follow, for the same reason.
+   *
+   * The caller is expected to have confirmed WHICH chat this is. The id alone
+   * carries no evidence, and `epic.deleteChat` will delete whatever it is
+   * given.
+   */
+  async deleteChat(chatId) {
+    const endpoint = this.endpointPoller.get();
+    if (endpoint === null) {
+      throw new Error("remote-bridge: no host endpoint available yet");
+    }
+    const response = await this.rpcClient.request(
+      "epic.deleteChat",
+      { epicId: this.epicId, chatId },
+      {
+        endpoint,
+        bearer: this.auth.lease,
+        abortSignal: new AbortController().signal
+      }
+    );
+    return { deleted: response.deleted };
+  }
   async getTranscript(chatId, offset, limit) {
     return this.ensureChatSession(chatId).getTranscript(offset, limit);
   }
@@ -43081,6 +43113,24 @@ function createLogger(threshold) {
     warn: (message, fields) => write("warn", message, fields, null),
     error: (message, fields, error51) => write("error", message, fields, error51)
   };
+}
+
+// src/delete-guard.ts
+function checkDeleteTarget(agents, chatId, expectTitle) {
+  const match = agents.find((a) => a.agentId === chatId);
+  if (match === void 0) {
+    return {
+      ok: false,
+      reason: `no chat ${chatId} visible in this epic \u2014 refusing to delete an id I cannot see`
+    };
+  }
+  if (match.title !== expectTitle) {
+    return {
+      ok: false,
+      reason: `expected title ${JSON.stringify(expectTitle)}, host says ${JSON.stringify(match.title)}`
+    };
+  }
+  return { ok: true };
 }
 
 // src/adapters/cli-adapter.ts
@@ -43306,6 +43356,28 @@ program2.command("create-chat <chatId> <title>").description("Create a new agent
         hostId: opts.hostId,
         parentId: opts.parentId ?? null
       });
+      process.stdout.write(`${JSON.stringify(result)}
+`);
+    });
+  }
+);
+program2.command("delete-chat <chatId>").description(
+  "Delete a chat. Requires --expect-title matching the chat's current title."
+).requiredOption(
+  "--expect-title <title>",
+  "The chat's exact current title. Refuses if it does not match."
+).option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)").option(
+  "--sender-agent-id <id>",
+  "Sender agent id (defaults to $TRAYCER_AGENT_ID)"
+).action(
+  async (chatId, opts) => {
+    await withBridge(opts, async (bridge) => {
+      const agents = await bridge.listAgents();
+      const check3 = checkDeleteTarget(agents, chatId, opts.expectTitle);
+      if (!check3.ok) {
+        throw new Error(`remote-bridge: ${check3.reason}`);
+      }
+      const result = await bridge.deleteChat(chatId);
       process.stdout.write(`${JSON.stringify(result)}
 `);
     });
