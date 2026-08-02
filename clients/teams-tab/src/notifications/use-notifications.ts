@@ -130,7 +130,28 @@ export function useNotifications(
       // is that one malformed row takes down the only screen that lists what
       // needs a human.
       if (!parsed.success) return;
-      feedRef.current = applyFeedFrame(feedRef.current, parsed.data);
+      const next = applyFeedFrame(feedRef.current, parsed.data);
+      /**
+       * A FRAME THAT CHANGED NOTHING DOES NOT MOVE US OUT OF `loading`.
+       *
+       * `applyFeedFrame` returns the SAME OBJECT for `pong` and
+       * `channelEmission` — a heartbeat and an external delivery, neither of
+       * which is feed state. Publishing on them anyway turned the very first
+       * heartbeat into `{ kind: "ready", entries: [], summary: null }`, and
+       * both surfaces render that as an answer: *"You're all caught up."* and
+       * *"Nothing is waiting on you."*
+       *
+       * So a keepalive arriving before the snapshot produced a confident
+       * "nothing needs you" on the screen whose whole promise is the
+       * opposite — the empty-versus-loading conflation the bell's nullable
+       * summary was built to avoid, reintroduced one layer below it. Caught in
+       * the preview images, not in a test.
+       *
+       * Reference equality is exact here rather than approximate: every frame
+       * kind that IS feed state constructs a new object.
+       */
+      if (next === feedRef.current) return;
+      feedRef.current = next;
       if (!sawSnapshot && parsed.data.kind === "snapshot") {
         sawSnapshot = true;
         // eslint-disable-next-line no-console -- a Teams tab has no timeline

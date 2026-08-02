@@ -378,14 +378,37 @@ function EpicsScreen({
   readonly waitingPreview: AttentionState | null;
   readonly notificationsPreview: NotificationsState | null;
 }): ReactElement {
+  /**
+   * ANY preview suppresses the connection, not just the epics one.
+   *
+   * This gate read `preview === null`, and `preview` is the EPICS preview
+   * specifically — so `?preview=waiting`, `?preview=agents` and
+   * `?preview=notifications` all fell through it and built a real
+   * `HostClient`, with `useEpics` then issuing a live `epic.listTasks`. The
+   * screens still rendered their fixtures, so nothing looked wrong.
+   *
+   * That made App's stated property — *"no code path reachable from here ever
+   * reads the host … enforced by the WIRING"* — true only of the one preview
+   * it was first written for. It is the same instance-versus-class mistake
+   * recorded a few lines below it, where naming `previewState` rather than the
+   * class sent `?preview=agents` to the config screen for the second time.
+   *
+   * Widened to the class here. Any preview state set means no connection is
+   * constructed at all, which is what the docblock has always claimed.
+   */
+  const previewing =
+    preview !== null ||
+    agentsPreview !== null ||
+    waitingPreview !== null ||
+    notificationsPreview !== null;
   const [connection] = useState(() =>
-    preview === null ? createTabHostConnection(auth) : null,
+    previewing ? null : createTabHostConnection(auth),
   );
   // One stream client for the screen's lifetime — a new one per render would
   // re-dial the socket continuously. Not built at all in preview, so the
   // "no path from here reads the host" property holds for the stream too.
   const [streamConnection] = useState(() =>
-    preview === null && HOST_WS_URL !== ""
+    !previewing && HOST_WS_URL !== ""
       ? new HostStreamConnection(auth, {
           hostWsUrl: HOST_WS_URL,
           hostId: CONFIGURED_HOST_ID,
@@ -434,9 +457,12 @@ function EpicsScreen({
    *
    * Null connection under preview, so no path from a preview reaches the host.
    */
+  // Both are already `null` under any preview — the gate is the wiring above,
+  // not a second conditional here. Re-checking `previewing` at every use is
+  // how the first version ended up guarding one preview and missing three.
   const notificationsLive = useNotifications(
-    preview === null ? streamConnection : null,
-    preview === null ? (connection?.hostClient ?? null) : null,
+    streamConnection,
+    connection?.hostClient ?? null,
   );
   const notifications: NotificationsState =
     notificationsPreview ?? notificationsLive;
@@ -450,11 +476,19 @@ function EpicsScreen({
     navigate({ name: "notifications" });
   }, [navigate]);
 
-  // Into the FRAME's trailing cluster. Under preview there is no feed to
-  // report, so the bell is absent rather than permanently blank.
+  /**
+   * Into the FRAME's trailing cluster.
+   *
+   * PUBLISHED UNDER PREVIEW TOO, deliberately, and it is the one host-touching
+   * rule this file has that this does not break: `openNotifications` is
+   * `navigate`, which is `history.pushState` and nothing else. No host, no
+   * socket, no request. Withholding it would have cost the bell its only
+   * reviewable states — the badge, the unread dot and the not-yet-known dot
+   * are exactly what the preview URLs exist to photograph.
+   */
   useShellNotifications(
     notifications.kind === "ready" ? notifications.summary : null,
-    preview === null ? openNotifications : null,
+    openNotifications,
   );
 
   if (route.name === "waiting") {
@@ -476,9 +510,9 @@ function EpicsScreen({
       <div className={styles.screen}>
         <NotificationsScreen
           state={notifications}
-          // Null under preview, which DISABLES the writes rather than faking
-          // them — the same property every other preview surface holds.
-          client={preview === null ? (connection?.hostClient ?? null) : null}
+          // Already null under any preview, so the writes are disabled rather
+          // than faked — the same property every other preview surface holds.
+          client={connection?.hostClient ?? null}
           now={notificationsPreview === null ? now : NOTIFICATIONS_NOW}
           onOpenChat={(epicId, chatId) => {
             navigate({ name: "chat", epicId, chatId });
@@ -746,10 +780,23 @@ export function App(): ReactElement {
           summary: { unreadCount: 0, attentionCount: 0 },
           epicTitles: {},
         };
-      // The bell before the first snapshot — the state that must NOT read as
-      // "nothing waiting", and the reason `summary` is nullable at all.
-      case "unknown":
-        return { kind: "ready", entries: [], summary: null, epicTitles: {} };
+      /*
+       * NO `unknown` STATE HERE, and its absence is the finding.
+       *
+       * There was one — `ready` with a null summary — meant to photograph the
+       * bell before its first snapshot. The image showed the bell's grey
+       * not-yet-known dot above a body reading "You're all caught up.", which
+       * is the conflation the bell exists to prevent, on the same screen.
+       *
+       * It is unreachable now: `use-notifications` refuses to leave `loading`
+       * for a frame that carried no feed state, which was the only way to
+       * reach `ready` without a summary. Modelling it here would be a preview
+       * URL for a state the client cannot produce — and it rendered the wrong
+       * copy while pretending otherwise.
+       *
+       * The bell's not-yet-known dot is `loading`'s, and `?state=loading`
+       * already shoots it.
+       */
       default:
         return {
           kind: "ready",
