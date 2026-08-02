@@ -152,6 +152,23 @@ const VIEWS = [
   { name: "waiting", q: "preview=waiting", path: "/waiting", expects: ["Streaming Transport Reconnect"] },
   { name: "waiting-loading", q: "preview=waiting&state=loading", path: "/waiting", expects: [], exempt: "a spinner and no copy of its own" },
   { name: "waiting-error", q: "preview=waiting&state=error", path: "/waiting", expects: ["Couldn’t check what’s waiting"] },
+  // The BELL surface, which is a different screen from `waiting` above on the
+  // same feed — attention slice vs. app-level list with read state. Both are
+  // shot, because the parity contract's two rows read like one and the images
+  // are where that stops being an argument.
+  // The row titles are asserted, not just the chrome. `taskTitle` comes from
+  // the payload through the protocol's own formatter, and a payload that fails
+  // its parse degrades EVERY row to the generic "Task • Agent" — which renders
+  // cleanly, throws nothing, and looks like a working screen. The first
+  // version of this fixture did exactly that, so these strings are the guard.
+  { name: "notifications", q: "preview=notifications", path: "/notifications", expects: ["Needs attention", "Streaming Transport Reconnect", "Approval requested", "Workspace operation failed", "Unread only", "Mark all read"] },
+  { name: "notifications-empty", q: "preview=notifications&state=empty", path: "/notifications", expects: ["You’re all caught up."] },
+  { name: "notifications-loading", q: "preview=notifications&state=loading", path: "/notifications", expects: [], exempt: "a spinner and no copy of its own" },
+  { name: "notifications-error", q: "preview=notifications&state=error", path: "/notifications", expects: ["stream closed — host unreachable"] },
+  // NO `-unknown` SHOT. There was one, and it earned its removal: it rendered
+  // the bell's grey not-yet-known dot above a body saying "You're all caught
+  // up." The state is now unreachable (see `app.tsx`), and the bell's
+  // not-yet-known dot is what `notifications-loading` above already shows.
   { name: "epics", q: "preview=epics", path: "/epics", expects: ["Streaming Transport Reconnect", "Dependency Licence Audit"] },
   { name: "epics-loading", q: "preview=epics&state=loading", path: "/epics", expects: [], exempt: "skeleton rows, no copy" },
   { name: "epics-empty", q: "preview=epics&state=empty", path: "/epics", expects: ["No epics yet", "Create one from this tab"] },

@@ -35,7 +35,7 @@ import {
 import { attentionLabel, type AttentionItem } from "@traycer-clients/shared/epic/attention";
 import { FleetError, FleetLoading } from "../fleet/fleet-state";
 import { terseTime } from "../fleet/fleet-grid";
-import type { AttentionState } from "./use-attention";
+import type { AttentionState } from "./attention-state";
 
 const useStyles = makeStyles({
   list: { display: "flex", flexDirection: "column" },

@@ -46,10 +46,17 @@ export interface UseHostNotificationsResult {
   readonly connection: StreamConnectionState;
 }
 
-/** Unread AND either blocking (`needs_action`) or a failure — the "Needs attention" section, never filtered out by the Recent/unread toggle. */
-export function isAttentionEntry(entry: HostNotificationEntry): boolean {
-  return entry.readAt === null && (entry.severity === "needs_action" || entry.severity === "failure");
-}
+/**
+ * Unread AND either blocking (`needs_action`) or a failure — the "Needs
+ * attention" section, never filtered out by the Recent/unread toggle.
+ *
+ * MOVED to `@traycer-clients/shared/epic/host-notifications-grouping` when the
+ * Teams tab built the same screen, and re-exported here so this hook's
+ * existing consumers keep their import. The rule decides which section a row
+ * lands in, and two clients disagreeing about it would put a blocked agent
+ * under "Earlier" on one of them.
+ */
+export { isAttentionEntry } from "@traycer-clients/shared/epic/host-notifications-grouping";
 
 export function useHostNotifications(
   streamConnection: HostStreamConnection | null,

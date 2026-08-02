@@ -31,6 +31,11 @@ import {
   type EpicConnectionState,
 } from "./epic-status-row";
 import { ShellStatusProvider } from "./shell-status";
+import {
+  ShellNotificationsProvider,
+  type ShellNotifications,
+} from "./shell-notifications";
+import { NotificationBell } from "../notifications/notification-bell";
 
 /**
  * How many times this shell has MOUNTED. The persistence probe.
@@ -166,6 +171,17 @@ export function AppShell({
    * `./shell-status`.
    */
   const [status, setStatus] = useState<EpicConnectionState | null>(null);
+  /**
+   * The bell's data, published from the screen that owns the feed, or `null`.
+   *
+   * Held here for the same reason as `status`, and rendered into the TRAILING
+   * cluster beside sign-out — the region that survives navigation, which is
+   * the whole argument for an app-level interrupt surface living in the frame.
+   * See `./shell-notifications`.
+   */
+  const [notifications, setNotifications] = useState<ShellNotifications | null>(
+    null,
+  );
   // Empty dep array: once per MOUNT, never on re-render. A remount is the
   // thing being detected, so anything that runs per-render would report the
   // opposite of the property.
@@ -178,7 +194,26 @@ export function AppShell({
       <header className={styles.header}>
         {leading}
         <div className={styles.spacer} />
-        <div className={styles.trailing}>{trailing}</div>
+        <div className={styles.trailing}>
+          {/*
+            BEFORE the caller's cluster, so the bell sits inboard of sign-out.
+            Deliberate: the destructive control stays at the far edge, where it
+            is hardest to hit by accident, and the bell is the one you reach
+            for often.
+
+            Absent entirely until a screen publishes — not a greyed-out bell.
+            A control that cannot be told what is waiting has nothing to say,
+            and rendering it anyway is the "affordance that silently does
+            nothing" this client keeps finding.
+          */}
+          {notifications === null ? null : (
+            <NotificationBell
+              summary={notifications.summary}
+              onClick={notifications.onOpen}
+            />
+          )}
+          {trailing}
+        </div>
       </header>
       {status === null ? null : (
         <div className={styles.status}>
@@ -199,7 +234,9 @@ export function AppShell({
       */}
       <div className={styles.body} data-shell-region="body">
         <ShellStatusProvider setStatus={setStatus}>
-          {children}
+          <ShellNotificationsProvider setNotifications={setNotifications}>
+            {children}
+          </ShellNotificationsProvider>
         </ShellStatusProvider>
       </div>
     </div>

@@ -15,6 +15,7 @@ const ALL_ROUTES: readonly Route[] = [
     chatId: "a1000000-0000-4000-8000-000000000c4a",
   },
   { name: "waiting" },
+  { name: "notifications" },
 ];
 
 describe("route — round-trip", () => {
@@ -29,7 +30,19 @@ describe("route — round-trip", () => {
 
   it("covers every member of the Route union", () => {
     expect(new Set(ALL_ROUTES.map((r) => r.name))).toEqual(
-      new Set(["epics", "epic", "chat", "waiting"]),
+      new Set(["epics", "epic", "chat", "waiting", "notifications"]),
+    );
+  });
+
+  /**
+   * `waiting` and `notifications` are DIFFERENT screens on the same feed —
+   * the attention slice versus the app-level bell — so they must not collapse
+   * onto one path. Two manifest entries collapsing onto one screen is exactly
+   * what happened while there was no router.
+   */
+  it("keeps the two notification surfaces on distinct paths", () => {
+    expect(routeToPath({ name: "waiting" })).not.toBe(
+      routeToPath({ name: "notifications" }),
     );
   });
 });
