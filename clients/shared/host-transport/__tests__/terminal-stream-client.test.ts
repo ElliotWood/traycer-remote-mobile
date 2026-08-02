@@ -171,7 +171,10 @@ describe("TerminalStreamClient", () => {
       },
     });
 
-    completeHandshake(sockets[0], buildStreamManifest(hostStreamRpcRegistry));
+    completeHandshake(sockets[0], {
+      ...buildStreamManifest(hostStreamRpcRegistry),
+      "terminal.subscribe": { major: 1, minor: 4 },
+    });
     sockets[0].fireText({
       kind: "binarySnapshot",
       hasBinaryPayload: true,
@@ -188,6 +191,42 @@ describe("TerminalStreamClient", () => {
 
     expect(snapshots).toEqual(["independent"]);
     expect(updates).toEqual(["independent"]);
+    stream.close();
+  });
+
+  it("parses live current-directory metadata when negotiated at 1.5", () => {
+    const { factory, sockets } = makeFactory();
+    const client = makeClient(factory);
+    const currentDirectories: string[] = [];
+    const stream = new TerminalStreamClient({
+      wsStreamClient: client,
+      sessionId: "terminal-1",
+      cols: 80,
+      rows: 24,
+      callbacks: {
+        onSnapshot: () => undefined,
+        onData: () => undefined,
+        onResized: () => undefined,
+        onExit: () => undefined,
+        onActionAck: () => undefined,
+        onSessionUpdated: (frame) => {
+          if ("currentCwd" in frame.session) {
+            currentDirectories.push(frame.session.currentCwd);
+          }
+        },
+        onConnectionStatus: () => undefined,
+      },
+    });
+
+    completeHandshake(sockets[0], buildStreamManifest(hostStreamRpcRegistry));
+    sockets[0].fireText({
+      kind: "sessionUpdated",
+      hasBinaryPayload: false,
+      sessionId: "terminal-1",
+      session: { ...canonicalSession, currentCwd: "/workspace/next" },
+    });
+
+    expect(currentDirectories).toEqual(["/workspace/next"]);
     stream.close();
   });
 
