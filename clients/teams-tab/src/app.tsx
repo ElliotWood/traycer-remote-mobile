@@ -88,6 +88,7 @@ import {
 import { themeFor } from "./theme/teams-theme";
 import { configProblems } from "./config";
 import { SignIn } from "./auth/sign-in";
+import { SignOutButton } from "./auth/sign-out-button";
 import { useAuthService, useAuthStatus } from "./auth/use-auth";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
@@ -542,7 +543,33 @@ export function App(): ReactElement {
    */
   const shell = (content: ReactElement | null): ReactElement => (
     <FluentProvider theme={themeFor(ready ? themeName : "default")}>
-      <AppShell leading={<Text weight="semibold">Traycer</Text>}>
+      <AppShell
+        leading={<Text weight="semibold">Traycer</Text>}
+        /*
+         * SIGN-OUT LIVES IN THE FRAME, not on a screen.
+         *
+         * The states where you most want out — signed in as the wrong
+         * principal, a screen throwing, a shared machine — are exactly the
+         * states where navigating to a settings screen is least reliable. The
+         * trailing slot survives navigation and survives a screen error,
+         * because the in-frame boundary below replaces the SCREEN and leaves
+         * the header standing.
+         *
+         * Absent unless genuinely signed in: under preview there is no
+         * session to end, and rendering a dead control would be the
+         * "affordance that silently does nothing" this project keeps finding.
+         */
+        trailing={
+          status.kind === "signed-in" ? (
+            <SignOutButton
+              userId={status.user.user.id}
+              onSignOut={() => {
+                auth.signOut();
+              }}
+            />
+          ) : null
+        }
+      >
         {/*
           THE IN-FRAME BOUNDARY, and it belongs here rather than around each
           returned screen for the same reason the shell itself does.
