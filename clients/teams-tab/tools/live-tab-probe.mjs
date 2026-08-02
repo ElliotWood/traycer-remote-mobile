@@ -578,6 +578,42 @@ async function run() {
   let failed = false;
   try {
     const page = await context.newPage();
+    /*
+     * REFUSE TO MEASURE ANYTHING WHILE SIGNED OUT.
+     *
+     * Every assertion in this file is satisfiable by the SIGN-IN SCREEN. It
+     * has a header, it has content after that header, it contains no fenced
+     * code and no literal fences, and it renders ~80 characters. So a run
+     * against an expired credential reports `headerRenderedAlone=true`,
+     * `literalFences=0`, `pre=0` — indistinguishable from a green run, and
+     * that is not hypothetical: a deploy was verified against a signed-out
+     * tab and reported as passing.
+     *
+     * The `chars < 50` guard did not catch it, because 81 > 50. A threshold
+     * chosen to catch "rendered nothing" cannot tell "rendered nothing" from
+     * "rendered a DIFFERENT screen".
+     *
+     * A gate, before any measurement, not a heuristic after one.
+     */
+    if (!SELF_TEST) {
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
+      const signedOut = await page
+        .getByRole("button", { name: /^sign in$/i })
+        .count();
+      if (signedOut > 0) {
+        console.error(
+          "REFUSING: the tab is SIGNED OUT — the stored credential is expired or rotated.",
+        );
+        console.error(
+          "          Re-seed with --seed. Nothing below would have measured the",
+        );
+        console.error(
+          "          product: the sign-in screen satisfies every assertion here.",
+        );
+        await browser.close();
+        process.exit(1);
+      }
+    }
     const target =
       EPIC === null
         ? baseUrl
@@ -643,6 +679,17 @@ async function run() {
       await chatPage.close();
     }
     await page.close();
+    /*
+     * WRITE THE STATE BACK, because the refresh token ROTATES.
+     *
+     * The service refreshes on rehydration and the server issues a new
+     * refresh token, retiring the old one — so a static state file is good
+     * for about one run. That is why a credential a human approved two runs
+     * ago was dead, and why the repair is this rather than another approval.
+     */
+    if (!SELF_TEST && STATE !== null) {
+      await context.storageState({ path: STATE });
+    }
   } finally {
     await browser.close();
     served?.server.close();
