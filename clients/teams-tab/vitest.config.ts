@@ -31,5 +31,19 @@ export default defineConfig({
       },
     ],
   },
-  test: { environment: "node", include: ["src/**/*.test.ts"] },
+  /**
+   * `.tsx` is collected as well as `.ts`, and the default environment stays
+   * `node`.
+   *
+   * Both halves matter. The include pattern was `.test.ts` only, so a render
+   * test could not have run even if written — which is why `shell-contract`
+   * asserts against source text and says so. Render tests opt INTO jsdom
+   * per-file with a `// @vitest-environment jsdom` docblock, exactly as
+   * `clients/mobile` does, so the existing node-environment logic tests keep
+   * their environment rather than paying jsdom's startup for every file.
+   */
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  },
 });

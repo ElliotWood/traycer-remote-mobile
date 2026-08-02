@@ -16,12 +16,32 @@
  * shortens what a person said.
  */
 import type { CommentThreadWire } from "@traycer/protocol/host/epic/unary-schemas";
+import type { JsonContent } from "@traycer/protocol/common/registry";
 
 export const COMMENTS_FIXTURE_NOW = 1_800_000_000_000;
 const T = COMMENTS_FIXTURE_NOW;
 
-const p = (...content: unknown[]) => ({ type: "paragraph", content });
-const t = (text: string, ...marks: string[]) => ({
+/*
+ * ANNOTATED, and that is what lets the trailing cast stay deleted.
+ *
+ * `] as unknown as readonly CommentThreadWire[]` was removed on the argument
+ * that it "verified nothing and could have hidden a real mismatch". The first
+ * half was wrong and the second half was right about a mismatch that was
+ * already there: these two helpers returned `unknown[]` content and a widened
+ * `type: string`, so the fixture did not fit `JsonContent`, and the cast was
+ * the only reason it compiled. Deleting the cast alone left SIX errors.
+ *
+ * Restoring the cast would have worked and would have been the wrong repair —
+ * it re-hides what the deletion correctly exposed. Typing the helpers fixes
+ * the mismatch instead, and checks strictly MORE than the cast ever did: the
+ * literals below are now compared against `JsonContent` element by element,
+ * which is what the cast was suppressing.
+ */
+const p = (...content: JsonContent[]): JsonContent => ({
+  type: "paragraph",
+  content,
+});
+const t = (text: string, ...marks: string[]): JsonContent => ({
   type: "text",
   text,
   ...(marks.length > 0
@@ -117,4 +137,4 @@ export const COMMENTS_FIXTURE: readonly CommentThreadWire[] = [
       },
     ],
   },
-] as unknown as readonly CommentThreadWire[];
+];

@@ -22,6 +22,7 @@ import {
 } from "@fluentui/react-components";
 import { FleetLoading } from "./fleet/fleet-state";
 import { AppShell } from "./shell/app-shell";
+import { ErrorBoundary } from "./shell/error-boundary";
 import { type EpicConnectionState } from "./shell/epic-status-row";
 import { useShellStatus } from "./shell/shell-status";
 import { EpicDetail } from "./epics/epic-detail";
@@ -87,6 +88,7 @@ import {
 import { themeFor } from "./theme/teams-theme";
 import { configProblems } from "./config";
 import { SignIn } from "./auth/sign-in";
+import { SignOutButton } from "./auth/sign-out-button";
 import { useAuthService, useAuthStatus } from "./auth/use-auth";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
@@ -396,6 +398,10 @@ function EpicsScreen({
     connection?.hostClient ?? null,
     CONFIGURED_HOST_ID,
     userId,
+    // The real clock, stated. The hook no longer defaults it — see its
+    // docblock; a defaulted `Date.now` is how a test ends up reading the wall
+    // clock without anyone having chosen that.
+    Date.now,
   );
   // The list is the confirmation. Reloading on success means the new epic
   // appears as the HOST's row rather than as our echo of the request.
@@ -537,8 +543,52 @@ export function App(): ReactElement {
    */
   const shell = (content: ReactElement | null): ReactElement => (
     <FluentProvider theme={themeFor(ready ? themeName : "default")}>
-      <AppShell leading={<Text weight="semibold">Traycer</Text>}>
-        {content}
+      <AppShell
+        leading={<Text weight="semibold">Traycer</Text>}
+        /*
+         * SIGN-OUT LIVES IN THE FRAME, not on a screen.
+         *
+         * The states where you most want out — signed in as the wrong
+         * principal, a screen throwing, a shared machine — are exactly the
+         * states where navigating to a settings screen is least reliable. The
+         * trailing slot survives navigation and survives a screen error,
+         * because the in-frame boundary below replaces the SCREEN and leaves
+         * the header standing.
+         *
+         * Absent unless genuinely signed in: under preview there is no
+         * session to end, and rendering a dead control would be the
+         * "affordance that silently does nothing" this project keeps finding.
+         */
+        trailing={
+          status.kind === "signed-in" ? (
+            <SignOutButton
+              userId={status.user.user.id}
+              onSignOut={() => {
+                auth.signOut();
+              }}
+            />
+          ) : null
+        }
+      >
+        {/*
+          THE IN-FRAME BOUNDARY, and it belongs here rather than around each
+          returned screen for the same reason the shell itself does.
+          Twelve wrappers would be twelve boundaries at twelve positions;
+          this is ONE, at one reconciled position, so the header still
+          survives navigation and `shell-contract`'s property is untouched.
+
+          What it buys over the root boundary in `main.tsx`: a screen that
+          throws loses the SCREEN, not the frame. The header, the theme and
+          the status region stay, so the tab still looks like Traycer and the
+          user can see where they are — where the root boundary replaces the
+          entire document with a message on a bare background.
+
+          The root one is still the backstop for this one: its fallback is
+          plain DOM but it renders inside `FluentProvider`, so if the throw
+          came from the provider or the theme, this boundary goes down with
+          it and `main.tsx` catches what is left.
+        */}
+        <ErrorBoundary label="this screen">{content}</ErrorBoundary>
       </AppShell>
     </FluentProvider>
   );

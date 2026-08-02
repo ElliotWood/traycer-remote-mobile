@@ -85,6 +85,15 @@ jobs:
           - project: "@traycer-clients/teams-bot"
             name: "test (@traycer-clients/teams-bot)"
             test_args: ""
+          # `teams-tab` — added for the SAME reason as `teams-bot` above, which
+          # is the point: that entry's own note says it "had never run in CI",
+          # and the package added after it repeated the omission exactly. A
+          # hand-maintained matrix is a list someone has to REMEMBER, and the
+          # failure is silent — the suite passes locally and runs nowhere.
+          # 129 tests, including the shell contract and the create-epic rules.
+          - project: "@traycer-clients/teams-tab"
+            name: "test (@traycer-clients/teams-tab)"
+            test_args: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2

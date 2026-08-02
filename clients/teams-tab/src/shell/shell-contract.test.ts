@@ -69,6 +69,34 @@ describe("shell contract — containment, not growth", () => {
     expect(read("shell/epic-status-row.tsx")).toContain("ageLabel");
   });
 
+  /**
+   * THE WIRING, not the component.
+   *
+   * `sign-out-button.test.tsx` proves the button calls `signOut` when
+   * pressed. It passes whether or not anything RENDERS the button — and
+   * "the method exists, shared, and nothing calls it" is the exact defect
+   * the button was built to fix. Repeating it one level up would be the
+   * joke telling itself twice.
+   *
+   * Mutation-checked: changing `app.tsx` to pass `userId={null}` reddened
+   * nothing before this existed.
+   *
+   * Stated limit, same as the rest of this file: a source assertion proves
+   * the wiring is WRITTEN, not that it renders. A jsdom render of `App`
+   * would prove more and needs the Teams SDK handshake faked; that is a
+   * bigger piece of work and this is not a substitute for it.
+   */
+  it("CONTRACT: sign-out is wired into the frame with the real identity", () => {
+    const app = read("app.tsx");
+    expect(app).toContain("trailing={");
+    expect(app).toContain("<SignOutButton");
+    // The IDENTITY, from the auth status — not a placeholder, and not null.
+    expect(app).toContain("userId={status.user.user.id}");
+    // Only when signed in: a dead control under preview is the affordance
+    // that silently does nothing.
+    expect(app).toContain('status.kind === "signed-in" ? (');
+  });
+
   it("CONTROL: these assertions can fail — a string absent from the shell is absent", () => {
     // Without this, a read() that silently returned "" would pass every
     // `not.toContain` above and the `toContain`s would be the only real
