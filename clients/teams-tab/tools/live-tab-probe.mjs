@@ -131,6 +131,7 @@ const STATE = arg("state");
 const EPIC = arg("epic");
 const SELF_TEST = flag("self-test");
 const CREATE_EPIC = flag("create-epic");
+const CHAT = flag("chat");
 
 const executablePath = process.env.CHROMIUM_PATH;
 if (!executablePath || !existsSync(executablePath)) {
@@ -188,14 +189,46 @@ async function measureOrdering(page, url) {
     window.__probe = {
       headerAt: null,
       contentAt: null,
-      // THE ACTUAL PROPERTY: was a frame ever on screen with nothing in it?
+      // Was a frame ever on screen with nothing in it? Falsifiable, kept.
       framesWithHeaderOnly: 0,
+      /*
+       * THE HEADLINE, and it measures the property instead of a proxy for it.
+       *
+       * `framesWithHeaderOnly` fires before the body gets ANY child — which
+       * includes the loading skeleton, so on a fast epic it is satisfied in
+       * ~14ms and says nothing about a long wait. The shell exists so that a
+       * person waiting on a 47-second snapshot sees a populated frame the
+       * whole time. That is exactly: while the status row says it is loading,
+       * the header is there.
+       *
+       * Counted rather than sampled once, and compared for EQUALITY: the
+       * header must be present in EVERY frame where the loading state is,
+       * not merely in one of them.
+       */
+      framesLoading: 0,
+      framesLoadingWithHeader: 0,
+      loadingSeen: false,
+      loadingEnded: false,
       t0: Date.now(),
     };
     const tick = () => {
       const p = window.__probe;
       const header = document.querySelector("header");
-      const body = document.querySelector('[data-shell-region="body"]');
+      /*
+       * TWO WAYS TO FIND THE BODY, because this runs against whatever is
+       * DEPLOYED, not against what we have written.
+       *
+       * `data-shell-region` was added after the current bundle shipped, so
+       * keying on it alone made this probe time out against production while
+       * the app was working perfectly — the third time in one session that I
+       * assumed my tree's DOM in a build I do not control. The header's next
+       * sibling is the frame's scrolling region in every build that has had a
+       * shell at all.
+       */
+      const body =
+        document.querySelector('[data-shell-region="body"]') ??
+        header?.nextElementSibling ??
+        null;
       const hasContent = body !== null && body.childElementCount > 0;
       if (p.headerAt === null && header !== null) {
         p.headerAt = Date.now() - p.t0;
@@ -206,23 +239,66 @@ async function measureOrdering(page, url) {
       if (header !== null && !hasContent) {
         p.framesWithHeaderOnly += 1;
       }
-      if (p.headerAt === null || p.contentAt === null) {
-        requestAnimationFrame(tick);
+      /*
+       * Keyed on the STATUS ROW'S OWN WORDS, not on a class or a data
+       * attribute. A selector must exist in the oldest build this may run
+       * against, and this string has been in `epic-status-row.tsx` since the
+       * row was written — where `data-shell-region` was added later and made
+       * this probe time out against a working production app.
+       */
+      const loading = (document.body.innerText || "").includes(
+        "Loading this epic",
+      );
+      if (loading) {
+        p.loadingSeen = true;
+        p.framesLoading += 1;
+        if (header !== null) p.framesLoadingWithHeader += 1;
+      } else if (p.loadingSeen) {
+        p.loadingEnded = true;
       }
+      requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
   await page.goto(url, { waitUntil: "commit" });
   // Long enough for the 4s handshake timeout plus a large snapshot.
+  // Wait for the epic to finish loading, not merely for the first child —
+  // the whole point is to sample THROUGH the wait.
+  /*
+   * STOP WHEN THE LOAD ENDS, not when the first child appears.
+   *
+   * The previous condition was `contentAt !== null && (loadingSeen ?
+   * loadingEnded : true)` and it resolved at 527ms — BEFORE the loading row
+   * appeared at ~1s. It then reported `framesLoading=0` and called the run
+   * inconclusive, on the 50 MB epic that is the entire reason this
+   * measurement exists. The observation window closed before the event.
+   *
+   * So: wait for a load to be seen AND finished. If none appears within
+   * `LOADING_GRACE_MS`, this epic genuinely returned fast and the run is
+   * inconclusive rather than passing — the grace has to be long enough that
+   * "no loading state" means the host was quick, not that we looked early.
+   */
+  const LOADING_GRACE_MS = 15_000;
   await page.waitForFunction(
-    () => window.__probe?.contentAt !== null,
-    undefined,
-    { timeout: 120_000 },
+    (graceMs) => {
+      const p = window.__probe;
+      if (p === undefined) return false;
+      // Enough evidence is enough: 120 frames (~2s) samples the property
+      // plenty, and a fixture whose loading state never ends would otherwise
+      // hang the run — which is how the mutation control gets tested.
+      if (p.framesLoading >= 120) return true;
+      if (p.loadingSeen) return p.loadingEnded;
+      return p.contentAt !== null && Date.now() - p.t0 > graceMs;
+    },
+    LOADING_GRACE_MS,
+    { timeout: 180_000 },
   );
   return page.evaluate(() => ({
     headerAt: window.__probe.headerAt,
     contentAt: window.__probe.contentAt,
     framesWithHeaderOnly: window.__probe.framesWithHeaderOnly,
+    framesLoading: window.__probe.framesLoading,
+    framesLoadingWithHeader: window.__probe.framesLoadingWithHeader,
   }));
 }
 
@@ -231,19 +307,206 @@ async function seed() {
     console.error("--seed needs --url and --state");
     process.exit(1);
   }
-  const browser = await chromium.launch({ executablePath, headless: false });
+  /*
+   * HEADLESS, and it prints the code rather than waiting at its own window.
+   *
+   * A device flow does not need the approver to be at this machine — that is
+   * the whole point of it. So this starts the flow, reads the code and the
+   * verification URL off the app's own sign-in screen, PRINTS them, and keeps
+   * polling while a human approves from any device. The ask becomes "visit
+   * this, enter this", which is ten seconds, instead of "run this command".
+   */
+  const browser = await chromium.launch({ executablePath });
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(URL_ARG);
-  console.log("Complete the device flow in the browser window.");
-  console.log("Waiting for a signed-in session (10 minutes)…");
-  // The signed-in tab has a sign-out control in the frame; its presence is
-  // the app's own statement that a session exists, rather than our guess.
-  await page.waitForSelector("header button", { timeout: 600_000 });
+  await page.goto(URL_ARG, { waitUntil: "networkidle" });
+
+  const signIn = page.getByRole("button", { name: /^sign in$/i });
+  await signIn.waitFor({ timeout: 60_000 });
+  await signIn.click();
+
+  // The code and the link are what the sign-in screen shows a user; reading
+  // them from the DOM means relaying exactly what the app said, not a
+  // reconstruction of it.
+  const link = page.getByRole("link", { name: /approval page/i });
+  await link.waitFor({ timeout: 60_000 });
+  const url = await link.getAttribute("href");
+  const code = (await page.locator("div").filter({ hasText: /^[A-Z0-9-]{6,}$/ }).first().textContent())?.trim();
+
+  console.log("");
+  console.log("=== RELAY THIS ===");
+  console.log(`  Visit: ${url ?? "(no href found)"}`);
+  console.log(`  Code:  ${code ?? "(not found — read it off the page)"}`);
+  console.log("==================");
+  console.log("");
+  console.log("Polling for approval (10 minutes)…");
+
+  /*
+   * WAIT FOR THE TOKEN ITSELF, not for a control that implies it.
+   *
+   * Two proxies were tried and both were wrong, in opposite directions:
+   *
+   *   "Sign out" appears   — that control exists in the current source and
+   *                          NOT in the deployed bundle, so it could never
+   *                          appear. Burned the full 10-minute timeout and
+   *                          lost a token a human had already approved.
+   *   "Sign in" detaches   — the sign-in button is REPLACED by the code
+   *                          screen the moment the flow starts, so this
+   *                          fired instantly, before any approval, and wrote
+   *                          an empty 36-byte state file that claimed success.
+   *
+   * The thing being captured is a token in `localStorage`. Waiting for
+   * anything else is waiting for a proxy that can be wrong in a build we do
+   * not control — and this step runs against whatever is deployed, which is
+   * exactly where our assumptions are least reliable.
+   */
+  await page.waitForFunction(
+    () => window.localStorage.getItem("traycer.mobile.auth") !== null,
+    undefined,
+    { timeout: 600_000 },
+  );
+
   mkdirSync(dirname(resolve(STATE)), { recursive: true });
-  await context.storageState({ path: STATE });
-  console.log(`Wrote ${STATE} — treat it as a credential: chmod 600, never commit.`);
+  const state = await context.storageState({ path: STATE });
+  /*
+   * ASSERT THE ARTEFACT, not the write. The previous version reported
+   * "Wrote <path>" for a 36-byte file containing no origins at all — the
+   * write succeeded and captured nothing, which is the same shape as a green
+   * gate that ran nothing.
+   */
+  const entries = state.origins.flatMap((o) => o.localStorage);
+  const hasToken = entries.some((e) => e.name === "traycer.mobile.auth");
+  if (!hasToken) {
+    console.error(
+      `FAILED: ${STATE} was written with no session in it — ${String(entries.length)} localStorage entries, no traycer.mobile.auth`,
+    );
+    await browser.close();
+    process.exit(1);
+  }
+  console.log(
+    `Wrote ${STATE} — ${String(entries.length)} storage entries including the session.`,
+  );
+  console.log("It is a CREDENTIAL: chmod 600, never commit, never log.");
   await browser.close();
+}
+
+/**
+ * The chat checks, against REAL host content.
+ *
+ * Two of the three defects Elliot photographed were here: an assistant row
+ * that rendered EMPTY, and fenced code showing its ``` markers literally.
+ * Both were fixed and both were only ever verified against our own fixtures —
+ * which is a fixture confirming the code that produced it.
+ *
+ * WHAT IS ASSERTED, AND WHAT IS ONLY REPORTED. A real chat may legitimately
+ * contain no table and no fence, so requiring a `<table>` would fail for
+ * reasons unrelated to rendering. So:
+ *
+ *   FAIL   a literal ``` in the rendered text — the exact defect, and its
+ *          presence is unambiguous whatever the content is
+ *   FAIL   a message row with no text at all — the empty-message defect
+ *   REPORT `<pre>` / `<table>` counts. Zero means this chat had none, which
+ *          is untested, not passed.
+ */
+async function chatChecks(page, baseUrl, epicId) {
+  const root = baseUrl.replace(/\/$/, "");
+  await page.goto(`${root}/epics/${epicId}`, { waitUntil: "networkidle" });
+  // Wait out the snapshot, then open the first agent row.
+  await page.waitForTimeout(20_000);
+  const row = page.locator("[role=button], button").filter({ hasText: /./ });
+  const count = await row.count();
+  let opened = false;
+  for (let i = 0; i < count && !opened; i += 1) {
+    const text = (await row.nth(i).textContent()) ?? "";
+    if (/on this host|runs on another host|host not known/i.test(text)) {
+      await row.nth(i).click();
+      opened = true;
+    }
+  }
+  if (!opened) {
+    console.error("chat: could not find an agent row to open — NOT a pass");
+    return false;
+  }
+  await page.waitForTimeout(15_000);
+  const r = await page.evaluate(() => {
+    const text = document.body.innerText || "";
+    return {
+      url: window.location.pathname,
+      /*
+       * FENCES OUTSIDE CODE, not fences anywhere.
+       *
+       * Counting ``` in `innerText` reported 5 against a transcript that
+       * renders 360 code blocks and 140 tables — because the text legitimately
+       * CONTAINS ``` where people discuss fences, and inside a rendered <pre>
+       * that is content, not a defect. The assertion fired on a consequence
+       * that correct rendering also produces.
+       *
+       * The defect is a fence marker in PROSE — a paragraph that should have
+       * become a code block and didn't. So: walk text nodes, skip anything
+       * inside <pre> or <code>, and count there.
+       */
+      literalFences: (() => {
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+        );
+        let n = 0;
+        let node = walker.nextNode();
+        while (node !== null) {
+          const inCode = node.parentElement?.closest("pre, code") !== null &&
+            node.parentElement?.closest("pre, code") !== undefined;
+          if (!inCode) {
+            /*
+             * A fence that STARTS A LINE, not a fence anywhere in prose.
+             *
+             * The previous version flagged 2 hits that were real sentences
+             * ABOUT the characters — "render as monospace rather than literal
+             * ``` delimiters". Discussion of a fence is not an unrendered
+             * fence, and a harness that cries wolf gets switched off, which
+             * costs more than the check is worth.
+             *
+             * An unrendered fence opens its own line. That is the signature.
+             */
+            const NL = String.fromCharCode(10);
+            const fenceAtLineStart = new RegExp(
+              "(^|" + NL + ")\s*```",
+              "g",
+            );
+            n += ((node.textContent ?? "").match(fenceAtLineStart) ?? []).length;
+          }
+          node = walker.nextNode();
+        }
+        return n;
+      })(),
+      pre: document.querySelectorAll("pre").length,
+      table: document.querySelectorAll("table").length,
+      chars: text.length,
+    };
+  });
+  console.log(
+    `chat: url=${r.url} literalFences=${String(r.literalFences)} pre=${String(r.pre)} table=${String(r.table)} chars=${String(r.chars)}`,
+  );
+  if (!r.url.includes("/chats/")) {
+    console.error("chat: did not navigate into a chat — NOT a pass");
+    return false;
+  }
+  if (r.literalFences > 0) {
+    console.error(
+      `FAIL: ${String(r.literalFences)} literal \`\`\` markers rendered as text — the fence defect is back`,
+    );
+    return false;
+  }
+  if (r.chars < 50) {
+    console.error("FAIL: the transcript rendered almost no text");
+    return false;
+  }
+  console.log(
+    `chat: no literal fences; ${String(r.pre)} code blocks and ${String(r.table)} tables rendered` +
+      (r.pre === 0 && r.table === 0
+        ? " — NOTE: this chat contained neither, so those paths are UNTESTED here"
+        : ""),
+  );
+  return true;
 }
 
 async function run() {
@@ -254,7 +517,14 @@ async function run() {
     // `preview=epics` renders real screens from fixtures with no host and no
     // session — the mutation being proven is about WHEN the frame renders,
     // which is upstream of where the data comes from.
-    baseUrl = `http://localhost:${String(served.port)}/epics?preview=epics`;
+    // `--preview` selects the fixture state. `agents&state=loading` holds the
+    // loading row open forever, which is what lets the loading assertion's
+    // mutation be tested at all — production cannot be broken on purpose.
+    const preview = arg("preview", "epics");
+    const path = preview.startsWith("agents")
+      ? `/epics/e1000000-0000-4000-8000-000000000001?preview=${preview}`
+      : `/epics?preview=${preview}`;
+    baseUrl = `http://localhost:${String(served.port)}${path}`;
   }
   if (baseUrl === null) {
     console.error("--url is required");
@@ -296,6 +566,32 @@ async function run() {
      */
     const headerRenderedAlone = t.framesWithHeaderOnly > 0;
     console.log(`headerRenderedAlone=${String(headerRenderedAlone)}`);
+    console.log(
+      `loading: framesLoading=${String(t.framesLoading)} withHeader=${String(t.framesLoadingWithHeader)}`,
+    );
+    /*
+     * A run that never saw the loading state has NOT verified this — it is
+     * untested here, which is a different fact from passing, and reporting it
+     * as a pass is how a fast epic launders a claim about a slow one.
+     */
+    if (t.framesLoading === 0) {
+      console.error(
+        "INCONCLUSIVE: the loading state never appeared — this epic returned too fast",
+      );
+      console.error(
+        "              to test whether the frame stands during a wait. NOT a pass.",
+      );
+      failed = true;
+    } else if (t.framesLoadingWithHeader !== t.framesLoading) {
+      console.error(
+        `FAIL: the header was missing for ${String(t.framesLoading - t.framesLoadingWithHeader)} of ${String(t.framesLoading)} loading frames`,
+      );
+      failed = true;
+    } else {
+      console.log(
+        `frameStoodThroughTheWait=true (${String(t.framesLoading)} loading frames, header in all)`,
+      );
+    }
     if (!headerRenderedAlone) {
       console.error(
         "FAIL: no frame was ever on screen without content — the shell rendered WITH the",
@@ -304,6 +600,12 @@ async function run() {
         "      epic data, which is the failure mode the shell exists to prevent.",
       );
       failed = true;
+    }
+    if (CHAT && EPIC !== null) {
+      const chatPage = await context.newPage();
+      const ok = await chatChecks(chatPage, baseUrl, EPIC);
+      if (!ok) failed = true;
+      await chatPage.close();
     }
     await page.close();
   } finally {
