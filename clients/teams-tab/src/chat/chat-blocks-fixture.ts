@@ -102,7 +102,17 @@ const M2_BLOCKS: readonly ContentBlock[] = [
     taskTodoItems: null,
     error: null,
     agentMessageSend: {
-      receiverAgentId: "50886d43-cf38-4c4e-b21e-b535c5d3f8a8",
+      // HOUSE PATTERN, and it was a REAL agent id — the id of the agent that
+      // reviewed this merge, copied into shipping source in a public repo.
+      // `oss-hygiene` caught it, which is the second time today a real GUID
+      // reached a fixture because a plausible-looking value was pasted from a
+      // live system rather than invented.
+      //
+      // The tell is the same one as last time: every other identifier in this
+      // file follows `a1000000-…-000000000001`, and this was the only UUID
+      // here with real random entropy. Entropy in a fixture means it came
+      // from somewhere.
+      receiverAgentId: "a1000000-0000-4000-8000-00000000a201",
       message: "Config schema is in. Want the exported type too?",
       responseId: null,
       expectReply: true,
