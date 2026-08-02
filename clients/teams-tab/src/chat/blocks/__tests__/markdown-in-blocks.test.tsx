@@ -45,13 +45,16 @@ import type { ReactElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FluentProvider, webLightTheme } from "@fluentui/react-components";
 import {
+  autonomousResumeBlockSchema,
   planBlockSchema,
   subAgentBlockSchema,
   todoBlockSchema,
+  type AutonomousResumeBlock as AutonomousResumeBlockType,
   type PlanBlock as PlanBlockType,
   type SubAgentBlock as SubAgentBlockType,
   type TodoBlock as TodoBlockType,
 } from "@traycer/protocol/persistence/epic/content-blocks";
+import { AutonomousResumeBlock } from "../autonomous-resume-block";
 import { PlanBlock } from "../plan-block";
 import { SubagentBlock } from "../subagent-block";
 import { TodoBlock } from "../todo-block";
@@ -230,5 +233,67 @@ describe("markdown inside a todo block", () => {
     const shown = onScreen();
     expect(shown).toContain("Strip markdown from the summary");
     expect(shown).not.toContain("**");
+  });
+});
+
+/**
+ * The two fields the LIVE harness traced, added after the first fix moved the
+ * deployed count 72 -> 50 rather than to 0.
+ *
+ * The first of these is the one that was actually costing the 50. It was found
+ * by matching the label the harness saw — `"subagent · completed"` — to the
+ * source that composes it (`{trigger.kind} · {trigger.status}`), rather than
+ * by picking the most plausible of four candidate `Body1 as="p"` sites. The
+ * plausible pick was wrong and moved no number.
+ */
+describe("markdown in the fields the live harness traced", () => {
+  it("renders an autonomous-resume trigger summary as markdown", () => {
+    const block = autonomousResumeBlockSchema.parse({
+      type: "autonomous_resume",
+      blockId: "ar-md",
+      status: "completed",
+      timestamp: 1,
+      triggers: [
+        {
+          kind: "subagent",
+          status: "completed",
+          title: "Explore finished",
+          summary: MARKDOWN_REPORT,
+        },
+      ],
+    }) as AutonomousResumeBlockType;
+
+    draw(<AutonomousResumeBlock block={block} />);
+
+    expect(document.querySelectorAll("pre").length).toBeGreaterThan(0);
+    const shown = onScreen();
+    expect(shown).not.toContain(FENCE);
+    expect(shown).not.toContain("# How the renderer works");
+  });
+
+  it("renders a sub-agent TASK as markdown", () => {
+    /*
+     * EVIDENCED BY TEST, NOT BY THE LIVE COUNT. Routing the task through the
+     * markdown renderer moved the deployed number not at all — because no
+     * sampled sub-agent happened to have markdown in its task. That is a fact
+     * about the sample, not about the code: a task IS authored markdown, and
+     * this fixture is the specimen the live transcript did not supply.
+     */
+    const block = subAgentBlockSchema.parse({
+      type: "subagent",
+      blockId: "sa-task-md",
+      status: "completed",
+      timestamp: 1,
+      name: "Explore",
+      task: MARKDOWN_REPORT,
+      progressUpdates: [],
+      result: null,
+    });
+
+    draw(<SubagentBlock block={block} childNodes={[]} client={null} />);
+    fireEvent.click(screen.getByLabelText("Sub-agent: Explore"));
+
+    expect(document.querySelectorAll("pre").length).toBeGreaterThan(0);
+    expect(onScreen()).not.toContain(FENCE);
   });
 });

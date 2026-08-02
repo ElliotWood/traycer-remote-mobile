@@ -18,6 +18,7 @@ import type {
   AutonomousResumeTrigger,
 } from "@traycer/protocol/persistence/epic/content-blocks";
 import { StaticCard } from "./block-card";
+import { ArtifactMarkdown } from "../../artifacts/artifact-markdown";
 
 const useStyles = makeStyles({
   title: {
@@ -68,9 +69,19 @@ function TriggerCard({
       <Caption1 className={styles.meta}>
         {trigger.kind} · {trigger.status}
       </Caption1>
-      <Body1 as="p" className={styles.summary}>
-        {trigger.summary}
-      </Body1>
+      {/*
+        THE FIELD THAT WAS COSTING THE LIVE COUNT OF 50.
+        A trigger summary is an agent's report — headings, rules and fences —
+        and it was printed as a text node. Found by matching the label the
+        live harness saw, "subagent · completed", to the composition two lines
+        above; the previous, plausible guess at a different `Body1 as="p"`
+        moved the number not at all.
+        A `div`, because the markdown renderer emits block elements and a
+        `<pre>` inside a `<p>` is invalid HTML.
+      */}
+      <div className={styles.summary}>
+        <ArtifactMarkdown body={trigger.summary} />
+      </div>
       {/*
         The file is NAMED even though its contents are not fetched. "There is
         more, and here is where it lives" is a different statement from
