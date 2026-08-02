@@ -23,6 +23,7 @@ import { TranscriptView } from "./transcript-view";
 import { InterviewCard } from "./interview-card";
 import { chatActionability } from "./actionability";
 import type { ChatController } from "./use-chat";
+import type { SnapshotDiffClient } from "./blocks/use-snapshot-diff";
 
 const useStyles = makeStyles({
   section: { marginTop: tokens.spacingVerticalL },
@@ -38,6 +39,12 @@ export interface ChatScreenProps {
   /** The chat's epic-doc row, for locality. `null` on a deep link. */
   readonly entry: EpicChatEntry | null;
   readonly configuredHostId: string;
+  /**
+   * The UNARY client, for the diff bodies inside `file_change` /
+   * `artifact_operation` cards. Distinct from the stream the controller
+   * holds: a diff is a request/response, not a subscription.
+   */
+  readonly diffClient: SnapshotDiffClient | null;
   readonly now: number;
   readonly onBack: () => void;
 }
@@ -46,6 +53,7 @@ export function ChatScreen({
   controller,
   entry,
   configuredHostId,
+  diffClient,
   now,
   onBack,
 }: ChatScreenProps): ReactElement {
@@ -143,7 +151,12 @@ export function ChatScreen({
           ) : null}
 
           <Subtitle2 className={styles.section}>Conversation</Subtitle2>
-          <TranscriptView messages={state.messages} now={now} />
+          <TranscriptView
+            messages={state.messages}
+            blockTrees={state.blockTrees}
+            client={diffClient}
+            now={now}
+          />
         </>
       )}
     </>

@@ -1,14 +1,28 @@
 /**
  * The conversation.
  *
- * TWO BLOCK KINDS RENDER, SIXTEEN ARE NAMED. A block we don't render appears
- * as a labelled chip — "Tool call", "File change" — never as nothing. Dropping
- * it would make a turn that ran three tools and wrote one sentence read as a
- * turn that wrote one sentence, with no signal that anything was missing.
+ * EVERY BLOCK KIND NOW RENDERS. This file used to say "two block kinds
+ * render, sixteen are named", and the chip it described was a good answer to
+ * the question it was asked: a named block is honest, and honesty was the
+ * property that mattered when the card surface was retired for projecting
+ * rich content into text.
  *
- * That is the difference between an incomplete view and a misleading one, and
- * it is the reason the card surface was retired: it projected rich content
- * into text until the projection became the product.
+ * It was the wrong question for the standing goal. "Does the tab have a chat
+ * screen" is answered yes by one screen; "does the tab do what mobile's chat
+ * screen does" is answered by rendered kinds, and the answer was 2 of 15.
+ *
+ * The blocker was never twelve unwritten renderers — it was the PROJECTION.
+ * `shared/epic/transcript.ts` reduces every non-prose block to a label string
+ * before a renderer can see it, so `toolName`, `filePath`, the diff and the
+ * to-do items were gone before this file ran. That is why no amount of work
+ * here reached parity, and why the fix was `transcript-tree.ts` landing
+ * first.
+ *
+ * WHAT EACH PROJECTION IS STILL FOR. `messages` (wording) supplies the author,
+ * the timestamp and the user turn's prose; `blockTrees` (structure) supplies
+ * the assistant turn's cards, nested and de-duplicated. The chip survives as
+ * `block-list.tsx`'s unreachable fallback, so the no-silent-drop promise is
+ * kept by a renderer that should never fire rather than by thirteen that do.
  */
 import type { ReactElement } from "react";
 import {
@@ -21,8 +35,11 @@ import type {
   TranscriptBlock,
   TranscriptMessage,
 } from "@traycer-clients/shared/epic/transcript";
+import type { RenderableBlock } from "@traycer-clients/shared/epic/transcript-tree";
 import { terseTime } from "../fleet/fleet-grid";
 import { ArtifactMarkdown } from "../artifacts/artifact-markdown";
+import { BlockList } from "./blocks/block-list";
+import type { SnapshotDiffClient } from "./blocks/use-snapshot-diff";
 
 const useStyles = makeStyles({
   list: {
@@ -65,25 +82,12 @@ const useStyles = makeStyles({
     gap: "2px",
   },
   answeredHead: { color: tokens.colorNeutralForeground3 },
-  chips: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: tokens.spacingHorizontalXS,
-  },
-  /**
-   * A named, unrendered block.
-   *
-   * Deliberately understated — it is a note about the conversation, not part
-   * of it — but never invisible.
+  /*
+   * The `chips` / `chip` styles that lived here are GONE, not orphaned. The
+   * fallback chip moved to `blocks/block-list.tsx` with its own style, so the
+   * one place that can still render an unnamed block is the one place that
+   * styles it.
    */
-  chip: {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: `2px ${tokens.spacingHorizontalS}`,
-    borderRadius: tokens.borderRadiusSmall,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    color: tokens.colorNeutralForeground3,
-  },
   empty: {
     padding: tokens.spacingVerticalXXL,
     textAlign: "center",
@@ -156,11 +160,17 @@ function Block({ block }: { block: TranscriptBlock }): ReactElement | null {
 
 export interface TranscriptViewProps {
   readonly messages: readonly TranscriptMessage[];
+  /** Structure per assistant `messageId`. See `use-chat.ts`. */
+  readonly blockTrees: ReadonlyMap<string, readonly RenderableBlock[]>;
+  /** Unary client, for the diff bodies. `null` under preview. */
+  readonly client: SnapshotDiffClient | null;
   readonly now: number;
 }
 
 export function TranscriptView({
   messages,
+  blockTrees,
+  client,
   now,
 }: TranscriptViewProps): ReactElement {
   const styles = useStyles();
@@ -176,7 +186,7 @@ export function TranscriptView({
   return (
     <div className={styles.list}>
       {messages.map((message) => {
-        const named = message.blocks.filter((b) => b.kind === "other");
+        const tree = blockTrees.get(message.id);
         return (
           <div key={message.id} className={styles.message}>
             <div className={styles.head}>
@@ -185,25 +195,17 @@ export function TranscriptView({
                 {terseTime(message.timestamp, now)}
               </Caption1>
             </div>
-            {message.blocks.map((block, i) => (
-              <Block key={i} block={block} />
-            ))}
-            {named.length === 0 ? null : (
-              <div className={styles.chips}>
-                {named.map((block, i) => (
-                  <Caption1
-                    key={i}
-                    className={styles.chip}
-                    // The chip IS the information — it says something happened
-                    // that this view does not render. No `aria-hidden`.
-                    title={
-                      block.kind === "other" ? block.blockType : undefined
-                    }
-                  >
-                    {block.kind === "other" ? block.label : ""}
-                  </Caption1>
-                ))}
-              </div>
+            {/*
+              A user turn has no blocks to build a tree from — its payload is
+              one body — so it keeps the prose path. An assistant turn renders
+              from the tree, and falls back to the prose path only if no tree
+              was built for it, which would mean the two projections disagreed
+              about the same snapshot.
+            */}
+            {tree === undefined ? (
+              message.blocks.map((block, i) => <Block key={i} block={block} />)
+            ) : (
+              <BlockList nodes={tree} client={client} />
             )}
           </div>
         );

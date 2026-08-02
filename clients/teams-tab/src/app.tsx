@@ -67,6 +67,7 @@ import {
   CHAT_FIXTURE_NOW,
   CHAT_FIXTURE_TITLE,
 } from "./chat/chat-fixture";
+import { CHAT_FIXTURE_BLOCK_TREES } from "./chat/chat-blocks-fixture";
 import { useChat } from "./chat/use-chat";
 import {
   ATTENTION_FIXTURE,
@@ -129,6 +130,7 @@ const useStyles = makeStyles({
 function ChatRoute({
   styles,
   streamConnection,
+  diffClient,
   epicId,
   chatId,
   entry,
@@ -137,6 +139,8 @@ function ChatRoute({
 }: {
   readonly styles: Record<string, string>;
   readonly streamConnection: HostStreamConnection | null;
+  /** The unary client — the transcript's diff bodies are requests, not frames. */
+  readonly diffClient: EpicListClient | null;
   readonly epicId: string;
   readonly chatId: string;
   readonly entry: EpicChatEntry | null;
@@ -150,6 +154,7 @@ function ChatRoute({
         controller={controller}
         entry={entry}
         configuredHostId={CONFIGURED_HOST_ID}
+        diffClient={diffClient}
         now={now}
         onBack={onBack}
       />
@@ -432,6 +437,7 @@ function EpicsScreen({
       <ChatRoute
         styles={styles}
         streamConnection={streamConnection}
+        diffClient={connection?.hostClient ?? null}
         epicId={route.epicId}
         chatId={route.chatId}
         // The agent row that opened it, so locality is known immediately. A
@@ -972,6 +978,7 @@ export function App(): ReactElement {
                   },
                 ],
                 messages: CHAT_FIXTURE,
+                blockTrees: CHAT_FIXTURE_BLOCK_TREES,
                 title: CHAT_FIXTURE_TITLE,
                 access: { canAct: true, role: "owner" },
               },
@@ -999,6 +1006,9 @@ export function App(): ReactElement {
               hostId: "h-alpha",
             }}
             configuredHostId="h-alpha"
+            // No host under preview, so the diff bodies report that rather
+            // than spinning. The cards themselves are the subject here.
+            diffClient={null}
             now={CHAT_FIXTURE_NOW}
             onBack={() => undefined}
           />

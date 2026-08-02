@@ -35,6 +35,10 @@ import {
   toTranscript,
   type TranscriptMessage,
 } from "@traycer-clients/shared/epic/transcript";
+import {
+  buildBlockTree,
+  type RenderableBlock,
+} from "@traycer-clients/shared/epic/transcript-tree";
 import type { ActionPhase } from "./action-state";
 
 export type ChatState =
@@ -44,6 +48,20 @@ export type ChatState =
       readonly approvals: readonly ChatApprovalState[];
       /** Same snapshot, same subscription — never a second read path. */
       readonly messages: readonly TranscriptMessage[];
+      /**
+       * The SAME messages, projected for structure instead of for wording.
+       *
+       * Two projections of one snapshot, joined by `messageId`. They compose
+       * rather than compete and `transcript-projections.test.ts` pins why:
+       * `transcript.ts` answers what a block is CALLED and is lossy on
+       * purpose; `transcript-tree.ts` answers which blocks render, nested how,
+       * and which are REPLACED by another, and hands back the `ContentBlock`
+       * itself. The renderers need both — structure from here, vocabulary
+       * from `messages` — and neither can be derived from the other.
+       *
+       * Assistant rows only. A user turn carries a payload, not blocks.
+       */
+      readonly blockTrees: ReadonlyMap<string, readonly RenderableBlock[]>;
       readonly title: string;
       /**
        * The host's own answer to "may this client act right now".
@@ -115,10 +133,25 @@ export function useChat(
           const approvals = frame.snapshot.pendingApprovals;
           pendingIds = new Set(approvals.map((a) => a.approvalId));
           const chat = frame.snapshot.chat;
+          /*
+           * Built from the TYPED snapshot rows, not from the projection.
+           * `toTranscript` takes `unknown[]` on purpose — it degrades a
+           * malformed block to a named placeholder rather than throwing —
+           * but that tolerance is exactly what erases the payload a renderer
+           * needs. The wire has already been through the schema by the time
+           * it reaches here, so the structure projection reads the real
+           * blocks.
+           */
+          const blockTrees = new Map<string, readonly RenderableBlock[]>();
+          for (const message of chat.messages) {
+            if (message.role !== "assistant") continue;
+            blockTrees.set(message.messageId, buildBlockTree(message.blocks));
+          }
           setState({
             kind: "ready",
             approvals,
             messages: toTranscript(chat.messages, "Agent"),
+            blockTrees,
             title:
               chat.title.trim().length > 0
                 ? chat.title
