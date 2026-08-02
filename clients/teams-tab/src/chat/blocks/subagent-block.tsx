@@ -16,6 +16,8 @@ import type { RenderableBlock } from "@traycer-clients/shared/epic/transcript-tr
 import { CollapsibleCard, StatusBadge } from "./block-card";
 import { BlockList } from "./block-list";
 import type { SnapshotDiffClient } from "./use-snapshot-diff";
+import { ArtifactMarkdown } from "../../artifacts/artifact-markdown";
+import { plainSummary } from "./plain-summary";
 
 const useStyles = makeStyles({
   name: { fontWeight: tokens.fontWeightSemibold, flexShrink: 0 },
@@ -77,7 +79,9 @@ export function SubagentBlock({
           {block.agentType !== null ? (
             <Caption1 className={styles.type}>{block.agentType}</Caption1>
           ) : null}
-          <Caption1 className={styles.summary}>{summaryLine(block)}</Caption1>
+          <Caption1 className={styles.summary}>
+            {plainSummary(summaryLine(block))}
+          </Caption1>
           <StatusBadge status={block.status} />
         </>
       }
@@ -111,9 +115,16 @@ export function SubagentBlock({
         </div>
       ) : null}
       {block.result !== null ? (
-        <Body1 as="p" className={styles.result}>
-          {block.result}
-        </Body1>
+        <div className={styles.result}>
+          {/*
+            MARKDOWN, not a text node. A subagent's result is a full report —
+            headings, rules, fenced code — and printing it raw put
+            "--- # How the renderer works" on screen in the deployed tab.
+            The one-line caption above takes the same field through
+            `plainSummary` instead: same source, two jobs.
+          */}
+          <ArtifactMarkdown body={block.result} />
+        </div>
       ) : null}
     </CollapsibleCard>
   );

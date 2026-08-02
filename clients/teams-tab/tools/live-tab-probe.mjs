@@ -411,22 +411,28 @@ async function seed() {
 async function chatChecks(page, baseUrl, epicId) {
   const root = baseUrl.replace(/\/$/, "");
   await page.goto(`${root}/epics/${epicId}`, { waitUntil: "networkidle" });
-  // Wait out the snapshot, then open the first agent row.
-  await page.waitForTimeout(20_000);
-  const row = page.locator("[role=button], button").filter({ hasText: /./ });
-  const count = await row.count();
-  let opened = false;
-  for (let i = 0; i < count && !opened; i += 1) {
-    const text = (await row.nth(i).textContent()) ?? "";
-    if (/on this host|runs on another host|host not known/i.test(text)) {
-      await row.nth(i).click();
-      opened = true;
-    }
-  }
-  if (!opened) {
-    console.error("chat: could not find an agent row to open — NOT a pass");
+  /*
+   * WAIT FOR THE ROW, not for a duration.
+   *
+   * This was `waitForTimeout(20_000)` and then a scan. It passed until a
+   * bundle rendered a little slower, and then reported "could not find an
+   * agent row" against a tab that was working — a fixed sleep is a guess
+   * about someone else's latency, and the epic behind this one is 50 MB.
+   *
+   * Keyed on the locality text the row itself renders, which exists in every
+   * build that has had an agent list.
+   */
+  const row = page
+    .locator("button")
+    .filter({ hasText: /on this host|another host|not known yet/i })
+    .first();
+  try {
+    await row.waitFor({ timeout: 120_000 });
+  } catch {
+    console.error("chat: no agent row appeared within 120s — NOT a pass");
     return false;
   }
+  await row.click();
   await page.waitForTimeout(15_000);
   const r = await page.evaluate(() => {
     const text = document.body.innerText || "";
@@ -481,10 +487,39 @@ async function chatChecks(page, baseUrl, epicId) {
       pre: document.querySelectorAll("pre").length,
       table: document.querySelectorAll("table").length,
       chars: text.length,
+      /*
+       * A rendered tool call names its tool. `humaniseToolName` turns
+       * `mcp__traycer_a2a__traycer_send_message` into "traycer send message",
+       * and every agent transcript on this host runs tools, so zero here
+       * means the blocks rendered as bare labels.
+       */
+      toolNames: (text.match(/Tool call: \S/g) ?? []).length,
+      filePaths: (text.match(/File change: \S/g) ?? []).length,
+      /*
+       * The OLD behaviour, which must be absent: a chip carrying only its
+       * category, with nothing after it.
+       */
+      bareChips: (text.match(/Tool call(?![:\w])/g) ?? []).length,
     };
   });
   console.log(
     `chat: url=${r.url} literalFences=${String(r.literalFences)} pre=${String(r.pre)} table=${String(r.table)} chars=${String(r.chars)}`,
+  );
+  /*
+   * THE PAYLOAD, not the kinds.
+   *
+   * A transcript rendering sixteen labelled chips with no content passes any
+   * check that counts kinds — and that is exactly the defect the projection
+   * split exists to fix: the payload disappeared while the kind survived.
+   * So the assertion is that a tool's NAME and a file's PATH are on screen,
+   * not that a "Tool call" label is.
+   *
+   * Same distinction that made `framesWithHeaderOnly` worth having over
+   * `headerFirst`: the obvious signal is a consequence the defect also
+   * produces.
+   */
+  console.log(
+    `payload: toolNames=${String(r.toolNames)} filePaths=${String(r.filePaths)} bareChips=${String(r.bareChips)}`,
   );
   if (!r.url.includes("/chats/")) {
     console.error("chat: did not navigate into a chat — NOT a pass");
