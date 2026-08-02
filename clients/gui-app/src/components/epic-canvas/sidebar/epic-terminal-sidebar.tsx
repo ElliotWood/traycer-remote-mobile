@@ -547,6 +547,7 @@ function terminalRowMenuEntries(
       label: "Rename",
       icon: <Pencil className="size-3.5" />,
       disabled: false,
+      disabledTooltip: null,
       variant: "default",
       testIds: {
         dropdown: `epic-terminal-sidebar-rename-${props.sessionId}`,
@@ -561,6 +562,7 @@ function terminalRowMenuEntries(
       label: "Close",
       icon: <Trash2 className="size-3.5" />,
       disabled: props.closePending,
+      disabledTooltip: null,
       variant: "destructive",
       testIds: {
         dropdown: `epic-terminal-sidebar-kill-menu-${props.sessionId}`,
