@@ -175,6 +175,8 @@ export interface EpicsViewProps {
   readonly onReload: () => void;
   readonly onLoadMore: () => void;
   readonly onOpen: (epic: FleetEpic) => void;
+  /** Threaded through to the temporary viewport readout. See that file. */
+  readonly hostClientType: string | null;
 }
 
 export function EpicsView({
@@ -183,6 +185,7 @@ export function EpicsView({
   onReload,
   onLoadMore,
   onOpen,
+  hostClientType,
 }: EpicsViewProps): ReactElement {
   const styles = useStyles();
 
@@ -256,7 +259,7 @@ export function EpicsView({
         Teams and on Teams mobile alike. Anywhere else and the measurement
         would cost more human attention than the number is worth.
       */}
-      <ViewportReadout />
+      <ViewportReadout hostClientType={hostClientType} />
     </>
   );
 }

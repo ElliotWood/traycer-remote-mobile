@@ -372,6 +372,7 @@ function EpicsScreen({
   agentsPreview,
   waitingPreview,
   notificationsPreview,
+  hostClientType,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth & StreamConnectionAuth;
@@ -397,6 +398,8 @@ function EpicsScreen({
   readonly agentsPreview: EpicAgentsState | null;
   readonly waitingPreview: AttentionState | null;
   readonly notificationsPreview: NotificationsState | null;
+  /** Threaded to the temporary viewport readout. See that file. */
+  readonly hostClientType: string | null;
 }): ReactElement {
   /**
    * ANY preview suppresses the connection, not just the epics one.
@@ -602,6 +605,7 @@ function EpicsScreen({
       <EpicsView
         state={state}
         now={now}
+        hostClientType={hostClientType}
         onReload={reload}
         onLoadMore={loadMore}
         onOpen={(epic) => {
@@ -632,7 +636,7 @@ function EpicsScreen({
 
 export function App(): ReactElement {
   const styles = useStyles();
-  const { themeName, inTeams, ready } = useTeamsTheme();
+  const { themeName, inTeams, ready, hostClientType } = useTeamsTheme();
   const { auth, restoring } = useAuthService();
   const status = useAuthStatus(auth);
 
@@ -1240,6 +1244,7 @@ export function App(): ReactElement {
         agentsPreview={agentsPreview}
         waitingPreview={waitingPreview}
         notificationsPreview={notificationsPreview}
+        hostClientType={hostClientType}
       />,
   );
 }

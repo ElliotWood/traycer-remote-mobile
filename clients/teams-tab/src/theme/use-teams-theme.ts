@@ -21,6 +21,22 @@ export interface TeamsThemeState {
   readonly inTeams: boolean;
   /** `false` until initialize settles either way, so nothing paints on a guess. */
   readonly ready: boolean;
+  /**
+   * Which Teams client this is — `desktop`, `web`, `android`, `ios` — or null
+   * outside Teams.
+   *
+   * ALREADY IN THE RESPONSE. `app.getContext()` has been called here since the
+   * theme work and this field was read off the same object and discarded. That
+   * is the third time today a needed value turned out to be arriving already
+   * (the interview questions on a snapshot the bridge held; transcript
+   * payloads dropped at the projection), so: **before adding a call, check
+   * whether the response you already make contains the answer.**
+   *
+   * Needed because a viewport width means nothing without knowing which
+   * client produced it — 390px is a phone and 390px is also a narrow browser
+   * window, and only one of those decides whether the canvas can split.
+   */
+  readonly hostClientType: string | null;
 }
 
 /**
@@ -68,6 +84,7 @@ export function useTeamsTheme(): TeamsThemeState {
     themeName: "default",
     inTeams: false,
     ready: false,
+    hostClientType: null,
   });
 
   useEffect(() => {
@@ -105,6 +122,7 @@ export function useTeamsTheme(): TeamsThemeState {
               themeName: themeFromLocation(),
               inTeams: false,
               ready: true,
+              hostClientType: null,
             });
           }
           return;
@@ -115,6 +133,9 @@ export function useTeamsTheme(): TeamsThemeState {
           themeName: normaliseThemeName(context.app.theme),
           inTeams: true,
           ready: true,
+          // Optional in the SDK's own types, so read defensively rather than
+          // asserted: an older host that omits it must yield null, not throw.
+          hostClientType: context.app.host.clientType ?? null,
         });
         // Teams pushes theme changes rather than expecting a poll; without
         // this the tab keeps the theme it started with when the user switches.
@@ -132,6 +153,7 @@ export function useTeamsTheme(): TeamsThemeState {
           themeName: themeFromLocation(),
           inTeams: false,
           ready: true,
+              hostClientType: null,
         });
       });
 

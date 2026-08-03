@@ -21,7 +21,7 @@
  * jsdom is exactly the kind that can pass for the unrelated reason that
  * `fireEvent` re-rendered the tree anyway.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { FluentProvider, webLightTheme } from "@fluentui/react-components";
 import { ViewportReadout } from "../viewport-readout";
@@ -46,18 +46,35 @@ function setViewport(width: number, height: number, ratio: number): void {
   });
 }
 
-function draw(): void {
+function draw(hostClientType: string | null): void {
   render(
     <FluentProvider theme={webLightTheme}>
-      <ViewportReadout />
+      <ViewportReadout hostClientType={hostClientType} />
     </FluentProvider>,
   );
 }
 
+/** Records beacon URLs without letting a real request escape the test. */
+function stubFetch(): Array<string> {
+  const urls: Array<string> = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<(input: string) => Promise<Response>>((input: string) => {
+      urls.push(input);
+      return Promise.resolve(new Response(null, { status: 200 }));
+    }),
+  );
+  return urls;
+}
+
+beforeEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("viewport readout", () => {
   it("prints the live width, height and pixel ratio", () => {
     setViewport(1024, 768, 2);
-    draw();
+    draw("desktop");
     expect(screen.getByTestId("viewport-readout").textContent).toContain(
       "1024×768",
     );
@@ -71,7 +88,7 @@ describe("viewport readout", () => {
     // guarded is a hard-coded desktop-ish default, which the 1024 case above
     // cannot distinguish from a correct read.
     setViewport(390, 844, 3);
-    draw();
+    draw("desktop");
     expect(screen.getByTestId("viewport-readout").textContent).toContain(
       "390×844",
     );
@@ -79,7 +96,7 @@ describe("viewport readout", () => {
 
   it("follows a resize instead of sampling once", () => {
     setViewport(1024, 768, 2);
-    draw();
+    draw("desktop");
     expect(screen.getByTestId("viewport-readout").textContent).toContain(
       "1024×768",
     );
@@ -95,5 +112,58 @@ describe("viewport readout", () => {
     // component that appended would satisfy `toContain` above while still
     // showing a number that is no longer true.
     expect(shown).not.toContain("1024");
+  });
+});
+
+describe("the self-reporting beacon", () => {
+  it("reports width, height, dpr and host client type — and nothing else", () => {
+    /*
+     * The prohibition is the test. Anything identifying reaching this URL is
+     * the failure, and "no host id, no user, no epic" is checkable in a way
+     * that a comment is not.
+     */
+    const urls = stubFetch();
+    setViewport(1024, 768, 2);
+    draw("desktop");
+
+    expect(urls).toHaveLength(1);
+    const params = new URL(urls[0], "https://example.test").searchParams;
+    expect([...params.keys()].sort()).toEqual(["dpr", "h", "host", "w"]);
+    expect(params.get("w")).toBe("1024");
+    expect(params.get("host")).toBe("desktop");
+  });
+
+  it("fires ONCE per mount, not once per resize", () => {
+    /*
+     * `viewport` changes on every resize by design, so an effect that
+     * depended on it would beacon per resize — a log flood, and the reason
+     * this kind of thing gets banned.
+     *
+     * Mutation: add `viewport` to the effect's dependency array. This goes
+     * 1 → 2 and the visible-line tests all stay green.
+     */
+    const urls = stubFetch();
+    setViewport(1024, 768, 2);
+    draw("desktop");
+
+    act(() => {
+      setViewport(640, 900, 2);
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(urls).toHaveLength(1);
+  });
+
+  it("does NOT report from outside Teams", () => {
+    // A browser window's width is the wrong subject; reporting it would put a
+    // real number about nothing into the log.
+    const urls = stubFetch();
+    setViewport(1024, 768, 2);
+    draw(null);
+
+    expect(urls).toHaveLength(0);
+    // The visible line still renders — it is useful in a browser even though
+    // the beacon is not.
+    expect(screen.getByTestId("viewport-readout")).toBeTruthy();
   });
 });

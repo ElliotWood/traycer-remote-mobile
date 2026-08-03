@@ -42,6 +42,57 @@
  */
 import { useEffect, useState, type ReactElement } from "react";
 import { Caption1, makeStyles, tokens } from "@fluentui/react-components";
+import { BASE } from "@/router/route";
+
+/**
+ * A SELF-REPORTING BEACON, so the reading arrives when the tab is opened for
+ * any reason rather than when a human is asked to read a line and type it back.
+ *
+ * ─── It is a measurement, not telemetry, and the difference is what it must
+ * never grow into ───
+ *
+ * Width, height, pixel ratio, host client type. Nothing else. No host id, no
+ * user, no epic, no session. **The first person to add `epicId` "for
+ * correlation" will do it in good faith** — which is why the prohibition is
+ * written as a prediction rather than as a rule.
+ *
+ * Removal condition is the same as the visible readout's: it goes when the
+ * widths are recorded and a sizing rule exists.
+ *
+ * ─── IT DEPENDS ON A FALLBACK NOBODY PROMISED ───
+ *
+ * There is no `/tab/vp` route. It returns 200 because any unknown path under
+ * `/tab/` falls through to `index.html` — **the same fallthrough that made a
+ * wrong `--base` serve HTML where JavaScript was expected**, which the install
+ * script asserts content-type against precisely because it has happened.
+ *
+ * So this relies on behaviour flagged as a hazard, and that is tolerable for
+ * exactly one reason: **if someone later adds a strict `location /tab/vp`
+ * returning 404, the beacon goes silent — and silence is indistinguishable
+ * from "nobody opened the tab", which is the state we are already in.**
+ *
+ * It fails to the status quo rather than to a plausible number. A beacon whose
+ * failure mode is the current state costs nothing to be wrong about; one that
+ * failed to a believable width would be a bad idea at any price.
+ *
+ * A reader who finds this comment can decide. A reader who finds a
+ * mysteriously dead beacon cannot.
+ */
+function reportViewport(viewport: Viewport, hostClientType: string): void {
+  const query = new URLSearchParams({
+    w: String(viewport.width),
+    h: String(viewport.height),
+    dpr: viewport.ratio.toFixed(2),
+    host: hostClientType,
+  });
+  // `keepalive` so a tab closed immediately after mount still delivers it, and
+  // a swallowed rejection because a failed beacon must never surface to a user
+  // as an error about a diagnostic they did not ask for.
+  void fetch(`${BASE}/vp?${query.toString()}`, {
+    method: "GET",
+    keepalive: true,
+  }).catch(() => undefined);
+}
 
 const useStyles = makeStyles({
   line: {
@@ -108,9 +159,36 @@ function useViewport(): Viewport | null {
  * would be this component deciding, and the arithmetic belongs next to the
  * sizing rule once one exists. The raw numbers are the deliverable.
  */
-export function ViewportReadout(): ReactElement | null {
+export interface ViewportReadoutProps {
+  /**
+   * `desktop` / `web` / `android` / `ios`, or null outside Teams. Explicit
+   * rather than defaulted: a beacon that reported `host=unknown` because a
+   * caller forgot to pass it would be a measurement about nothing, and the
+   * whole point is telling a phone from a narrow browser window.
+   */
+  readonly hostClientType: string | null;
+}
+
+export function ViewportReadout(props: ViewportReadoutProps): ReactElement | null {
   const styles = useStyles();
   const viewport = useViewport();
+  const { hostClientType } = props;
+
+  /*
+   * ONCE PER MOUNT, not per resize. `viewport` changes on every resize by
+   * design — the visible line must stay true — so the effect deliberately
+   * depends on neither it nor its fields, and reads the live value at fire
+   * time instead. A resize-driven beacon is a log flood and the reason this
+   * kind of thing gets banned.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Outside Teams the width is a browser window, which is the wrong subject.
+    // Reporting it would put a real number about nothing into the log.
+    if (hostClientType === null) return;
+    reportViewport(read(), hostClientType);
+  }, [hostClientType]);
+
   if (viewport === null) return null;
   return (
     <Caption1 className={styles.line} data-testid="viewport-readout">
