@@ -15,8 +15,28 @@
  * entirely client-local and, per a dedicated research pass, never actually
  * populated on any real model today — porting it would be faking a check
  * off data neither client has (flagged + approved, not silently skipped).
- * @-mention/slash pickers and mic input stay deferred per the accepted P2
- * contract (no file-search/command-list RPC, no STT infra).
+ * Mic input stays deferred (no STT infra) — see M4.
+ *
+ * M3: the `/` picker is BUILT. The claim that stood here — that `@`/`/` were
+ * deferred because there is "no file-search/command-list RPC" — was false.
+ * `agent.gui.listCommands`, `workspace.mentionFiles` and `workspace.mentionFolders`
+ * were all in the released floor the whole time (`released-floor.ts:8,96,97`).
+ *
+ * `/` needs no worktree binding: the host ignores `workingDirectory`
+ * (measured — two different repositories return byte-identical lists), so the
+ * sheet works in a folderless chat, which is every chat mobile can currently
+ * create. `harnessId` IS honoured and is why this had to wait for M1.
+ *
+ * `@` is deliberately NOT wired yet: it needs a non-empty `worktreeBinding`
+ * for its `roots`, and an empty result from `workspace.mentionFiles` is
+ * indistinguishable from a bad root or no roots at all — see the ticket's
+ * canary. `detectTrigger` recognises `@` but nothing consumes it, so an `@`
+ * stays plain text rather than opening a sheet that cannot be trusted.
+ *
+ * No rich-text editor, deliberately: a mention already serializes to the agent
+ * as plain text, so a token spliced into this textarea IS the payload. Porting
+ * desktop's Tiptap stack would have risked the draft/prefill/IME behaviour
+ * below for no wire benefit.
  *
  * M1: the model / harness / reasoning-effort / speed-tier controls now come
  * from `agent.gui.listModels` + `agent.gui.listHarnesses` and live in
@@ -41,6 +61,7 @@ import {
 import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persistence/epic/foundation";
 import type { AgentMode } from "@traycer/protocol/common/schemas";
 import type { GuiHarnessId } from "@traycer/protocol/host/agent/shared";
+import type { GuiAgentCommandOption } from "@traycer/protocol/host/agent/gui/unary-schemas";
 import {
   normalizeReasoningForModel,
   normalizeServiceTierForModel,
@@ -59,6 +80,13 @@ import { RateLimitBanner } from "@/views/chat/rate-limit-banner";
 import { useProviders } from "@/host/use-provider-usage";
 import { guiHarnessIdToProviderId } from "@traycer-clients/shared/providers/provider-ordering";
 import { chatDraftKey, useDraft } from "@/router/drafts";
+import { useGuiCommands } from "@/host/use-gui-commands";
+import { CommandSheet } from "@/views/chat/command-sheet";
+import {
+  applyTrigger,
+  detectTrigger,
+  filterByName,
+} from "@/views/chat/composer-trigger";
 import {
   AttachmentTooLargeError,
   MAX_ATTACHMENTS_PER_MESSAGE,
@@ -204,6 +232,54 @@ export function Composer({
   const effectiveServiceTier = normalizeServiceTierForModel(serviceTierRaw, selectedModel);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  /**
+   * M3. The trigger is derived from (value, caret) on every change/selection
+   * rather than stored — storing it means a second source of truth that can
+   * disagree with the textarea after a prefill adoption or an undo.
+   *
+   * `caret` IS stored, because `selectionStart` is only readable from the
+   * event that produced it; keeping it lets the sheet survive a re-render.
+   */
+  const [caret, setCaret] = useState(0);
+  const { commands, phase: commandsPhase } = useGuiCommands(client, harnessId);
+  const trigger = detectTrigger(draftText, caret);
+  // `@` is not wired yet (it needs a worktree binding and the canary — see the
+  // ticket); only `/` opens a sheet, so an `@` trigger deliberately falls
+  // through to plain text rather than opening an empty sheet.
+  const slashTrigger = trigger?.kind === "slash" ? trigger : null;
+  const matchingCommands = slashTrigger === null
+    ? []
+    : filterByName(commands, slashTrigger.query, (c) => c.name);
+
+  /**
+   * Explicit dismissal, keyed to the trigger's position. Keyed rather than a
+   * bare boolean because a plain flag stays true and suppresses the NEXT
+   * `/` too — dismissing once would silently disable the feature for the rest
+   * of the draft.
+   */
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+  const setSheetDismissed = (): void => setDismissedAt(slashTrigger?.start ?? null);
+  const sheetCommands =
+    slashTrigger !== null && dismissedAt !== slashTrigger.start ? matchingCommands : [];
+
+  const pickCommand = (command: GuiAgentCommandOption): void => {
+    if (slashTrigger === null) return;
+    const next = applyTrigger(draftText, slashTrigger, caret, `/${command.name}`);
+    setDraftText(next.value);
+    setCaret(next.caret);
+    // The caret must be set on the DOM node, not just in state: React controls
+    // `value` but never `selectionStart`, so without this the caret jumps to
+    // the end of the text and the keyboard dismisses. Deferred to the next
+    // frame because the node still holds the OLD value until React commits.
+    requestAnimationFrame(() => {
+      const node = textareaRef.current;
+      if (node === null) return;
+      node.focus();
+      node.setSelectionRange(next.caret, next.caret);
+    });
+  };
 
   // Adjusted DURING render, not in an effect that fires after commit — an
   // effect here means the render that bumps `prefillNonce` still paints the
@@ -336,8 +412,16 @@ export function Composer({
             <AttachmentStrip attachments={attachments} onRemove={removeAttachment} />
           )}
           <textarea
+            ref={textareaRef}
             value={draftText}
-            onChange={(e) => setDraftText(e.target.value)}
+            onChange={(e) => {
+              setDraftText(e.target.value);
+              setCaret(e.target.selectionStart ?? e.target.value.length);
+            }}
+            // Arrow keys and taps move the caret WITHOUT firing `onChange`, so
+            // without this the sheet stays open after the caret has left the
+            // token it belongs to.
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
             placeholder="Message this agent…"
             rows={2}
             // Gated on ACCESS, not on connection. Disabling a focused
@@ -364,6 +448,23 @@ export function Composer({
               marginBottom: 6,
             }}
             onKeyDown={(e) => {
+              // While the command sheet is up, Enter completes the highlighted
+              // suggestion instead of sending. Sending a half-typed `/rev`
+              // when the sheet is showing `/review` is the wrong reading of
+              // the keypress, and it is unrecoverable — the turn has started.
+              if (e.key === "Enter" && !e.shiftKey && sheetCommands.length > 0) {
+                e.preventDefault();
+                pickCommand(sheetCommands[0]);
+                return;
+              }
+              // Escape dismisses the sheet without touching the draft. The
+              // ticket requires the text and caret to survive this intact,
+              // which they do because dismissal is a caret-independent flag.
+              if (e.key === "Escape" && sheetCommands.length > 0) {
+                e.preventDefault();
+                setSheetDismissed();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
@@ -450,6 +551,14 @@ export function Composer({
               disabled={!connectionLive}
             />
           </>
+        )}
+        {sheetCommands.length > 0 && (
+          <CommandSheet
+            commands={sheetCommands}
+            loading={commandsPhase === "loading"}
+            onPick={pickCommand}
+            onClose={setSheetDismissed}
+          />
         )}
         <div style={{ flex: 1 }} />
         <SendStopButton
