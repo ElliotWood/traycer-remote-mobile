@@ -60,9 +60,9 @@ export function useMentionFiles(
   // caller's projection, so depending on the array itself would re-issue every
   // canary on every keystroke.
   //
-  // Newline-joined, not space-joined: `C:\Users\Some Name\repo` is an ordinary
-  // root on this platform, and a space separator would split one path into two
-  // bogus ones — each failing its own canary, reporting a healthy workspace as
+  // Newline-joined, not space-joined: a Windows home directory routinely
+  // contains a space, so a space separator would split one root into two bogus
+  // ones — each failing its own canary, reporting a healthy workspace as
   // broken. A newline cannot occur in a Windows path.
   const rootsKey = roots.join("\n");
   const rootList = useMemo(
