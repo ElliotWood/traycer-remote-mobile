@@ -396,6 +396,20 @@ describe("reconcile drops rather than throws", () => {
         activationHistory: ["a"],
       },
     };
-    expect(findPaneById(reconcile(damaged).root, "p1")?.previewTabId).toBeNull();
+    const repaired = findPaneById(reconcile(damaged).root, "p1");
+    /*
+     * Narrowed with a real guard, not `?.` and not `??`.
+     *
+     * `repaired?.previewTabId` against `toBeNull()` PASSES when the pane
+     * vanished entirely — the opposite of what this test claims. The first
+     * repair reached for `?? "MISSING PANE"` and was WORSE: `null ?? x` is
+     * `x`, so a correctly-null previewTabId became a string and the
+     * assertion failed on the passing case. The nullish operator cannot
+     * distinguish "absent" from "legitimately null", which is exactly the
+     * distinction being made here.
+     */
+    expect(repaired).not.toBeNull();
+    if (repaired === null) return;
+    expect(repaired.previewTabId).toBeNull();
   });
 });

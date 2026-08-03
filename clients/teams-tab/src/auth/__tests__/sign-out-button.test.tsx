@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("SignOutButton", () => {
   it("calls signOut exactly once when pressed", () => {
-    const onSignOut = vi.fn();
+    const onSignOut = vi.fn<() => void>();
     render(<SignOutButton userId="user-1" onSignOut={onSignOut} />);
     screen.getByRole("button", { name: /sign out/i }).click();
     expect(onSignOut).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe("SignOutButton", () => {
   it("still offers sign-out when the identity has not resolved", () => {
     // Being unable to NAME the user is not a reason to trap them in the
     // session. The label is a disclosure; the button is the remedy.
-    const onSignOut = vi.fn();
+    const onSignOut = vi.fn<() => void>();
     render(<SignOutButton userId={null} onSignOut={onSignOut} />);
     screen.getByRole("button", { name: /sign out/i }).click();
     expect(onSignOut).toHaveBeenCalledTimes(1);

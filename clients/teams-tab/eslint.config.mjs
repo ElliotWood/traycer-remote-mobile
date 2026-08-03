@@ -29,6 +29,7 @@ import {
 } from "../../eslint/flat-base.mjs";
 import { traycerTypeSafetyRestrictions } from "../../eslint/traycer-type-safety-rules.mjs";
 import { traycerClientsImportBoundaryRestrictions } from "../../eslint/traycer-clients-import-boundary-rules.mjs";
+import { traycerTestHonestyRestrictions } from "../../eslint/traycer-test-honesty-rules.mjs";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
@@ -66,6 +67,30 @@ export default tseslint.config(
         traycerClientsImportBoundaryRestrictions,
       ],
       ...reactHooks.configs.recommended.rules,
+    },
+  },
+  {
+    /*
+     * TEST FILES ONLY, and scoped to this package deliberately.
+     *
+     * These rules come from four near-misses in this client over two days,
+     * all of the same shape — the change that makes the check stop
+     * complaining. They belong in `../../eslint/` so another package can
+     * adopt them, and they are NOT applied repo-wide from here: turning them
+     * on for packages whose suites this work has never run would produce a
+     * pile of errors somebody else has to triage, attributed to a canvas
+     * change. Measured before deciding, not assumed — see the commit.
+     *
+     * `**\/__tests__\/**` matches this repo's convention; `*.test.*` catches
+     * the stragglers that sit beside their subject.
+     */
+    files: ["**/__tests__/**/*.ts", "**/__tests__/**/*.tsx", "**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...traycerTypeSafetyRestrictions,
+        ...traycerTestHonestyRestrictions,
+      ],
     },
   },
 );

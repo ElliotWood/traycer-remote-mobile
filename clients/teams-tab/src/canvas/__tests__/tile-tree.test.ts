@@ -459,8 +459,15 @@ describe("removePaneFromTree", () => {
       { root: pane("a", []), sizesByGroupId: {} },
       "a",
     );
-    expect(result?.root).toBeNull();
-    expect(result?.sizesByGroupId).toEqual({});
+    // `result?.root` against `toBeNull()` PASSES when `result` itself is
+    // null — i.e. when the pane was not found at all — so the test named
+    // "yields root: null" was also satisfied by "yielded nothing". Narrowed
+    // with a guard rather than `??`, which cannot tell "absent" from
+    // "legitimately null" and would fail on the passing case.
+    expect(result).not.toBeNull();
+    if (result === null) return;
+    expect(result.root).toBeNull();
+    expect(result.sizesByGroupId).toEqual({});
   });
 
   it("shrinks a >2-child parent and renormalizes its sizes", () => {

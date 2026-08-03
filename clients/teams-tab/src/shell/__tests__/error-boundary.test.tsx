@@ -150,7 +150,7 @@ describe("ErrorBoundary", () => {
   });
 
   it("Reload re-fetches the app — the only way out of a bad bundle, and Teams has no address bar", () => {
-    const reload = vi.fn();
+    const reload = vi.fn<() => void>();
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
       configurable: true,

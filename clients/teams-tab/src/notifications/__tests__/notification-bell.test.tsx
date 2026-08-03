@@ -96,7 +96,7 @@ describe("NotificationBell", () => {
   });
 
   it("calls onClick exactly once when pressed", () => {
-    const onClick = vi.fn();
+    const onClick = vi.fn<() => void>();
     render(
       <NotificationBell
         summary={{ unreadCount: 0, attentionCount: 0 }}
