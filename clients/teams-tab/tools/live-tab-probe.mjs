@@ -511,6 +511,14 @@ async function chatChecks(page, baseUrl, epicId) {
       pre: document.querySelectorAll("pre").length,
       table: document.querySelectorAll("table").length,
       chars: text.length,
+      /*
+       * POSITIVE, for the same reason as the boot gate: `Sign out` renders
+       * only under `status.kind === "signed-in"`, so its presence identifies
+       * THE APP rather than ruling out one known wrong screen.
+       */
+      signedIn: Array.from(document.querySelectorAll("button")).some((b) =>
+        /^sign out$/i.test((b.textContent ?? "").trim()),
+      ),
       signedOut: Array.from(document.querySelectorAll("button")).some((b) =>
         /^sign in$/i.test((b.textContent ?? "").trim()),
       ),
@@ -534,9 +542,11 @@ async function chatChecks(page, baseUrl, epicId) {
    * `pre=0` with a few hundred characters is what a sign-in screen looks
    * like, and `literalFences=0` is trivially true there.
    */
-  if (r.signedOut) {
+  if (!r.signedIn) {
     console.error(
-      "REFUSING: the chat page is SIGNED OUT — every count below is a sign-in screen",
+      r.signedOut
+        ? "REFUSING: the chat page is SIGNED OUT — every count below is a sign-in screen"
+        : "REFUSING: the chat page is not the signed-in app and is not the sign-in screen — every count below describes some other page",
     );
     return false;
   }
@@ -635,9 +645,64 @@ async function run() {
      */
     if (!SELF_TEST) {
       await page.goto(baseUrl, { waitUntil: "networkidle" });
+      /*
+       * A POSITIVE GATE, and it replaced a negative one.
+       *
+       * The original asked "is a Sign in button present?" and refused if so.
+       * That enumerates wrong screens forever and misses the next one. It
+       * knew about the sign-in screen. It did not know about a
+       * configuration-error page, a 502 from the proxy, a service-worker
+       * offline shell, or an unstyled HTML fallback - and THAT LAST ONE IS
+       * NOT HYPOTHETICAL: building with the wrong `--base` makes nginx fall
+       * through and serve index.html where JavaScript was expected, which I
+       * hit during a publish. Every one of those renders a page, with a
+       * header, and with no Sign in button.
+       *
+       * The mobile stream's harness reported PASS against a
+       * configuration-error page; this one reported green against a
+       * signed-out page. Same defect, two clients, hours apart - a property
+       * of the approach, not of either author.
+       *
+       * So: a screen IS the app only if something ONLY THE APP renders is on
+       * it. `Sign out` is the exact positive dual of the old check -
+       * `app.tsx` renders it under `status.kind === "signed-in"` and nowhere
+       * else, on every route, without waiting for epic data.
+       */
+      const signedIn = await page
+        .getByRole("button", { name: /^sign out$/i })
+        .count();
+      // Kept as a DIAGNOSTIC, never as the gate: it distinguishes "signed
+      // out" from "some other wrong screen" in the failure message, which is
+      // the difference between re-seeding and investigating.
       const signedOut = await page
         .getByRole("button", { name: /^sign in$/i })
         .count();
+      if (signedIn === 0) {
+        console.error(
+          "REFUSING: this is not the signed-in app - no `Sign out` control on screen.",
+        );
+        if (signedOut > 0) {
+          console.error(
+            "          It is the SIGN-IN screen: the stored credential is expired or",
+          );
+          console.error("          rotated. Re-seed with --seed.");
+        } else {
+          console.error(
+            "          It is not the sign-in screen either. Something else is being",
+          );
+          console.error(
+            "          served - a config error page, a proxy 502, or an index.html",
+          );
+          console.error(
+            "          fallback from a wrong --base. Open the URL and look.",
+          );
+        }
+        console.error(
+          "          Nothing below would have measured the product.",
+        );
+        await browser.close();
+        process.exit(1);
+      }
       /*
        * PERSIST IMMEDIATELY, not at the end of the run.
        *
@@ -647,21 +712,10 @@ async function run() {
        * human is asked to approve again for a crash that had nothing to do
        * with them. Two approvals have already been spent on my mistakes.
        */
-      if (STATE !== null && signedOut === 0) {
+      // Persisted only AFTER the positive gate passes, so a rotated token is
+      // never written back over a good one from a wrong screen.
+      if (STATE !== null) {
         await context.storageState({ path: STATE });
-      }
-      if (signedOut > 0) {
-        console.error(
-          "REFUSING: the tab is SIGNED OUT — the stored credential is expired or rotated.",
-        );
-        console.error(
-          "          Re-seed with --seed. Nothing below would have measured the",
-        );
-        console.error(
-          "          product: the sign-in screen satisfies every assertion here.",
-        );
-        await browser.close();
-        process.exit(1);
       }
     }
     const target =
