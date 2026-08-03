@@ -231,8 +231,14 @@ export function openTile(args: OpenTileArgs): CanvasState {
 
   if (state.root === null) {
     const paneId = ids.paneId();
+    const pane = makePane(paneId, tile.instanceId);
     return {
-      root: makePane(paneId, tile.instanceId),
+      // `preview` is honoured HERE too, and originally was not. The empty
+      // branch is the first tab a user ever opens, so the bug was "the very
+      // first single-click produces a permanent tab" — invisible in the
+      // canvas-state suite, which always previewed into a canvas that
+      // already had something in it. Found by the opener's tests.
+      root: preview ? { ...pane, previewTabId: tile.instanceId } : pane,
       activePaneId: paneId,
       tilesByInstanceId: { [tile.instanceId]: tile },
       sizesByGroupId: {},

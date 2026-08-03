@@ -141,6 +141,29 @@ describe("preview tabs", () => {
     expectInvariantI1(state);
   });
 
+  it("marks the FIRST tab as a preview when the canvas was empty", () => {
+    /*
+     * A GAP THIS SUITE HAD, found by the opener's tests rather than by this
+     * file. Every preview case here opened into a canvas that already held
+     * something, so all of them took `openTile`'s non-empty branch — and the
+     * empty branch ignored `preview` outright.
+     *
+     * The user-visible bug: **the very first single-click of a session
+     * produces a permanent tab**, and only the second onward previews. Nobody
+     * would report that as "preview is broken"; they would report nothing.
+     *
+     * Mutation: drop the `preview ?` in `openTile`'s `root === null` branch.
+     */
+    const ids = idSource();
+    const state = openTile({
+      state: EMPTY_CANVAS,
+      tile: chat("a", "a"),
+      preview: true,
+      ids,
+    });
+    expect(activePane(state)?.previewTabId).toBe("a");
+  });
+
   it("keeps a promoted tab when the next preview arrives", () => {
     const ids = idSource();
     let state = openTile({ state: EMPTY_CANVAS, tile: chat("a", "a"), preview: true, ids });
@@ -400,13 +423,23 @@ describe("reconcile drops rather than throws", () => {
     /*
      * Narrowed with a real guard, not `?.` and not `??`.
      *
-     * `repaired?.previewTabId` against `toBeNull()` PASSES when the pane
-     * vanished entirely — the opposite of what this test claims. The first
-     * repair reached for `?? "MISSING PANE"` and was WORSE: `null ?? x` is
-     * `x`, so a correctly-null previewTabId became a string and the
-     * assertion failed on the passing case. The nullish operator cannot
-     * distinguish "absent" from "legitimately null", which is exactly the
-     * distinction being made here.
+     * The claim this comment ORIGINALLY made was that
+     * `repaired?.previewTabId` against `toBeNull()` would pass if the pane
+     * had vanished. **Measured: it would not** — vitest's `toBeNull` is
+     * strict, so a missing pane yields `undefined` and the assertion fails.
+     * Corrected rather than deleted, because the wrong version predicts a
+     * whole class of safe assertions is unsafe, which is what it did: it
+     * cost two edits and nearly a ticket filed against another package.
+     *
+     * The guard stays because it distinguishes "no pane" from "pane with a
+     * null preview" *in the failure message*, rather than relying on a
+     * matcher's strictness to do it.
+     *
+     * NOT `?? "MISSING PANE"`, which was the first repair and was genuinely
+     * worse than either: `null ?? x` is `x`, so a correctly-null
+     * previewTabId became a string and the assertion failed on the PASSING
+     * case. The nullish operator cannot distinguish "absent" from
+     * "legitimately null" — exactly the distinction being made here.
      */
     expect(repaired).not.toBeNull();
     if (repaired === null) return;
