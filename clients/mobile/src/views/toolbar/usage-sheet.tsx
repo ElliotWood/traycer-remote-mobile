@@ -4,19 +4,33 @@
  * for the scoping simplification (openrouter/kilocode have no window
  * concept — balance-only fallback).
  */
-import type { ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import type { ProviderCliState, ProviderProfile } from "@traycer/protocol/host/provider-schemas";
 import { useHostClientOrNull, type MobileHostClient } from "@/host/host-client-context";
 import { useProviders, useRateLimitUsage, extractUsageWindows, type UsageWindowRow } from "@/host/use-provider-usage";
 import { PROVIDER_DISPLAY_NAMES } from "@traycer/protocol/host/provider-schemas";
+import { profileCommitId } from "@traycer-clients/shared/providers/provider-profile-model";
 import { radius, theme, type } from "@/views/design-tokens";
 import { BottomSheet } from "./bottom-sheet";
 
 export interface UsageSheetProps {
   readonly onClose: () => void;
+  /**
+   * M2 item 4 — scroll to and briefly highlight one profile's row, in COMMIT-id
+   * terms (`null` is ambient, never the wire sentinel).
+   *
+   * ANCHOR, not filter. Filtering to the named profile would re-introduce the
+   * single-profile view whose removal was item 1's entire point, and it would
+   * look correct: someone arriving here would have no way to know the other
+   * accounts exist. Keeping the other rows visible makes this "here, among
+   * these" rather than "this one".
+   *
+   * `undefined` means "opened from the toolbar, nothing to anchor to".
+   */
+  readonly anchorProfileId?: string | null;
 }
 
-export function UsageSheet({ onClose }: UsageSheetProps): ReactElement {
+export function UsageSheet({ onClose, anchorProfileId }: UsageSheetProps): ReactElement {
   const client = useHostClientOrNull();
   const { providers, loading } = useProviders(client);
   const enabled = providers.filter((p) => p.enabled);
@@ -29,7 +43,12 @@ export function UsageSheet({ onClose }: UsageSheetProps): ReactElement {
         <p style={{ ...type.bodySm, color: theme.mutedText }}>No providers enabled.</p>
       ) : (
         enabled.map((provider) => (
-          <ProviderUsageCard key={provider.providerId} client={client} provider={provider} />
+          <ProviderUsageCard
+            key={provider.providerId}
+            client={client}
+            provider={provider}
+            anchorProfileId={anchorProfileId}
+          />
         ))
       )}
     </BottomSheet>
@@ -61,9 +80,11 @@ export function UsageSheet({ onClose }: UsageSheetProps): ReactElement {
 function ProviderUsageCard({
   client,
   provider,
+  anchorProfileId,
 }: {
   readonly client: MobileHostClient | null;
   readonly provider: ProviderCliState;
+  readonly anchorProfileId: string | null | undefined;
 }): ReactElement {
   return (
     <div
@@ -101,7 +122,13 @@ function ProviderUsageCard({
       </div>
 
       {provider.profiles.length === 0 ? (
-        <ProfileUsageBlock client={client} provider={provider} profile={null} showLabel={false} />
+        <ProfileUsageBlock
+          client={client}
+          provider={provider}
+          profile={null}
+          showLabel={false}
+          anchored={false}
+        />
       ) : (
         provider.profiles.map((profile) => (
           <ProfileUsageBlock
@@ -112,6 +139,13 @@ function ProviderUsageCard({
             // Only label rows when there is something to distinguish. A lone
             // profile needs no name; two or more always do.
             showLabel={provider.profiles.length > 1}
+            // Compared on the COMMIT id: the ambient row's wire id is the
+            // "ambient" sentinel while its committed form is `null`, so
+            // matching on `profileId` would never anchor to it.
+            anchored={
+              anchorProfileId !== undefined &&
+              profileCommitId(profile) === anchorProfileId
+            }
           />
         ))
       )}
@@ -128,13 +162,24 @@ function ProfileUsageBlock({
   provider,
   profile,
   showLabel,
+  anchored,
 }: {
   readonly client: MobileHostClient | null;
   readonly provider: ProviderCliState;
   /** `null` when the provider reports no profiles at all — the pre-profile shape. */
   readonly profile: ProviderProfile | null;
   readonly showLabel: boolean;
+  readonly anchored: boolean;
 }): ReactElement {
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!anchored) return;
+    // Optional-called, not assumed: `scrollIntoView` is absent in jsdom and in
+    // some embedded webviews, and an unguarded call THROWS out of the effect
+    // and takes the whole sheet down. A row that fails to scroll is a
+    // cosmetic miss; a sheet that fails to render is not.
+    rowRef.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  }, [anchored]);
   const { rateLimits, loading } = useRateLimitUsage(
     client,
     provider.providerId,
@@ -143,7 +188,17 @@ function ProfileUsageBlock({
   const windows = rateLimits !== null ? extractUsageWindows(rateLimits) : null;
 
   return (
-    <div style={{ marginTop: showLabel ? 8 : 0 }}>
+    <div
+      ref={rowRef}
+      data-anchored={anchored ? "true" : undefined}
+      style={{
+        marginTop: showLabel ? 8 : 0,
+        // A transient-looking emphasis rather than a selection state: this row
+        // is where you were sent, not a row you chose.
+        borderLeft: anchored ? `2px solid ${theme.primary}` : undefined,
+        paddingLeft: anchored ? 8 : 0,
+      }}
+    >
       {showLabel && profile !== null && (
         <div style={{ ...type.bodyXs, color: theme.mutedText, marginBottom: 4 }}>
           {profile.label}

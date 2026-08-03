@@ -21,6 +21,7 @@ import { AlertTriangle, X } from "lucide-react";
 import type { GuiAgentModelOption } from "@traycer/protocol/host/agent/gui/unary-schemas";
 import type { ProviderProfile } from "@traycer/protocol/host/provider-schemas";
 import { deriveRateLimitBanner } from "@/views/chat/rate-limit-banner-model";
+import { UsageSheet } from "@/views/toolbar/usage-sheet";
 import { radius, theme, type } from "@/views/design-tokens";
 
 /**
@@ -52,6 +53,7 @@ export function RateLimitBanner({
   readonly onSwitchProfile: (profileId: string | null) => void;
 }): ReactElement | null {
   const [dismissedEpisode, setDismissedEpisode] = useState<string | null>(null);
+  const [limitsOpen, setLimitsOpen] = useState(false);
   const banner = deriveRateLimitBanner({ profiles, currentProfileId, model });
 
   if (banner === null) return null;
@@ -111,6 +113,24 @@ export function RateLimitBanner({
             Switch to {banner.switchTarget.label}
           </button>
         )}
+        {/* M2 item 4 — REUSE the usage sheet rather than rebuilding a
+            limits view, anchored to the profile this banner is about. */}
+        <button
+          type="button"
+          onClick={() => setLimitsOpen(true)}
+          style={{
+            ...type.bodyXs,
+            display: "block",
+            marginTop: 4,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+            color: theme.mutedText,
+            cursor: "pointer",
+          }}
+        >
+          View profile limits
+        </button>
       </div>
       <button
         type="button"
@@ -127,6 +147,9 @@ export function RateLimitBanner({
       >
         <X size={13} aria-hidden="true" />
       </button>
+      {limitsOpen && (
+        <UsageSheet onClose={() => setLimitsOpen(false)} anchorProfileId={currentProfileId} />
+      )}
     </div>
   );
 }

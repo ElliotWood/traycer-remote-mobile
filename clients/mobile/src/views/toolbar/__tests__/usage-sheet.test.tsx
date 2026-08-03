@@ -80,10 +80,10 @@ function hostWith(provider: ProviderCliState): {
   return { fake, usageProfileIds };
 }
 
-function renderSheet(fake: FakeHostClient): void {
+function renderSheet(fake: FakeHostClient, anchorProfileId: string | null | undefined): void {
   render(
     <HostClientProvider client={fake.client}>
-      <UsageSheet onClose={() => {}} />
+      <UsageSheet onClose={() => {}} anchorProfileId={anchorProfileId} />
     </HostClientProvider>,
   );
 }
@@ -97,7 +97,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake);
+    renderSheet(fake, undefined);
 
     await waitFor(() => {
       expect(usageProfileIds).toContain("p-one");
@@ -114,7 +114,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake);
+    renderSheet(fake, undefined);
 
     await waitFor(() => {
       expect(screen.getByText(/First account/)).toBeTruthy();
@@ -129,7 +129,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake);
+    renderSheet(fake, undefined);
 
     await waitFor(() => {
       expect(screen.getByText(/signed in on this machine/)).toBeTruthy();
@@ -138,7 +138,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
 
   it("does not label a lone profile — there is nothing to disambiguate", async () => {
     const { fake } = hostWith(providerRow([profile({ profileId: "p-only", label: "Only account" })]));
-    renderSheet(fake);
+    renderSheet(fake, undefined);
 
     await waitFor(() => {
       expect(screen.getByText("Claude Code")).toBeTruthy();
@@ -150,10 +150,63 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
     // The pre-profile shape: `profileId: null` is the honest request, and the
     // card must not silently render nothing.
     const { fake, usageProfileIds } = hostWith(providerRow([]));
-    renderSheet(fake);
+    renderSheet(fake, undefined);
 
     await waitFor(() => {
       expect(usageProfileIds).toEqual(["<null>"]);
     });
+  });
+});
+
+describe("UsageSheet — anchoring (M2 item 4)", () => {
+  it("ANCHORS to a profile without filtering the others away", async () => {
+    // Anchor, not filter. Filtering would re-introduce the single-profile view
+    // that item 1 removed, and it would look correct — someone arriving from
+    // the banner would have no way to know the other accounts exist.
+    const { fake } = hostWith(
+      providerRow([
+        profile({ profileId: "p-one", label: "First account" }),
+        profile({ profileId: "p-two", label: "Second account" }),
+      ]),
+    );
+    renderSheet(fake, "p-two");
+
+    await waitFor(() => {
+      expect(screen.getByText(/Second account/)).toBeTruthy();
+    });
+    // The OTHER row is still on screen — that is the whole point.
+    expect(screen.getByText(/First account/)).toBeTruthy();
+    expect(document.querySelectorAll('[data-anchored="true"]')).toHaveLength(1);
+  });
+
+  it("anchors the AMBIENT row on a null commit id, not the wire sentinel", async () => {
+    // The ambient row's wire id is "ambient" but its committed form is null;
+    // matching on `profileId` would never anchor to it.
+    const { fake } = hostWith(
+      providerRow([
+        profile({ profileId: "ambient", kind: "ambient", label: "Terminal account" }),
+        profile({ profileId: "p-two", label: "Second account" }),
+      ]),
+    );
+    renderSheet(fake, null);
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('[data-anchored="true"]')).toHaveLength(1);
+    });
+  });
+
+  it("anchors nothing when opened from the toolbar", async () => {
+    const { fake } = hostWith(
+      providerRow([
+        profile({ profileId: "p-one", label: "First account" }),
+        profile({ profileId: "p-two", label: "Second account" }),
+      ]),
+    );
+    renderSheet(fake, undefined);
+
+    await waitFor(() => {
+      expect(screen.getByText(/First account/)).toBeTruthy();
+    });
+    expect(document.querySelectorAll('[data-anchored="true"]')).toHaveLength(0);
   });
 });

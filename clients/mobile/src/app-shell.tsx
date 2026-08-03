@@ -293,7 +293,7 @@ function AppShellChrome({
             onSignOut={onSignOut}
           />
         )}
-        {usageOpen && <UsageSheet onClose={() => setUsageOpen(false)} />}
+        {usageOpen && <UsageSheet onClose={() => setUsageOpen(false)} anchorProfileId={undefined} />}
       </div>
     </ArtifactNavProvider>
   );
