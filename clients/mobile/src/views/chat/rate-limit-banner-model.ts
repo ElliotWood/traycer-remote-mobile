@@ -44,7 +44,7 @@ import type { ProviderProfile } from "@traycer/protocol/host/provider-schemas";
 import {
   assessProfileRateLimit,
   effectiveProfileRateLimitSeverity,
-  matchingRateLimitScopes,
+  limitedFamiliesForCopy,
   rateLimitSeverityTier,
   type ProfileRateLimitSeverity,
 } from "@traycer-clients/shared/rate-limits/rate-limit-scope-match";
@@ -104,26 +104,6 @@ export function isBetterSwitchTarget(
 }
 
 /**
- * The families a profile's limit applies to — `[]` when the limit is
- * profile-wide.
- *
- * Both "no per-scope data" (`null`) and "a scope with no family" collapse to
- * empty here, because they mean the same thing to a reader: everything is
- * affected and there is nothing specific to name.
- */
-function limitedFamiliesFor(
-  profile: ProviderProfile,
-  model: GuiAgentModelOption | null,
-): readonly string[] {
-  const scopes = matchingRateLimitScopes(profile, model);
-  if (scopes === null) return [];
-  const named = scopes
-    .map((scope) => scope.family)
-    .filter((family): family is string => family !== null);
-  return [...new Set(named)];
-}
-
-/**
  * The banner to show, or `null` for "say nothing".
  *
  * `null` covers healthy, unknown, and no-current-profile alike — the warning
@@ -152,7 +132,12 @@ export function deriveRateLimitBanner(args: {
   return {
     severity,
     currentLabel: profileDisplayLabel(current),
-    limitedFamilies: limitedFamiliesFor(current, args.model),
+    // The copy rule is shared, not re-derived here: this client's own
+    // version dropped both of its rules (a `family: null` window alongside a
+    // named one understated the limit, and a near-limit family could be named
+    // on a hard-limit banner). Severity is passed in because the rule filters
+    // to the scopes at the severity the banner is actually reporting.
+    limitedFamilies: limitedFamiliesForCopy(current, args.model, severity),
     switchTarget:
       target === null
         ? null

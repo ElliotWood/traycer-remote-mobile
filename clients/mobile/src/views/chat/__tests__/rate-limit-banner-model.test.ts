@@ -157,6 +157,58 @@ describe("deriveRateLimitBanner — profile-wide vs named families", () => {
     expect(banner?.limitedFamilies).toEqual(["opus"]);
   });
 
+  /**
+   * Every other fixture in this describe carries exactly ONE scope, and with
+   * one scope both of the rules below are invisible: naming "the families of
+   * the matching scopes" and naming "the families desktop would name" agree.
+   * The claim is about SELECTING among scopes, so it needs at least two.
+   *
+   * Found by the Evaluator; the rules are desktop's
+   * `limitedFamiliesForCopy` (`use-profile-rate-limit-switch-prompt.ts`).
+   */
+  it("names NO families when a family:null window gates everything alongside a named one", () => {
+    const banner = deriveRateLimitBanner({
+      profiles: [
+        profile({
+          profileId: "p-a",
+          rateLimitStatus: "hard_limit",
+          rateLimitLimitedScopes: [
+            { family: "opus", severity: "hard_limit" },
+            // A shared window: it gates EVERY model, so the limit is not
+            // "for opus" — naming only opus tells the user it is narrower
+            // than it is, on the surface whose whole job is the opposite.
+            { family: null, severity: "hard_limit" },
+          ],
+        }),
+      ],
+      currentProfileId: "p-a",
+      model: MODEL,
+    });
+    expect(banner?.severity).toBe("hard_limit");
+    expect(banner?.limitedFamilies).toEqual([]);
+  });
+
+  it("does not name a merely near-limit family on a hard-limit banner", () => {
+    const banner = deriveRateLimitBanner({
+      profiles: [
+        profile({
+          profileId: "p-a",
+          rateLimitStatus: "hard_limit",
+          rateLimitLimitedScopes: [
+            // Both families match MODEL, so both reach the copy; only the
+            // one AT the banner's severity may be named.
+            { family: "opus", severity: "near_limit" },
+            { family: "Opus 5", severity: "hard_limit" },
+          ],
+        }),
+      ],
+      currentProfileId: "p-a",
+      model: MODEL,
+    });
+    expect(banner?.severity).toBe("hard_limit");
+    expect(banner?.limitedFamilies).toEqual(["Opus 5"]);
+  });
+
   it("falls back to the profile-level status when per-scope data is absent", () => {
     const banner = deriveRateLimitBanner({
       profiles: [

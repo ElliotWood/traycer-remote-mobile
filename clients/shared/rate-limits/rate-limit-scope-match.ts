@@ -90,6 +90,48 @@ export function effectiveProfileRateLimitSeverity(
     : "near_limit";
 }
 
+const NO_FAMILIES: ReadonlyArray<string> = [];
+
+/**
+ * The model families a rate-limit warning may NAME in its copy, or empty for
+ * "say nothing specific".
+ *
+ * Two rules, and both are invisible unless a profile carries more than one
+ * matching scope — which is why each client that re-derived them by hand got
+ * them wrong:
+ *
+ * 1. **All-or-nothing.** If ANY matching scope has `family: null`, name no
+ *    families at all. A `null` family is a shared window that gates every
+ *    model, so naming the subset that happens to be labelled tells the reader
+ *    the limit is narrower than it is.
+ * 2. **Severity filter.** Name only the scopes AT `severity`. A hard-limit
+ *    banner must not name a family that is merely near its limit.
+ *
+ * Lives here rather than in either client because this is the third rule in
+ * this family to drift after being re-derived per client — the same argument
+ * that moved `matchingRateLimitScopes` here. gui-app's
+ * `use-profile-rate-limit-switch-prompt.ts` and mobile's
+ * `rate-limit-banner-model.ts` both call this one implementation.
+ */
+export function limitedFamiliesForCopy(
+  profile: ProviderProfile,
+  model: ModelOption | null,
+  severity: ProfileRateLimitSeverity,
+): ReadonlyArray<string> {
+  const matching = matchingRateLimitScopes(profile, model);
+  // `null` is "no per-scope data" and `[]` is "nothing gates this model" —
+  // neither gives a family to name.
+  if (matching === null || matching.length === 0) return NO_FAMILIES;
+  if (!matching.every((scope) => scope.family !== null)) return NO_FAMILIES;
+  return [
+    ...new Set(
+      matching
+        .filter((scope) => scope.severity === severity)
+        .map((scope) => scope.family),
+    ),
+  ].filter((family): family is string => family !== null);
+}
+
 /**
  * Orders severities for "is this destination in a strictly better tier than
  * the limited current profile" comparisons: not-limited (0) < near_limit (1)
