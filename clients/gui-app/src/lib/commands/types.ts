@@ -81,6 +81,16 @@ export interface CommandItem {
   readonly actionId: ActionId | null;
   readonly run: CommandRun;
   readonly subpage: CommandSubpage | null;
+  /**
+   * Trailing status text for a non-actionable row. Sub-pages render this in a
+   * badge so a workspace that is still resolving or unavailable cannot be
+   * mistaken for a selectable directory.
+   */
+  readonly statusBadge?: string;
+  /**
+   * Prevent selection in cmdk while retaining the row as contextual feedback.
+   */
+  readonly disabled?: boolean;
 }
 
 /**

@@ -37,6 +37,17 @@ function SubpageItemLabel({ label }: { label: string }) {
   );
 }
 
+function RowStatusBadge({ children }: { readonly children: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className="ml-auto shrink-0 border-border/70 bg-background/60 text-muted-foreground"
+    >
+      {children}
+    </Badge>
+  );
+}
+
 interface SubpageViewProps {
   readonly subpage: CommandSubpage;
   readonly ctx: CommandContext;
@@ -57,9 +68,13 @@ export function SubpageView(props: SubpageViewProps) {
             key={item.id}
             value={buildCmdkValue(item)}
             keywords={[...item.keywords]}
+            disabled={item.disabled === true}
             onSelect={() => onSelect(item)}
           >
             <SubpageItemLabel label={item.label} />
+            {item.statusBadge !== undefined ? (
+              <RowStatusBadge>{item.statusBadge}</RowStatusBadge>
+            ) : null}
           </PaletteItemRow>
         ))}
       </CommandGroup>
@@ -73,8 +88,14 @@ interface OpenerRootViewProps {
 }
 
 /** The full "Agents → New agent (Chat)" trail a deep row represents. */
-function deepRowName(path: ReadonlyArray<string>, label: string): string {
-  return [...path, label].join(" → ");
+function deepRowName(
+  path: ReadonlyArray<string>,
+  label: string,
+  statusBadge: string | undefined,
+): string {
+  return statusBadge === undefined
+    ? [...path, label].join(" → ")
+    : [...path, label, statusBadge].join(" → ");
 }
 
 /**
@@ -132,10 +153,14 @@ function OpenerDeepRows(props: OpenerDeepRowsProps) {
               ...item.keywords,
               ...path.map((segment) => segment.toLowerCase()),
             ]}
-            aria-label={deepRowName(path, item.label)}
+            aria-label={deepRowName(path, item.label, item.statusBadge)}
+            disabled={item.disabled === true}
             onSelect={() => onSelect(item)}
           >
             <DeepPathLabel path={path} label={item.label} />
+            {item.statusBadge !== undefined ? (
+              <RowStatusBadge>{item.statusBadge}</RowStatusBadge>
+            ) : null}
           </PaletteItemRow>
           {item.subpage !== null && path.length < OPENER_DEEP_MAX_DEPTH ? (
             <OpenerDeepRows
