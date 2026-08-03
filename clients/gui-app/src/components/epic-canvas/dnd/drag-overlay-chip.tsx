@@ -7,7 +7,7 @@
  */
 import { AnimatePresence } from "motion/react";
 import * as m from "motion/react-m";
-import { FileDiff, FilePlus, GitPullRequest } from "lucide-react";
+import { FileDiff, FilePlus, Folder, GitPullRequest } from "lucide-react";
 import { LEFT_PANEL_DEFINITIONS } from "@/components/epic-canvas/sidebar/left-panel-registry";
 import { EpicNodeTabIcon } from "@/components/epic-canvas/epic-node-tab-icon";
 import { HeaderTabDragOverlay } from "@/components/layout/tabs/tab-strip-drag-overlay";
@@ -15,6 +15,7 @@ import { useHeaderTabs } from "@/stores/tabs/use-header-tabs";
 import { useEpicDndStore } from "@/components/epic-canvas/dnd/dnd-store";
 import {
   LEFT_PANEL_RAIL_ITEM_DND_TYPE,
+  WORKSPACE_FOLDER_DND_TYPE,
   type EpicCanvasDragSourceData,
   type EpicCanvasLeftPanelRailDragData,
 } from "@/components/epic-canvas/dnd/dnd";
@@ -84,6 +85,8 @@ export function EpicRootDragOverlayContent() {
   const openableSource = canvasOpenableDragSource(activeSource);
   const railSource =
     activeSource?.kind === LEFT_PANEL_RAIL_ITEM_DND_TYPE ? activeSource : null;
+  const folderSource =
+    activeSource?.kind === WORKSPACE_FOLDER_DND_TYPE ? activeSource : null;
 
   return (
     <>
@@ -93,6 +96,14 @@ export function EpicRootDragOverlayContent() {
             key={overlayTile.instanceId}
             node={overlayTile}
             epicId={openableSource.epicId}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence initial={false}>
+        {folderSource === null ? null : (
+          <WorkspaceFolderDragOverlay
+            key={folderSource.folderPath}
+            name={folderSource.name}
           />
         )}
       </AnimatePresence>
@@ -113,6 +124,15 @@ export function EpicRootDragOverlayContent() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function WorkspaceFolderDragOverlay(props: { readonly name: string }) {
+  return (
+    <m.div {...CHIP_MOTION} className={cn(CHIP_CLASS)}>
+      <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 truncate font-medium">{props.name}</span>
+    </m.div>
   );
 }
 
