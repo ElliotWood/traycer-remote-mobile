@@ -36,12 +36,15 @@ import {
   approvalKey,
   fileEditKey,
   interviewKey,
+  revertKey,
   useChat,
+  REVERT_ALL_SCOPE,
   type ReplyStatus,
   type UseChatResult,
 } from "@/host/use-chat";
 import { lastAssistantTurn, pinnedTodoSnapshot, type InterviewBlock } from "@/host/chat-projection";
 import type {
+  ChatAccumulatedFileChange,
   ChatApprovalState,
   ChatFileEditApprovalState,
   ChatPendingInterviewState,
@@ -196,19 +199,37 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
     setPrefill((prev) => ({ text, nonce: (prev?.nonce ?? 0) + 1 }));
   };
 
-  const [undoAllPending, setUndoAllPending] = useState(false);
+  /*
+   * M6 — Undo, with its outcome actually correlated.
+   *
+   * This used to dispatch untracked and clear a pending flag on a 3-second
+   * timer, so a REJECTED revert rendered "Undoing…" and then looked exactly
+   * like success while the host's `reason` was discarded off the wire. The
+   * timer was also a second-order bug in its own right: it re-enabled the
+   * control on a schedule rather than on completion, so a revert still in
+   * flight left a live button and a reachable double-dispatch.
+   */
   const handleUndoAll = (): void => {
-    setUndoAllPending(true);
-    chat.dispatchAction((base) => ({
+    chat.dispatchTrackedAction(revertKey(REVERT_ALL_SCOPE), (base) => ({
       ...base,
       kind: "revertFileChanges",
       fromMessageId: null,
       filePaths: null,
       revertArtifacts: true,
     }));
-    // No ack tracked for this frame today — clear the pending flag optimistically
-    // once the snapshot that follows resolves accumulatedFileChanges away.
-    setTimeout(() => setUndoAllPending(false), 3000);
+  };
+
+  const handleUndoFile = (change: ChatAccumulatedFileChange): void => {
+    chat.dispatchTrackedAction(revertKey(change.filePath), (base) => ({
+      ...base,
+      kind: "revertFileChanges",
+      fromMessageId: null,
+      filePaths: [change.filePath],
+      // An artifact row IS a file (`index.md`) and the host needs telling that
+      // reverting it is intended — `chatAccumulatedFileChangeSchema.artifact`
+      // is exactly what marks those rows.
+      revertArtifacts: change.artifact !== null && change.artifact !== undefined,
+    }));
   };
 
   const canMutate = hostClient !== null && connectionLive && chat.accessRole === "owner";
@@ -328,8 +349,10 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
           backgroundItems={chat.backgroundItems}
           accumulatedFileChanges={chat.accumulatedFileChanges}
           canMutate={canMutate}
-          undoAllPending={undoAllPending}
+          undoAllStatus={chat.replyStatusFor(revertKey(REVERT_ALL_SCOPE))}
+          undoStatusFor={(filePath: string) => chat.replyStatusFor(revertKey(filePath))}
           onUndoAll={handleUndoAll}
+          onUndoFile={handleUndoFile}
           onStopBackgroundItem={(taskId) =>
             chat.dispatchAction((base) => ({ ...base, kind: "stopBackgroundItem", taskId }))
           }

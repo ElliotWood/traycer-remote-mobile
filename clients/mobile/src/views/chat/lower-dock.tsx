@@ -29,6 +29,7 @@ import type {
 import type { PinnedTodoSnapshot } from "@/host/chat-projection";
 import { radius, theme, type } from "@/views/design-tokens";
 import { AccumulatedChangesPanel } from "./accumulated-changes-panel";
+import type { ReplyStatus } from "@/host/use-chat";
 import { ActiveAgentsPanel, type ActiveAgentRow } from "./active-agents-panel";
 import { BackgroundItemsPanel } from "./background-items-panel";
 import { PinnedTodoPanel } from "./pinned-todo-panel";
@@ -43,8 +44,10 @@ export interface LowerDockProps {
   readonly backgroundItems: readonly BackgroundItem[] | undefined;
   readonly accumulatedFileChanges: readonly ChatAccumulatedFileChange[];
   readonly canMutate: boolean;
-  readonly undoAllPending: boolean;
+  readonly undoAllStatus: ReplyStatus | undefined;
+  readonly undoStatusFor: (filePath: string) => ReplyStatus | undefined;
   readonly onUndoAll: () => void;
+  readonly onUndoFile: (change: ChatAccumulatedFileChange) => void;
   readonly onStopBackgroundItem: (taskId: string) => void;
   readonly onStopAllBackgroundItems: () => void;
   readonly onPauseQueue: () => void;
@@ -154,8 +157,10 @@ export function LowerDock(props: LowerDockProps): ReactElement | null {
           <AccumulatedChangesPanel
             changes={props.accumulatedFileChanges}
             canMutate={props.canMutate}
-            undoAllPending={props.undoAllPending}
+            undoAllStatus={props.undoAllStatus}
+            undoStatusFor={props.undoStatusFor}
             onUndoAll={props.onUndoAll}
+            onUndoFile={props.onUndoFile}
           />
         </div>
       )}
