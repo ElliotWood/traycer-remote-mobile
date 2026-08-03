@@ -52,7 +52,23 @@ export type SendOutcome =
    * unrecognised status must not inherit either one's disposal rule, because
    * one of them deletes state.
    */
-  | { readonly kind: "unknown"; readonly status: number };
+  | { readonly kind: "unknown"; readonly status: number }
+  /**
+   * **We never got an answer at all** — DNS, TLS, a timeout, an abort. There
+   * is no status to classify, and this is the one case the status-based
+   * union above structurally could not express.
+   *
+   * Kept distinct from `unknown` rather than folded into it with a sentinel
+   * status: `{ kind: "unknown", status: 0 }` reads, in a log and to the next
+   * reader, as *"Bot Service replied 0"* — a claim about a response that
+   * never existed. `unknown` means **they said something we don't
+   * recognise**; `unreachable` means **they said nothing**. Different
+   * diagnoses, different fixes, and only an absent field makes a reader ask.
+   *
+   * Disposal rule is the same as `auth` and for the same reason: a network
+   * blip must never delete a conversation reference.
+   */
+  | { readonly kind: "unreachable"; readonly detail: string };
 
 /**
  * Whether this outcome means the stored conversation reference is dead.
@@ -66,6 +82,62 @@ export type SendOutcome =
  */
 export function shouldDiscardReference(outcome: SendOutcome): boolean {
   return outcome.kind === "gone";
+}
+
+/**
+ * What actually came back from `adapter.continueConversation(...)`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * THE SEND PATH HAS NO STATUS CODE TO CLASSIFY. THIS FINDS ONE, OR SAYS SO.
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * {@link classifySendFailure} takes a `number`, and the design that
+ * specified it assumed the send would hand one back. **It does not.**
+ * `CloudAdapter.continueConversation` is typed `Promise<void>`: it resolves
+ * with nothing on success and *throws* on failure. So there is no status at
+ * the call site, and the 403-vs-401 distinction — the highest-consequence
+ * one in this path — has nothing to operate on unless it is recovered from
+ * the thrown value.
+ *
+ * It is recoverable, but only for HTTP failures. The SDK's `HttpError`
+ * carries `readonly status: number` (`@microsoft/agents-hosting`'s
+ * `httpClient.d.ts`), and its connector client throws that instance through.
+ * A DNS failure, a TLS failure, a timeout or an abort throws something else
+ * entirely, with no status anywhere on it — which is why `unreachable`
+ * exists.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHY THE STATUS IS READ STRUCTURALLY RATHER THAN VIA `instanceof HttpError`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Same reason `state/conversation-reference-store.ts` persists a structural
+ * subset rather than the SDK's type: an `instanceof` against a dependency's
+ * class is a silent-failure risk across a version bump or a duplicated copy
+ * of the package in the tree, and it fails in the direction that *keeps* a
+ * dead reference or *drops* a live one. A numeric `status` on the error is
+ * the actual contract we depend on, so that is what is checked.
+ *
+ * Note the deliberate asymmetry: an error with no readable status returns
+ * `unreachable`, never a guess. Guessing `auth` would mask an uninstall
+ * forever; guessing `gone` would delete state on a flaky network. **Neither
+ * wrong answer is recoverable, so the honest one is "we do not know".**
+ */
+export function outcomeOfSendError(error: unknown): SendOutcome {
+  const detail = error instanceof Error ? error.message : String(error);
+
+  if (error !== null && typeof error === "object" && "status" in error) {
+    const { status } = error;
+    // `Number.isInteger` on top of the `typeof` guard, not instead of it:
+    // NaN passes `typeof === "number"`, and `classifySendFailure(NaN)` would
+    // fall through to `unknown` carrying a NaN status — a value that prints
+    // as "unknown status NaN" and tells nobody anything. An unreadable
+    // status is the `unreachable` case, which says something true.
+    if (typeof status === "number" && Number.isInteger(status)) {
+      return classifySendFailure(status);
+    }
+  }
+
+  return { kind: "unreachable", detail };
 }
 
 export function classifySendFailure(status: number): SendOutcome {
