@@ -1,32 +1,13 @@
-import type { LiveProviderRateLimitSeverity } from "@traycer/protocol/host/rate-limit";
-
-export type RateLimitWindowSeverity = LiveProviderRateLimitSeverity;
-
-/** Binary severity for credit/balance meters that have no reset window. */
-export function creditUsageSeverity(
-  usedPercent: number,
-): RateLimitWindowSeverity {
-  return usedPercent > 85 ? "limited" : "healthy";
-}
-
-/** Tailwind fill color for a severity tier, matching the Core Flows wireframe's bar colors. */
-export function rateLimitWindowSeverityBarClassName(
-  severity: RateLimitWindowSeverity,
-): string {
-  switch (severity) {
-    case "limited":
-      return "bg-red-500 dark:bg-red-400";
-    case "running_low":
-      return "bg-amber-500 dark:bg-amber-400";
-    case "healthy":
-      return "bg-blue-500 dark:bg-blue-400";
-  }
-}
-
 /**
- * The width (0-100) a severity-colored window bar should fill. This tracks the
- * real used percentage, clamped to [0, 100].
+ * MOVED to `clients/shared/rate-limits/` (M2 item 5).
+ *
+ * Relocated rather than forked: the mobile composer needs the same rate-limit
+ * severity rules, and two clients disagreeing about when a profile is
+ * "exhausted" means one of them tells the user something false about their
+ * account. A fork guarantees that drift eventually.
+ *
+ * This file stays as a re-export so gui-app's twelve consumers and their tests
+ * import from the same path as before — the regression gate for the move is
+ * those tests passing UNCHANGED. Nothing was renamed while moving.
  */
-export function rateLimitWindowFillPercent(usedPercent: number): number {
-  return Math.min(100, Math.max(0, usedPercent));
-}
+export * from "@traycer-clients/shared/rate-limits/window-severity";

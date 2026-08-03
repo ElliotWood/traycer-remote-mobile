@@ -1,44 +1,34 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
-import type {
-  ProviderRateLimits,
-  RateLimitUnavailableReason,
-} from "@traycer/protocol/host";
+// `ProviderRateLimits` / `RateLimitUnavailableReason` are no longer imported
+// here: the declarations that used them went to `clients/shared` with the pure
+// half. eslint caught them as unused — the split's own leftovers.
 import type { ResponseOfMethod } from "@traycer-clients/shared/host-transport/host-messenger";
 import type { HostRpcRegistry } from "@/lib/host";
+/**
+ * SPLIT (M2 item 5): the pure half of this module moved to
+ * `clients/shared/rate-limits/provider-rate-limit-envelope.ts` so the mobile
+ * composer applies the same retention rules. What remains here is the
+ * TanStack query-cache convergence, which is genuinely gui-app's:
+ * `@tanstack/react-query` deliberately did NOT follow the pure half into
+ * `clients/shared`.
+ *
+ * Re-exported so every existing consumer of this path is unaffected.
+ */
+import {
+  isTransientUnavailableReason,
+  type AvailableProviderRateLimits,
+  type ProviderRateLimitEnvelope,
+} from "@traycer-clients/shared/rate-limits/provider-rate-limit-envelope";
+
+export * from "@traycer-clients/shared/rate-limits/provider-rate-limit-envelope";
 
 const PROVIDERS_LIST_METHOD_DISCRIMINATOR = "providers.list";
-
-/** The `available: true` arm of `ProviderRateLimits` - the only shape worth retaining. */
-export type AvailableProviderRateLimits = Extract<
-  ProviderRateLimits,
-  { available: true }
->;
 
 /** The raw wire response for `host.getRateLimitUsage` at whatever version the GUI currently negotiates. */
 export type RateLimitUsageResponse = ResponseOfMethod<
   HostRpcRegistry,
   "host.getRateLimitUsage"
 >;
-
-/**
- * Reasons a provider-pull can fail that are transient - a fetch problem on
- * THIS attempt, not a statement about the account's capability to ever report
- * usage. `usage_fetch_failed` is the CLI usage-HTTP-fetch failure the Claude
- * usage-limit fix's protocol ticket split out (e.g. a server-side 429 on
- * Anthropic's `/api/oauth/usage` with a multi-minute penalty window);
- * `timeout`/`connection_failed` are the probe-level analogues. Every other
- * reason (`rate_limits_not_available`, `cli_not_found`, etc.) is authoritative
- * - it says something about the account/setup, not "try again shortly" - so a
- * retained last-good reading must NOT survive alongside one of those.
- */
-const TRANSIENT_UNAVAILABLE_REASONS: ReadonlySet<RateLimitUnavailableReason> =
-  new Set(["usage_fetch_failed", "timeout", "connection_failed"]);
-
-export function isTransientUnavailableReason(
-  reason: RateLimitUnavailableReason,
-): boolean {
-  return TRANSIENT_UNAVAILABLE_REASONS.has(reason);
-}
 
 /**
  * Some Codex refreshes report the authoritative reset-credit count without
@@ -97,12 +87,6 @@ function retainCodexResetCreditDetails(
  *   above, `null` until they've happened at least once in this envelope's
  *   lifetime.
  */
-export interface ProviderRateLimitEnvelope {
-  readonly latest: ProviderRateLimits | null;
-  readonly lastGood: AvailableProviderRateLimits | null;
-  readonly lastGoodAt: number | null;
-  readonly lastFailureAt: number | null;
-}
 
 /**
  * Whether `response` carries a snapshot for a provider whose `providers.list`
@@ -236,45 +220,4 @@ export function mapResponseToProviderRateLimitEnvelope(args: {
   return buildProviderRateLimitEnvelope(previous, args.response, Date.now());
 }
 
-/**
- * What a consumer should currently render for a provider: the retained
- * `lastGood` reading when the latest attempt is a transient failure with one
- * available, otherwise exactly what the latest attempt reported (a good
- * reading, an authoritative unavailable reason, or `null` if no provider
- * snapshot has ever arrived). Shared by both resolvers in
- * `provider-rate-limit-content.ts` and by the header glyph bars
- * (`use-header-rate-limit-bars.ts`), so all three surfaces retain identically.
- */
-export function resolveRetainedProviderRateLimits(
-  envelope: ProviderRateLimitEnvelope | null,
-): ProviderRateLimits | null {
-  if (envelope === null) return null;
-  const { latest, lastGood } = envelope;
-  if (latest === null) return null;
-  if (latest.available) return latest;
-  if (isTransientUnavailableReason(latest.reason) && lastGood !== null) {
-    return lastGood;
-  }
-  return latest;
-}
 
-/**
- * Whether the CURRENT retained view (`resolveRetainedProviderRateLimits`) is a
- * dimmed last-known-good reading rather than a fresh one - true only when the
- * latest attempt itself is a transient failure and a `lastGood` reading is
- * being shown in its place. Distinct from a query-level `isError` degrade
- * (TanStack retaining old data across a thrown fetch exception): that case
- * has no specific wire reason to report and stays the caller's own generic
- * "refresh failed" treatment.
- */
-export function envelopeDegradedReason(
-  envelope: ProviderRateLimitEnvelope | null,
-): RateLimitUnavailableReason | null {
-  if (envelope === null) return null;
-  const { latest, lastGood } = envelope;
-  if (latest === null || latest.available) return null;
-  if (isTransientUnavailableReason(latest.reason) && lastGood !== null) {
-    return latest.reason;
-  }
-  return null;
-}
