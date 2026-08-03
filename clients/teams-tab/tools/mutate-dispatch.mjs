@@ -45,6 +45,7 @@ const ROUTE = join(ROOT, "src/router/route.ts");
 const SCREEN = join(ROOT, "src/canvas/canvas-screen.tsx");
 const CANVAS = join(ROOT, "src/canvas/tile-canvas.tsx");
 const STRIP = join(ROOT, "src/canvas/tab-strip.tsx");
+const HOOK = join(ROOT, "src/canvas/use-canvas.ts");
 const PANES = "src/canvas/__tests__/pane-controls.test.tsx";
 
 const MUTATIONS = {
@@ -130,6 +131,42 @@ const MUTATIONS = {
     to: 'tile: makeBlankTile(""),\n              paneId: pane.id,',
     expect: "binds the configured host onto the tile it mints",
     suite: PANES,
+  },
+  /*
+   * THE ONE THAT MATTERS. Reverts `useCanvas` to the naive shape — a
+   * `useState` initialiser and no handling of `epicId` changing — which is
+   * what every reasonable person writes first and what silently writes epic
+   * A's layout into epic B's key.
+   */
+  "naive-usestate-initialiser": {
+    file: HOOK,
+    from:
+      "  let current = held;\n" +
+      "  if (held.epicId !== epicId) {\n" +
+      "    current = { epicId, state: load(epicId, storageFor) };\n" +
+      "    setHeld(current);\n" +
+      "  }",
+    to: "  const current = held;",
+    expect: "navigating A to B does not carry A's layout",
+    suite: "src/canvas/__tests__/use-canvas.test.tsx",
+  },
+  "empty-string-for-no-epic": {
+    file: HOOK,
+    from: "  return epicId === null ? EMPTY_CANVAS : loadCanvas(storageFor(epicId));",
+    to: '  return loadCanvas(storageFor(epicId ?? ""));',
+    expect: "a route with no epic touches no key at all",
+    suite: "src/canvas/__tests__/use-canvas.test.tsx",
+  },
+  "save-on-visit": {
+    file: HOOK,
+    from: "  const setState = useCallback(",
+    to:
+      "  useEffect(() => {\n" +
+      "    if (epicId !== null) saveCanvas(storageFor(epicId), current.state);\n" +
+      "  });\n" +
+      "  const setState = useCallback(",
+    expect: "does not rewrite storage merely because the canvas was visited",
+    suite: "src/canvas/__tests__/use-canvas.test.tsx",
   },
   "break-the-union-parse": {
     file: ROUTE,

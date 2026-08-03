@@ -94,7 +94,8 @@ import { NOTIFICATIONS_FIXTURE, NOTIFICATIONS_NOW } from "./notifications/notifi
 import { useShellNotifications } from "./shell/shell-notifications";
 import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import { CanvasScreen, uuidIds } from "./canvas/canvas-screen";
-import { EMPTY_CANVAS, type CanvasState } from "./canvas/canvas-state";
+import { useCanvas } from "./canvas/use-canvas";
+import { browserCanvasStorage } from "./canvas/canvas-persistence";
 import {
   createTabHostConnection,
   type HostConnectionAuth,
@@ -454,12 +455,16 @@ function EpicsScreen({
   const [opened, setOpened] = useState<FleetEpic | null>(null);
   const [openedChat, setOpenedChat] = useState<EpicChatEntry | null>(null);
   /*
-   * The canvas layout, held here rather than inside `CanvasScreen`, so it
-   * survives navigating away to a chat and back. Not persisted yet — see the
-   * `canvas` case below and `canvas-screen.tsx`'s docblock for why that is one
-   * more commit rather than one more line.
+   * The canvas layout, loaded from and saved to per-epic storage.
+   *
+   * `route.name === "canvas"` is NOT the condition — the hook runs on every
+   * route, because hooks cannot be conditional, and it is handed the epic id
+   * of whatever route carries one. `useCanvas` owns the epic-change handling;
+   * this call site deliberately holds none of that logic, so there is nothing
+   * here to forget when a route is added.
    */
-  const [canvas, setCanvas] = useState<CanvasState>(EMPTY_CANVAS);
+  const canvasEpicId = route.name === "canvas" ? route.epicId : null;
+  const canvas = useCanvas(canvasEpicId, browserCanvasStorage);
   // Null under preview, so no path from this screen can create against a host.
   const epicAuthoring = useCreateEpic(
     connection?.hostClient ?? null,
@@ -642,8 +647,8 @@ function EpicsScreen({
               ? epicDisplayName(opened)
               : null
           }
-          state={canvas}
-          onChange={setCanvas}
+          state={canvas.state}
+          onChange={canvas.setState}
           hostId={CONFIGURED_HOST_ID}
           ids={uuidIds}
           onBack={() => {
