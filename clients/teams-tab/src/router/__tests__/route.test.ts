@@ -16,6 +16,7 @@ const ALL_ROUTES: readonly Route[] = [
   },
   { name: "waiting" },
   { name: "notifications" },
+  { name: "canvas", epicId: "a1000000-0000-4000-8000-000000000e91" },
 ];
 
 describe("route — round-trip", () => {
@@ -30,7 +31,21 @@ describe("route — round-trip", () => {
 
   it("covers every member of the Route union", () => {
     expect(new Set(ALL_ROUTES.map((r) => r.name))).toEqual(
-      new Set(["epics", "epic", "chat", "waiting", "notifications"]),
+      new Set(["epics", "epic", "chat", "waiting", "notifications", "canvas"]),
+    );
+  });
+
+  /**
+   * The canvas and the epic detail address the SAME epic and must not collapse
+   * onto one path — the canvas sits beside the drill-in rather than replacing
+   * it, so both have to be reachable at once. This is the `waiting` /
+   * `notifications` rule one drilldown down, and it is the failure that shipped
+   * once already: two manifest entries collapsing onto one screen.
+   */
+  it("keeps the canvas and the epic detail on distinct paths", () => {
+    const epicId = "a1000000-0000-4000-8000-000000000e91";
+    expect(routeToPath({ name: "canvas", epicId })).not.toBe(
+      routeToPath({ name: "epic", epicId }),
     );
   });
 
@@ -130,5 +145,54 @@ describe("route — the epic/chat drilldown", () => {
   it("`epics` alone is the list, not an epic with an empty id", () => {
     expect(parseRoute(`${BASE}/epics`)).toEqual({ name: "epics" });
     expect(parseRoute(`${BASE}/epics/`)).toEqual({ name: "epics" });
+  });
+});
+
+describe("route — the canvas segment", () => {
+  const epicId = "a1000000-0000-4000-8000-000000000e91";
+
+  it("parses the canvas without disturbing the epic beside it", () => {
+    expect(parseRoute(`${BASE}/epics/${epicId}/canvas`)).toEqual({
+      name: "canvas",
+      epicId,
+    });
+    // The regression this pair exists for: the canvas check sits between the
+    // `chats` branch and the epic fallback, so getting it wrong shows up as
+    // the DRILL-IN breaking, not as the canvas failing to open.
+    expect(parseRoute(`${BASE}/epics/${epicId}`)).toEqual({
+      name: "epic",
+      epicId,
+    });
+  });
+
+  it("CONTRACT: a word merely starting with `canvas` is the epic, not the canvas", () => {
+    // `segments[2] === "canvas"`, never `startsWith`. A prefix test would
+    // claim every future third segment beginning with those six letters, and
+    // it would do it silently — the user lands on a canvas having asked for
+    // something else.
+    expect(parseRoute(`${BASE}/epics/${epicId}/canvassed`)).toEqual({
+      name: "epic",
+      epicId,
+    });
+  });
+
+  it("CONTRACT: a segment AFTER `canvas` is not the canvas", () => {
+    // Deliberately the OPPOSITE of the chat rule one describe up, where
+    // `/chats/c1/anything` resolves to the chat. There, the id is the last
+    // thing that carries meaning and trailing junk is noise. Here, a fourth
+    // segment is a URL this build does not define — a tile deep link is the
+    // obvious future use — and resolving it to the bare canvas would invent a
+    // meaning that a later version has to take back.
+    expect(parseRoute(`${BASE}/epics/${epicId}/canvas/tile-7`)).toEqual({
+      name: "epic",
+      epicId,
+    });
+  });
+
+  it("survives doubled slashes, as the chat route does", () => {
+    expect(parseRoute(`${BASE}//epics//${epicId}//canvas//`)).toEqual({
+      name: "canvas",
+      epicId,
+    });
   });
 });

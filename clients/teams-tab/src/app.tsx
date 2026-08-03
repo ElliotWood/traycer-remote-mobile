@@ -92,7 +92,9 @@ import {
 import { NotificationsScreen } from "./notifications/notifications-screen";
 import { NOTIFICATIONS_FIXTURE, NOTIFICATIONS_NOW } from "./notifications/notifications-fixture";
 import { useShellNotifications } from "./shell/shell-notifications";
-import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
+import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
+import { CanvasScreen } from "./canvas/canvas-screen";
+import { EMPTY_CANVAS, type CanvasState } from "./canvas/canvas-state";
 import {
   createTabHostConnection,
   type HostConnectionAuth,
@@ -451,6 +453,13 @@ function EpicsScreen({
   // that breaks on refresh.
   const [opened, setOpened] = useState<FleetEpic | null>(null);
   const [openedChat, setOpenedChat] = useState<EpicChatEntry | null>(null);
+  /*
+   * The canvas layout, held here rather than inside `CanvasScreen`, so it
+   * survives navigating away to a chat and back. Not persisted yet — see the
+   * `canvas` case below and `canvas-screen.tsx`'s docblock for why that is one
+   * more commit rather than one more line.
+   */
+  const [canvas, setCanvas] = useState<CanvasState>(EMPTY_CANVAS);
   // Null under preview, so no path from this screen can create against a host.
   const epicAuthoring = useCreateEpic(
     connection?.hostClient ?? null,
@@ -607,6 +616,36 @@ function EpicsScreen({
           onOpenAgent={(chatId, entry) => {
             setOpenedChat(entry);
             navigate({ name: "chat", epicId: route.epicId, chatId });
+          }}
+        />
+      );
+
+    /*
+     * BESIDE the `epic` case above, not replacing it. Both routes address the
+     * same epic and mean different things: `epic` is a list you read, this is
+     * a workspace you arrange. Nothing above changed.
+     *
+     * The layout is held in THIS component's state rather than the canvas's,
+     * so it survives navigating to a chat and back — and it is deliberately
+     * not persisted yet. `browserCanvasStorage(epicId)` is per-epic and the
+     * naive wiring shows one epic's layout under another's key; that lands
+     * with its own test rather than as a line in this one.
+     */
+    case "canvas":
+      return (
+        <CanvasScreen
+          epicId={route.epicId}
+          // Same rule as the detail screen: the row that was clicked when
+          // there was one, and nothing invented when there was not.
+          epicName={
+            opened !== null && opened.id === route.epicId
+              ? epicDisplayName(opened)
+              : null
+          }
+          state={canvas}
+          onChange={setCanvas}
+          onBack={() => {
+            navigate({ name: "epic", epicId: route.epicId });
           }}
         />
       );

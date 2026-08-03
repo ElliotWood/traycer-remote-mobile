@@ -42,6 +42,7 @@ import { join } from "node:path";
 const ROOT = process.cwd();
 const APP = join(ROOT, "src/app.tsx");
 const ROUTE = join(ROOT, "src/router/route.ts");
+const SCREEN = join(ROOT, "src/canvas/canvas-screen.tsx");
 
 const MUTATIONS = {
   "drop-a-case": {
@@ -61,6 +62,32 @@ const MUTATIONS = {
     from: "  switch (route.name) {",
     to: '  if (route.name === "epics") return <div />;\n  switch (route.name) {',
     expect: "no `if (route.name ===` chain returns anywhere",
+  },
+  "canvas-prefix-match": {
+    file: ROUTE,
+    from: 'if (segments[2] === "canvas" && segments.length === 3) {',
+    to: 'if (segments[2]?.startsWith("canvas") === true && segments.length === 3) {',
+    expect: "a word merely starting with `canvas` is the epic, not the canvas",
+  },
+  "canvas-drop-length-check": {
+    file: ROUTE,
+    from: 'if (segments[2] === "canvas" && segments.length === 3) {',
+    to: 'if (segments[2] === "canvas") {',
+    expect: "a segment AFTER `canvas` is not the canvas",
+  },
+  "unattributed-empty-label": {
+    file: SCREEN,
+    from: 'emptyLabel="Nothing open yet — opening tabs from the epic lands next."',
+    to: 'emptyLabel="Nothing open"',
+    expect: "the empty state says WHY it is empty",
+    suite: "src/canvas/__tests__/canvas-screen.test.tsx",
+  },
+  "drop-the-epic-name-fallback": {
+    file: SCREEN,
+    from: "const title = epicName ?? `Epic ${epicId.slice(0, 8)}`;",
+    to: 'const title = epicName ?? "";',
+    expect: "a deep link with no epic name shows a short id",
+    suite: "src/canvas/__tests__/canvas-screen.test.tsx",
   },
   "break-the-union-parse": {
     file: ROUTE,
@@ -108,7 +135,15 @@ try {
   try {
     execFileSync(
       process.execPath,
-      [join(ROOT, "../../node_modules/vitest/vitest.mjs"), "run", "src/router"],
+      [
+        join(ROOT, "../../node_modules/vitest/vitest.mjs"),
+        "run",
+        // The suite that OWNS the assertion. Running the whole package would
+        // still go red, and it would go red for a mutation that happened to
+        // break something unrelated — a red you did not cause reads exactly
+        // like the one you did.
+        mutation.suite ?? "src/router",
+      ],
       { stdio: "inherit", cwd: ROOT },
     );
     console.log(`RESULT [${name}]: GREEN — the assertion could not fail`);

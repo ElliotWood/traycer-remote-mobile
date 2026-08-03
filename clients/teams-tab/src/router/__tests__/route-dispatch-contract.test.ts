@@ -120,6 +120,11 @@ describe("route dispatch — every member reaches a screen", () => {
       "chat",
       "waiting",
       "notifications",
+      // Added with the canvas. This assertion failed on the commit that added
+      // it, before the case existed — which is the test working, and is the
+      // first time it has been exercised by something other than a deliberate
+      // mutation.
+      "canvas",
     ]);
   });
 
