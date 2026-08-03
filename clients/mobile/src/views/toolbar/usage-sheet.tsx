@@ -5,7 +5,7 @@
  * concept — balance-only fallback).
  */
 import type { ReactElement } from "react";
-import type { ProviderCliState } from "@traycer/protocol/host/provider-schemas";
+import type { ProviderCliState, ProviderProfile } from "@traycer/protocol/host/provider-schemas";
 import { useHostClientOrNull, type MobileHostClient } from "@/host/host-client-context";
 import { useProviders, useRateLimitUsage, extractUsageWindows, type UsageWindowRow } from "@/host/use-provider-usage";
 import { PROVIDER_DISPLAY_NAMES } from "@traycer/protocol/host/provider-schemas";
@@ -36,6 +36,28 @@ export function UsageSheet({ onClose }: UsageSheetProps): ReactElement {
   );
 }
 
+/**
+ * M2 item 1 — one usage block PER PROFILE, not one for a guessed "active" one.
+ *
+ * This card used to do `provider.profiles[0] ?? null` and read usage for that
+ * profile alone. With more than one profile configured it reported another
+ * account's limits under this provider's name, confidently and with no way to
+ * tell.
+ *
+ * The instinctive fix — "determine the genuinely active profile" — is not
+ * available: `providerProfileSchema` carries no `isActive` / `lastUsed` /
+ * equivalent, and the provider row's only active-ish field is `selected`,
+ * which names the CLI binary (`{kind: "bundled"}`), not a profile. Verified on
+ * a live host as well as in the schema. Desktop's own resolver falls back to
+ * index 0 for exactly this reason, and it only works there because it has two
+ * inputs this sheet does not: a browsed selection and a chat's committed
+ * `selectedProfileId`.
+ *
+ * This sheet is provider-global — it has no chat, so "the active profile" is
+ * not merely unknown here, it is UNDEFINED. So it stops choosing. Every
+ * profile gets a row, each labelled, and the wrong-account bug is deleted
+ * rather than relocated.
+ */
 function ProviderUsageCard({
   client,
   provider,
@@ -43,10 +65,6 @@ function ProviderUsageCard({
   readonly client: MobileHostClient | null;
   readonly provider: ProviderCliState;
 }): ReactElement {
-  const activeProfile = provider.profiles[0] ?? null;
-  const { rateLimits, loading } = useRateLimitUsage(client, provider.providerId, activeProfile?.profileId ?? null);
-  const windows = rateLimits !== null ? extractUsageWindows(rateLimits) : null;
-
   return (
     <div
       style={{
@@ -82,6 +100,56 @@ function ProviderUsageCard({
         )}
       </div>
 
+      {provider.profiles.length === 0 ? (
+        <ProfileUsageBlock client={client} provider={provider} profile={null} showLabel={false} />
+      ) : (
+        provider.profiles.map((profile) => (
+          <ProfileUsageBlock
+            key={profile.profileId}
+            client={client}
+            provider={provider}
+            profile={profile}
+            // Only label rows when there is something to distinguish. A lone
+            // profile needs no name; two or more always do.
+            showLabel={provider.profiles.length > 1}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+/**
+ * One profile's usage. Its own component because `useRateLimitUsage` is a
+ * hook — the per-profile fetch cannot be looped inside the card.
+ */
+function ProfileUsageBlock({
+  client,
+  provider,
+  profile,
+  showLabel,
+}: {
+  readonly client: MobileHostClient | null;
+  readonly provider: ProviderCliState;
+  /** `null` when the provider reports no profiles at all — the pre-profile shape. */
+  readonly profile: ProviderProfile | null;
+  readonly showLabel: boolean;
+}): ReactElement {
+  const { rateLimits, loading } = useRateLimitUsage(
+    client,
+    provider.providerId,
+    profile?.profileId ?? null,
+  );
+  const windows = rateLimits !== null ? extractUsageWindows(rateLimits) : null;
+
+  return (
+    <div style={{ marginTop: showLabel ? 8 : 0 }}>
+      {showLabel && profile !== null && (
+        <div style={{ ...type.bodyXs, color: theme.mutedText, marginBottom: 4 }}>
+          {profile.label}
+          {profile.kind === "ambient" && " · signed in on this machine"}
+        </div>
+      )}
       {loading ? (
         <p style={{ ...type.bodyXs, color: theme.mutedText, margin: 0 }}>Loading usage…</p>
       ) : rateLimits === null ? (
