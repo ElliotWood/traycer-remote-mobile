@@ -46,6 +46,7 @@ const SCREEN = join(ROOT, "src/canvas/canvas-screen.tsx");
 const CANVAS = join(ROOT, "src/canvas/tile-canvas.tsx");
 const STRIP = join(ROOT, "src/canvas/tab-strip.tsx");
 const HOOK = join(ROOT, "src/canvas/use-canvas.ts");
+const PERSIST = join(ROOT, "src/canvas/canvas-persistence.ts");
 const PANES = "src/canvas/__tests__/pane-controls.test.tsx";
 
 const MUTATIONS = {
@@ -168,6 +169,29 @@ const MUTATIONS = {
     expect: "does not rewrite storage merely because the canvas was visited",
     suite: "src/canvas/__tests__/use-canvas.test.tsx",
   },
+  /*
+   * The defence that had never been executed. Removing the read guard is the
+   * boot failure this client would show in Teams and nowhere else.
+   */
+  "storage-read-unguarded": {
+    file: PERSIST,
+    from:
+      "      try {\n" +
+      "        return window.localStorage.getItem(key);\n" +
+      "      } catch {\n" +
+      "        return null;\n" +
+      "      }",
+    to: "      return window.localStorage.getItem(key);",
+    expect: "a throwing PROPERTY ACCESS degrades to no stored layout",
+    suite: "src/canvas/__tests__/browser-canvas-storage.test.ts",
+  },
+  "storage-write-unguarded": {
+    file: PERSIST,
+    from: "      try {\n        window.localStorage.setItem(key, value);\n      } catch {",
+    to: "      window.localStorage.setItem(key, value);\n      if (false) try { } catch {",
+    expect: "a throwing setItem - the quota case",
+    suite: "src/canvas/__tests__/browser-canvas-storage.test.ts",
+  },
   "break-the-union-parse": {
     file: ROUTE,
     from: '| { readonly name: "waiting" }',
@@ -186,8 +210,23 @@ if (mutation === undefined) {
 
 const original = readFileSync(mutation.file, "utf8");
 
+/*
+ * Matching happens against an LF-NORMALISED copy.
+ *
+ * This tree checks out CRLF on Windows, so every multi-line pattern here
+ * matched ZERO times and the harness aborted — correctly, and for a reason
+ * that had nothing to do with the code under test. Worth the note because the
+ * failure is indistinguishable from "the code you meant to mutate is not
+ * there", and the tempting response to that is to weaken the pattern until it
+ * matches something.
+ *
+ * The mutated file is written as LF; `original` is restored byte-for-byte in
+ * the `finally`, so the working tree ends exactly as it started.
+ */
+const normalized = original.replace(/\r\n/g, "\n");
+
 try {
-  const occurrences = original.split(mutation.from).length - 1;
+  const occurrences = normalized.split(mutation.from).length - 1;
   if (occurrences !== 1) {
     // NOT a warning. A pattern matching zero times mutates nothing and the
     // suite then reports green about unmutated code; matching twice mutates
@@ -198,7 +237,7 @@ try {
     process.exit(3);
   }
 
-  const mutated = original.replace(mutation.from, mutation.to);
+  const mutated = normalized.replace(mutation.from, mutation.to);
   writeFileSync(mutation.file, mutated);
 
   // Read BACK from disk. Trusting the in-memory string would prove that
