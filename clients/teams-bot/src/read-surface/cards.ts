@@ -6,6 +6,7 @@ import type {
   AgentSummary,
   ChatStatus,
   EpicSummary,
+  InterviewQuestion,
   PendingApproval,
   PendingInterview,
   Transcript,
@@ -1466,39 +1467,204 @@ export function buildApprovalCard(
   );
 }
 
-/** A pending interview, surfaced so it isn't invisible. Answering it is not built yet, and this says so rather than implying it is. */
+export const ANSWER_VERB = "traycer/answer";
+export const ANSWER_TITLE = "➤ Send answers";
+
+/**
+ * Input id for question `index`. The index — not the `questionId` — because
+ * `questionId` is nullable in the protocol and an Adaptive Card input id
+ * must exist and be unique. The mapping back to the real question travels in
+ * the submit action's own data (see {@link INTERVIEW_QUESTIONS_KEY}).
+ */
+export function interviewInputId(index: number): string {
+  return `answer_${String(index)}`;
+}
+
+/** Carries `[{ index, questionId, question, multiSelect }]` as JSON on the submit action. */
+export const INTERVIEW_QUESTIONS_KEY = "interviewQuestions";
+export const INTERVIEW_BLOCK_KEY = "interviewBlockId";
+
+/**
+ * Adaptive Cards joins a multi-select `Input.ChoiceSet`'s chosen values with
+ * this, and there is no option to change it. Exported so the dispatcher
+ * splits on the same constant the card was built with rather than a second
+ * comma typed somewhere else.
+ */
+export const CHOICE_VALUE_SEPARATOR = ",";
+
+/** Free-text answers get a bound for the same reason messages do — a card is not a document. */
+export const MAX_ANSWER_LENGTH = 2_000;
+
+/**
+ * One pending interview, ANSWERABLE.
+ *
+ * This card used to end with "Answering interviews from Teams isn't built
+ * yet", which was true and honest for as long as the questions could not
+ * reach it: the `interviewRequested` frame carries a block id and a
+ * timestamp, so the bot could announce an interview and never render one.
+ * The bridge now resolves the questions off the snapshot it already holds.
+ *
+ * `questions === null` KEEPS THE OLD CARD, deliberately. Null means we do
+ * not know what is being asked — an older bridge binary, or a block the
+ * bridge could not find in its snapshot. A form under zero questions would
+ * submit `answers: []` to an agent waiting for a real answer, which is "the
+ * button did nothing" with extra steps. So the refusal is rendered instead,
+ * and it names which of the two it is as far as this side can tell.
+ */
 export function buildInterviewCard(
   chat: ChatRef,
   epicId: string,
   interview: PendingInterview,
   now: number,
 ): Attachment {
-  return card([
-    container(
-      [
-        text("Interview waiting", {
-          weight: "bolder",
-          color: "attention",
-          spacing: "none",
-        }),
-      ],
-      { style: "attention" },
-    ),
-    text("The agent is waiting on an answer to continue.", {
-      spacing: "medium",
-    }),
-    facts([
-      ["Asked", approvalAgeLabel(interview.requestedAt, now)],
-      ["Block", shortId(interview.blockId)],
-      ["Chat", chatLabel(chat)],
-      ["Epic", shortId(epicId)],
-    ]),
-    text("Answering interviews from Teams isn't built yet.", {
-      isSubtle: true,
-      size: "small",
-      separator: true,
-    }),
+  const header = container(
+    [
+      text("Interview waiting", {
+        weight: "bolder",
+        color: "attention",
+        spacing: "none",
+      }),
+      ...(interview.title === null
+        ? []
+        : [
+            text(interview.title, {
+              weight: "bolder",
+              size: "medium",
+              spacing: "small",
+            }),
+          ]),
+    ],
+    { style: "attention" },
+  );
+
+  const identity = facts([
+    ["Asked", approvalAgeLabel(interview.requestedAt, now)],
+    ["Chat", chatLabel(chat)],
+    ["Epic", shortId(epicId)],
   ]);
+
+  const questions = interview.questions;
+  if (questions === null || questions.length === 0) {
+    return card([
+      header,
+      text("The agent is waiting on an answer to continue.", {
+        spacing: "medium",
+      }),
+      identity,
+      text(
+        questions === null
+          ? "This one can't be answered from here — its questions didn't reach the bot. Answer it on the desktop."
+          : "This interview arrived with no questions, so there is nothing to answer here.",
+        { isSubtle: true, size: "small", separator: true, wrap: true },
+      ),
+    ]);
+  }
+
+  return buildCard(
+    [
+      header,
+      ...(interview.description === null
+        ? []
+        : [text(interview.description, { spacing: "medium", wrap: true })]),
+      identity,
+      ...questions.flatMap((question, index) =>
+        interviewQuestionElements(question, index),
+      ),
+    ],
+    [
+      submitAction(
+        ANSWER_TITLE,
+        ANSWER_VERB,
+        {
+          chatId: chat.chatId,
+          chatTitle: chat.title ?? "",
+          [INTERVIEW_BLOCK_KEY]: interview.blockId,
+          // The card is the only place that knows which input id belongs to
+          // which question, so it says so here rather than leaving the
+          // dispatcher to re-derive an ordering it cannot see.
+          [INTERVIEW_QUESTIONS_KEY]: JSON.stringify(
+            questions.map((question, index) => ({
+              index,
+              questionId: question.questionId,
+              question: question.question,
+              multiSelect: question.multiSelect,
+            })),
+          ),
+        },
+        // REQUIRED: without it Teams sends the action with none of the
+        // selected values, exactly as it does on the composer.
+        { associateInputs: true, style: "positive" },
+      ),
+    ],
+  );
+}
+
+/**
+ * One question as card elements.
+ *
+ * `options: []` is a FREE-TEXT question, not a broken one — the protocol
+ * allows it and an empty `Input.ChoiceSet` would render a picker with
+ * nothing in it, which reads as a loading failure.
+ */
+function interviewQuestionElements(
+  question: InterviewQuestion,
+  index: number,
+): readonly unknown[] {
+  const heading = [
+    ...(question.header === null
+      ? []
+      : [
+          text(question.header, {
+            isSubtle: true,
+            size: "small",
+            spacing: "medium",
+          }),
+        ]),
+    text(question.question, {
+      weight: "bolder",
+      wrap: true,
+      spacing: question.header === null ? "medium" : "none",
+    }),
+  ];
+
+  if (question.options.length === 0) {
+    return [
+      ...heading,
+      {
+        type: "Input.Text",
+        id: interviewInputId(index),
+        placeholder: "Type your answer…",
+        isMultiline: true,
+        maxLength: MAX_ANSWER_LENGTH,
+      },
+    ];
+  }
+
+  return [
+    ...heading,
+    {
+      type: "Input.ChoiceSet",
+      id: interviewInputId(index),
+      // `expanded` renders radio buttons / checkboxes rather than a dropdown.
+      // On a phone a dropdown hides every option but one, and the options are
+      // the question — an agent asking "staging or production" should not
+      // need a tap to reveal that production is available.
+      style: "expanded",
+      isMultiSelect: question.multiSelect,
+      choices: question.options.map((option) => ({
+        // `description`/`preview` have nowhere to go in a ChoiceSet choice —
+        // the schema has `title` and `value` only. Folding the description
+        // into the title keeps it visible rather than silently dropping it.
+        title:
+          option.description === null
+            ? option.label
+            : `${option.label} — ${option.description}`,
+        // The VALUE stays the bare label: it is what the agent gets back, and
+        // it must not pick up display decoration.
+        value: option.label,
+      })),
+    },
+  ];
 }
 
 /**
@@ -1627,6 +1793,74 @@ export function buildMessageOutcomeCard(
         text(
           'It may already have reached the agent. Check with "chat <id>" before sending again — a duplicate is a second message the agent will act on, not a no-op.',
           { isSubtle: true, size: "small", spacing: "medium" },
+        ),
+      ]);
+  }
+}
+
+/**
+ * The result of answering an interview.
+ *
+ * Separate from {@link buildMessageOutcomeCard} because the `failed` advice
+ * is the OPPOSITE one. A message that could not be confirmed may need
+ * sending again; an interview must not be answered twice — the host settles
+ * it on the block leaving the pending set, so a repeat lands as "not
+ * currently pending" and the user has been told to press a button that
+ * cannot work.
+ */
+export function buildInterviewOutcomeCard(
+  outcome: ActionOutcome,
+  chat: ChatRef,
+): Attachment {
+  switch (outcome.kind) {
+    case "applied":
+      return card([
+        container(
+          [
+            text("Answers sent", {
+              weight: "bolder",
+              color: "good",
+              spacing: "none",
+            }),
+            text(`${chatLabel(chat)} can continue.`, {
+              isSubtle: true,
+              spacing: "small",
+            }),
+          ],
+          { style: "good" },
+        ),
+      ]);
+    case "rejected":
+      return card([
+        container(
+          [
+            text("The host declined these answers", {
+              weight: "bolder",
+              color: "warning",
+              spacing: "none",
+            }),
+            text(outcome.reason ?? "No reason given.", { spacing: "small" }),
+          ],
+          { style: "warning" },
+        ),
+        ...(outcome.code === null ? [] : [facts([["Code", outcome.code]])]),
+      ]);
+    case "failed":
+      return card([
+        container(
+          [
+            text("Couldn't confirm these answers", {
+              weight: "bolder",
+              color: "attention",
+              spacing: "none",
+            }),
+            text(outcome.reason, { spacing: "small" }),
+          ],
+          { style: "attention" },
+        ),
+        text(
+          'They may already have reached the agent. Check with "chat <id>" first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.',
+          { isSubtle: true, size: "small", spacing: "medium", wrap: true },
         ),
       ]);
   }

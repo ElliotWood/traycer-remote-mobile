@@ -247,6 +247,52 @@ export function sendMessageAction(
   return runAction(["send", chatId, text], env, config);
 }
 
+/**
+ * One answer to one interview question, as the bridge's `answer` command
+ * parses it (with the protocol's own `interviewAnswerSchema`, on that side).
+ *
+ * `notes` is always `null` from this client today — the card asks the
+ * questions and nothing else. Carried in the type rather than omitted so the
+ * shape stays the bridge's, and adding a notes box later is a card change
+ * with no wire change.
+ */
+export interface InterviewAnswerInput {
+  readonly questionId: string | null;
+  readonly question: string | null;
+  readonly values: readonly string[];
+  readonly notes: string | null;
+}
+
+/**
+ * Answers a pending interview.
+ *
+ * Takes `chatId` AND `blockId` because a block id is only unique within a
+ * chat's message list — unlike an approval id, there is nothing safe for the
+ * bridge to search by, so the destination is named on both axes.
+ *
+ * The answers cross as ONE argv element of JSON via {@link OneShotSpawnFn},
+ * which uses no shell, so a user's free-text answer is argument data and
+ * never anything the OS could interpret.
+ *
+ * Retry is NOT safe here, and it differs from approve/reject: the host
+ * settles this on the interview leaving the pending set, so a repeat lands
+ * as "not currently pending" rather than being deduped. A non-`applied`
+ * outcome means UNKNOWN — never "press it again".
+ */
+export function answerInterviewAction(
+  chatId: string,
+  blockId: string,
+  answers: readonly InterviewAnswerInput[],
+  env: NodeJS.ProcessEnv,
+  config: BridgeCliConfig,
+): Promise<BridgeCliResult<ActionOutcome>> {
+  return runAction(
+    ["answer", chatId, blockId, JSON.stringify(answers)],
+    env,
+    config,
+  );
+}
+
 /** `reason` is surfaced to the agent as the denial explanation; omit for none. */
 export function rejectAction(
   approvalId: string,

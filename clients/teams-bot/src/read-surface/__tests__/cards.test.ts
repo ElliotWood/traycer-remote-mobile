@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Attachment } from "@microsoft/agents-activity";
 import {
+  ANSWER_VERB,
   buildApprovalCard,
   buildBridgeUnavailableCard,
   buildChatCard,
@@ -25,6 +26,7 @@ import {
 } from "../cards";
 import type {
   ChatStatus,
+  PendingInterview,
   Transcript,
   TranscriptMessage,
   TranscriptPart,
@@ -74,7 +76,15 @@ describe("read-surface/cards", () => {
           requestedAt: 0,
         },
       ],
-      pendingInterviews: [{ blockId: "b-1", requestedAt: 0 }],
+      pendingInterviews: [
+        {
+          blockId: "b-1",
+          requestedAt: 0,
+          title: null,
+          description: null,
+          questions: null,
+        },
+      ],
       connected: false,
     };
 
@@ -379,13 +389,126 @@ describe("read-surface/cards — approval and interview cards stand alone", () =
         buildInterviewCard(
           { chatId: LONG_CHAT_ID, title: "   " },
           "epic-1",
-          { blockId: "b-1", requestedAt: 0 },
+          {
+            blockId: "b-1",
+            requestedAt: 0,
+            title: null,
+            description: null,
+            questions: null,
+          },
           0,
         ).content,
       ),
     );
     expect(visible).toContain("a1000000");
     expect(visible).not.toContain(LONG_CHAT_ID);
+  });
+
+  describe("the interview card is answerable, and refuses when it cannot be", () => {
+    const CHAT = { chatId: LONG_CHAT_ID, title: "Migrate config loader" };
+    const QUESTION = {
+      questionId: "q-1",
+      question: "Which environment first?",
+      header: null,
+      options: [
+        { label: "Staging", description: "safe", preview: null },
+        { label: "Production", description: null, preview: null },
+      ],
+      multiSelect: false,
+    };
+    // Typed off the real field rather than off the literal: a fixture that
+    // does not typecheck is testing a shape the bridge cannot send.
+    const pending = (
+      questions: PendingInterview["questions"],
+    ): PendingInterview => ({
+      blockId: "b-1",
+      requestedAt: 0,
+      title: "Pick a deployment target",
+      description: "This decides the rollout order.",
+      questions,
+    });
+
+    it("CONTRACT: questions=null renders NO form and NO submit action", () => {
+      // Null means we do not know what is being asked. A form here would put
+      // Submit under zero questions and send `answers: []` to an agent that
+      // is blocked waiting for a real answer.
+      const content = JSON.stringify(
+        buildInterviewCard(CHAT, "epic-1", pending(null), 0).content,
+      );
+      expect(content).not.toContain("Input.ChoiceSet");
+      expect(content).not.toContain(ANSWER_VERB);
+      expect(content).toContain("Answer it on the desktop");
+    });
+
+    it("questions=[] says so in different words — it is a different fact", () => {
+      const content = JSON.stringify(
+        buildInterviewCard(CHAT, "epic-1", pending([]), 0).content,
+      );
+      expect(content).not.toContain(ANSWER_VERB);
+      expect(content).toContain("no questions");
+      // And NOT the null copy: "didn't reach the bot" would be false here.
+      expect(content).not.toContain("Answer it on the desktop");
+    });
+
+    it("renders a ChoiceSet whose VALUES are the agent's bare labels, undecorated", () => {
+      // The description is folded into the title so it stays visible, but the
+      // value is what the agent gets back — decorating it would answer the
+      // interview with a string the agent never offered.
+      const content = buildInterviewCard(
+        CHAT,
+        "epic-1",
+        pending([QUESTION]),
+        0,
+      ).content;
+      const body = JSON.stringify(content);
+      expect(body).toContain("Input.ChoiceSet");
+      expect(body).toContain(ANSWER_VERB);
+
+      const choices = JSON.parse(body) as {
+        body: { type: string; choices?: { title: string; value: string }[] }[];
+      };
+      const choiceSet = choices.body.find((e) => e.type === "Input.ChoiceSet");
+      expect(choiceSet?.choices).toEqual([
+        { title: "Staging — safe", value: "Staging" },
+        { title: "Production", value: "Production" },
+      ]);
+    });
+
+    it("a question with no options is FREE TEXT, not an empty picker", () => {
+      // An empty ChoiceSet renders a picker with nothing in it, which reads
+      // as a loading failure rather than as a question.
+      const content = JSON.stringify(
+        buildInterviewCard(
+          CHAT,
+          "epic-1",
+          pending([{ ...QUESTION, options: [] }]),
+          0,
+        ).content,
+      );
+      expect(content).toContain("Input.Text");
+      expect(content).not.toContain("Input.ChoiceSet");
+      expect(content).toContain(ANSWER_VERB);
+    });
+
+    it("carries the question list on the submit action, so the dispatcher need not guess an ordering", () => {
+      const content = JSON.stringify(
+        buildInterviewCard(
+          CHAT,
+          "epic-1",
+          pending([QUESTION, { ...QUESTION, questionId: "q-2" }]),
+          0,
+        ).content,
+      );
+      const parsed = JSON.parse(content) as {
+        actions: { data: Record<string, string> }[];
+      };
+      const refs = JSON.parse(
+        parsed.actions[0]?.data["interviewQuestions"] ?? "null",
+      ) as { index: number; questionId: string }[];
+      expect(refs.map((r) => r.index)).toEqual([0, 1]);
+      expect(refs.map((r) => r.questionId)).toEqual(["q-1", "q-2"]);
+      expect(parsed.actions[0]?.data["interviewBlockId"]).toBe("b-1");
+    });
   });
 
   it("renders a fenced code block as monospace TextBlocks, not as literal ``` characters", () => {

@@ -1,5 +1,13 @@
 import type { Attachment } from "@microsoft/agents-activity";
+import { z } from "zod";
 import {
+  ANSWER_VERB,
+  CHOICE_VALUE_SEPARATOR,
+  INTERVIEW_BLOCK_KEY,
+  INTERVIEW_QUESTIONS_KEY,
+  MAX_ANSWER_LENGTH,
+  buildInterviewOutcomeCard,
+  interviewInputId,
   APPROVE_VERB,
   CONFIRM_ROUTE_VERB,
   CLARIFY_OTHER_VERB,
@@ -28,9 +36,11 @@ import {
 import {
   submitApprovalDecision,
   submitChatMessage,
+  submitInterviewAnswer,
   fetchTranscript,
   type ApprovalDecision,
 } from "./host-access";
+import type { InterviewAnswerInput } from "./bridge-cli";
 import { dispatchCommand, type DispatchDeps } from "./dispatch";
 
 /**
@@ -80,6 +90,157 @@ function readString(
 ): string | null {
   const value = data[key];
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * The question list the card put on its own submit action, as parsed back.
+ *
+ * Validated rather than trusted: this rides in the action payload that Bot
+ * Service relays, so it is the same class of input as `chatId`. It cannot
+ * name an identity, and a malformed one is refused instead of being coerced
+ * into a partial answer set.
+ */
+const interviewQuestionRefsSchema = z.array(
+  z.object({
+    index: z.number().int().nonnegative(),
+    questionId: z.string().nullable(),
+    question: z.string(),
+    multiSelect: z.boolean(),
+  }),
+);
+
+/**
+ * The interview path.
+ *
+ * The guard that does the work is the UNANSWERED check, and it is the same
+ * defect as the composer's empty-message guard: `Action.Submit` fires
+ * whether or not the user filled anything in, so an accidental tap on an
+ * untouched card would otherwise deliver empty answers to an agent that is
+ * blocked waiting for real ones — and an interview can be answered exactly
+ * once, so there is no second attempt to correct it with.
+ *
+ * Every question must be answered, and the refusal NAMES the one that
+ * isn't. Nothing in the protocol marks a question optional, so "some
+ * answers" would be this client inventing a semantics the agent did not ask
+ * for.
+ */
+async function dispatchAnswerInterview(
+  request: ActionInvokeRequest,
+  deps: DispatchDeps,
+): Promise<ActionInvokeResult> {
+  const chatId = readString(request.data, "chatId");
+  const blockId = readString(request.data, INTERVIEW_BLOCK_KEY);
+  if (chatId === null || blockId === null) {
+    return {
+      card: buildUsageCard("That interview card was missing its ids."),
+      acted: false,
+    };
+  }
+
+  const rawQuestions = readString(request.data, INTERVIEW_QUESTIONS_KEY);
+  if (rawQuestions === null) {
+    return {
+      card: buildUsageCard("That interview card was missing its questions."),
+      acted: false,
+    };
+  }
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawQuestions);
+  } catch {
+    return {
+      card: buildUsageCard("That interview card's questions were unreadable."),
+      acted: false,
+    };
+  }
+  const questions = interviewQuestionRefsSchema.safeParse(parsedJson);
+  if (!questions.success || questions.data.length === 0) {
+    return {
+      card: buildUsageCard("That interview card's questions were unreadable."),
+      acted: false,
+    };
+  }
+
+  const answers: InterviewAnswerInput[] = [];
+  for (const ref of questions.data) {
+    const raw = (readString(request.data, interviewInputId(ref.index)) ?? "")
+      .trim();
+    // A multi-select ChoiceSet returns its picks joined by a comma and
+    // nothing else — there is no per-value escaping in Adaptive Cards, which
+    // is why the choice VALUES are the agent's own option labels rather than
+    // anything this client composes.
+    const values = ref.multiSelect
+      ? raw
+          .split(CHOICE_VALUE_SEPARATOR)
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+      : raw.length === 0
+        ? []
+        : [raw];
+
+    if (values.length === 0) {
+      return {
+        card: buildUsageCard(
+          `Answer every question before sending — "${ref.question}" is still blank.`,
+        ),
+        acted: false,
+      };
+    }
+    if (raw.length > MAX_ANSWER_LENGTH) {
+      return {
+        card: buildUsageCard(
+          `That answer is ${String(raw.length)} characters; the limit is ${String(MAX_ANSWER_LENGTH)}.`,
+        ),
+        acted: false,
+      };
+    }
+    answers.push({
+      questionId: ref.questionId,
+      question: ref.question,
+      values,
+      notes: null,
+    });
+  }
+
+  // Identity first — before the answers are issued, never after.
+  const identity = await deps.resolvePrincipal();
+  if (identity.kind === "unavailable") {
+    return {
+      card: buildIdentityUnavailableCard(identity.reason),
+      acted: false,
+    };
+  }
+
+  const chat: ChatRef = {
+    chatId,
+    title: readString(request.data, "chatTitle"),
+  };
+
+  const result = await submitInterviewAnswer(
+    identity.principal,
+    request.conversationId,
+    chatId,
+    blockId,
+    answers,
+    deps,
+  );
+
+  switch (result.kind) {
+    case "ok":
+      return {
+        card: buildInterviewOutcomeCard(result.outcome, chat),
+        acted: true,
+      };
+    case "principal_refused":
+      return { card: buildPrincipalRefusedCard(result.reason), acted: false };
+    case "epic_not_bound":
+      return { card: buildEpicNotBoundCard(), acted: false };
+    case "bridge_unavailable":
+      return {
+        card: buildBridgeUnavailableCard(result.reason, result.detail),
+        acted: false,
+      };
+  }
 }
 
 /**
@@ -301,6 +462,9 @@ export async function dispatchActionInvoke(
   }
   if (request.verb === SEND_VERB) {
     return dispatchSend(request, deps);
+  }
+  if (request.verb === ANSWER_VERB) {
+    return dispatchAnswerInterview(request, deps);
   }
   if (
     request.verb === OLDER_VERB ||
