@@ -107,25 +107,93 @@ describe("mentionEmptyState", () => {
   });
 
   it("says nothing while there are rows to show", () => {
-    expect(mentionEmptyState(false, rows, [status("a", "unavailable")])).toBeNull();
+    expect(mentionEmptyState({ connected: true, loading: false, suggestions: rows, statuses: [status("a", "unavailable")] })).toBeNull();
   });
 
   it("waits for the canaries rather than guessing mid-probe", () => {
     // Reporting `unavailable` here would flash "no files" at someone whose
     // workspace is fine, every time the sheet opens.
-    expect(mentionEmptyState(false, [], [status("a", "checking")])).toBe("loading");
+    expect(mentionEmptyState({ connected: true, loading: false, suggestions: [], statuses: [status("a", "checking")] })).toBe("loading");
   });
 
   it("separates a true no-match from an unreadable root", () => {
-    expect(mentionEmptyState(false, [], [status("a", "readable")])).toBe("no-matches");
-    expect(mentionEmptyState(false, [], [status("a", "unavailable")])).toBe("unavailable");
+    expect(mentionEmptyState({ connected: true, loading: false, suggestions: [], statuses: [status("a", "readable")] })).toBe("no-matches");
+    expect(mentionEmptyState({ connected: true, loading: false, suggestions: [], statuses: [status("a", "unavailable")] })).toBe("unavailable");
   });
 
   it("calls it a no-match when ANY root is readable", () => {
     // The half-broken binding: results are still trustworthy from the healthy
     // root, so "unavailable" would be a lie about the whole chat.
     expect(
-      mentionEmptyState(false, [], [status("a", "readable"), status("b", "unavailable")]),
+      mentionEmptyState({ connected: true, loading: false, suggestions: [], statuses: [status("a", "readable"), status("b", "unavailable")] }),
+    ).toBe("no-matches");
+  });
+
+  /**
+   * The Evidence Gate's finding on `98304215`, and the tests that would have
+   * caught it. The old rule was `if (statuses.length === 0) return
+   * "unavailable"` — a LENGTH read as a verdict about the user's workspace.
+   */
+  it("says UNDETERMINED, not unavailable, when there is no client", () => {
+    // The true fact is "the socket is not connected". Calling that an
+    // unreadable workspace is the exact confusion the transport-failure catch
+    // in `use-mention-files.ts` refuses to make — the guard was on the
+    // exception, and this path never threw.
+    expect(
+      mentionEmptyState({ connected: false, loading: false, suggestions: [], statuses: [] }),
+    ).toBe("undetermined");
+  });
+
+  it("stays undetermined without a client even once statuses exist", () => {
+    expect(
+      mentionEmptyState({
+        connected: false,
+        loading: false,
+        suggestions: [],
+        statuses: [status("a", "readable")],
+      }),
+    ).toBe("undetermined");
+  });
+
+  it("does not pass judgement on the first paint, before any canary reports", () => {
+    // Both effects run post-commit, so the first render with a live trigger
+    // has `loading: false` and no statuses. Silence is not a finding.
+    expect(
+      mentionEmptyState({ connected: true, loading: false, suggestions: [], statuses: [] }),
+    ).toBe("loading");
+  });
+
+  it("says undetermined when a probe could not answer at all", () => {
+    // `unknown` is a settled "we cannot tell", not a spinner: a permanently
+    // failing socket used to sit in `checking` forever, which is
+    // indistinguishable from a slow probe.
+    expect(
+      mentionEmptyState({ connected: true, loading: false, suggestions: [], statuses: [status("a", "unknown")] }),
+    ).toBe("undetermined");
+  });
+
+  it("refuses BOTH verdicts when one root is unreadable and another is unknown", () => {
+    // No root was successfully searched, so "no matches" would be a lie; not
+    // every root is known-broken, so "unavailable" would be one too.
+    expect(
+      mentionEmptyState({
+        connected: true,
+        loading: false,
+        suggestions: [],
+        statuses: [status("a", "unavailable"), status("b", "unknown")],
+      }),
+    ).toBe("undetermined");
+  });
+
+  it("still says no-matches when a readable root sits beside an unknown one", () => {
+    // One root genuinely answered, so the query did reach a workspace.
+    expect(
+      mentionEmptyState({
+        connected: true,
+        loading: false,
+        suggestions: [],
+        statuses: [status("a", "readable"), status("b", "unknown")],
+      }),
     ).toBe("no-matches");
   });
 });
@@ -150,5 +218,13 @@ describe("partiallyUnavailableRoots", () => {
 
   it("says nothing when every root is fine", () => {
     expect(partiallyUnavailableRoots([status("a", "readable")])).toEqual([]);
+  });
+
+  it("does not call an all-broken binding partial just because one root is unknown", () => {
+    // Naming one root here would imply the others were fine — ignorance
+    // dressed as a verdict, the same defect one function up.
+    expect(
+      partiallyUnavailableRoots([status("a", "unavailable"), status("b", "unknown")]),
+    ).toEqual([]);
   });
 });

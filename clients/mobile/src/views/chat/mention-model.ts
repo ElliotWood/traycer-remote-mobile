@@ -109,7 +109,30 @@ export function mentionToken(suggestion: MentionSuggestion): string {
   return `@${suggestion.relPath}`;
 }
 
-export type RootHealth = "checking" | "readable" | "unavailable";
+/**
+ * A root's state, INCLUDING an arm for "we cannot tell".
+ *
+ * `unknown` exists because of a defect the Evidence Gate found in the first
+ * version of this file, which had only the first three arms. With no way to
+ * say *ignorance*, an unknown state has to collapse into one of the others,
+ * and it collapsed both possible ways at once:
+ *
+ * - a probe that never answered stayed `checking` forever — correct, but
+ *   indistinguishable from a slow probe, with no copy able to say which;
+ * - a client that was not connected produced NO statuses, and the verdict
+ *   inferred `unavailable` from the empty list — **"your workspace is
+ *   unreadable" when the true fact was "the socket is not connected"**.
+ *
+ * The second is exactly the confusion the transport-failure `catch` in
+ * `use-mention-files.ts` was written to refuse. That guard was on the throwing
+ * path; the ignorant path reached the same wrong conclusion without passing
+ * through it. **A guard on the exception is not a guard on the ignorance.**
+ *
+ * It is also the third missing-`unknown`-arm defect in this epic (M2's
+ * rate-limit model was the first two), and the most pointed: the canary exists
+ * to remove an unfalsifiable state and had reintroduced one in its own verdict.
+ */
+export type RootHealth = "checking" | "readable" | "unavailable" | "unknown";
 
 export interface MentionRootStatus {
   readonly root: string;
@@ -117,30 +140,47 @@ export interface MentionRootStatus {
 }
 
 /**
- * What to show when there is nothing to list.
+ * What to show when there is nothing to list. Total over the four things that
+ * can actually be true, rather than inferred from a list's length.
  *
- * `"unavailable"` is the canary's verdict and is only ever reachable when
- * every root failed it AND the query returned nothing — so the empty-directory
- * false positive above can only surface in a case where there was genuinely
- * nothing to mention, where the wording is true anyway.
+ * `"unavailable"` is the canary's verdict and is only reachable when a root
+ * genuinely answered zero — so the readable-but-empty false positive can only
+ * surface where there was nothing to mention anyway, and the copy is true
+ * under both readings.
  */
-export type MentionEmptyState = "loading" | "no-matches" | "unavailable" | null;
+export type MentionEmptyState =
+  | "loading"
+  | "no-matches"
+  | "unavailable"
+  | "undetermined"
+  | null;
 
-export function mentionEmptyState(
-  loading: boolean,
-  suggestions: readonly MentionSuggestion[],
-  statuses: readonly MentionRootStatus[],
-): MentionEmptyState {
+export interface MentionEmptyInput {
+  /** False when there is no host client — ignorance, never a verdict about a root. */
+  readonly connected: boolean;
+  readonly loading: boolean;
+  readonly suggestions: readonly MentionSuggestion[];
+  readonly statuses: readonly MentionRootStatus[];
+}
+
+export function mentionEmptyState(input: MentionEmptyInput): MentionEmptyState {
+  const { connected, loading, suggestions, statuses } = input;
   if (suggestions.length > 0) return null;
+  // Ordered so that every arm is justified by evidence the previous arms
+  // could not have produced. Nothing here reads a LENGTH as a verdict.
+  if (!connected) return "undetermined";
   if (loading) return "loading";
-  if (statuses.length === 0) return "unavailable";
-  // `every` over a list that may still contain `"checking"` would report a
-  // healthy root as unavailable mid-probe, so the verdict waits for the
-  // canaries to land.
+  // No canary has reported yet — the first render after the trigger goes
+  // active, since both effects run post-commit. Silence is not a finding.
+  if (statuses.length === 0) return "loading";
   if (statuses.some((s) => s.health === "checking")) return "loading";
-  return statuses.every((s) => s.health === "unavailable")
-    ? "unavailable"
-    : "no-matches";
+  // One root that genuinely answered is enough to make "no matches" true: the
+  // query reached a readable workspace and matched nothing.
+  if (statuses.some((s) => s.health === "readable")) return "no-matches";
+  if (statuses.every((s) => s.health === "unavailable")) return "unavailable";
+  // Nothing readable, and at least one root we could not determine. Claiming
+  // either verdict here would be asserting something no probe established.
+  return "undetermined";
 }
 
 /**
@@ -155,8 +195,13 @@ export function partiallyUnavailableRoots(
   statuses: readonly MentionRootStatus[],
 ): readonly string[] {
   const unavailable = statuses.filter((s) => s.health === "unavailable");
-  if (unavailable.length === 0 || unavailable.length === statuses.length) {
-    return [];
-  }
+  if (unavailable.length === 0) return [];
+  // "Every root is broken" is the empty state, not a footnote on a populated
+  // list. Compared against a verdict count rather than `statuses.length` so an
+  // `unknown` sibling cannot make an all-broken binding look partial — that
+  // would name one root while implying the others were fine, which is the
+  // ignorance-as-verdict mistake in miniature.
+  const determined = statuses.filter((s) => s.health !== "unknown");
+  if (unavailable.length === determined.length) return [];
   return unavailable.map((s) => s.root);
 }

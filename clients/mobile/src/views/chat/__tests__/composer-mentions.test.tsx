@@ -210,6 +210,32 @@ describe("the canary distinguishes states the host cannot", () => {
   });
 });
 
+describe("ignorance is never reported as a verdict", () => {
+  it("a canary that CANNOT answer says so, instead of blaming the workspace", () => {
+    // The Evidence Gate's finding, at the hook level: the transport-failure
+    // path has to settle into "we cannot tell" rather than "your workspace is
+    // unreadable" (a claim no probe established) or an indefinite spinner
+    // (correct, but indistinguishable from a slow probe).
+    const host = createFakeHostClient((method) => {
+      if (method === "agent.gui.listHarnesses") return Promise.resolve({ harnesses: [] });
+      if (method === "agent.gui.listModels") {
+        return Promise.resolve({ harnessId: "claude", models: [] });
+      }
+      if (method.startsWith("workspace.mention")) {
+        return Promise.reject(new Error("socket closed"));
+      }
+      return Promise.reject(new Error(`unexpected RPC in this test: ${method}`));
+    });
+    renderComposer([ROOT_A], host);
+    type("@app");
+    return waitFor(() => {
+      expect(screen.getByTestId("mention-empty-undetermined")).toBeTruthy();
+      expect(screen.queryByTestId("mention-empty-unavailable")).toBeNull();
+      expect(screen.queryByTestId("mention-empty-loading")).toBeNull();
+    });
+  });
+});
+
 describe("the canary is per root", () => {
   it("issues one single-row canary per root, not one per query", async () => {
     const host = mentionHost();

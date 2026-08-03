@@ -93,7 +93,13 @@ export function useMentionFiles(
           } catch {
             // A transport failure is not evidence about the root. Reporting it
             // as `unavailable` would blame the workspace for a dropped socket.
-            return { root, health: "checking" };
+            //
+            // `unknown`, not `checking`: `checking` means a probe is still in
+            // flight, so a permanently failing socket spun a loading state
+            // forever — correct, and indistinguishable from a slow probe, with
+            // no copy able to say which. `unknown` settles, and settles into
+            // honest wording.
+            return { root, health: "unknown" };
           }
         }),
       );

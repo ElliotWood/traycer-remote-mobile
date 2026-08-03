@@ -28,6 +28,49 @@ const TRIGGERS: ReadonlyMap<string, TriggerKind> = new Map([
   ["@", "mention"],
 ]);
 
+/** Delimiters that can precede a token without being part of it. */
+const OPENERS = /[("'`[{*<]/;
+
+/**
+ * Scripts written without word-separating spaces.
+ *
+ * The word-boundary rule exists to exclude `a@b.com` and `src/foo`, which are
+ * ASCII by construction — no email or path has a CJK character before its `@`
+ * or `/`. But CJK prose has no spaces, so a whitespace-only boundary means
+ * `@` NEVER fires mid-sentence for those users: a CJK sentence ending in `@src` was `null`.
+ *
+ * That is a class-of-user exclusion rather than an edge case, which is why it
+ * is worth a named rule rather than a note. Covers CJK punctuation, kana,
+ * ideographs (incl. extension A), Hangul and fullwidth forms.
+ */
+const CJK_RANGES: readonly (readonly [number, number])[] = [
+  [0x3000, 0x303f], // CJK symbols and punctuation
+  [0x3040, 0x30ff], // hiragana + katakana
+  [0x3400, 0x4dbf], // ideographs, extension A
+  [0x4e00, 0x9fff], // ideographs
+  [0xac00, 0xd7af], // hangul syllables
+  [0xff00, 0xffef], // fullwidth forms
+];
+
+/**
+ * Zero-width space, as a CODE POINT rather than a character literal — a
+ * literal one is invisible in review and in a diff, which is the same property
+ * that makes it a hazard in the input.
+ */
+const ZERO_WIDTH_SPACE = 0x200b;
+
+/**
+ * U+200B (zero-width space) is deliberately included and is NOT in `\s`: it
+ * arrives via paste from rendered documentation, and a token silently refusing
+ * to trigger is indistinguishable from the feature being broken.
+ */
+function isBoundary(char: string): boolean {
+  if (/\s/.test(char)) return true;
+  const code = char.codePointAt(0) ?? 0;
+  if (code === ZERO_WIDTH_SPACE) return true;
+  return CJK_RANGES.some(([lo, hi]) => code >= lo && code <= hi);
+}
+
 /**
  * The trigger the caret is currently inside, or `null`.
  *
@@ -69,16 +112,21 @@ export function detectTrigger(
   if (caret < 0 || caret > value.length) return null;
 
   // The token the caret sits in: back to the start of the string or to the
-  // last whitespace. Everything inside it — `/`, `.`, `@` — is query text.
+  // last boundary. Everything inside it — `/`, `.`, `@` — is query text.
   let start = caret;
-  while (start > 0 && !/\s/.test(value[start - 1])) start -= 1;
+  while (start > 0 && !isBoundary(value[start - 1])) start -= 1;
   // Caret at a token's start (or right after a space) is not inside a token,
   // so a trailing space closes the sheet on what was just completed.
   if (start === caret) return null;
 
+  // An opening delimiter is not part of the token. `` `@src/app.ts` `` and
+  // "the handler (@src/app.ts)" are ordinary in a coding composer, and both
+  // opened no sheet at all before this. Only OPENERS are skipped, so
+  // `a@b.com` and `src/foo` still open with an ordinary character and are
+  // still not triggers however many `@`/`/` they contain further along.
+  while (start < caret && OPENERS.test(value[start])) start += 1;
+
   const kind = TRIGGERS.get(value[start]);
-  // `a@b.com` and `src/foo` open with an ordinary character, so they are not
-  // triggers however many `@`/`/` they contain further along.
   if (kind === undefined) return null;
   return { kind, start, query: value.slice(start + 1, caret) };
 }

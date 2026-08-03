@@ -39,25 +39,36 @@ import { radius, theme, type } from "@/views/design-tokens";
 export interface MentionSheetProps {
   readonly suggestions: readonly MentionSuggestion[];
   readonly loading: boolean;
+  /** False when there is no host client. Ignorance, not a verdict about a root. */
+  readonly connected: boolean;
   readonly rootStatuses: readonly MentionRootStatus[];
   readonly onPick: (suggestion: MentionSuggestion) => void;
   readonly onClose: () => void;
 }
 
-const EMPTY_COPY: Record<"loading" | "no-matches" | "unavailable", string> = {
+const EMPTY_COPY: Record<"loading" | "no-matches" | "unavailable" | "undetermined", string> = {
   loading: "Searching…",
   "no-matches": "No matching files or folders.",
   unavailable: "No files available from this workspace.",
+  // Says what is true — that the client could not check — instead of
+  // converting ignorance into a claim about the user's workspace.
+  undetermined: "Can't check this workspace right now.",
 };
 
 export function MentionSheet({
   suggestions,
   loading,
+  connected,
   rootStatuses,
   onPick,
   onClose,
 }: MentionSheetProps): ReactElement {
-  const empty = mentionEmptyState(loading, suggestions, rootStatuses);
+  const empty = mentionEmptyState({
+    connected,
+    loading,
+    suggestions,
+    statuses: rootStatuses,
+  });
   const degraded = partiallyUnavailableRoots(rootStatuses);
 
   return (

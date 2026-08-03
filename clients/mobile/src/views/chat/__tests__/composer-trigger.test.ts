@@ -85,6 +85,56 @@ describe("detectTrigger — a mention query is a PATH", () => {
   });
 });
 
+describe("detectTrigger — boundaries that are not spaces", () => {
+  /**
+   * All measured by the Evidence Gate against the previous version, where
+   * every case here returned `null`. They were conservative failures — no
+   * sheet, nothing wrong on the wire — so they are missing affordances rather
+   * than the canary's bug class. Two of them are ordinary in a coding
+   * composer, and one excludes a class of user rather than an edge case.
+   */
+  it.each([
+    ["a backtick, as in inline code", "`@src/app.ts", 12],
+    ["a paren, as in prose (@file)", "the handler (@src/app.ts", 24],
+    ["a double quote", '"@src/app.ts', 12],
+    ["a bracket", "[@src/app.ts", 12],
+    ["an asterisk, as in bold", "*@src/app.ts", 12],
+  ])("fires after %s", (_label, value, caret) => {
+    const trigger = detectTrigger(value, caret);
+    expect(trigger?.kind).toBe("mention");
+    expect(trigger?.query).toBe("src/app.ts");
+  });
+
+  it("fires mid-sentence in a script written without spaces", () => {
+    // CJK prose has no word-separating spaces, so a whitespace-only boundary
+    // meant `@` never fired mid-sentence for those users at all. The
+    // word-boundary rule exists to exclude `a@b.com` and `src/foo`, which are
+    // ASCII by construction — no email or path carries a CJK character before
+    // its `@`, so admitting one costs nothing.
+    const value = "これは@src";
+    const trigger = detectTrigger(value, value.length);
+    expect(trigger).toEqual({ kind: "mention", start: 3, query: "src" });
+  });
+
+  it("fires after a zero-width space, which `\\s` does not match", () => {
+    // Arrives by paste from rendered docs. A token silently refusing to
+    // trigger is indistinguishable from the feature being broken.
+    const value = "see​@src";
+    const trigger = detectTrigger(value, value.length);
+    expect(trigger).toEqual({ kind: "mention", start: 4, query: "src" });
+  });
+
+  it("still refuses an email whose local part ends in a bracket-free word", () => {
+    // The openers are skipped only at the START of a token, so nothing here
+    // loosens the rule that keeps `a@b.com` quiet.
+    expect(detectTrigger("(mail a@b.com", 13)).toBeNull();
+  });
+
+  it("still refuses a parenthesised path", () => {
+    expect(detectTrigger("(src/foo", 8)).toBeNull();
+  });
+});
+
 describe("detectTrigger — does NOT fire", () => {
   it("ignores the slash inside a path", () => {
     // The single most common thing typed into a coding composer.

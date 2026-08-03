@@ -628,6 +628,7 @@ export function Composer({
           <MentionSheet
             suggestions={suggestions}
             loading={mentionsLoading}
+            connected={client !== null}
             rootStatuses={rootStatuses}
             onPick={pickMention}
             onClose={setSheetDismissed}
