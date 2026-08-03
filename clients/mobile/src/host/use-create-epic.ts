@@ -40,7 +40,6 @@ import { CURRENT_EPIC_VERSION } from "@traycer-clients/shared/epic/epic-version"
 import type { CreateEpicRequest } from "@traycer/protocol/host/epic/unary-schemas";
 import type { ChatRunSettings } from "@traycer/protocol/persistence/epic/foundation";
 import {
-  FOLDERLESS_TARGET,
   toEpicWorkspaceFields,
   toWorktreeIntent,
   type WorkspaceTarget,
@@ -196,7 +195,7 @@ export interface UseCreateEpicResult {
   readonly phase: CreateEpicPhase;
   readonly error: string | null;
   /** Ignored when the instruction is blank or a submit is already in flight. */
-  readonly submit: (instruction: string) => void;
+  readonly submit: (instruction: string, target: WorkspaceTarget) => void;
 }
 
 export interface UseCreateEpicArgs {
@@ -227,7 +226,7 @@ export function useCreateEpic({
   const inFlightRef = useRef(false);
 
   const submit = useCallback(
-    (instruction: string): void => {
+    (instruction: string, target: WorkspaceTarget): void => {
       const text = instruction.trim();
       if (text.length === 0 || inFlightRef.current) {
         return;
@@ -280,7 +279,7 @@ export function useCreateEpic({
             // Until the picker UI lands, this flow still creates folderless
             // epics — but the request is now DERIVED from a target rather than
             // hardcoded, so wiring the picker is a prop change, not a rewrite.
-            target: FOLDERLESS_TARGET,
+            target,
             settings: null,
           });
 

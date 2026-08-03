@@ -71,6 +71,8 @@ const MODELS_RESPONSE: ListHarnessModelsResponse = {
 function requestImpl(opts: {
   readonly models?: ListHarnessModelsResponse;
   readonly createEpic?: () => Promise<unknown>;
+  readonly worktrees?: readonly unknown[];
+  readonly mappings?: readonly unknown[];
 }): (method: string, params: unknown) => Promise<unknown> {
   return (method) => {
     if (method === "agent.listHarnessModels") {
@@ -80,6 +82,19 @@ function requestImpl(opts: {
       return opts.createEpic !== undefined
         ? opts.createEpic()
         : Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: true });
+    }
+    // M5: the workspace picker's two RPCs. Absent by default, so the existing
+    // folderless tests exercise the honest-degrade path (picker unavailable,
+    // creation still works) rather than silently gaining a repo.
+    if (method === "worktree.listAllForHost") {
+      return opts.worktrees === undefined
+        ? Promise.reject(new Error("no worktrees in this test"))
+        : Promise.resolve({ worktrees: opts.worktrees, nextCursor: null });
+    }
+    if (method === "workspace.resolvePathsByRepoIdentifiers") {
+      return opts.mappings === undefined
+        ? Promise.reject(new Error("no mappings in this test"))
+        : Promise.resolve({ mappings: opts.mappings });
     }
     throw new Error(`unexpected method ${method}`);
   };
@@ -375,8 +390,8 @@ describe("NewEpicView", () => {
     );
 
     act(() => {
-      result.current.submit("Twice in one tick");
-      result.current.submit("Twice in one tick");
+      result.current.submit("Twice in one tick", FOLDERLESS_TARGET);
+      result.current.submit("Twice in one tick", FOLDERLESS_TARGET);
     });
 
     await waitFor(() => {
@@ -435,5 +450,120 @@ describe("NewEpicView", () => {
     );
     expect(request.epic.createdAt).toBe(1_700_000_000_000);
     expect(request.epic.updatedAt).toBe(1_700_000_000_000);
+  });
+});
+
+/**
+ * M5 item 3/4 — the picker is the whole point of the ticket: before it, every
+ * epic started from a phone was folderless, i.e. one that could not touch code.
+ *
+ * These assert the REQUEST, not the sheet: a picker that renders rows but
+ * still sends `repoIdentifiers: []` would look correct and change nothing.
+ */
+describe("NewEpicView — workspace picker (M5)", () => {
+  const WORKTREE = {
+    worktreePath: "/src/wt/feature-a",
+    repoLabel: "acme-web",
+    repoIdentifier: { owner: "acme", repo: "acme-web" },
+    branch: "feature-a",
+    inUse: false,
+    uncommittedCount: 0,
+    gitRemovable: true,
+    scripts: null,
+  };
+  const MAPPING = {
+    repoIdentifier: { owner: "acme", repo: "acme-web" },
+    workspacePath: "/src/acme-web",
+  };
+
+  it("still defaults to folderless, and says so", async () => {
+    const fake = createFakeHostClient(
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING] }),
+    );
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Workspace" }).textContent).toContain(
+        "No repo (folderless)",
+      );
+    });
+    await typeAndSubmit("Plan something");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+    const body = createEpicBody(fake);
+    expect(body.repoIdentifiers).toEqual([]);
+    expect(body.workspaces).toEqual([]);
+  });
+
+  it("binds the epic to a picked REPO — the capability the phone did not have", async () => {
+    const fake = createFakeHostClient(
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING] }),
+    );
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Workspace" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    await waitFor(() => {
+      expect(screen.getByText("Repositories")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Runs against the checked-out repository/ }));
+
+    await typeAndSubmit("Fix the billing bug");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+
+    const body = createEpicBody(fake);
+    expect(body.repoIdentifiers).toEqual([{ owner: "acme", repo: "acme-web" }]);
+    expect(body.workspaces).toEqual([{ workspacePath: "/src/acme-web" }]);
+    // Parsed against the REAL schema so a shape the host rejects fails here.
+    const parsed = createEpicRequestSchema.parse(body);
+    expect(parsed.chat?.workspaceMode).toBe("inherit");
+    expect(parsed.chat?.worktreeIntent?.entries[0].kind).toBe("local");
+  });
+
+  it("binds to a picked WORKTREE as an `import` intent, never a `worktree` one", async () => {
+    // `import` adopts an existing worktree; `worktree` would CREATE one, which
+    // this ticket forbids from a phone.
+    const fake = createFakeHostClient(
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING] }),
+    );
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Workspace" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    await waitFor(() => {
+      expect(screen.getByText("Existing worktrees")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /acme-web · feature-a/ }));
+
+    await typeAndSubmit("Work on feature a");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+
+    const parsed = createEpicRequestSchema.parse(createEpicBody(fake));
+    const entry = parsed.chat?.worktreeIntent?.entries[0];
+    expect(entry?.kind).toBe("import");
+    if (entry?.kind !== "import") throw new Error("expected an import arm");
+    expect(entry.worktreePath).toBe("/src/wt/feature-a");
+  });
+
+  it("still creates folderless when the host's worktree list is unreachable", async () => {
+    // Honest degrade: a phone that cannot read the repo list must still be
+    // able to do the thing it could always do.
+    const fake = createFakeHostClient(requestImpl({}));
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await typeAndSubmit("Plan something anyway");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+    expect(createEpicBody(fake).workspaces).toEqual([]);
   });
 });
