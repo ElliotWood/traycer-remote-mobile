@@ -378,6 +378,11 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
           prefillText={prefill?.text ?? null}
           prefillNonce={prefill?.nonce ?? 0}
           chatSettings={chat.chatSettings}
+          // The `unknown` arm. `chatSettings !== null` would NOT do: a new
+          // chat's settings are legitimately null after its snapshot, and
+          // gating on that would make its first turn unsendable — which is the
+          // one turn only this composer can send.
+          settingsLoaded={chat.hasSnapshot}
           canStop={isRunning}
           stopping={chat.runStatus === "stopping"}
           // H2: a foreign-host chat has no reachable runtime to send a turn

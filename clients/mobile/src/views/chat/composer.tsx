@@ -128,6 +128,21 @@ const AGENT_MODE_OPTIONS: readonly { readonly id: AgentMode; readonly shortLabel
 
 const DEFAULT_HARNESS = "claude" as const;
 
+/**
+ * What the USER has explicitly chosen this session, layered over the chat's own
+ * settings. A field is absent until they touch its control — presence is the
+ * whole signal, which is why the two nullable fields are read with `in`.
+ */
+interface RunSettingsOverride {
+  readonly harnessId?: GuiHarnessId;
+  readonly model?: string | null;
+  readonly permissionMode?: PermissionMode;
+  readonly agentMode?: AgentMode;
+  readonly reasoningEffort?: string;
+  readonly serviceTier?: string;
+  readonly profileId?: string | null;
+}
+
 export interface ComposerProps {
   /**
    * No `epicId`: it existed only to satisfy `agent.listHarnessModels`, whose
@@ -159,6 +174,18 @@ export interface ComposerProps {
   readonly prefillText: string | null;
   readonly prefillNonce: number;
   readonly chatSettings: ChatRunSettings | null;
+  /**
+   * Has the chat's snapshot arrived? This is the `unknown` arm, and it is NOT
+   * `chatSettings !== null`: a brand-new chat legitimately has `settings: null`
+   * after its snapshot, because nothing has picked a harness or model yet, and
+   * the mobile composer is the only surface that can. Collapsing the two would
+   * make the first turn of a new chat unsendable.
+   *
+   *   no snapshot          -> unknown   : do not display or commit a setting
+   *   snapshot, null       -> none yet  : defaults are honest, composer usable
+   *   snapshot, populated  -> known     : the chat's own settings
+   */
+  readonly settingsLoaded: boolean;
   readonly canStop: boolean;
   readonly stopping: boolean;
   readonly accessRole: "owner" | "viewer";
@@ -175,6 +202,7 @@ export function Composer({
   prefillText,
   prefillNonce,
   chatSettings,
+  settingsLoaded,
   canStop,
   stopping,
   accessRole,
@@ -190,14 +218,26 @@ export function Composer({
   const draftText = draft.value;
   const setDraftText = draft.set;
   const [attachments, setAttachments] = useState<readonly AttachmentDraft[]>([]);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
-    chatSettings?.permissionMode ?? "full_access",
-  );
-  const [agentMode, setAgentMode] = useState<AgentMode>(chatSettings?.agentMode ?? "regular");
-  const [modelSlug, setModelSlug] = useState<string | null>(chatSettings?.model ?? null);
-  const [harnessId, setHarnessId] = useState<GuiHarnessId>(
-    chatSettings?.harnessId ?? DEFAULT_HARNESS,
-  );
+  /**
+   * DERIVED, never seeded. These used to be seven `useState(chatSettings?.x ??
+   * default)` initializers — which run ONCE, while `chatSettings` is still
+   * `null` on every cold open (chat-view mounts this before the snapshot
+   * lands, and nothing re-read the prop). A chat configured `supervised` then
+   * armed its composer at `full_access` and never corrected, and `handleSend`
+   * commits this state as the turn's settings, so the defect GRANTED
+   * privilege rather than merely misinforming.
+   *
+   * The repair is not an adoption effect. An effect leaves a clobber window
+   * and a key to get wrong; deriving makes the whole class — "initialised once
+   * from something that wasn't there yet" — inexpressible. `override` holds
+   * only what the USER has explicitly chosen this session, and it is checked
+   * first, so a late-arriving snapshot flows in on its own and can never stomp
+   * a deliberate choice.
+   */
+  const [override, setOverride] = useState<RunSettingsOverride>({});
+  const permissionMode = override.permissionMode ?? chatSettings?.permissionMode ?? "full_access";
+  const agentMode = override.agentMode ?? chatSettings?.agentMode ?? "regular";
+  const harnessId = override.harnessId ?? chatSettings?.harnessId ?? DEFAULT_HARNESS;
   /**
    * The user's RAW effort / tier preference, kept sticky across model changes
    * and clamped only on the way out (below). Storing the clamped value instead
@@ -205,20 +245,24 @@ export function Composer({
    * that doesn't support it — desktop keeps the raw value in its toolbar store
    * for the same reason.
    */
-  const [reasoningRaw, setReasoningRaw] = useState<string>(
-    chatSettings?.reasoningEffort ?? "",
-  );
-  const [serviceTierRaw, setServiceTierRaw] = useState<string>(
-    chatSettings?.serviceTier ?? "",
-  );
+  const reasoningRaw = override.reasoningEffort ?? chatSettings?.reasoningEffort ?? "";
+  const serviceTierRaw = override.serviceTier ?? chatSettings?.serviceTier ?? "";
   /**
-   * M2 item 2. `null` is AMBIENT, not "unset" — the wire's ambient sentinel
-   * never reaches this state (see `profile-chip.tsx`), so seeding from
-   * `chatSettings` is safe and `null` round-trips as the host's own default.
+   * These two test PRESENCE with `in` rather than falling through `??`,
+   * because `null` is a meaningful choice for both and `??` cannot tell
+   * "the user chose null" from "the user chose nothing":
+   *
+   * - `model: null` is what a harness switch sets, meaning "reset to the new
+   *   harness's first model". Under `??` it would fall through to the chat's
+   *   stored slug — a slug belonging to the OLD harness, which is exactly what
+   *   that reset exists to prevent.
+   * - `profileId: null` is AMBIENT (M2 item 2), not "unset" — the wire's
+   *   ambient sentinel never reaches this state (see `profile-chip.tsx`), so
+   *   picking ambient must override a stored profile rather than be ignored.
    */
-  const [profileId, setProfileId] = useState<string | null>(
-    chatSettings?.profileId ?? null,
-  );
+  const modelSlug = "model" in override ? override.model ?? null : chatSettings?.model ?? null;
+  const profileId =
+    "profileId" in override ? override.profileId ?? null : chatSettings?.profileId ?? null;
 
   // M2 item 3: the banner is derived from `providers.list`, which mobile
   // already polls — there is no rate-limit signal on `chat.subscribe`.
@@ -403,8 +447,25 @@ export function Composer({
   const readyAttachments = attachments.filter((a): a is AttachmentDraft & { prepared: PreparedAttachment } => a.status === "ready" && a.prepared !== null);
   const isIngestingAttachments = attachments.some((a) => a.status === "ingesting");
   const hasContent = draftText.trim().length > 0 || readyAttachments.length > 0;
+  /**
+   * `settingsLoaded` is a SAFETY term, not a cosmetic one, and it is the half
+   * of this fix that deriving does not cover. Deriving stops the composer
+   * being permanently wrong; it still reads `?? "full_access"` in the window
+   * before the snapshot arrives, so without this a turn sent in that window
+   * runs at a privilege nobody chose.
+   *
+   * The window is reachable, not theoretical: nothing else here is a snapshot
+   * term. The model catalogue is a unary RPC racing the chat stream, and the
+   * transcript paints from cache before `hasSnapshot` flips, so a cold open of
+   * a cached chat looks completely ready while its settings are still absent.
+   */
   const canSubmit =
-    canType && connectionLive && hasContent && !isIngestingAttachments && resolvedModel !== null;
+    canType &&
+    connectionLive &&
+    settingsLoaded &&
+    hasContent &&
+    !isIngestingAttachments &&
+    resolvedModel !== null;
   // `canSubmit` above already requires a resolved model, but `sendDisabledHint`
   // (the parent's reason: foreign host / offline / view-only) knows nothing
   // about the model fetch — when it's null and the ONLY thing blocking Send is
@@ -415,7 +476,14 @@ export function Composer({
     modelsPhase === "error" && resolvedModel === null
       ? "Couldn't load available models — check your connection and try again."
       : null;
-  const effectiveSendHint = sendDisabledHint ?? modelsUnavailableHint;
+  /**
+   * A newly disabling condition needs its own hint or it recreates the defect
+   * this file's docblock opens with — a Send that does nothing and says
+   * "Send". Ranked above the models hint because it is the more immediate
+   * truth when both hold.
+   */
+  const settingsPendingHint = settingsLoaded ? null : "Loading this chat's settings…";
+  const effectiveSendHint = sendDisabledHint ?? settingsPendingHint ?? modelsUnavailableHint;
 
   const handleSend = (): void => {
     if (!canSubmit || resolvedModel === null) return;
@@ -460,7 +528,7 @@ export function Composer({
           providerId={bannerProviderId ?? ""}
           currentProfileId={profileId}
           model={selectedModel}
-          onSwitchProfile={setProfileId}
+          onSwitchProfile={(id) => setOverride((o) => ({ ...o, profileId: id }))}
         />
       )}
       {readOnly ? (
@@ -584,45 +652,63 @@ export function Composer({
                 actually sent — there is nothing for a live connection to
                 gate here, and greying them out during a blip just makes the
                 composer feel broken alongside the textarea. */}
-            <PermissionModeToggle value={permissionMode} onChange={setPermissionMode} disabled={!canType} />
-            <AgentModeToggle value={agentMode} onChange={setAgentMode} disabled={!canType} />
+            {/*
+              Every control below is also disabled while the settings are
+              UNKNOWN, so nothing invites a choice against a state the composer
+              has not been told yet. Stated as a residue rather than claimed as
+              complete: this stops the unknown state being ACTED on, it does not
+              stop it being DISPLAYED — a disabled permission toggle still shows
+              `full_access` before the snapshot lands. Suppressing the displayed
+              value outright is the stronger form of the same rule.
+            */}
+            <PermissionModeToggle
+              value={permissionMode}
+              onChange={(v) => setOverride((o) => ({ ...o, permissionMode: v }))}
+              disabled={!canType || !settingsLoaded}
+            />
+            <AgentModeToggle
+              value={agentMode}
+              onChange={(v) => setOverride((o) => ({ ...o, agentMode: v }))}
+              disabled={!canType || !settingsLoaded}
+            />
             <HarnessChip
               harnesses={availableHarnesses}
               value={harnessId}
               probing={harnessesProbing}
-              onChange={(id) => {
-                setHarnessId(id);
+              onChange={(id) =>
                 // The catalogue is per harness, so the old slug is meaningless
                 // here. Null resets to the new harness's first model rather
-                // than carrying a slug the new harness has never heard of.
-                setModelSlug(null);
-              }}
-              disabled={!connectionLive}
+                // than carrying a slug the new harness has never heard of —
+                // and it is set PRESENT-as-null, which is why `modelSlug` reads
+                // this field with `in` rather than `??`.
+                setOverride((o) => ({ ...o, harnessId: id, model: null }))
+              }
+              disabled={!connectionLive || !settingsLoaded}
             />
             <ModelChip
               models={models}
               value={resolvedModel}
-              onChange={setModelSlug}
-              disabled={!connectionLive}
+              onChange={(slug) => setOverride((o) => ({ ...o, model: slug }))}
+              disabled={!connectionLive || !settingsLoaded}
             />
             <ReasoningChip
               model={selectedModel}
               value={effectiveReasoning}
-              onChange={setReasoningRaw}
-              disabled={!connectionLive}
+              onChange={(v) => setOverride((o) => ({ ...o, reasoningEffort: v }))}
+              disabled={!connectionLive || !settingsLoaded}
             />
             <ServiceTierChip
               model={selectedModel}
               value={effectiveServiceTier}
-              onChange={setServiceTierRaw}
-              disabled={!connectionLive}
+              onChange={(v) => setOverride((o) => ({ ...o, serviceTier: v }))}
+              disabled={!connectionLive || !settingsLoaded}
             />
             <ProfileChip
               client={client}
               harnessId={harnessId}
               value={profileId}
-              onChange={setProfileId}
-              disabled={!connectionLive}
+              onChange={(id) => setOverride((o) => ({ ...o, profileId: id }))}
+              disabled={!connectionLive || !settingsLoaded}
             />
           </>
         )}

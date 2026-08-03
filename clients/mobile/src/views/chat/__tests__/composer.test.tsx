@@ -109,6 +109,7 @@ function renderComposer(props: {
       prefillText={null}
       prefillNonce={0}
       chatSettings={null}
+      settingsLoaded
       canStop={false}
       stopping={false}
       accessRole={props.accessRole ?? "owner"}
@@ -127,7 +128,11 @@ function fullProps(overrides: Partial<ComposerProps>): ComposerProps {
     mentionRoots: [],
     prefillText: null,
     prefillNonce: 0,
+    // Snapshot HAS arrived, this chat just has nothing chosen yet — the
+    // new-chat case. The pre-snapshot `unknown` state is `settingsLoaded:
+    // false` and is exercised deliberately, not inherited as a default.
     chatSettings: null,
+    settingsLoaded: true,
     canStop: false,
     stopping: false,
     accessRole: "owner",
@@ -378,22 +383,57 @@ describe("Composer — prefill (queue-edit)", () => {
  * fixture never seeds anything" — and the two have completely different fixes.
  */
 describe("Composer — the chat's settings arrive after mount", () => {
-  /** Through the REAL schema, like the model/harness fixtures above — a settings object the host could never send must fail here rather than pass quietly. */
+  /**
+   * EVERY FIELD DIFFERS FROM THE FALLBACK IT WOULD OTHERWISE COLLIDE WITH.
+   *
+   * This is load-bearing and it is the easiest way to under-report this defect.
+   * A polite fixture — `harnessId: "claude"`, `agentMode: "regular"`,
+   * `profileId: null` — matches the very defaults the broken code falls back
+   * to, so those fields look correct while being entirely unread. The result is
+   * a finding that is true and TOO SMALL, and a red test gets audited far less
+   * than a green one.
+   *
+   * So: a non-default harness, a model that is NOT `models[0]` (which is why
+   * the fake below advertises two codex models), the non-default agent mode and
+   * permission mode, a real profile id rather than ambient, and an effort/tier
+   * the model actually advertises so normalization cannot clamp them to "".
+   *
+   * Parsed through the real schema, per this file's docblock.
+   */
   function settings(overrides: Record<string, unknown>): ChatRunSettings {
     return chatRunSettingsSchema.parse({
       harnessId: "codex",
-      model: "gpt-5",
+      model: "gpt-5-codex",
       permissionMode: "supervised",
-      agentMode: "regular",
-      reasoningEffort: null,
-      serviceTier: null,
-      profileId: null,
+      agentMode: "epic",
+      reasoningEffort: "high",
+      serviceTier: "priority",
+      profileId: "profile-9",
       ...overrides,
     });
   }
 
-  /** Dispatches `listModels` on the REQUESTED harness, so a harness the composer never switches to cannot supply the model that makes the test pass. */
+  /**
+   * Dispatches `listModels` on the REQUESTED harness, so a harness the composer
+   * never switches to cannot supply the model that makes a test pass. Codex
+   * advertises TWO models and the chat's is the SECOND — with one, `models[0]`
+   * is the chat's model and the slug assertion passes without ever being read.
+   */
   function twoHarnessHost(): FakeHostClient {
+    const codexModel = (slug: string, label: string): GuiAgentModelOption =>
+      guiModel({
+        harnessId: "codex",
+        slug,
+        label,
+        supportedReasoningEfforts: [
+          { id: "high", label: "High", description: null },
+          { id: "low", label: "Low", description: null },
+        ],
+        supportedServiceTiers: [
+          { id: "priority", label: "Priority", description: null },
+          { id: "standard", label: "Standard", description: null },
+        ],
+      });
     return createFakeHostClient((method, params) => {
       if (method === "agent.gui.listHarnesses") {
         return Promise.resolve({
@@ -406,7 +446,7 @@ describe("Composer — the chat's settings arrive after mount", () => {
           harnessId,
           models:
             harnessId === "codex"
-              ? [guiModel({ harnessId: "codex", slug: "gpt-5", label: "GPT-5" })]
+              ? [codexModel("gpt-5-first", "GPT-5 First"), codexModel("gpt-5-codex", "GPT-5 Codex")]
               : [guiModel({ slug: "m1", label: "Model One" })],
         });
       }
@@ -482,11 +522,80 @@ describe("Composer — the chat's settings arrive after mount", () => {
     fireEvent.click(sendButton());
 
     expect(sent).toHaveLength(1);
-    expect(sent[0].harnessId).toBe("codex");
-    expect(sent[0].model).toBe("gpt-5");
-    // The permission mode rides the same seeding path, so a fix that only
-    // adopts the harness would leave the turn running at the wrong privilege.
+    // ALL SEVEN, not just the harness. Every one of them rides the same path,
+    // and a repair that adopts `harnessId` alone would go green on a narrower
+    // assertion while the turn still runs at the wrong privilege, on the wrong
+    // profile, in the wrong mode.
+    expect(sent[0]).toMatchObject({
+      harnessId: "codex",
+      model: "gpt-5-codex",
+      permissionMode: "supervised",
+      agentMode: "epic",
+      reasoningEffort: "high",
+      serviceTier: "priority",
+      profileId: "profile-9",
+    });
+  });
+
+  /**
+   * THE SAME ASSUMPTION, MEETING A CHANGED CHAT RATHER THAN A LATE ARRIVAL.
+   *
+   * The root is that the composer treated `chatSettings` as an INITIAL VALUE
+   * rather than as the chat's IDENTITY. Cold-open is that assumption meeting a
+   * late arrival; this is it meeting a different chat.
+   *
+   * Today nothing leaks, because `app-shell.tsx:353` keys an ErrorBoundary on
+   * `chat:${chatId}` and the whole subtree remounts. But that boundary's
+   * declared purpose is ERROR ISOLATION (`label="this chat"`) — nothing marks
+   * it load-bearing for run-settings correctness, and hoisting or sharing it
+   * (an entirely reasonable refactor) would silently carry a `full_access`
+   * chat's permission mode into a `supervised` one.
+   *
+   * This test locks the property at the level that actually owns it, so the
+   * separation survives a refactor of that key: the SAME instance, given a new
+   * chat, emits the new chat's values. Derivation gives this for free; the old
+   * initializer form cannot pass it at all.
+   */
+  it("emits the NEW chat's settings when reused across chats, without a remount", async () => {
+    const sent: ChatRunSettings[] = [];
+    const fake = twoHarnessHost();
+    const chatA = settings({ harnessId: "claude", model: "m1", permissionMode: "full_access" });
+    const chatB = settings({});
+    const { rerender } = render(
+      <Composer
+        {...fullProps({
+          chatId: "chat-a",
+          client: fake.client,
+          chatSettings: chatA,
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" }).textContent).toContain("Model One");
+    });
+
+    // Same component instance — no key, no unmount. Only the props change.
+    rerender(
+      <Composer
+        {...fullProps({
+          chatId: "chat-b",
+          client: fake.client,
+          chatSettings: chatB,
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" }).textContent).toContain("GPT-5 Codex");
+    });
+
+    fireEvent.change(textarea(), { target: { value: "go" } });
+    fireEvent.click(sendButton());
+
+    expect(sent).toHaveLength(1);
     expect(sent[0].permissionMode).toBe("supervised");
+    expect(sent[0].harnessId).toBe("codex");
   });
 
   /**
@@ -516,12 +625,16 @@ describe("Composer — the chat's settings arrive after mount", () => {
         {...fullProps({
           client: fake.client,
           chatSettings: null,
+          // The snapshot has NOT arrived. Distinct from the new-chat case
+          // (`settingsLoaded: true`, settings null), which must stay sendable —
+          // that is the one turn only this composer can send.
+          settingsLoaded: false,
           onSend: (_t, s) => sent.push(s),
         })}
       />,
     );
-    // The catalogue lands first. Everything `canSubmit` asks about is now
-    // satisfied, and the chat's own settings are still absent.
+    // The catalogue lands first. Everything else `canSubmit` asks about is now
+    // satisfied, and the chat's own settings are still unknown.
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
     });
@@ -530,5 +643,43 @@ describe("Composer — the chat's settings arrive after mount", () => {
     fireEvent.click(sendButton());
 
     expect(sent).toHaveLength(0);
+    // A disabled Send must never be silent about why — this file's opening
+    // docblock exists because one was.
+    expect(sendButton().getAttribute("title")).toMatch(/loading this chat/i);
+  });
+
+  /**
+   * THE CONTRAST, and it is what stops the gate above from being an
+   * over-correction. `settingsLoaded` is deliberately NOT `chatSettings !==
+   * null`: a brand-new chat's settings are legitimately null once its snapshot
+   * arrives, because nothing has picked a harness or model yet — and H5
+   * measured that the CLI cannot send that first turn (`snapshot.chat.settings`
+   * is null, so the host answers MALFORMED_FRAME), which makes this composer
+   * the only surface that can.
+   *
+   * A fix that gated on `chatSettings !== null` would pass the safety test
+   * above and silently make new chats unusable. Only the pair discriminates.
+   */
+  it("still sends the FIRST turn of a new chat, whose settings are null by nature", async () => {
+    const sent: ChatRunSettings[] = [];
+    const fake = twoHarnessHost();
+    render(
+      <Composer
+        {...fullProps({
+          client: fake.client,
+          chatSettings: null,
+          settingsLoaded: true,
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
+    });
+
+    fireEvent.change(textarea(), { target: { value: "go" } });
+    fireEvent.click(sendButton());
+
+    expect(sent).toHaveLength(1);
   });
 });

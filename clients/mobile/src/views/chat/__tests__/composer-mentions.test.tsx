@@ -140,6 +140,9 @@ function renderComposer(roots: readonly string[], client: FakeHostClient): void 
       prefillText={null}
       prefillNonce={0}
       chatSettings={null}
+      // Snapshot HAS arrived; this chat simply has no settings chosen yet
+      // (a new chat). Not the pre-snapshot `unknown` state -- see composer.tsx.
+      settingsLoaded={true}
       canStop={false}
       stopping={false}
       accessRole="owner"
