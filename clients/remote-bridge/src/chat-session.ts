@@ -8,7 +8,10 @@ import {
   type ChatSnapshot,
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import { DEFAULT_ACCOUNT_CONTEXT } from "@traycer/protocol/common/schemas";
-import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
+import type {
+  InterviewAnswer,
+  InterviewBlock,
+} from "@traycer/protocol/persistence/epic/content-blocks";
 import type { HostStreamRpcRegistry } from "@traycer/protocol/host/registry";
 import type { IStreamSession } from "@traycer-clients/shared/host-transport/i-stream-session";
 import type { WsStreamClient } from "@traycer-clients/shared/host-transport/ws-stream-client";
@@ -231,12 +234,49 @@ export class ChatSession {
           requestedAt: a.requestedAt,
         })),
       ],
-      pendingInterviews: this.pendingInterviews.map((i) => ({
-        blockId: i.blockId,
-        requestedAt: i.requestedAt,
-      })),
+      pendingInterviews: this.pendingInterviews.map((i) => {
+        const block = this.findInterviewBlock(i.blockId);
+        return {
+          blockId: i.blockId,
+          requestedAt: i.requestedAt,
+          title: block?.title ?? null,
+          description: block?.description ?? null,
+          // `null` when the block is not in the snapshot, NOT `[]` — see
+          // `PendingInterview.questions`. `block?.questions ?? null` would
+          // read the same for a found-but-empty block, so the distinction is
+          // made on the BLOCK, not on its questions array.
+          questions: block === null ? null : block.questions,
+        };
+      }),
       connected: this.connected,
     };
+  }
+
+  /**
+   * The `interview` block a pending interview refers to, or `null` when the
+   * snapshot does not contain it.
+   *
+   * The pending list and the block live in two different places on the same
+   * snapshot: `pendingInterviews` comes from the status frames, the questions
+   * come from the message the agent wrote. They can legitimately disagree —
+   * a snapshot arriving mid-turn can name a pending interview whose block has
+   * not landed in `chat.messages` yet — so a miss is a real state and is
+   * reported as one rather than smoothed into an empty question list.
+   *
+   * The `type` check is not belt-and-braces: block ids are unique per block,
+   * not per kind, and a caller reading `questions` off whatever block happens
+   * to carry that id would get `undefined` at runtime past a cast.
+   */
+  private findInterviewBlock(blockId: string): InterviewBlock | null {
+    for (const message of this.snapshot?.chat.messages ?? []) {
+      if (message.role !== "assistant") continue;
+      for (const block of message.blocks) {
+        if (block.blockId === blockId && block.type === "interview") {
+          return block;
+        }
+      }
+    }
+    return null;
   }
 
   /**
