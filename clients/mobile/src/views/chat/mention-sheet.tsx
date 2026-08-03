@@ -135,6 +135,17 @@ export function MentionSheet({
                   agent resolves — so it has to be visible before the tap. Two
                   files with the same basename in different directories are
                   otherwise indistinguishable rows. */}
+              {/* `direction: rtl` is here to ellipsize a long path at the
+                  START, keeping the filename end visible. It also reorders the
+                  string's BIDI-NEUTRAL characters, and a path is mostly
+                  neutrals: measured live, `.github/` rendered as `/github.` and
+                  every folder row showed its trailing slash at the front.
+                  The inner isolate keeps the text's own direction LTR — so the
+                  path reads correctly — while the outer box stays RTL and goes
+                  on truncating from the left. Both properties are load-bearing;
+                  `unicode-bidi: plaintext` on one element would fix the order
+                  by flipping the base direction, and lose the truncation side
+                  with it. */}
               <span
                 style={{
                   ...type.bodyXs,
@@ -147,7 +158,9 @@ export function MentionSheet({
                   textAlign: "left",
                 }}
               >
-                {suggestion.relPath}
+                <bdi data-testid="mention-relpath" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+                  {suggestion.relPath}
+                </bdi>
               </span>
             </span>
           </button>

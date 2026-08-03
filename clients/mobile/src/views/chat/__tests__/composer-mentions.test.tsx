@@ -324,3 +324,43 @@ describe("a folderless chat", () => {
     });
   });
 });
+
+/**
+ * The path row is laid out RIGHT-TO-LEFT so a long path ellipsizes at the
+ * START, keeping the filename visible. A path is almost entirely BIDI-NEUTRAL
+ * characters, and RTL reorders those: shipped, `.github/` RENDERED as
+ * `/github.` and every folder row showed its trailing slash at the front.
+ * Photographed against the real host before the fix.
+ *
+ * jsdom does no bidi and no layout, so these assert the STRUCTURE that produces
+ * the behaviour, and the rendering itself is measured in a real browser by
+ * `tmp/probe-bidi.mjs` (order + which side actually clips, off client rects).
+ *
+ * Both properties are asserted because each has its own way of being lost, and
+ * the plausible one-line "simplification" loses one while keeping the other:
+ * `unicode-bidi: plaintext` on a single element fixes the ORDER and moves the
+ * ellipsis to the right — measured, not guessed. A test that only checked the
+ * order would go green on that change.
+ */
+describe("the relPath renders in reading order without giving up left-truncation", () => {
+  it("isolates the path's direction inside an RTL box", async () => {
+    renderComposer([ROOT_A], mentionHost());
+    type("@src/deep");
+    await waitFor(() => {
+      expect(screen.getByText("src/deep/app.tsx")).toBeTruthy();
+    });
+
+    const path = screen.getByText("src/deep/app.tsx");
+    // The text itself reads LTR...
+    expect(path.style.direction).toBe("ltr");
+    expect(path.style.unicodeBidi).toBe("isolate");
+
+    // ...inside a box that is still RTL, which is what puts the ellipsis on
+    // the left. Losing this is a silent UX regression with no visual tell
+    // until a path is long enough to overflow.
+    const box = path.parentElement;
+    expect(box).not.toBeNull();
+    expect(box?.style.direction).toBe("rtl");
+    expect(box?.style.textOverflow).toBe("ellipsis");
+  });
+});
