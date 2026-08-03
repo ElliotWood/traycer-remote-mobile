@@ -141,6 +141,29 @@ describe("preview tabs", () => {
     expectInvariantI1(state);
   });
 
+  it("marks the FIRST tab as a preview when the canvas was empty", () => {
+    /*
+     * A GAP THIS SUITE HAD, found by the opener's tests rather than by this
+     * file. Every preview case here opened into a canvas that already held
+     * something, so all of them took `openTile`'s non-empty branch — and the
+     * empty branch ignored `preview` outright.
+     *
+     * The user-visible bug: **the very first single-click of a session
+     * produces a permanent tab**, and only the second onward previews. Nobody
+     * would report that as "preview is broken"; they would report nothing.
+     *
+     * Mutation: drop the `preview ?` in `openTile`'s `root === null` branch.
+     */
+    const ids = idSource();
+    const state = openTile({
+      state: EMPTY_CANVAS,
+      tile: chat("a", "a"),
+      preview: true,
+      ids,
+    });
+    expect(activePane(state)?.previewTabId).toBe("a");
+  });
+
   it("keeps a promoted tab when the next preview arrives", () => {
     const ids = idSource();
     let state = openTile({ state: EMPTY_CANVAS, tile: chat("a", "a"), preview: true, ids });
