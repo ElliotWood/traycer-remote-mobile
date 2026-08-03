@@ -32,6 +32,7 @@ import type {
   CreateChatInitialMessage,
   CreateChatRequest,
 } from "@traycer/protocol/host/epic/unary-schemas";
+import type { ChatRunSettings } from "@traycer/protocol/persistence/epic/foundation";
 import type { MobileHostClient } from "@/host/host-client-context";
 // HA-1: `MOBILE_HOST_ID` is deliberately NOT imported here any more. It stays a
 // valid local UI label in `connection.ts`, but nothing in this module may reach
@@ -89,6 +90,16 @@ export interface BuildInitialMessageArgs {
   readonly userId: string;
   readonly model: string;
   readonly instruction: string;
+  /**
+   * M1 item 6, inherited by M5: the run settings the user actually chose.
+   *
+   * `null` (or omitted) keeps the historical behaviour — `model` as resolved
+   * by the caller, `supervised`, `regular`, and every capacity setting null.
+   * When present, `model` here is authoritative over the `model` argument,
+   * because a caller that resolved a whole settings tuple has already chosen
+   * a slug and the two disagreeing silently would be worse than either.
+   */
+  readonly settings?: ChatRunSettings | null;
 }
 
 /**
@@ -104,7 +115,7 @@ export function buildInitialMessage(
     clientActionId: args.clientActionId,
     content: plainTextContent(args.instruction),
     sender: { type: "user", userId: args.userId },
-    settings: {
+    settings: args.settings ?? {
       harnessId: AUTHOR_HARNESS_ID,
       model: args.model,
       permissionMode: AUTHOR_PERMISSION_MODE,

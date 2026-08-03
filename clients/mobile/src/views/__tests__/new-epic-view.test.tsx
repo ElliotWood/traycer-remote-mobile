@@ -20,6 +20,7 @@ import type { ListHarnessModelsResponse } from "@traycer/protocol/host/agent/sha
 import type { ReactNode } from "react";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { NewEpicView } from "@/views/new-epic-view";
+import { FOLDERLESS_TARGET } from "@/host/workspace-selection";
 import { buildCreateEpicRequest, useCreateEpic } from "@/host/use-create-epic";
 import {
   createFakeHostClient,
@@ -253,6 +254,8 @@ describe("NewEpicView", () => {
       userId: "user-1",
       model: "test-model",
       instruction: "Anything",
+      target: FOLDERLESS_TARGET,
+      settings: null,
       hostId: CONFIGURED_HOST_ID,
       now: 1,
     });
@@ -414,6 +417,8 @@ describe("NewEpicView", () => {
       userId: "user-1",
       model: "test-model",
       instruction: "First line of the instruction\nsecond line",
+      target: FOLDERLESS_TARGET,
+      settings: null,
       hostId: CONFIGURED_HOST_ID,
       now: 1_700_000_000_000,
     });
