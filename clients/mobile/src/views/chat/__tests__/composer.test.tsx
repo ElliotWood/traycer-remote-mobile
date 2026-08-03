@@ -24,7 +24,10 @@ import {
   type GuiAgentModelOption,
   type GuiHarnessOption,
 } from "@traycer/protocol/host/agent/gui/unary-schemas";
-import type { ChatRunSettings } from "@traycer/protocol/persistence/epic/foundation";
+import {
+  chatRunSettingsSchema,
+  type ChatRunSettings,
+} from "@traycer/protocol/persistence/epic/foundation";
 import { Composer, type ComposerProps } from "@/views/chat/composer";
 import { resetDraftsForTest } from "@/router/drafts";
 import { createFakeHostClient, type FakeHostClient } from "@/test-utils/fakes";
@@ -348,5 +351,184 @@ describe("Composer — prefill (queue-edit)", () => {
 
     rerender(<Composer {...fullProps({ prefillText: "second edit", prefillNonce: 2 })} />);
     expect(textarea().value).toBe("second edit");
+  });
+});
+
+/**
+ * The chat's OWN run settings arrive LATE, and the composer is mounted before
+ * they do.
+ *
+ * `chat-view.tsx` renders `<Composer>` unconditionally with
+ * `chatSettings={chat.chatSettings}`, and `use-chat.ts` holds that at `null`
+ * until the snapshot lands (`INITIAL_STATE`, and `seedFromCache` deliberately
+ * does not carry it). So on every cold open of an EXISTING chat the composer
+ * mounts with `chatSettings === null`.
+ *
+ * That matters because these are `useState` INITIALIZERS, which run once. The
+ * question these tests ask is not "does seeding work" — it does, at mount —
+ * but "what happens to a chat whose settings the client had not yet received",
+ * which is every chat, every time.
+ *
+ * `handleSend` commits this state as the turn's settings, so this is a send-path
+ * question, not a display one: whatever the chips end up holding is what the
+ * next turn actually runs on.
+ *
+ * THE CONTROL IS LOAD-BEARING. Settings-present-at-mount is asserted alongside,
+ * because without it a red late-arrival test is equally consistent with "the
+ * fixture never seeds anything" — and the two have completely different fixes.
+ */
+describe("Composer — the chat's settings arrive after mount", () => {
+  /** Through the REAL schema, like the model/harness fixtures above — a settings object the host could never send must fail here rather than pass quietly. */
+  function settings(overrides: Record<string, unknown>): ChatRunSettings {
+    return chatRunSettingsSchema.parse({
+      harnessId: "codex",
+      model: "gpt-5",
+      permissionMode: "supervised",
+      agentMode: "regular",
+      reasoningEffort: null,
+      serviceTier: null,
+      profileId: null,
+      ...overrides,
+    });
+  }
+
+  /** Dispatches `listModels` on the REQUESTED harness, so a harness the composer never switches to cannot supply the model that makes the test pass. */
+  function twoHarnessHost(): FakeHostClient {
+    return createFakeHostClient((method, params) => {
+      if (method === "agent.gui.listHarnesses") {
+        return Promise.resolve({
+          harnesses: [guiHarness({}), guiHarness({ id: "codex", label: "Codex" })],
+        });
+      }
+      if (method === "agent.gui.listModels") {
+        const harnessId = (params as { readonly harnessId: string }).harnessId;
+        return Promise.resolve({
+          harnessId,
+          models:
+            harnessId === "codex"
+              ? [guiModel({ harnessId: "codex", slug: "gpt-5", label: "GPT-5" })]
+              : [guiModel({ slug: "m1", label: "Model One" })],
+        });
+      }
+      return Promise.reject(new Error(`unexpected RPC in this test: ${method}`));
+    });
+  }
+
+  it("CONTROL: settings present at mount seed the harness chip", async () => {
+    const fake = twoHarnessHost();
+    render(<Composer {...fullProps({ client: fake.client, chatSettings: settings({}) })} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Harness" }).textContent).toContain("Codex");
+    });
+  });
+
+  it("adopts settings that arrive after mount, the way the live sequence delivers them", async () => {
+    const fake = twoHarnessHost();
+    // t=0: chat-view has no snapshot, so it passes null. This is the ONLY
+    // state a cold open ever mounts in.
+    const { rerender } = render(
+      <Composer {...fullProps({ client: fake.client, chatSettings: null })} />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
+    });
+
+    // The snapshot lands. `chat.chatSettings` flips from null to the chat's
+    // real settings and the composer re-renders with them.
+    rerender(<Composer {...fullProps({ client: fake.client, chatSettings: settings({}) })} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Harness" }).textContent).toContain("Codex");
+    });
+  });
+
+  it("SENDS on the chat's own harness after a late arrival, not on the mount-time default", async () => {
+    // The consequence, and why this is not a cosmetic defect: `handleSend`
+    // commits the composer's own state. A chat configured for one harness,
+    // opened cold, would run its next turn somewhere else entirely — with no
+    // interaction from the user and nothing on screen admitting it.
+    const sent: ChatRunSettings[] = [];
+    const fake = twoHarnessHost();
+    const { rerender } = render(
+      <Composer
+        {...fullProps({
+          client: fake.client,
+          chatSettings: null,
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
+    });
+
+    rerender(
+      <Composer
+        {...fullProps({
+          client: fake.client,
+          chatSettings: settings({}),
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    // Wait for the adopted harness's catalogue rather than racing it — Send is
+    // disabled while a harness switch re-fetches models (see the M1 test above).
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" }).textContent).toContain("GPT-5");
+    });
+
+    fireEvent.change(textarea(), { target: { value: "go" } });
+    fireEvent.click(sendButton());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].harnessId).toBe("codex");
+    expect(sent[0].model).toBe("gpt-5");
+    // The permission mode rides the same seeding path, so a fix that only
+    // adopts the harness would leave the turn running at the wrong privilege.
+    expect(sent[0].permissionMode).toBe("supervised");
+  });
+
+  /**
+   * THE SAFETY PROPERTY, and it is separate from the two above.
+   *
+   * Deriving settings instead of seeding them fixes the case where the composer
+   * never corrects. It does NOT fix the window BEFORE they arrive: a composer
+   * reading `chatSettings?.permissionMode ?? "full_access"` still commits
+   * `full_access` during it. Making the screen honest and making the window
+   * safe are different fixes, and only this assertion binds the second.
+   *
+   * The window is reachable — `canSubmit` is
+   * `canType && connectionLive && hasContent && !isIngestingAttachments &&
+   * resolvedModel !== null`, which has no snapshot term in it. The model
+   * catalogue is a unary RPC racing the chat stream's snapshot, and the
+   * transcript paints from cache before `hasSnapshot` flips, so a cold open of
+   * a cached chat looks completely ready while the settings are still absent.
+   *
+   * Not asserted as "the button is disabled" — that would pass against a screen
+   * disabled for any unrelated reason. Asserted as: nothing was EMITTED.
+   */
+  it("does not run a turn on settings it has not received yet", async () => {
+    const sent: ChatRunSettings[] = [];
+    const fake = twoHarnessHost();
+    render(
+      <Composer
+        {...fullProps({
+          client: fake.client,
+          chatSettings: null,
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    // The catalogue lands first. Everything `canSubmit` asks about is now
+    // satisfied, and the chat's own settings are still absent.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
+    });
+
+    fireEvent.change(textarea(), { target: { value: "go" } });
+    fireEvent.click(sendButton());
+
+    expect(sent).toHaveLength(0);
   });
 });
