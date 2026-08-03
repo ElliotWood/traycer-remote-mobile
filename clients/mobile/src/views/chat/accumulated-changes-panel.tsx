@@ -20,16 +20,23 @@
  * restore the content. The ack is the only in-app evidence that the revert
  * itself was accepted; the filesystem is the only evidence of what it did.
  *
- * "Review all" (M6 item 2) is still deferred.
+ * ## "Review all" (M6 item 2)
+ *
+ * The disclosure rows stay — they are right for glancing at one file — but
+ * reviewing a whole changeset through them means twelve taps and losing your
+ * place between each. `ReviewAllSheet` is the other half: every diff stacked
+ * on one surface with a jump-list. It reads the same inline before/after
+ * content, so it costs no additional RPC.
  */
 import { useMemo, useState, type ReactElement } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, FileDiff, RotateCcw } from "lucide-react";
 import type { ChatAccumulatedFileChange } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { ReplyStatus } from "@/host/use-chat";
 import { BottomSheet } from "@/views/toolbar/bottom-sheet";
 import { radius, theme, type } from "@/views/design-tokens";
 import { computeLineDelta } from "./line-delta";
 import { DiffView } from "./diff-view";
+import { ReviewAllSheet } from "./review-all-sheet";
 
 export interface AccumulatedChangesPanelProps {
   readonly changes: readonly ChatAccumulatedFileChange[];
@@ -61,6 +68,7 @@ export function AccumulatedChangesPanel({
 }: AccumulatedChangesPanelProps): ReactElement | null {
   const [expandedPath, setExpandedPath] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<PendingConfirm | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const undoAllPending = undoAllStatus?.phase === "submitting";
 
   const totals = useMemo(() => {
@@ -93,6 +101,27 @@ export function AccumulatedChangesPanel({
           <span style={{ color: theme.success }}>+{totals.added}</span>{" "}
           <span style={{ color: theme.danger }}>-{totals.deleted}</span>
         </span>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        {/* Reviewing is not a mutation — it stays available to a viewer, and
+            while an Undo is in flight. */}
+        <button
+          type="button"
+          onClick={() => setReviewing(true)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            border: "none",
+            background: "transparent",
+            color: theme.mutedText,
+            ...type.bodyXs,
+            padding: "4px 6px",
+            cursor: "pointer",
+          }}
+        >
+          <FileDiff size={12} aria-hidden="true" />
+          Review all
+        </button>
         <button
           type="button"
           disabled={!canMutate || undoAllPending}
@@ -113,6 +142,7 @@ export function AccumulatedChangesPanel({
           <RotateCcw size={12} aria-hidden="true" />
           {undoAllPending ? "Undoing…" : "Undo all"}
         </button>
+        </div>
       </div>
 
       {undoAllStatus?.phase === "rejected" && (
@@ -179,6 +209,8 @@ export function AccumulatedChangesPanel({
           );
         })}
       </ul>
+
+      {reviewing && <ReviewAllSheet changes={changes} onClose={() => setReviewing(false)} />}
 
       {confirming !== null && (
         <BottomSheet title="Undo changes?" onClose={() => setConfirming(null)}>
