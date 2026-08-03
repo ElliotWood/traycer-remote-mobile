@@ -76,34 +76,46 @@ const testMockTypingRestrictions = [
 const assertionDirectnessRestrictions = [
   {
     /*
-     * `expect(x?.y).toBeNull()` and friends — optional chaining in the
-     * subject, checked against a NULLISH matcher.
+     * `expect(x?.y).toBeUndefined()` / `.toBeFalsy()` — optional chaining in
+     * the subject, checked against a matcher that a MISSING subject
+     * satisfies.
      *
-     * ─── This rule was too broad on the first attempt, and the measurement
-     * is why it is narrow now ───
+     * ─── Narrowed twice, and the second narrowing came from running it ───
      *
-     * Banning `?.` anywhere inside `expect(...)` produced **37 errors** in
-     * `clients/teams-tab` alone. Almost all were harmless: with a value
-     * matcher, a missing subject yields `undefined`, the comparison FAILS,
-     * and the only cost is an error message naming the wrong problem.
+     * FIRST: banning `?.` anywhere inside `expect(...)` produced **37
+     * errors** in `clients/teams-tab` alone. Almost all harmless — with a
+     * value matcher a missing subject yields `undefined`, the comparison
+     * FAILS, and the only cost is an error message naming the wrong problem.
+     * Shipping that takes the package's lint baseline from 5 to 42, and a
+     * 42-error baseline detects nothing — the exact instrument this rule set
+     * exists to protect. **A rule whose cost is 37 edits to prevent two
+     * defects is a tax, not a gate, and a tax gets suppressed.**
      *
-     * Shipping that would have taken the package's lint baseline from 5 to
-     * 42 — and a 42-error baseline detects nothing, which is the exact
-     * instrument this rule set exists to protect. **A rule whose cost is 37
-     * edits to prevent two defects is a tax, not a gate.**
+     * SECOND: the narrowed rule listed `toBeNull` alongside `toBeUndefined`
+     * and `toBeFalsy`. **That was wrong, and reasoning said otherwise until
+     * it was measured.** Vitest's `toBeNull` is strict — `undefined` is not
+     * `null`, so a missing subject FAILS it. Probed directly rather than
+     * argued:
      *
-     * The genuinely dangerous case is small and precise: with `toBeNull`,
-     * `toBeUndefined` or `toBeFalsy`, a missing subject makes the assertion
-     * PASS — for exactly the reason the test was written to rule out. That
-     * is what is banned.
+     *     expect(absent?.y).toBeNull()        FAILS   <- safe
+     *     expect(absent?.y).toBeUndefined()   passes  <- hole
+     *     expect(absent?.y).toBeFalsy()       passes  <- hole
+     *
+     * Including `toBeNull` cost two real edits and nearly cost a ticket
+     * filed against another team for a defect that was not there. **A rule
+     * that flags a safe pattern is the same class of error as a test that
+     * cannot fail** — both assert something about code that is not true of
+     * it.
      *
      * The fix at a call site is two lines: assert the subject is defined,
-     * then narrow.
+     * then narrow with a guard. NOT with `??` — `null ?? x` is `x`, so the
+     * nullish operator cannot distinguish "absent" from "legitimately null",
+     * which is precisely the distinction being made.
      */
     selector:
-      "CallExpression[callee.property.name=/^(toBeNull|toBeUndefined|toBeFalsy)$/][callee.object.callee.name='expect'][callee.object.arguments.0.type='ChainExpression']",
+      "CallExpression[callee.property.name=/^(toBeUndefined|toBeFalsy)$/][callee.object.callee.name='expect'][callee.object.arguments.0.type='ChainExpression']",
     message:
-      "Do not check a `?.` subject with a nullish matcher — a MISSING subject passes, which is what the test was meant to rule out. Assert the subject is defined first, then narrow.",
+      "Do not check a `?.` subject with `toBeUndefined`/`toBeFalsy` — a MISSING subject satisfies them, which is what the test was meant to rule out. Assert the subject is defined first, then narrow with a guard (not `??`).",
   },
 ];
 

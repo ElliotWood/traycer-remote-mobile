@@ -400,13 +400,23 @@ describe("reconcile drops rather than throws", () => {
     /*
      * Narrowed with a real guard, not `?.` and not `??`.
      *
-     * `repaired?.previewTabId` against `toBeNull()` PASSES when the pane
-     * vanished entirely — the opposite of what this test claims. The first
-     * repair reached for `?? "MISSING PANE"` and was WORSE: `null ?? x` is
-     * `x`, so a correctly-null previewTabId became a string and the
-     * assertion failed on the passing case. The nullish operator cannot
-     * distinguish "absent" from "legitimately null", which is exactly the
-     * distinction being made here.
+     * The claim this comment ORIGINALLY made was that
+     * `repaired?.previewTabId` against `toBeNull()` would pass if the pane
+     * had vanished. **Measured: it would not** — vitest's `toBeNull` is
+     * strict, so a missing pane yields `undefined` and the assertion fails.
+     * Corrected rather than deleted, because the wrong version predicts a
+     * whole class of safe assertions is unsafe, which is what it did: it
+     * cost two edits and nearly a ticket filed against another package.
+     *
+     * The guard stays because it distinguishes "no pane" from "pane with a
+     * null preview" *in the failure message*, rather than relying on a
+     * matcher's strictness to do it.
+     *
+     * NOT `?? "MISSING PANE"`, which was the first repair and was genuinely
+     * worse than either: `null ?? x` is `x`, so a correctly-null
+     * previewTabId became a string and the assertion failed on the PASSING
+     * case. The nullish operator cannot distinguish "absent" from
+     * "legitimately null" — exactly the distinction being made here.
      */
     expect(repaired).not.toBeNull();
     if (repaired === null) return;

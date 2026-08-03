@@ -459,11 +459,22 @@ describe("removePaneFromTree", () => {
       { root: pane("a", []), sizesByGroupId: {} },
       "a",
     );
-    // `result?.root` against `toBeNull()` PASSES when `result` itself is
-    // null — i.e. when the pane was not found at all — so the test named
-    // "yields root: null" was also satisfied by "yielded nothing". Narrowed
-    // with a guard rather than `??`, which cannot tell "absent" from
-    // "legitimately null" and would fail on the passing case.
+    /*
+     * DIVERGES FROM THE gui-app ORIGINAL, which reads
+     * `expect(result?.root).toBeNull()`. The original is NOT broken — a
+     * lint rule flagged it, I inferred a hole, and the control refuted me:
+     * vitest's `toBeNull` is strict, so a null `result` yields `undefined`
+     * and the assertion fails. Both forms catch an injected
+     * `if (path.length === 0) return null`.
+     *
+     * Kept anyway, because it says what it means: `removePaneFromTree`
+     * returns null for NOT FOUND, and this case is about a found pane whose
+     * removal empties the tree. The guard separates those two nulls; `?.`
+     * merges them and relies on a matcher's strictness to tell them apart.
+     *
+     * Narrowed with a guard rather than `??`: `null ?? x` is `x`, so the
+     * nullish operator would fail on the PASSING case.
+     */
     expect(result).not.toBeNull();
     if (result === null) return;
     expect(result.root).toBeNull();
