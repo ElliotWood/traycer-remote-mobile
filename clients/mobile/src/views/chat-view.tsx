@@ -59,7 +59,7 @@ import { NotificationPermissionButton } from "./notification-permission-button";
 import { defaultStorage, markSeen } from "@/host/read-tracking-store";
 import { radius, theme, type } from "./design-tokens";
 import { ConnectionPill } from "./epic-tree/connection-pill";
-import { BranchChip } from "./chat/branch-chip";
+import { BindingChip } from "./chat/binding-chip";
 import { ContextUsageChip } from "./chat/context-usage-chip";
 import { RunIndicator } from "./chat/run-indicator";
 import { ElapsedFooter } from "./chat/elapsed-footer";
@@ -270,7 +270,7 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
       <header style={headerStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <ConnectionPill state={displayConnection} />
-          <BranchChip binding={chat.worktreeBinding} missingWorktreePaths={chat.missingWorktreePaths} />
+          <BindingChip binding={chat.worktreeBinding} missingWorktreePaths={chat.missingWorktreePaths} />
           <ContextUsageChip usage={turn?.usage ?? null} />
         </div>
       </header>
