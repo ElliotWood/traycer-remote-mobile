@@ -23,17 +23,24 @@
  * store, which is a later problem and not this one.
  */
 import { useCallback, type ReactNode } from "react";
-import { makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
+import { Button, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
+import { AddRegular } from "@fluentui/react-icons";
 import { SplitContainer, type SplitPaneComponentProps } from "./split-container";
 import { TabStrip } from "./tab-strip";
 import {
+  canSplitPane,
+  closePane,
   closeTab,
+  openTile,
   promotePreview,
   resizeSplit,
   setActivePane,
   setActiveTab,
+  splitPane,
   type CanvasState,
+  type IdSource,
 } from "./canvas-state";
+import { makeBlankTile } from "./opener";
 import type { TilePane } from "./tile-tree";
 import type { TileRef } from "./tile-ref";
 
@@ -64,6 +71,8 @@ const useStyles = makeStyles({
   },
   empty: {
     display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalM,
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
@@ -80,10 +89,27 @@ export interface TileCanvasProps {
   readonly renderTile: (tile: TileRef) => ReactNode;
   /** Shown when the canvas holds nothing. */
   readonly emptyLabel?: string;
+  /**
+   * Where pane and group ids come from. INJECTED rather than defaulted to a
+   * uuid generator: a default would let a test pass one and then silently not
+   * use it, and it is the ids that make a persisted layout re-identifiable.
+   */
+  readonly ids: IdSource;
+  /**
+   * Bound onto every blank tab this canvas mints. Single-host today, and the
+   * field is carried anyway — a layout persisted without it needs a migration
+   * to gain one, and sanitize-on-read would have to invent a value.
+   */
+  readonly hostId: string;
+  /**
+   * Opens the first tab when the canvas is empty. Optional: without it the
+   * empty canvas is a message, which is what it was before this existed.
+   */
+  readonly onOpenFirst?: () => void;
 }
 
 export function TileCanvas(props: TileCanvasProps) {
-  const { state, onChange, renderTile } = props;
+  const { state, onChange, renderTile, ids, hostId } = props;
   const styles = useStyles();
 
   const onResizeGroup = useCallback(
@@ -109,17 +135,37 @@ export function TileCanvas(props: TileCanvasProps) {
           state={state}
           onChange={onChange}
           renderTile={renderTile}
+          ids={ids}
+          hostId={hostId}
         />
       );
     },
-    [state, onChange, renderTile],
+    [state, onChange, renderTile, ids, hostId],
   );
 
   if (state.root === null) {
     return (
       <div className={styles.canvas} data-testid="tile-canvas">
         <div className={styles.empty} data-testid="canvas-empty">
-          {props.emptyLabel ?? "Nothing open"}
+          <span>{props.emptyLabel ?? "Nothing open"}</span>
+          {/*
+            An empty canvas has no pane, so it has no tab strip, so it has no
+            "+". Without this the canvas is a ONE-WAY DOOR: close the last
+            pane and the only recovery is a reload. That is not a cosmetic
+            gap — `closePane` documents that "the last pane leaves an empty
+            canvas", and this is the state it leaves you in.
+          */}
+          {props.onOpenFirst === undefined ? null : (
+            <Button
+              appearance="primary"
+              size="small"
+              icon={<AddRegular fontSize={14} />}
+              onClick={props.onOpenFirst}
+              data-testid="canvas-open-first"
+            >
+              New tab
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -142,10 +188,12 @@ interface PaneViewProps {
   readonly state: CanvasState;
   readonly onChange: (next: CanvasState) => void;
   readonly renderTile: (tile: TileRef) => ReactNode;
+  readonly ids: IdSource;
+  readonly hostId: string;
 }
 
 function PaneView(props: PaneViewProps) {
-  const { pane, state, onChange, renderTile } = props;
+  const { pane, state, onChange, renderTile, ids, hostId } = props;
   const styles = useStyles();
   const focused = state.activePaneId === pane.id;
 
@@ -181,6 +229,42 @@ function PaneView(props: PaneViewProps) {
         onClose={(instanceId) => {
           onChange(closeTab(state, pane.id, instanceId));
         }}
+        onNewTab={() => {
+          onChange(
+            openTile({
+              state,
+              tile: makeBlankTile(hostId),
+              paneId: pane.id,
+              // NOT a preview. A preview tab is replaced by the next one, so
+              // pressing "+" twice would leave one tab — which reads as the
+              // button being broken. Preview is for BROWSING a list; this is
+              // an explicit "give me a tab".
+              preview: false,
+              ids,
+            }),
+          );
+        }}
+        onSplit={(position) => {
+          onChange(
+            splitPane({
+              state,
+              paneId: pane.id,
+              position,
+              // A blank tile, so a split does not duplicate the current tab.
+              // Duplicating would give two live views of one thing by default,
+              // and the tree rejects an empty pane outside the root — so
+              // "split with nothing in it" is not available even if it were
+              // wanted.
+              tile: makeBlankTile(hostId),
+              ids,
+            }),
+          );
+        }}
+        onClosePane={() => {
+          onChange(closePane(state, pane.id));
+        }}
+        canSplitRight={canSplitPane(state, pane.id, "right")}
+        canSplitDown={canSplitPane(state, pane.id, "bottom")}
       />
       <div className={styles.body} data-testid="canvas-pane-body">
         {activeTile === null ? null : renderTile(activeTile)}

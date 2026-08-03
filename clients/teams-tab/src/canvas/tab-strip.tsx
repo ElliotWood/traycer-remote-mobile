@@ -33,22 +33,57 @@ import {
   mergeClasses,
   tokens,
 } from "@fluentui/react-components";
-import { DismissRegular } from "@fluentui/react-icons";
-import type { TilePane } from "./tile-tree";
+import {
+  AddRegular,
+  DismissRegular,
+  SplitHorizontalRegular,
+  SplitVerticalRegular,
+  SubtractRegular,
+} from "@fluentui/react-icons";
+import type { EdgeDropPosition, TilePane } from "./tile-tree";
 import { tileTitle, type TileRef } from "./tile-ref";
 
 const useStyles = makeStyles({
-  strip: {
+  /*
+   * The strip is now a HEADER holding two things: the tablist, and the pane
+   * controls. They are siblings rather than the controls living inside the
+   * tablist, and that is an accessibility requirement rather than tidiness —
+   * a `role="tablist"` whose children include four buttons that are not tabs
+   * misreports the tab count to every screen reader, and the count is how a
+   * user of one knows where they are in the strip.
+   */
+  header: {
     display: "flex",
     alignItems: "stretch",
     flexShrink: 0,
+    minWidth: 0,
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  controls: {
+    display: "flex",
+    alignItems: "center",
+    flexShrink: 0,
+    gap: tokens.spacingHorizontalXXS,
+    paddingLeft: tokens.spacingHorizontalXXS,
+    paddingRight: tokens.spacingHorizontalXXS,
+    // Pushed to the trailing edge, and it must not shrink: the tablist
+    // scrolls, so on a narrow pane the controls stay put and the tabs move
+    // under them rather than the controls sliding off where nothing can
+    // reach them.
+    marginLeft: "auto",
+    borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  paneButton: { minWidth: "24px", maxWidth: "24px", height: "24px" },
+  strip: {
+    display: "flex",
+    alignItems: "stretch",
+    flexShrink: 1,
     minWidth: 0,
     overflowX: "auto",
     // Teams' own chrome has no visible scrollbar here and one inside a pane
     // header reads as a rendering fault. The strip still scrolls.
     scrollbarWidth: "none",
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   tab: {
     display: "flex",
@@ -98,10 +133,44 @@ export interface TabStripProps {
   readonly onActivate: (instanceId: string) => void;
   readonly onPromote: (instanceId: string) => void;
   readonly onClose: (instanceId: string) => void;
+  /** A new blank tab in this pane. */
+  readonly onNewTab: () => void;
+  readonly onSplit: (position: EdgeDropPosition) => void;
+  /** Close this pane and everything in it. */
+  readonly onClosePane: () => void;
+  /**
+   * Whether each split would do anything, asked PER DIRECTION.
+   *
+   * Two booleans rather than one, because the answers genuinely differ: a
+   * same-direction split merges into the parent group instead of deepening,
+   * so a pane at `MAX_TREE_DEPTH` can often still split one way. One flag
+   * would disable a control that works.
+   *
+   * DISABLED rather than hidden. `splitPane` declines by returning the state
+   * unchanged, which is the right model behaviour and the worst possible UI:
+   * the button depresses and nothing happens, which reads as the app being
+   * broken rather than as a limit being reached. A control that vanishes is
+   * nearly as bad — the user assumes they mis-saw it. Disabled with the reason
+   * in the tooltip is the only one of the three that says what happened.
+   */
+  readonly canSplitRight: boolean;
+  readonly canSplitDown: boolean;
 }
 
 export function TabStrip(props: TabStripProps) {
-  const { pane, tiles, paneFocused, onActivate, onPromote, onClose } = props;
+  const {
+    pane,
+    tiles,
+    paneFocused,
+    onActivate,
+    onPromote,
+    onClose,
+    onNewTab,
+    onSplit,
+    onClosePane,
+    canSplitRight,
+    canSplitDown,
+  } = props;
   const styles = useStyles();
 
   const onKeyDown = useCallback(
@@ -128,6 +197,7 @@ export function TabStrip(props: TabStripProps) {
   );
 
   return (
+    <div className={styles.header}>
     <div role="tablist" aria-label="Open tabs" className={styles.strip}>
       {pane.tabInstanceIds.map((instanceId) => {
         const tile = tiles[instanceId];
@@ -192,6 +262,63 @@ export function TabStrip(props: TabStripProps) {
           </div>
         );
       })}
+    </div>
+      <div className={styles.controls}>
+        <Button
+          appearance="subtle"
+          size="small"
+          className={styles.paneButton}
+          icon={<AddRegular fontSize={14} />}
+          // "New tab", not "Add" — the label names the RESULT. An icon
+          // button's accessible name is the only thing a screen reader user
+          // gets, so it has to answer "what will this do" rather than
+          // describe the glyph.
+          aria-label="New tab in this pane"
+          title="New tab"
+          onClick={onNewTab}
+          data-testid="pane-new-tab"
+        />
+        <Button
+          appearance="subtle"
+          size="small"
+          className={styles.paneButton}
+          icon={<SplitVerticalRegular fontSize={14} />}
+          aria-label="Split pane right"
+          title={canSplitRight ? "Split right" : "Nesting limit reached"}
+          disabled={!canSplitRight}
+          onClick={() => {
+            onSplit("right");
+          }}
+          data-testid="pane-split-right"
+        />
+        <Button
+          appearance="subtle"
+          size="small"
+          className={styles.paneButton}
+          icon={<SplitHorizontalRegular fontSize={14} />}
+          aria-label="Split pane down"
+          title={canSplitDown ? "Split down" : "Nesting limit reached"}
+          disabled={!canSplitDown}
+          onClick={() => {
+            onSplit("bottom");
+          }}
+          data-testid="pane-split-down"
+        />
+        <Button
+          appearance="subtle"
+          size="small"
+          className={styles.paneButton}
+          icon={<SubtractRegular fontSize={14} />}
+          // NOT a Dismiss glyph. The tab close button four pixels away is a
+          // Dismiss, and two identical crosses that destroy different amounts
+          // of work is the kind of adjacency that gets somebody's pane closed
+          // by muscle memory.
+          aria-label="Close this pane and all its tabs"
+          title="Close pane"
+          onClick={onClosePane}
+          data-testid="pane-close"
+        />
+      </div>
     </div>
   );
 }

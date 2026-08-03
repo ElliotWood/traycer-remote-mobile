@@ -85,7 +85,13 @@ function changeSpy(): ChangeSpy {
 function draw(state: CanvasState, onChange: ChangeSpy): ChangeSpy {
   render(
     <FluentProvider theme={webLightTheme}>
-      <TileCanvas state={state} onChange={onChange} renderTile={renderTile} />
+      <TileCanvas
+        state={state}
+        onChange={onChange}
+        renderTile={renderTile}
+        ids={idSource()}
+        hostId="host-1"
+      />
     </FluentProvider>,
   );
   return onChange;

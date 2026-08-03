@@ -43,6 +43,9 @@ const ROOT = process.cwd();
 const APP = join(ROOT, "src/app.tsx");
 const ROUTE = join(ROOT, "src/router/route.ts");
 const SCREEN = join(ROOT, "src/canvas/canvas-screen.tsx");
+const CANVAS = join(ROOT, "src/canvas/tile-canvas.tsx");
+const STRIP = join(ROOT, "src/canvas/tab-strip.tsx");
+const PANES = "src/canvas/__tests__/pane-controls.test.tsx";
 
 const MUTATIONS = {
   "drop-a-case": {
@@ -88,6 +91,45 @@ const MUTATIONS = {
     to: 'const title = epicName ?? "";',
     expect: "a deep link with no epic name shows a short id",
     suite: "src/canvas/__tests__/canvas-screen.test.tsx",
+  },
+  "new-tab-as-preview": {
+    file: CANVAS,
+    from: "              // an explicit \"give me a tab\".\n              preview: false,",
+    to: "              preview: true,",
+    expect: "makes the new tab active and permanent, not a preview",
+    suite: PANES,
+  },
+  "both-splits-go-right": {
+    file: STRIP,
+    from: '            onSplit("bottom");',
+    to: '            onSplit("right");',
+    expect: "splitting down produces a VERTICAL group",
+    suite: PANES,
+  },
+  "one-boolean-for-both-splits": {
+    file: CANVAS,
+    from: 'canSplitDown={canSplitPane(state, pane.id, "bottom")}',
+    to: 'canSplitDown={canSplitPane(state, pane.id, "right")}',
+    expect: "disables the refused direction and leaves the other one alone",
+    suite: PANES,
+  },
+  "no-empty-canvas-recovery": {
+    file: CANVAS,
+    from: "          {props.onOpenFirst === undefined ? null : (",
+    to: "          {true ? null : (",
+    expect: "closing the LAST pane leaves a way back in",
+    suite: PANES,
+  },
+  "blank-tile-without-host": {
+    file: CANVAS,
+    // Two call sites mint a blank tile (new tab, split), so the pattern
+    // carries the following line to name ONE of them. The harness aborts on a
+    // 2-match pattern rather than mutating both — which is how this was
+    // caught, instead of a run that quietly changed more than it claimed.
+    from: "tile: makeBlankTile(hostId),\n              paneId: pane.id,",
+    to: 'tile: makeBlankTile(""),\n              paneId: pane.id,',
+    expect: "binds the configured host onto the tile it mints",
+    suite: PANES,
   },
   "break-the-union-parse": {
     file: ROUTE,

@@ -61,9 +61,11 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
+import { v4 as uuidv4 } from "uuid";
 import { TileCanvas } from "./tile-canvas";
+import { makeBlankTile } from "./opener";
 import { tileTitle, type TileRef } from "./tile-ref";
-import type { CanvasState } from "./canvas-state";
+import { openTile, type CanvasState, type IdSource } from "./canvas-state";
 
 const useStyles = makeStyles({
   screen: {
@@ -99,7 +101,27 @@ export interface CanvasScreenProps {
   readonly state: CanvasState;
   readonly onChange: (next: CanvasState) => void;
   readonly onBack: () => void;
+  /** Bound onto every tile this screen mints, and carried for life. */
+  readonly hostId: string;
+  /**
+   * Pane and group ids. Injected so a test can supply a counter and assert on
+   * the tree it produced; `uuidIds` is what the app passes.
+   */
+  readonly ids: IdSource;
 }
+
+/**
+ * Real ids for the running app.
+ *
+ * Separate from the component so the injection has one obvious production
+ * value rather than a default parameter — the package's lint bans those, and
+ * the reason applies here: a defaulted `IdSource` is one a test can forget to
+ * override while believing it did.
+ */
+export const uuidIds: IdSource = {
+  paneId: () => uuidv4(),
+  groupId: () => uuidv4(),
+};
 
 /**
  * One tile's body.
@@ -142,6 +164,8 @@ export function CanvasScreen({
   state,
   onChange,
   onBack,
+  hostId,
+  ids,
 }: CanvasScreenProps): ReactElement {
   const styles = useStyles();
   const title = epicName ?? `Epic ${epicId.slice(0, 8)}`;
@@ -168,11 +192,23 @@ export function CanvasScreen({
           state={state}
           onChange={onChange}
           renderTile={renderTile}
+          ids={ids}
+          hostId={hostId}
           // Names WHY it is empty rather than that it is. "Nothing open" is
           // true and tells a user who just navigated here that the screen is
           // working as intended, which is the opposite of what they need to
           // know.
-          emptyLabel="Nothing open yet — opening tabs from the epic lands next."
+          emptyLabel="Nothing open yet — opening epic content in a pane lands next."
+          onOpenFirst={() => {
+            onChange(
+              openTile({
+                state,
+                tile: makeBlankTile(hostId),
+                preview: false,
+                ids,
+              }),
+            );
+          }}
         />
       </div>
     </div>

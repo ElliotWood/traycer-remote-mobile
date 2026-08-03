@@ -60,6 +60,8 @@ function draw(
         state={state}
         onChange={() => undefined}
         onBack={onBack}
+        hostId="host-1"
+        ids={idSource()}
       />
     </FluentProvider>
   );

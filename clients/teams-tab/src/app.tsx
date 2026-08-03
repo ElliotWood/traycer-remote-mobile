@@ -93,7 +93,7 @@ import { NotificationsScreen } from "./notifications/notifications-screen";
 import { NOTIFICATIONS_FIXTURE, NOTIFICATIONS_NOW } from "./notifications/notifications-fixture";
 import { useShellNotifications } from "./shell/shell-notifications";
 import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
-import { CanvasScreen } from "./canvas/canvas-screen";
+import { CanvasScreen, uuidIds } from "./canvas/canvas-screen";
 import { EMPTY_CANVAS, type CanvasState } from "./canvas/canvas-state";
 import {
   createTabHostConnection,
@@ -644,6 +644,8 @@ function EpicsScreen({
           }
           state={canvas}
           onChange={setCanvas}
+          hostId={CONFIGURED_HOST_ID}
+          ids={uuidIds}
           onBack={() => {
             navigate({ name: "epic", epicId: route.epicId });
           }}

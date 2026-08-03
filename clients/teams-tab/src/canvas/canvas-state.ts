@@ -422,6 +422,52 @@ export function splitPane(args: SplitPaneArgs): CanvasState {
 }
 
 /**
+ * Would `splitPane` at this position do anything?
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * IT ASKS THE TRANSITION RATHER THAN RESTATING THE RULE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * A UI needs this to disable a split control, and the obvious implementation
+ * is to measure the pane's depth and compare it to `MAX_TREE_DEPTH`. That
+ * would be **wrong on its own terms**, not merely fragile: a same-direction
+ * split MERGES into the parent group instead of deepening, so a pane at the
+ * limit can still split one way and not the other. A depth comparison says
+ * "no" to both.
+ *
+ * Even a correct reimplementation would be two rules that agree by
+ * coincidence — the shape this codebase has already been bitten by, where a
+ * runtime guard and its compile-time twin drifted apart. So this runs the real
+ * transition against a throwaway tile and asks whether anything changed.
+ * `splitPane` returns the input state BY IDENTITY when it declines, which is
+ * what makes the check exact.
+ *
+ * The probe ids never escape: a declined split returns the original state, and
+ * an accepted one is discarded here — the caller re-runs the real `splitPane`
+ * with the real `IdSource`.
+ */
+export function canSplitPane(
+  state: CanvasState,
+  paneId: string,
+  position: EdgeDropPosition,
+): boolean {
+  const probed = splitPane({
+    state,
+    paneId,
+    position,
+    tile: {
+      type: "blank",
+      id: "split-probe",
+      instanceId: "split-probe",
+      name: "",
+      hostId: "",
+    },
+    ids: { paneId: () => "split-probe-pane", groupId: () => "split-probe-group" },
+  });
+  return probed !== state;
+}
+
+/**
  * Commit a resize. Sizes live OUTSIDE the tree on purpose: this returns a new
  * `sizesByGroupId` and the SAME `root` reference, so layout subscribers do not
  * re-render on a drag. Folding sizes into the tree makes every resize
