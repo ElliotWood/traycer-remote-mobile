@@ -55,6 +55,9 @@ import {
   ServiceTierChip,
 } from "@/views/chat/run-settings-controls";
 import { ProfileChip } from "@/views/chat/profile-chip";
+import { RateLimitBanner } from "@/views/chat/rate-limit-banner";
+import { useProviders } from "@/host/use-provider-usage";
+import { guiHarnessIdToProviderId } from "@traycer-clients/shared/providers/provider-ordering";
 import { chatDraftKey, useDraft } from "@/router/drafts";
 import {
   AttachmentTooLargeError,
@@ -174,6 +177,12 @@ export function Composer({
   const [profileId, setProfileId] = useState<string | null>(
     chatSettings?.profileId ?? null,
   );
+
+  // M2 item 3: the banner is derived from `providers.list`, which mobile
+  // already polls — there is no rate-limit signal on `chat.subscribe`.
+  const { providers } = useProviders(client);
+  const bannerProfiles =
+    providers.find((p) => p.providerId === guiHarnessIdToProviderId(harnessId))?.profiles ?? [];
 
   const { harnesses, probing: harnessesProbing } = useGuiHarnesses(client);
   const availableHarnesses = selectableHarnesses(harnesses);
@@ -307,6 +316,14 @@ export function Composer({
         padding: 8,
       }}
     >
+      {!readOnly && (
+        <RateLimitBanner
+          profiles={bannerProfiles}
+          currentProfileId={profileId}
+          model={selectedModel}
+          onSwitchProfile={setProfileId}
+        />
+      )}
       {readOnly ? (
         <p style={{ ...type.bodySm, color: theme.mutedText, margin: "4px 4px 8px" }}>
           You have view-only access to this chat.
