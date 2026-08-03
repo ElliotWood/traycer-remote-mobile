@@ -36,6 +36,10 @@ const PAIRS = [
     "src/stores/epics/canvas/tile-tree-constants.ts",
   ],
   [
+    "src/canvas/activation-history.ts",
+    "src/stores/epics/canvas/activation-history.ts",
+  ],
+  [
     "src/canvas/resize-sizes.ts",
     "src/components/epic-canvas/canvas/resize-handle-sizes.ts",
   ],

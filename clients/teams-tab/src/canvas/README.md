@@ -9,7 +9,15 @@ strings; the tree has never heard of a chat.
 | --- | --- |
 | `tile-tree.ts` | `stores/epics/canvas/tile-tree.ts` |
 | `tile-tree-constants.ts` | `stores/epics/canvas/tile-tree-constants.ts` |
+| `activation-history.ts` | `stores/epics/canvas/activation-history.ts` |
 | `resize-sizes.ts` | `components/epic-canvas/canvas/resize-handle-sizes.ts` |
+
+**`tile-ref.ts` and `canvas-state.ts` are NOT copies** — they are this
+client's own. The first is the tile union (four kinds, not eight); the second
+is the transitions, written at the size four kinds need rather than lifted
+from a 1,443-line file fused to a zustand store. The drift checker covers only
+the copies, which is why it names its pairs explicitly rather than scanning
+the directory.
 
 ## Why copied and not extracted to `clients/shared`
 
