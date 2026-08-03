@@ -38,6 +38,53 @@ describe("detectTrigger — fires at a word boundary", () => {
   });
 });
 
+describe("detectTrigger — a mention query is a PATH", () => {
+  /**
+   * These are the cases that were broken in `e57975fc` and are the reason the
+   * scan was replaced by a token-start rule. The first implementation gave up
+   * on the `/` inside the query, so `@src` was a trigger and `@src/` was not —
+   * on the feature whose entire subject is file paths.
+   *
+   * Nothing about the old tests was wrong; nobody wrote these because `@` had
+   * no consumer when the trigger was written, so the negative fixtures were
+   * complete against the world as it stood. That is the ceiling on the two
+   * mutation checks that commit reported: they proved the rules present were
+   * load-bearing, which is not evidence that no rule is missing.
+   */
+  it("keeps the trigger alive across the path separator", () => {
+    expect(detectTrigger("@src/", 5)).toEqual({
+      kind: "mention",
+      start: 0,
+      query: "src/",
+    });
+  });
+
+  it("carries a multi-segment path as the query", () => {
+    // Measured on the live host: `chat/composer` returns this directory's
+    // files first where bare `composer` returns another package's. The slash
+    // has to reach the wire.
+    expect(detectTrigger("look at @clients/mobile/src/views", 33)).toEqual({
+      kind: "mention",
+      start: 8,
+      query: "clients/mobile/src/views",
+    });
+  });
+
+  it("carries dots and dashes — a filename, not a word", () => {
+    expect(detectTrigger("@composer-trigger.ts", 20)).toEqual({
+      kind: "mention",
+      start: 0,
+      query: "composer-trigger.ts",
+    });
+  });
+
+  it("does not turn a path query into a slash command", () => {
+    // The kind comes from the character that OPENS the token, so an inner `/`
+    // cannot re-key a mention as a command mid-query.
+    expect(detectTrigger("@src/app.ts", 11)?.kind).toBe("mention");
+  });
+});
+
 describe("detectTrigger — does NOT fire", () => {
   it("ignores the slash inside a path", () => {
     // The single most common thing typed into a coding composer.

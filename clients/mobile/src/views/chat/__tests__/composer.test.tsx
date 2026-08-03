@@ -102,6 +102,7 @@ function renderComposer(props: {
     <Composer
       chatId="c1"
       client={props.client}
+      mentionRoots={[]}
       prefillText={null}
       prefillNonce={0}
       chatSettings={null}
@@ -120,6 +121,7 @@ function fullProps(overrides: Partial<ComposerProps>): ComposerProps {
   return {
     chatId: "c1",
     client: null,
+    mentionRoots: [],
     prefillText: null,
     prefillNonce: 0,
     chatSettings: null,

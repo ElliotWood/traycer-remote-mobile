@@ -39,6 +39,26 @@ const TRIGGERS: ReadonlyMap<string, TriggerKind> = new Map([
  *
  * The query stops at whitespace, so the sheet closes when the user types past
  * the token rather than matching an ever-growing sentence.
+ *
+ * ## Why this asks about the TOKEN rather than scanning for a trigger char
+ *
+ * The first version scanned backwards for a trigger character and gave up the
+ * moment it met one that was not itself at a word boundary. That is the same
+ * rule as below for `a@b.com` and `src/foo`, and **wrong for `@src/app.ts`**:
+ * the `/` inside the query is a non-boundary `/`, so the whole mention died as
+ * soon as the user typed the separator. Measured on the shipped function —
+ * `@src` was a trigger and `@src/` was `null` — on a feature whose entire
+ * subject is file paths.
+ *
+ * It was not a coverage gap that mutation testing could have found. Both rules
+ * were mutation-checked and both mutations reddened tests; mutation testing
+ * shows the tests bind the rules that EXIST, never that the rule set is
+ * complete.
+ *
+ * The host rewards the fix rather than merely tolerating it: measured,
+ * `query: "chat/composer"` returns this very directory's files first where
+ * bare `"composer"` returns another package's. A slash in the query is how the
+ * feature becomes usable, so it has to survive to the wire.
  */
 export function detectTrigger(
   value: string,
@@ -48,16 +68,19 @@ export function detectTrigger(
   // silently report a trigger for a stale caret after the value shrank.
   if (caret < 0 || caret > value.length) return null;
 
-  for (let i = caret - 1; i >= 0; i -= 1) {
-    const char = value[i];
-    if (/\s/.test(char)) return null;
-    const kind = TRIGGERS.get(char);
-    if (kind === undefined) continue;
-    // `foo/bar` and `a@b` are not triggers: the character must open a word.
-    if (i > 0 && !/\s/.test(value[i - 1])) return null;
-    return { kind, start: i, query: value.slice(i + 1, caret) };
-  }
-  return null;
+  // The token the caret sits in: back to the start of the string or to the
+  // last whitespace. Everything inside it — `/`, `.`, `@` — is query text.
+  let start = caret;
+  while (start > 0 && !/\s/.test(value[start - 1])) start -= 1;
+  // Caret at a token's start (or right after a space) is not inside a token,
+  // so a trailing space closes the sheet on what was just completed.
+  if (start === caret) return null;
+
+  const kind = TRIGGERS.get(value[start]);
+  // `a@b.com` and `src/foo` open with an ordinary character, so they are not
+  // triggers however many `@`/`/` they contain further along.
+  if (kind === undefined) return null;
+  return { kind, start, query: value.slice(start + 1, caret) };
 }
 
 export interface TriggerCompletion {

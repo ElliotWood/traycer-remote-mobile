@@ -1,0 +1,162 @@
+/**
+ * M3 item 3 — the pure half of `@`-file mentions: which roots to ask about,
+ * what a suggestion serializes to, and what an EMPTY result means.
+ *
+ * ## The empty result is the whole problem
+ *
+ * Measured against the live host (`tmp/probe-m3e.mjs`), `workspace.mentionFiles`
+ * answers `entries: []` for all of:
+ *
+ * | condition | count |
+ * | --- | --- |
+ * | genuine no-match (`query: "zzzznotafilezzzz"`) | 0 |
+ * | a path that does not exist on the host | 0 |
+ * | `roots: []` | 0 |
+ * | a readable but EMPTY directory | 0 |
+ *
+ * There is no error, no outcome field, no distinguishing shape — an empty
+ * success in every case. `workspace.listDirectory` has the same defect.
+ * So **any assertion about the empty state is vacuous**: "the empty query
+ * renders the empty state" passes against a client that never connected.
+ *
+ * The canary is the answer, and it is a workaround with a stated removal
+ * condition: **delete it when `workspace.searchPaths` reaches the released
+ * floor**, because that method carries a typed `root_unavailable` outcome and
+ * makes the whole file unnecessary. It is in `registry.ts` and answers
+ * `host-missing-method` today.
+ *
+ * ## Two corrections to the canary as it was specified
+ *
+ * **It is per root, not per query.** The ticket's canary is a single extra
+ * query issued alongside the user's. Measured: `roots: [real, BOGUS]` returns
+ * 25 rows, order-independently, and every row carries the real root's
+ * `workspacePath`. A half-broken binding is therefore *indistinguishable from
+ * full health* under an aggregate canary — which is the same
+ * one-of-the-thing blindness the canary was designed to fix, reappearing
+ * inside the fix. One canary per root, and it is a property of the ROOT, so it
+ * is issued once when the sheet opens rather than on every keystroke.
+ *
+ * **It reads "unreadable OR empty", not "unreadable".** A readable, empty
+ * directory answers 0 to the canary. Left alone, the canary would tell someone
+ * with a healthy workspace that it is broken — replacing an ambiguity with a
+ * confident wrong answer, which is the worse failure. Contained here by only
+ * ever speaking when there is nothing to show anyway, and by wording that is
+ * true under both readings (see `mentionEmptyState`).
+ */
+import type {
+  WorktreeBinding,
+  WorktreeBindingEntry,
+} from "@traycer/protocol/host/worktree-schemas";
+import type {
+  WorkspaceFileMentionSuggestion,
+  WorkspaceFolderMentionSuggestion,
+} from "@traycer/protocol/host/workspace/unary-schemas";
+
+export type MentionSuggestion =
+  | WorkspaceFileMentionSuggestion
+  | WorkspaceFolderMentionSuggestion;
+
+/**
+ * The directories to search, one per binding entry.
+ *
+ * `worktreePath` in preference to `workspacePath`: a bound chat's agent runs
+ * IN the worktree, and the two check out different branches — a file that
+ * exists only on the chat's branch is absent from the source workspace. The
+ * ticket named `workspacePath`; that is the right root only for a `local`-mode
+ * entry, where `worktreePath` is null.
+ *
+ * De-duplicated because two entries can legitimately name the same directory
+ * (the same repo bound twice under different modes), and a duplicated root
+ * would mean a duplicated canary and duplicated rows.
+ */
+export function mentionRootsForBinding(
+  binding: WorktreeBinding | null,
+): readonly string[] {
+  if (binding === null) return [];
+  const roots: string[] = [];
+  for (const entry of binding.entries) {
+    const root = rootForEntry(entry);
+    if (root.length > 0 && !roots.includes(root)) roots.push(root);
+  }
+  return roots;
+}
+
+function rootForEntry(entry: WorktreeBindingEntry): string {
+  return entry.worktreePath ?? entry.workspacePath;
+}
+
+/**
+ * What gets spliced into the textarea, and it is the payload.
+ *
+ * Mobile sends plain text, so the token has to be the exact string desktop's
+ * mention node serializes to for the agent. That is `@<relPath>` —
+ * workspace-relative and POSIX-separated — from
+ * `json-content-serializer.ts:368-372` (`atRef(attrs.relPath || attrs.id)`),
+ * NOT the label and NOT the absolute path. Folder `relPath` already carries
+ * its trailing slash by convention, so folders need no special case.
+ *
+ * Worth stating because the claim "a token IS the payload" was cited to the
+ * WORKTREE schema's docblock, which serializes an ABSOLUTE `@<worktreePath>`.
+ * Files are the opposite. Reading that citation as covering files would have
+ * shipped absolute paths to the agent.
+ *
+ * A relPath containing a space produces a token the agent will read as ending
+ * at the space. Desktop's LLM serializer does not quote either, so this is
+ * parity rather than a regression, and quoting unilaterally would emit a
+ * string desktop never emits.
+ */
+export function mentionToken(suggestion: MentionSuggestion): string {
+  return `@${suggestion.relPath}`;
+}
+
+export type RootHealth = "checking" | "readable" | "unavailable";
+
+export interface MentionRootStatus {
+  readonly root: string;
+  readonly health: RootHealth;
+}
+
+/**
+ * What to show when there is nothing to list.
+ *
+ * `"unavailable"` is the canary's verdict and is only ever reachable when
+ * every root failed it AND the query returned nothing — so the empty-directory
+ * false positive above can only surface in a case where there was genuinely
+ * nothing to mention, where the wording is true anyway.
+ */
+export type MentionEmptyState = "loading" | "no-matches" | "unavailable" | null;
+
+export function mentionEmptyState(
+  loading: boolean,
+  suggestions: readonly MentionSuggestion[],
+  statuses: readonly MentionRootStatus[],
+): MentionEmptyState {
+  if (suggestions.length > 0) return null;
+  if (loading) return "loading";
+  if (statuses.length === 0) return "unavailable";
+  // `every` over a list that may still contain `"checking"` would report a
+  // healthy root as unavailable mid-probe, so the verdict waits for the
+  // canaries to land.
+  if (statuses.some((s) => s.health === "checking")) return "loading";
+  return statuses.every((s) => s.health === "unavailable")
+    ? "unavailable"
+    : "no-matches";
+}
+
+/**
+ * Roots that failed the canary while at least one other passed.
+ *
+ * This is the partial failure that an aggregate canary cannot see: results
+ * come back, the sheet looks healthy, and one of the user's repositories is
+ * silently contributing nothing. Empty when every root failed — that case is
+ * the empty state above, not a footnote on a populated list.
+ */
+export function partiallyUnavailableRoots(
+  statuses: readonly MentionRootStatus[],
+): readonly string[] {
+  const unavailable = statuses.filter((s) => s.health === "unavailable");
+  if (unavailable.length === 0 || unavailable.length === statuses.length) {
+    return [];
+  }
+  return unavailable.map((s) => s.root);
+}

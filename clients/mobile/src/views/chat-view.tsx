@@ -60,6 +60,7 @@ import { defaultStorage, markSeen } from "@/host/read-tracking-store";
 import { radius, theme, type } from "./design-tokens";
 import { ConnectionPill } from "./epic-tree/connection-pill";
 import { BindingChip } from "./chat/binding-chip";
+import { mentionRootsForBinding } from "./chat/mention-model";
 import { ContextUsageChip } from "./chat/context-usage-chip";
 import { RunIndicator } from "./chat/run-indicator";
 import { ElapsedFooter } from "./chat/elapsed-footer";
@@ -348,6 +349,9 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
         <Composer
           chatId={chatId}
           client={hostClient}
+          // M3: empty in a folderless chat, which is what hides the `@`
+          // affordance there. Derived from the same binding the chip renders.
+          mentionRoots={mentionRootsForBinding(chat.worktreeBinding)}
           prefillText={prefill?.text ?? null}
           prefillNonce={prefill?.nonce ?? 0}
           chatSettings={chat.chatSettings}

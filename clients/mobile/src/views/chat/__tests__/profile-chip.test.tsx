@@ -129,6 +129,7 @@ function renderComposer(
       <Composer
         chatId="c1"
         client={fake.client}
+        mentionRoots={[]}
         prefillText={null}
         prefillNonce={0}
         chatSettings={null}

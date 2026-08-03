@@ -27,11 +27,13 @@
  * sheet works in a folderless chat, which is every chat mobile can currently
  * create. `harnessId` IS honoured and is why this had to wait for M1.
  *
- * `@` is deliberately NOT wired yet: it needs a non-empty `worktreeBinding`
- * for its `roots`, and an empty result from `workspace.mentionFiles` is
- * indistinguishable from a bad root or no roots at all — see the ticket's
- * canary. `detectTrigger` recognises `@` but nothing consumes it, so an `@`
- * stays plain text rather than opening a sheet that cannot be trusted.
+ * `@` is now wired, on the per-root canary in `mention-model.ts` — an empty
+ * result from `workspace.mentionFiles` is indistinguishable from a bad root or
+ * no roots at all, so the client earns its own evidence that the roots are
+ * readable rather than trusting a count. In a folderless chat there are no
+ * roots and the affordance HIDES ITSELF: `@` stays plain text. That is a
+ * client-side precondition rather than a response check precisely because the
+ * response cannot be checked.
  *
  * No rich-text editor, deliberately: a mention already serializes to the agent
  * as plain text, so a token spliced into this textarea IS the payload. Porting
@@ -81,7 +83,10 @@ import { useProviders } from "@/host/use-provider-usage";
 import { guiHarnessIdToProviderId } from "@traycer-clients/shared/providers/provider-ordering";
 import { chatDraftKey, useDraft } from "@/router/drafts";
 import { useGuiCommands } from "@/host/use-gui-commands";
+import { useMentionFiles } from "@/host/use-mention-files";
 import { CommandSheet } from "@/views/chat/command-sheet";
+import { MentionSheet } from "@/views/chat/mention-sheet";
+import { mentionToken, type MentionSuggestion } from "@/views/chat/mention-model";
 import {
   applyTrigger,
   detectTrigger,
@@ -134,6 +139,14 @@ export interface ComposerProps {
   readonly chatId: string;
   readonly client: MobileHostClient | null;
   /**
+   * Directories `@` searches, one per binding entry
+   * (`mentionRootsForBinding`). Empty in a folderless chat — which is every
+   * chat mobile can create without M5's picker — and that emptiness is what
+   * hides the affordance. Passed in rather than derived here so the composer
+   * keeps taking projections instead of wire shapes.
+   */
+  readonly mentionRoots: readonly string[];
+  /**
    * Perf fix: the composer owns its OWN draft text internally now (below) —
    * every keystroke used to live in `ChatView`'s state, re-rendering the
    * whole chat screen (transcript included) on every character. These two
@@ -158,6 +171,7 @@ export interface ComposerProps {
 export function Composer({
   chatId,
   client,
+  mentionRoots,
   prefillText,
   prefillNonce,
   chatSettings,
@@ -245,13 +259,25 @@ export function Composer({
   const [caret, setCaret] = useState(0);
   const { commands, phase: commandsPhase } = useGuiCommands(client, harnessId);
   const trigger = detectTrigger(draftText, caret);
-  // `@` is not wired yet (it needs a worktree binding and the canary — see the
-  // ticket); only `/` opens a sheet, so an `@` trigger deliberately falls
-  // through to plain text rather than opening an empty sheet.
   const slashTrigger = trigger?.kind === "slash" ? trigger : null;
   const matchingCommands = slashTrigger === null
     ? []
     : filterByName(commands, slashTrigger.query, (c) => c.name);
+
+  /**
+   * The `@` affordance hides itself when there is nothing to search. Not a
+   * cosmetic choice: with no roots the host answers an empty SUCCESS, which is
+   * byte-identical to a no-match, so an opened sheet would be indistinguishable
+   * from a working one that found nothing. Hiding is the only honest state
+   * available before a request is made.
+   */
+  const mentionTrigger =
+    trigger?.kind === "mention" && mentionRoots.length > 0 ? trigger : null;
+  const {
+    suggestions,
+    loading: mentionsLoading,
+    rootStatuses,
+  } = useMentionFiles(client, mentionRoots, mentionTrigger?.query ?? "", mentionTrigger !== null);
 
   /**
    * Explicit dismissal, keyed to the trigger's position. Keyed rather than a
@@ -260,13 +286,21 @@ export function Composer({
    * of the draft.
    */
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
-  const setSheetDismissed = (): void => setDismissedAt(slashTrigger?.start ?? null);
+  const setSheetDismissed = (): void => setDismissedAt(trigger?.start ?? null);
   const sheetCommands =
     slashTrigger !== null && dismissedAt !== slashTrigger.start ? matchingCommands : [];
+  /**
+   * Unlike the command sheet, this opens on an empty list. That IS the
+   * feature: "no matches" and "this workspace is unreadable" are the states
+   * the canary exists to tell apart, and a sheet that hides itself when empty
+   * can render neither.
+   */
+  const mentionSheetOpen =
+    mentionTrigger !== null && dismissedAt !== mentionTrigger.start;
 
-  const pickCommand = (command: GuiAgentCommandOption): void => {
-    if (slashTrigger === null) return;
-    const next = applyTrigger(draftText, slashTrigger, caret, `/${command.name}`);
+  const spliceToken = (token: string): void => {
+    if (trigger === null) return;
+    const next = applyTrigger(draftText, trigger, caret, token);
     setDraftText(next.value);
     setCaret(next.caret);
     // The caret must be set on the DOM node, not just in state: React controls
@@ -279,6 +313,23 @@ export function Composer({
       node.focus();
       node.setSelectionRange(next.caret, next.caret);
     });
+  };
+
+  const pickCommand = (command: GuiAgentCommandOption): void => {
+    if (slashTrigger === null) return;
+    spliceToken(`/${command.name}`);
+  };
+
+  /**
+   * The token is `@<relPath>` and nothing else — that is the exact string
+   * desktop's mention node serializes to for the agent
+   * (`json-content-serializer.ts:368-372`), so a phone-typed mention and a
+   * desktop-clicked one reach the model identically. The label would not
+   * resolve and the absolute path is what the WORKTREE kind uses, not this one.
+   */
+  const pickMention = (suggestion: MentionSuggestion): void => {
+    if (mentionTrigger === null) return;
+    spliceToken(mentionToken(suggestion));
   };
 
   // Adjusted DURING render, not in an effect that fires after commit — an
@@ -457,10 +508,23 @@ export function Composer({
                 pickCommand(sheetCommands[0]);
                 return;
               }
+              // Same reading for `@`, but gated on there being a suggestion:
+              // with the sheet open on an empty state, Enter is an ordinary
+              // send and swallowing it would strand the message.
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                mentionSheetOpen &&
+                suggestions.length > 0
+              ) {
+                e.preventDefault();
+                pickMention(suggestions[0]);
+                return;
+              }
               // Escape dismisses the sheet without touching the draft. The
               // ticket requires the text and caret to survive this intact,
               // which they do because dismissal is a caret-independent flag.
-              if (e.key === "Escape" && sheetCommands.length > 0) {
+              if (e.key === "Escape" && (sheetCommands.length > 0 || mentionSheetOpen)) {
                 e.preventDefault();
                 setSheetDismissed();
                 return;
@@ -557,6 +621,15 @@ export function Composer({
             commands={sheetCommands}
             loading={commandsPhase === "loading"}
             onPick={pickCommand}
+            onClose={setSheetDismissed}
+          />
+        )}
+        {mentionSheetOpen && (
+          <MentionSheet
+            suggestions={suggestions}
+            loading={mentionsLoading}
+            rootStatuses={rootStatuses}
+            onPick={pickMention}
             onClose={setSheetDismissed}
           />
         )}
