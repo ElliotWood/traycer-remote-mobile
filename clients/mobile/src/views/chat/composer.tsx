@@ -54,6 +54,7 @@ import {
   ReasoningChip,
   ServiceTierChip,
 } from "@/views/chat/run-settings-controls";
+import { ProfileChip } from "@/views/chat/profile-chip";
 import { chatDraftKey, useDraft } from "@/router/drafts";
 import {
   AttachmentTooLargeError,
@@ -165,6 +166,14 @@ export function Composer({
   const [serviceTierRaw, setServiceTierRaw] = useState<string>(
     chatSettings?.serviceTier ?? "",
   );
+  /**
+   * M2 item 2. `null` is AMBIENT, not "unset" — the wire's ambient sentinel
+   * never reaches this state (see `profile-chip.tsx`), so seeding from
+   * `chatSettings` is safe and `null` round-trips as the host's own default.
+   */
+  const [profileId, setProfileId] = useState<string | null>(
+    chatSettings?.profileId ?? null,
+  );
 
   const { harnesses, probing: harnessesProbing } = useGuiHarnesses(client);
   const availableHarnesses = selectableHarnesses(harnesses);
@@ -275,10 +284,11 @@ export function Composer({
         reasoningEffort: effectiveReasoning === "" ? null : effectiveReasoning,
         serviceTier: effectiveServiceTier === "" ? null : effectiveServiceTier,
         agentMode,
-        // M2 owns profile selection; still null here deliberately, not
-        // forgotten. Committing a profile id needs `profileCommitId()`'s
-        // ambient mapping, which arrives with that ticket.
-        profileId: null,
+        // Already mapped through `profileCommitId()` at selection time, so
+        // ambient is `null` here and never the `"ambient"` sentinel. Nothing
+        // downstream would reject the sentinel, which is why the mapping
+        // happens at the chip rather than being trusted to a schema.
+        profileId,
       },
       readyAttachments.map((a) => a.prepared),
     );
@@ -411,6 +421,13 @@ export function Composer({
               model={selectedModel}
               value={effectiveServiceTier}
               onChange={setServiceTierRaw}
+              disabled={!connectionLive}
+            />
+            <ProfileChip
+              client={client}
+              harnessId={harnessId}
+              value={profileId}
+              onChange={setProfileId}
               disabled={!connectionLive}
             />
           </>
