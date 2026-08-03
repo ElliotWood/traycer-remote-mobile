@@ -231,7 +231,11 @@ export function parseCanvasState(value: unknown): CanvasState {
 }
 
 export function serializeCanvasState(state: CanvasState): string {
-  return JSON.stringify({ version: CANVAS_STORAGE_VERSION, ...state });
+  // SPREAD FIRST, so `version` cannot be overridden by a stray field on
+  // `state`. Not reachable today — `parseCanvasState` builds a fresh
+  // four-field object and never carries `version` through — but the order
+  // that makes it unreachable by construction costs nothing.
+  return JSON.stringify({ ...state, version: CANVAS_STORAGE_VERSION });
 }
 
 /**

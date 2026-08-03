@@ -9,8 +9,9 @@
     "build": "vite build",
     "compile": "tsc -b",
     "preview": "vite preview",
-    "test": "vitest run",
-    "lint": "eslint . --max-warnings 0"
+    "test": "node tools/check-canvas-core.mjs && vitest run",
+    "lint": "eslint . --max-warnings 0",
+    "check-canvas-core": "node tools/check-canvas-core.mjs"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.71.0",

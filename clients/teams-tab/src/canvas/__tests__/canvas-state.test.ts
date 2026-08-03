@@ -26,7 +26,8 @@ import {
   type CanvasState,
   type IdSource,
 } from "@/canvas/canvas-state";
-import { findPaneById, firstPaneId } from "@/canvas/tile-tree";
+import { findPaneById, firstPaneId, getTreeDepth } from "@/canvas/tile-tree";
+import { MAX_TREE_DEPTH } from "@/canvas/tile-tree-constants";
 import type { TileRef } from "@/canvas/tile-ref";
 
 /** Deterministic ids, so assertions can name the shape they expect. */
@@ -272,7 +273,7 @@ describe("splitting", () => {
     let current = state;
     let lastPaneId = "p1";
     const positions = ["right", "bottom", "right", "bottom", "right"] as const;
-    let refused = false;
+    let refusedAt: number | null = null;
     for (const [index, position] of positions.entries()) {
       const next = splitPane({
         state: current,
@@ -282,13 +283,29 @@ describe("splitting", () => {
         ids,
       });
       if (next === current) {
-        refused = true;
+        refusedAt = index;
         break;
       }
       current = next;
       lastPaneId = current.activePaneId ?? lastPaneId;
     }
-    expect(refused).toBe(true);
+
+    /*
+     * THE CAUSE, not merely the identity return.
+     *
+     * `splitPane` returns `state` unchanged for THREE independent reasons:
+     * a null root, a pane id that does not resolve, and `insertPaneAtEdge`
+     * declining. Asserting only `refused === true` — which is what this did —
+     * sees THAT it declined and never WHY, so any unrelated early return makes
+     * it pass with the depth guard unreachable. Same defect as a guard with
+     * three producers, in the test rather than the code.
+     *
+     * Alternating directions deepens by one per split from depth 1, and
+     * MAX_TREE_DEPTH is 4 — so the first three succeed and the FOURTH is the
+     * one the cap refuses. A spurious earlier decline now fails on the index.
+     */
+    expect(refusedAt).toBe(MAX_TREE_DEPTH - 1);
+    expect(getTreeDepth(current.root!)).toBe(MAX_TREE_DEPTH);
   });
 
   it("closing one side of a split dissolves the group", () => {
