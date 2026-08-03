@@ -189,6 +189,27 @@ describe("ReviewAllSheet", () => {
     });
   });
 
+  it("truncates a jump chip from the LEFT, without reordering the path", () => {
+    // Found in a photograph of a real changeset, not in a test: the chips read
+    // `C:\Users\…\.traycer\scr…`, so twelve deep paths would render as twelve
+    // copies of the repo root — in the one control whose whole job is telling
+    // rows apart. jsdom cannot see the ellipsis, so the two CSS properties
+    // that produce it are asserted instead, and BOTH must be: `rtl` alone
+    // reorders the path's bidi-neutral characters (the `.github/` → `/github.`
+    // defect that shipped in the `@` sheet), and the isolate alone loses the
+    // truncation side.
+    render(<ReviewAllSheet changes={CHANGES} onClose={() => {}} />);
+
+    const label = screen.getAllByTestId("jump-label")[0];
+    if (label === undefined) throw new Error("no jump label");
+    expect(label.style.direction).toBe("ltr");
+    expect(label.style.unicodeBidi).toBe("isolate");
+
+    const box = label.parentElement;
+    expect(box?.style.direction).toBe("rtl");
+    expect(box?.style.textOverflow).toBe("ellipsis");
+  });
+
   it("totals the whole changeset, not one file", () => {
     render(<ReviewAllSheet changes={CHANGES} onClose={() => {}} />);
 

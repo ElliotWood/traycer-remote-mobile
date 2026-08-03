@@ -161,10 +161,36 @@ export function ReviewAllSheet({ changes, onClose }: ReviewAllSheetProps): React
               cursor: "pointer",
             }}
           >
-            {displayPath(change)}
-            {" "}
-            <span style={{ color: theme.success }}>+{deltas[index]?.added ?? 0}</span>{" "}
-            <span style={{ color: theme.danger }}>-{deltas[index]?.deleted ?? 0}</span>
+            {/*
+              Truncate from the LEFT, the same way the `@` sheet's rows do and
+              for a stronger reason: a jump-list is for TELLING ROWS APART, and
+              a chip that ellipsizes at the end renders twelve deep paths as
+              twelve copies of the repo root. Found in a photograph of a real
+              changeset — `C:\…\.traycer\scr…` — because jsdom cannot see it.
+
+              Both properties are load-bearing and are asserted together:
+              `direction: rtl` on the box picks the truncation side, the inner
+              `bdi` isolate keeps the path's own characters in order. RTL
+              reorders BIDI-NEUTRALS, and a path is almost entirely neutrals —
+              that is the defect that shipped in the `@` sheet.
+            */}
+            <span
+              style={{
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                direction: "rtl",
+                textAlign: "left",
+              }}
+            >
+              <bdi data-testid="jump-label" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+                {displayPath(change)}
+              </bdi>
+              {" "}
+              <span style={{ color: theme.success }}>+{deltas[index]?.added ?? 0}</span>{" "}
+              <span style={{ color: theme.danger }}>-{deltas[index]?.deleted ?? 0}</span>
+            </span>
           </button>
         ))}
       </nav>
