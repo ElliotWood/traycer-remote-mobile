@@ -75,6 +75,30 @@ describe("selectableTargets", () => {
     expect(targets).toEqual([FOLDERLESS_TARGET]);
   });
 
+  it("labels a branchless worktree by its DIRECTORY, never the full path", () => {
+    // Found by photographing the picker against a real host: worktrees with a
+    // null branch fell back to `worktreePath`, so rows rendered as three
+    // wrapped lines of an absolute Windows path and overflowed. Unit tests
+    // could not have caught it -- nothing was functionally wrong.
+    const targets = selectableTargets(
+      [
+        hostEntry({
+          branch: null,
+          // `String.raw` so the backslashes are REAL separators. Written as a
+          // plain literal they are escape sequences, and the fixture becomes a
+          // path with no separators at all — which would have "passed" the
+          // basename check without ever exercising it.
+          worktreePath: String.raw`C:\Users\someone\.traycer\worktrees\acme__web\swift-cheetah`,
+        }),
+      ],
+      RESOLVED,
+    );
+    const wt = targets.find((t) => t.kind === "worktree");
+    const label = wt === undefined ? "" : targetLabel(wt);
+    expect(label).toBe("acme-web · swift-cheetah");
+    expect(label).not.toContain("\\");
+  });
+
   it("falls back to the identifier's repo name when repoLabel is empty", () => {
     const targets = selectableTargets([hostEntry({ repoLabel: "" })], RESOLVED);
     const repo = targets.find((t) => t.kind === "repo");

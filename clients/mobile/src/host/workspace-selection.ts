@@ -30,6 +30,7 @@
  *
  * `kind: "worktree"` stays out: that one creates.
  */
+import { pathBasename } from "@/host/path-basename";
 import type {
   CreateEpicWorkspaceIdentifier,
   TaskRepoIdentifier,
@@ -109,7 +110,11 @@ export function selectableTargets(
       workspacePath,
       worktreePath: entry.worktreePath,
       branch: entry.branch,
-      label: entry.branch ?? entry.worktreePath,
+      // NOT the raw `worktreePath`. Caught by photographing the picker on
+      // a real host: worktrees with no branch fell back to the full
+      // absolute path and rendered as three wrapped lines, overflowing the
+      // row. The directory name is the part that identifies it.
+      label: entry.branch ?? pathBasename(entry.worktreePath),
     });
   }
 

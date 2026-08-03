@@ -11,25 +11,14 @@
  *   - `setupState`: a worktree whose setup script FAILED was indistinguishable
  *     from a healthy one.
  */
+import { pathBasename } from "@/host/path-basename";
 import type {
   WorktreeBinding,
   WorktreeBindingEntry,
 } from "@traycer/protocol/host/worktree-schemas";
 
-/**
- * Last path segment, tolerant of both separators.
- *
- * The host is whatever machine the user runs Traycer on, so these paths may be
- * POSIX or Windows and the phone cannot know which. Splitting on both is the
- * only correct answer from here; `path.basename` is Node-only and would be
- * wrong for the other platform anyway. Trailing separators are stripped first
- * so `/a/b/` yields `b` rather than `""`.
- */
-export function pathBasename(value: string): string {
-  const trimmed = value.replace(/[/\\]+$/, "");
-  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
-}
+export { pathBasename };
+
 
 /**
  * The repo name for an entry.
