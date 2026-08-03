@@ -67,6 +67,38 @@ if [ "$LEFT" -ne 0 ]; then
   exit 1
 fi
 
+# THE CLOSED CHECK: the size change must be EXACTLY what the substitution
+# predicts, and nothing else.
+#
+# The grep above is an open check — it confirms the placeholders you thought
+# to look for are gone. This confirms that those substitutions happened AND
+# THAT NOTHING ELSE CHANGED, because any other edit moves the total. It is the
+# difference between checking a list and checking a total, and it costs one
+# subtraction.
+#
+# Predicted delta per file: (len(fqdn) - 21) * count(__TRAYCER_HOST_FQDN__)
+#                         + (len(hostid) - 19) * count(__TRAYCER_HOST_ID__)
+# where 21 and 19 are the placeholder lengths. Counts are taken from the
+# PRISTINE blob in git, so the arithmetic is against the file as built rather
+# than against the file we just edited — comparing the edited file to itself
+# would be the assertion that cannot fail.
+FQDN_DELTA=$(( ${#TAB_FQDN} - 21 ))
+ID_DELTA=$(( ${#HOST_ID} - 19 ))
+BAD=0
+for f in $($GIT ls-tree -r --name-only HEAD | grep -E '^(index\.html|assets/)'); do
+  ORIG="$($GIT show "HEAD:$f" | wc -c)"
+  NOW="$(wc -c < "$DIST_DIR/$f")"
+  NF="$($GIT show "HEAD:$f" | grep -o __TRAYCER_HOST_FQDN__ | wc -l)"
+  NI="$($GIT show "HEAD:$f" | grep -o __TRAYCER_HOST_ID__ | wc -l)"
+  WANT=$(( ORIG + FQDN_DELTA * NF + ID_DELTA * NI ))
+  if [ "$NOW" -ne "$WANT" ]; then
+    echo "REFUSING: $f is $NOW bytes, substitution predicts $WANT" >&2
+    BAD=$(( BAD + 1 ))
+  fi
+done
+if [ "$BAD" -ne 0 ]; then exit 1; fi
+echo "byte-delta: $BAD unexplained size changes across the tree"
+
 # STAGE THEN SWAP, never empty-then-fill.
 #
 # The first version of this deleted the web root and then copied. A partial
