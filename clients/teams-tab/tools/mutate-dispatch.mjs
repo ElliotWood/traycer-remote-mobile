@@ -47,6 +47,8 @@ const CANVAS = join(ROOT, "src/canvas/tile-canvas.tsx");
 const STRIP = join(ROOT, "src/canvas/tab-strip.tsx");
 const HOOK = join(ROOT, "src/canvas/use-canvas.ts");
 const PERSIST = join(ROOT, "src/canvas/canvas-persistence.ts");
+const TRANSCRIPT = join(ROOT, "src/chat/transcript-view.tsx");
+const PROSE = "src/chat/blocks/__tests__/prose-markdown.test.tsx";
 const PANES = "src/canvas/__tests__/pane-controls.test.tsx";
 
 const MUTATIONS = {
@@ -191,6 +193,24 @@ const MUTATIONS = {
     to: "      window.localStorage.setItem(key, value);\n      if (false) try { } catch {",
     expect: "a throwing setItem - the quota case",
     suite: "src/canvas/__tests__/browser-canvas-storage.test.ts",
+  },
+  /*
+   * The defect Elliot photographed at 271b76d7: markdown produced correctly
+   * and printed as characters one layer short of the screen.
+   */
+  "text-block-as-plain-text": {
+    file: TRANSCRIPT,
+    from: "    return <ArtifactMarkdown body={block.text} />;",
+    to: "    return <Body1>{block.text}</Body1>;",
+    expect: "bold becomes <strong> and the asterisks are gone",
+    suite: PROSE,
+  },
+  "reasoning-as-plain-text": {
+    file: TRANSCRIPT,
+    from: "        <ArtifactMarkdown body={block.text} />",
+    to: "        <Body1>{block.text}</Body1>",
+    expect: "reasoning prose reaches the DOM as markdown",
+    suite: PROSE,
   },
   "break-the-union-parse": {
     file: ROUTE,
