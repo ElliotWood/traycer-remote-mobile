@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifySendFailure,
+  outcomeOfSendError,
   shouldDiscardReference,
   type SendOutcome,
 } from "../classify-send-failure";
@@ -95,5 +96,59 @@ describe("throttling and the unclassified", () => {
     expect(outcome.kind).toBe("unknown");
     if (outcome.kind !== "unknown") return;
     expect(outcome.status).toBe(503);
+  });
+});
+
+describe("the send throws, it does not return a status", () => {
+  it("recovers the status from an HttpError-shaped throw", () => {
+    /*
+     * `CloudAdapter.continueConversation` is typed `Promise<void>`: it
+     * resolves with nothing and throws on failure. So the 403/401 branches
+     * above have nothing to classify unless the status is read off the
+     * thrown value — the SDK's `HttpError` carries `readonly status: number`.
+     *
+     * Read structurally rather than via `instanceof`, for the same reason
+     * the reference store persists a structural subset: an `instanceof`
+     * against a dependency's class fails silently across a version bump,
+     * and it fails in the direction that keeps a dead reference or drops a
+     * live one.
+     */
+    const error: Error & { status?: number } = new Error("Forbidden");
+    error.status = 403;
+    expect(outcomeOfSendError(error)).toEqual({
+      kind: "gone",
+      reason: "uninstalled",
+    });
+    expect(shouldDiscardReference(outcomeOfSendError(error))).toBe(true);
+  });
+
+  it("says `unreachable` when there is no status, and does not discard", () => {
+    /*
+     * THE case the status-based union structurally could not express: DNS,
+     * TLS, a timeout, an abort. Nothing replied, so there is no status.
+     *
+     * Mutation: fall back to `classifySendFailure(0)`. The first assertion
+     * fails — and note it would then read `{kind:"unknown",status:0}`, i.e.
+     * "Bot Service replied 0", a claim about a response that never existed.
+     * The disposal assertion would still pass, which is why both are here.
+     */
+    const outcome = outcomeOfSendError(
+      new Error("getaddrinfo ENOTFOUND smba.example"),
+    );
+    expect(outcome.kind).toBe("unreachable");
+    expect(shouldDiscardReference(outcome)).toBe(false);
+  });
+
+  it("treats a non-integer status as unreachable rather than trusting it", () => {
+    // NaN passes `typeof === "number"`. Classifying it would produce
+    // "unknown status NaN", which tells an operator nothing at all.
+    const error: Error & { status?: number } = new Error("weird");
+    error.status = Number.NaN;
+    expect(outcomeOfSendError(error).kind).toBe("unreachable");
+  });
+
+  it("handles a thrown non-Error without losing the detail", () => {
+    const outcome = outcomeOfSendError("socket hang up");
+    expect(outcome).toEqual({ kind: "unreachable", detail: "socket hang up" });
   });
 });
