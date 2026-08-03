@@ -2,7 +2,8 @@
  * D3 — reference adapter proving {@link RemoteBridgeActions} is
  * implementable without touching the bridge's internals. No external
  * service, no network listener: `bridge watch` polls status on the agents
- * the bridge already knows about and prints pending approvals to stdout;
+ * the bridge already knows about and prints a JSON line per CHANGE in what
+ * is waiting on a human (see `watch-events.ts`);
  * `bridge approve <id>` / `bridge reject <id>` act on one by approval id
  * (searched across every chat the bridge is currently tracking — the CLI's
  * only bridge-specific convenience beyond the plain {@link RemoteBridgeActions}
@@ -12,7 +13,9 @@
 import { z } from "zod";
 import { interviewAnswerSchema } from "@traycer/protocol/persistence/epic/content-blocks";
 import type { BridgeClient } from "../bridge-client";
+import type { ChatStatus } from "../action-surface";
 import type { ILogger } from "../logger";
+import { WatchEventTracker } from "./watch-events";
 
 const WATCH_POLL_MS = 4_000;
 
@@ -177,10 +180,31 @@ export async function runTranscript(
   process.stdout.write(`${JSON.stringify(transcript, null, 2)}\n`);
 }
 
-/** Long-running: prints every currently-pending approval/interview across tracked chats every `WATCH_POLL_MS`, until SIGINT/SIGTERM. */
-export function runWatch(bridge: BridgeClient, logger: ILogger): Promise<void> {
+/**
+ * Long-running: polls every tracked chat every `WATCH_POLL_MS` and prints one
+ * {@link WatchEvent} JSON line per CHANGE — `appeared` when something starts
+ * waiting on a human, `resolved` when it stops — until SIGINT/SIGTERM.
+ *
+ * It previously printed every pending approval on every tick, which made
+ * "someone is newly blocked" and "someone is still blocked" the same line
+ * fifteen times a minute. See `watch-events.ts` for why that distinction is
+ * the bridge's to make and not a consumer's.
+ *
+ * ONE CHAT'S FAILURE MUST NOT BLIND THE OTHERS. `getStatus` is caught
+ * per-chat rather than per-tick: a single unreadable chat used to abort the
+ * whole sweep, so a genuinely new approval elsewhere went unannounced until
+ * the bad chat recovered. The failed chat is OMITTED from the observation
+ * set rather than passed as empty — {@link WatchEventTracker} treats absence
+ * as unknown, and an empty status would read as "everything was answered".
+ */
+export function runWatch(
+  bridge: BridgeClient,
+  epicId: string,
+  logger: ILogger,
+): Promise<void> {
   return new Promise<void>((resolve) => {
     let stopped = false;
+    const tracker = new WatchEventTracker();
     const cleanup = (): void => {
       if (stopped) return;
       stopped = true;
@@ -196,28 +220,19 @@ export function runWatch(bridge: BridgeClient, logger: ILogger): Promise<void> {
       if (stopped) return;
       try {
         const agents = await bridge.listAgents();
+        const observed: ChatStatus[] = [];
         for (const agent of agents) {
-          const status = await bridge.getStatus(agent.agentId);
-          for (const approval of status.pendingApprovals) {
-            process.stdout.write(
-              `${JSON.stringify({
-                chatId: agent.agentId,
-                chatTitle: status.title,
-                approvalId: approval.approvalId,
-                toolName: approval.toolName,
-                description: approval.description,
-              })}\n`,
-            );
+          try {
+            observed.push(await bridge.getStatus(agent.agentId));
+          } catch (err) {
+            logger.warn("watch: status unreadable, chat omitted this tick", {
+              chatId: agent.agentId,
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
-          for (const interview of status.pendingInterviews) {
-            process.stdout.write(
-              `${JSON.stringify({
-                chatId: agent.agentId,
-                chatTitle: status.title,
-                interviewBlockId: interview.blockId,
-              })}\n`,
-            );
-          }
+        }
+        for (const event of tracker.diff(epicId, observed)) {
+          process.stdout.write(`${JSON.stringify(event)}\n`);
         }
       } catch (err) {
         logger.warn("watch tick failed", {

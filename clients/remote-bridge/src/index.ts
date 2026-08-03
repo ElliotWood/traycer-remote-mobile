@@ -318,7 +318,7 @@ program
 program
   .command("watch")
   .description(
-    "Long-running: print every pending approval/interview across tracked agents until stopped",
+    "Long-running: print one JSON line per CHANGE (appeared/resolved) in what is waiting on a human, until stopped",
   )
   .option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)")
   .option(
@@ -327,7 +327,9 @@ program
   )
   .action(async (opts: { epicId?: string; senderAgentId?: string }) => {
     const logger = createLogger("info");
-    await withBridge(opts, (bridge) => runWatch(bridge, logger));
+    await withBridge(opts, (bridge) =>
+      runWatch(bridge, bridge.epicId, logger),
+    );
   });
 
 function isBridgeCliEntrypoint(argv1: string | undefined): boolean {

@@ -57,7 +57,15 @@ function sleep(ms: number): Promise<void> {
  * {@link RemoteBridgeActions} — the entire surface a channel adapter uses.
  */
 export class BridgeClient implements RemoteBridgeActions {
-  private readonly epicId: string;
+  /**
+   * The epic this bridge process is bound to, for the whole of its life.
+   *
+   * Public because an adapter has to stamp it onto what it emits — a
+   * `watch` event names its epic — and re-resolving `--epic-id`/
+   * `$TRAYCER_EPIC_ID` at the call site would put the binding decision in two
+   * places that could disagree. Read-only: nothing rebinds a running bridge.
+   */
+  readonly epicId: string;
   private readonly senderAgentId: string;
   private readonly auth: HostAuth;
   private readonly endpointPoller: HostEndpointPoller;
