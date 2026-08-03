@@ -346,7 +346,6 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
           onEditQueueItem={handleEditQueueItem}
         />
         <Composer
-          epicId={epicId}
           chatId={chatId}
           client={hostClient}
           prefillText={prefill?.text ?? null}

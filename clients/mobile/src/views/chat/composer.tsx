@@ -17,6 +17,11 @@
  * off data neither client has (flagged + approved, not silently skipped).
  * @-mention/slash pickers and mic input stay deferred per the accepted P2
  * contract (no file-search/command-list RPC, no STT infra).
+ *
+ * M1: the model / harness / reasoning-effort / speed-tier controls now come
+ * from `agent.gui.listModels` + `agent.gui.listHarnesses` and live in
+ * `run-settings-controls.tsx`. `reasoningEffort`, `serviceTier` and the
+ * harness are no longer hard-coded — see `handleSend`.
  */
 import { useRef, useState, type ChangeEvent, type ReactElement } from "react";
 import {
@@ -35,8 +40,20 @@ import {
 } from "lucide-react";
 import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persistence/epic/foundation";
 import type { AgentMode } from "@traycer/protocol/common/schemas";
+import type { GuiHarnessId } from "@traycer/protocol/host/agent/shared";
+import {
+  normalizeReasoningForModel,
+  normalizeServiceTierForModel,
+} from "@traycer-clients/shared/agent-models/model-selection";
 import type { MobileHostClient } from "@/host/host-client-context";
-import { useHarnessModels } from "@/host/use-harness-models";
+import { useGuiModels } from "@/host/use-gui-models";
+import { selectableHarnesses, useGuiHarnesses } from "@/host/use-gui-harnesses";
+import {
+  HarnessChip,
+  ModelChip,
+  ReasoningChip,
+  ServiceTierChip,
+} from "@/views/chat/run-settings-controls";
 import { chatDraftKey, useDraft } from "@/router/drafts";
 import {
   AttachmentTooLargeError,
@@ -44,6 +61,7 @@ import {
   prepareImageAttachment,
   type PreparedAttachment,
 } from "@/host/image-attachment";
+import { chipStyle } from "@/views/chat/run-settings-controls";
 import { radius, theme, type } from "@/views/design-tokens";
 
 interface AttachmentDraft {
@@ -74,7 +92,12 @@ const AGENT_MODE_OPTIONS: readonly { readonly id: AgentMode; readonly shortLabel
 const DEFAULT_HARNESS = "claude" as const;
 
 export interface ComposerProps {
-  readonly epicId: string;
+  /**
+   * No `epicId`: it existed only to satisfy `agent.listHarnessModels`, whose
+   * request took one. `agent.gui.listModels` is scoped by harness and takes a
+   * nullable `workingDirectory` instead, so the composer no longer needs to
+   * know which epic it is in. M3 may reintroduce it for `epic.mention*`.
+   */
   /** Scopes the preserved draft, so backing out of two chats keeps two separate unsent messages. */
   readonly chatId: string;
   readonly client: MobileHostClient | null;
@@ -101,7 +124,6 @@ export interface ComposerProps {
 }
 
 export function Composer({
-  epicId,
   chatId,
   client,
   prefillText,
@@ -127,8 +149,40 @@ export function Composer({
   );
   const [agentMode, setAgentMode] = useState<AgentMode>(chatSettings?.agentMode ?? "regular");
   const [modelSlug, setModelSlug] = useState<string | null>(chatSettings?.model ?? null);
-  const { models, phase: modelsPhase } = useHarnessModels(client, epicId, DEFAULT_HARNESS);
-  const resolvedModel = modelSlug ?? models[0]?.id ?? null;
+  const [harnessId, setHarnessId] = useState<GuiHarnessId>(
+    chatSettings?.harnessId ?? DEFAULT_HARNESS,
+  );
+  /**
+   * The user's RAW effort / tier preference, kept sticky across model changes
+   * and clamped only on the way out (below). Storing the clamped value instead
+   * would silently forget a preference the moment you passed through a model
+   * that doesn't support it — desktop keeps the raw value in its toolbar store
+   * for the same reason.
+   */
+  const [reasoningRaw, setReasoningRaw] = useState<string>(
+    chatSettings?.reasoningEffort ?? "",
+  );
+  const [serviceTierRaw, setServiceTierRaw] = useState<string>(
+    chatSettings?.serviceTier ?? "",
+  );
+
+  const { harnesses, probing: harnessesProbing } = useGuiHarnesses(client);
+  const availableHarnesses = selectableHarnesses(harnesses);
+  const { models, phase: modelsPhase } = useGuiModels(client, harnessId);
+  const resolvedModel = modelSlug ?? models[0]?.slug ?? null;
+  const selectedModel = models.find((m) => m.slug === resolvedModel) ?? null;
+
+  /**
+   * Derived, never stored. `selectedModel` is null while the catalogue is in
+   * flight, and both normalizers pass the value straight through in that case
+   * rather than clamping against a model they can't see — otherwise the first
+   * paint after a harness switch would overwrite a valid preference with "".
+   *
+   * These are what `handleSend` emits, so what is displayed and what is sent
+   * cannot disagree.
+   */
+  const effectiveReasoning = normalizeReasoningForModel(reasoningRaw, selectedModel);
+  const effectiveServiceTier = normalizeServiceTierForModel(serviceTierRaw, selectedModel);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -212,12 +266,18 @@ export function Composer({
     onSend(
       draftText,
       {
-        harnessId: DEFAULT_HARNESS,
+        harnessId,
         model: resolvedModel,
         permissionMode,
-        reasoningEffort: null,
-        serviceTier: null,
+        // `""` is this client's "no selection"; the wire's is `null`. Emitting
+        // the empty string would persist a reasoning effort of "" on the turn,
+        // which is neither a valid option id nor the absence of one.
+        reasoningEffort: effectiveReasoning === "" ? null : effectiveReasoning,
+        serviceTier: effectiveServiceTier === "" ? null : effectiveServiceTier,
         agentMode,
+        // M2 owns profile selection; still null here deliberately, not
+        // forgotten. Committing a profile id needs `profileCommitId()`'s
+        // ambient mapping, which arrives with that ticket.
         profileId: null,
       },
       readyAttachments.map((a) => a.prepared),
@@ -322,10 +382,35 @@ export function Composer({
                 composer feel broken alongside the textarea. */}
             <PermissionModeToggle value={permissionMode} onChange={setPermissionMode} disabled={!canType} />
             <AgentModeToggle value={agentMode} onChange={setAgentMode} disabled={!canType} />
+            <HarnessChip
+              harnesses={availableHarnesses}
+              value={harnessId}
+              probing={harnessesProbing}
+              onChange={(id) => {
+                setHarnessId(id);
+                // The catalogue is per harness, so the old slug is meaningless
+                // here. Null resets to the new harness's first model rather
+                // than carrying a slug the new harness has never heard of.
+                setModelSlug(null);
+              }}
+              disabled={!connectionLive}
+            />
             <ModelChip
               models={models}
               value={resolvedModel}
               onChange={setModelSlug}
+              disabled={!connectionLive}
+            />
+            <ReasoningChip
+              model={selectedModel}
+              value={effectiveReasoning}
+              onChange={setReasoningRaw}
+              disabled={!connectionLive}
+            />
+            <ServiceTierChip
+              model={selectedModel}
+              value={effectiveServiceTier}
+              onChange={setServiceTierRaw}
               disabled={!connectionLive}
             />
           </>
@@ -343,23 +428,6 @@ export function Composer({
       </div>
     </div>
   );
-}
-
-function chipStyle(disabled: boolean) {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    minHeight: 32,
-    padding: "0 8px",
-    border: `1px solid ${theme.border}`,
-    borderRadius: radius.md,
-    background: "transparent",
-    color: theme.mutedText,
-    fontSize: 12,
-    cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-  } as const;
 }
 
 function AttachButton({
@@ -544,39 +612,6 @@ function AgentModeToggle({
       <Icon size={13} aria-hidden="true" />
       {current.shortLabel}
     </button>
-  );
-}
-
-function ModelChip({
-  models,
-  value,
-  onChange,
-  disabled,
-}: {
-  readonly models: readonly { readonly id: string }[];
-  readonly value: string | null;
-  readonly onChange: (id: string) => void;
-  readonly disabled: boolean;
-}): ReactElement | null {
-  if (models.length === 0) return null;
-  return (
-    <select
-      aria-label="Model"
-      disabled={disabled}
-      value={value ?? models[0]?.id}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        ...chipStyle(disabled),
-        appearance: "none",
-        paddingRight: 8,
-      }}
-    >
-      {models.map((m) => (
-        <option key={m.id} value={m.id}>
-          {m.id}
-        </option>
-      ))}
-    </select>
   );
 }
 
