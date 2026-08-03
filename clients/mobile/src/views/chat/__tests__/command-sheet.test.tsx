@@ -35,7 +35,7 @@ import { fireEvent, render, screen, waitFor } from "@/test-utils/dom";
 
 function command(
   name: string,
-  extra: Partial<GuiAgentCommandOption> = {},
+  extra: Partial<GuiAgentCommandOption>,
 ): GuiAgentCommandOption {
   return guiAgentCommandOptionSchema.parse({
     harnessId: "claude",
@@ -53,7 +53,7 @@ function command(
 const COMMANDS: readonly GuiAgentCommandOption[] = [
   command("review", { kind: "slash-command", description: "Review a diff.", argumentHint: "<sha>" }),
   command("review", { kind: "skill", description: "The review skill." }),
-  command("deploy"),
+  command("deploy", {}),
 ];
 
 /** The sheet's own rows: buttons whose label starts with the `/` it inserts.
@@ -111,7 +111,7 @@ describe("CommandSheet", () => {
     // very defect this test exists for, while reading as though it caught it.
     render(
       <CommandSheet
-        commands={[command("deploy"), command("ship", { description: "Ship it." })]}
+        commands={[command("deploy", {}), command("ship", { description: "Ship it." })]}
         loading={false}
         onPick={() => {}}
         onClose={() => {}}
