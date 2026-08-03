@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "node tools/check-canvas-core.mjs && vitest run",
     "lint": "eslint . --max-warnings 0",
-    "check-canvas-core": "node tools/check-canvas-core.mjs"
+    "check-canvas-core": "node tools/check-canvas-core.mjs",
+    "//test": "ORDER IS LOAD-BEARING. The drift checker runs FIRST and `&&` means the suite does not run if it fails: drifted copies of the lifted canvas core make every canvas test a statement about the wrong code, so a green suite against a diverged copy is worse than a red one. Do not split this into two scripts, reorder it, or swap `&&` for `;` so both always run - each of those disarms the gate while leaving it looking present."
   },
   "dependencies": {
     "@fluentui/react-components": "^9.71.0",

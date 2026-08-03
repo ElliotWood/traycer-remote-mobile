@@ -261,6 +261,32 @@ describe("splitting", () => {
     expectInvariantI1(split);
   });
 
+  it("declines on an EMPTY canvas rather than seeding one", () => {
+    /*
+     * The Evaluator's Q5 candidate, closed by measurement rather than by
+     * argument: coverage showed `splitPane`'s `state.root === null` line
+     * EXECUTING, which says the condition was evaluated and not that the
+     * `return` was ever taken. Every existing call site reaches splitPane
+     * through `withTabs()`, which always populates.
+     *
+     * The behaviour matters: splitting nothing must not quietly create a
+     * pane. A caller that split an empty canvas would get a tile it never
+     * asked to open, and `openTile` — not `splitPane` — is the operation
+     * that seeds a root.
+     *
+     * Mutation: replace the guard with a seed. `root` becomes non-null.
+     */
+    const ids = idSource();
+    const result = splitPane({
+      state: EMPTY_CANVAS,
+      paneId: "p1",
+      position: "right",
+      tile: blank("n0"),
+      ids,
+    });
+    expect(result).toBe(EMPTY_CANVAS);
+  });
+
   it("REFUSES rather than throws past the depth limit", () => {
     /*
      * MAX_TREE_DEPTH is 4. Alternating directions deepens on every split, so
