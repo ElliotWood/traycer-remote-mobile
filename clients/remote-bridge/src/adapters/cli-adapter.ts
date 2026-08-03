@@ -9,6 +9,8 @@
  * surface, kept out of that interface itself so a channel adapter with its
  * own chat-id context never needs it).
  */
+import { z } from "zod";
+import { interviewAnswerSchema } from "@traycer/protocol/persistence/epic/content-blocks";
 import type { BridgeClient } from "../bridge-client";
 import type { ILogger } from "../logger";
 
@@ -66,6 +68,58 @@ export async function runReject(
   }
   const outcome = await bridge.reject(chatId, approvalId, reason);
   logger.info("reject outcome", { chatId, approvalId, outcome });
+  process.stdout.write(`${JSON.stringify(outcome)}\n`);
+  if (outcome.kind !== "applied") process.exitCode = 1;
+}
+
+/**
+ * Answers a pending interview, addressed by chat id and block id.
+ *
+ * Takes an EXPLICIT `chatId` for the same reason `send` does: an approval id
+ * is globally unique so `approve` can search for its chat, but a block id is
+ * only unique within a chat's message list, so there is nothing safe to
+ * search by. The destination has to be named.
+ *
+ * `answersJson` is parsed with the PROTOCOL'S OWN `interviewAnswerSchema`
+ * rather than a shape defined here. A hand-rolled parse in this file would be
+ * a second definition of a persisted protocol type living in an adapter, and
+ * it would drift silently — the answers would still send, and the host would
+ * store something subtly wrong. A parse failure is refused here, before any
+ * frame is issued, because an interview can be answered exactly once.
+ *
+ * Retry semantics match `send`, not `approve`: the host settles this on the
+ * interview leaving the pending set, so a repeat against an already-answered
+ * interview fails with "not currently pending" rather than being deduped.
+ * A non-`applied` outcome is "unknown", never "retry me".
+ */
+export async function runAnswer(
+  bridge: BridgeClient,
+  chatId: string,
+  blockId: string,
+  answersJson: string,
+  logger: ILogger,
+): Promise<void> {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(answersJson);
+  } catch (err) {
+    process.stderr.write(
+      `[bridge] --answers was not valid JSON: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const parsed = z.array(interviewAnswerSchema).safeParse(parsedJson);
+  if (!parsed.success) {
+    process.stderr.write(
+      `[bridge] --answers did not match InterviewAnswer[]: ${parsed.error.message}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const outcome = await bridge.answerInterview(chatId, blockId, parsed.data);
+  logger.info("answer outcome", { chatId, blockId, outcome });
   process.stdout.write(`${JSON.stringify(outcome)}\n`);
   if (outcome.kind !== "applied") process.exitCode = 1;
 }

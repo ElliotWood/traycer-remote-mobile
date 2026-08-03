@@ -84,9 +84,76 @@ export const pendingApprovalSchema = z.object({
 });
 export type PendingApproval = z.infer<typeof pendingApprovalSchema>;
 
+export const interviewQuestionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string().nullable(),
+  preview: z.string().nullable(),
+});
+export type InterviewQuestionOption = z.infer<
+  typeof interviewQuestionOptionSchema
+>;
+
+/**
+ * Mirrors the bridge's `InterviewQuestion`, which mirrors the protocol's.
+ * This package holds no protocol dependency by design (see this file's
+ * header), so like `pendingApprovalSchema` above it validates the bridge's
+ * STDOUT rather than importing the type — the same relationship, one field
+ * deeper.
+ *
+ * `options: []` is a free-text question, not a broken one.
+ */
+export const interviewQuestionSchema = z.object({
+  questionId: z.string().nullable(),
+  question: z.string(),
+  header: z.string().nullable(),
+  options: z.array(interviewQuestionOptionSchema),
+  multiSelect: z.boolean(),
+});
+export type InterviewQuestion = z.infer<typeof interviewQuestionSchema>;
+
 export const pendingInterviewSchema = z.object({
   blockId: z.string(),
   requestedAt: z.number(),
+  /**
+   * ALL THREE DEFAULT TO NULL, and that is a compatibility decision rather
+   * than laziness about nullability.
+   *
+   * The bot spawns a `traycer-remote-bridge` binary at an absolute path, and
+   * the two are deployed separately — so a bot carrying this schema will meet
+   * a bridge that predates these fields. Required fields would fail the parse
+   * and take the WHOLE status read down: no fleet, no approvals, no chat
+   * status, because an interview gained a question list.
+   *
+   * Defaulting to `null` degrades to exactly the state the bridge already
+   * defines for "the block was not found" — the card says it cannot read the
+   * questions and offers no form. One unreadable-interview state, reached by
+   * two routes, rather than a second one invented for old binaries.
+   */
+  title: z.string().nullable().default(null),
+  description: z.string().nullable().default(null),
+  /**
+   * `null` — the questions are unknown. `[]` — known, and there are none.
+   * Never render `null` as a form: see the bridge's
+   * `PendingInterview.questions`.
+   *
+   * `.catch` rather than `.default`, following `isLocal` above, because the
+   * two routes to `null` are worth telling apart in the journal even though
+   * the card treats them the same. A bridge that SENDS `null` could not find
+   * the block; a bridge that omits the key predates the field. `.default`
+   * would silently merge them and the "why can't I answer this?" question
+   * would have no answer anywhere.
+   */
+  questions: z
+    .array(interviewQuestionSchema)
+    .nullable()
+    .catch(() => {
+      logWarn("bridge omitted interview questions — interviews are read-only", {
+        consequence:
+          "the interview card offers no form and points at the desktop",
+        likelyCause: "bridge binary older than the interview-question passthrough",
+      });
+      return null;
+    }),
 });
 export type PendingInterview = z.infer<typeof pendingInterviewSchema>;
 

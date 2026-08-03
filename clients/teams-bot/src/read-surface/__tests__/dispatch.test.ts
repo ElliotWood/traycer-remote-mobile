@@ -13,7 +13,7 @@ import {
 } from "../../auth/__tests__/test-jwks-server";
 import { dispatchCommand, type DispatchDeps } from "../dispatch";
 import { dispatchActionInvoke } from "../dispatch-action";
-import { SEND_VERB } from "../cards";
+import { ANSWER_VERB, SEND_VERB } from "../cards";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
 import type { OneShotSpawnFn } from "../one-shot-spawn";
 import type { ResolvePrincipal } from "../principal-source";
@@ -582,6 +582,265 @@ describe("read-surface/dispatch-action — the send path", () => {
     expect(body).toContain("Couldn't confirm");
     expect(body).toContain("not a no-op");
     expect(body).not.toContain("try again");
+  });
+
+  /**
+   * The interview path shares this describe's harness on purpose: it is the
+   * same identity seam and the same spawn shape, and a test that built its
+   * own would stop proving that.
+   */
+  describe("the interview path", () => {
+    const BLOCK_ID = "iv-block-1";
+
+    /** The card's own submit payload, as Teams relays it back. */
+    function answerData(
+      inputs: Readonly<Record<string, string>>,
+      questions: readonly {
+        index: number;
+        questionId: string | null;
+        question: string;
+        multiSelect: boolean;
+      }[],
+    ): Readonly<Record<string, unknown>> {
+      return {
+        chatId: CHAT_ID,
+        chatTitle: "My chat",
+        interviewBlockId: BLOCK_ID,
+        interviewQuestions: JSON.stringify(questions),
+        ...inputs,
+      };
+    }
+
+    const ONE_CHOICE = [
+      {
+        index: 0,
+        questionId: "q-1",
+        question: "Which environment first?",
+        multiSelect: false,
+      },
+    ];
+
+    it("CONTRACT: an unanswered question never reaches the bridge, and the refusal names it", async () => {
+      // Exactly the composer's empty-message defect, and worse: an interview
+      // can be answered ONCE, so an accidental tap that delivered `values: []`
+      // could not be corrected afterwards.
+      let spawned = false;
+      const deps = sendDeps({
+        resolvePrincipal: resolved,
+        spawnFn: async () => {
+          spawned = true;
+          return { code: 0, stdout: "{}", stderr: "", timedOut: false };
+        },
+      });
+
+      for (const blank of ["", "   ", "\n\n", "\t "]) {
+        const result = await dispatchActionInvoke(
+          {
+            verb: ANSWER_VERB,
+            conversationId: "conv-1",
+            data: answerData({ answer_0: blank }, ONE_CHOICE),
+          },
+          deps,
+        );
+        expect(result.acted, JSON.stringify(blank)).toBe(false);
+        expect(JSON.stringify(result.card.content)).toContain(
+          "Which environment first?",
+        );
+      }
+      expect(spawned).toBe(false);
+    });
+
+    it("sends `answer <chatId> <blockId> <json>`, with the answers as ONE argv element", async () => {
+      let seen: readonly string[] = [];
+      const deps = sendDeps({
+        resolvePrincipal: resolved,
+        spawnFn: async (_cmd, args) => {
+          seen = args;
+          return {
+            code: 0,
+            stdout: JSON.stringify({ kind: "applied" }),
+            stderr: "",
+            timedOut: false,
+          };
+        },
+      });
+
+      const result = await dispatchActionInvoke(
+        {
+          verb: ANSWER_VERB,
+          conversationId: "conv-1",
+          data: answerData({ answer_0: "Staging" }, ONE_CHOICE),
+        },
+        deps,
+      );
+
+      expect(result.acted).toBe(true);
+      expect(seen.slice(0, 3)).toEqual(["answer", CHAT_ID, BLOCK_ID]);
+      expect(seen).toHaveLength(4);
+      expect(JSON.parse(seen[3] ?? "null")).toEqual([
+        {
+          questionId: "q-1",
+          question: "Which environment first?",
+          values: ["Staging"],
+          notes: null,
+        },
+      ]);
+    });
+
+    it("splits a multi-select's comma-joined value, and does NOT split a single-select's", async () => {
+      // The single-select half is the one that matters: an agent's own option
+      // label may legitimately contain a comma, and splitting it would send
+      // two answers it never offered.
+      let seen: readonly string[] = [];
+      const deps = sendDeps({
+        resolvePrincipal: resolved,
+        spawnFn: async (_cmd, args) => {
+          seen = args;
+          return {
+            code: 0,
+            stdout: JSON.stringify({ kind: "applied" }),
+            stderr: "",
+            timedOut: false,
+          };
+        },
+      });
+
+      await dispatchActionInvoke(
+        {
+          verb: ANSWER_VERB,
+          conversationId: "conv-1",
+          data: answerData(
+            { answer_0: "Staging,Production", answer_1: "Yes, definitely" },
+            [
+              {
+                index: 0,
+                questionId: "q-1",
+                question: "Which environments?",
+                multiSelect: true,
+              },
+              {
+                index: 1,
+                questionId: "q-2",
+                question: "Sure?",
+                multiSelect: false,
+              },
+            ],
+          ),
+        },
+        deps,
+      );
+
+      expect(JSON.parse(seen[3] ?? "null")).toEqual([
+        {
+          questionId: "q-1",
+          question: "Which environments?",
+          values: ["Staging", "Production"],
+          notes: null,
+        },
+        {
+          questionId: "q-2",
+          question: "Sure?",
+          values: ["Yes, definitely"],
+          notes: null,
+        },
+      ]);
+    });
+
+    it("identity is resolved BEFORE the answers are issued", async () => {
+      const calls: string[] = [];
+      const deps = sendDeps({
+        resolvePrincipal: async () => {
+          calls.push("resolvePrincipal");
+          return { kind: "resolved", principal: alice };
+        },
+        spawnFn: async () => {
+          calls.push("spawn");
+          return {
+            code: 0,
+            stdout: JSON.stringify({ kind: "applied" }),
+            stderr: "",
+            timedOut: false,
+          };
+        },
+      });
+
+      const result = await dispatchActionInvoke(
+        {
+          verb: ANSWER_VERB,
+          conversationId: "conv-1",
+          data: answerData({ answer_0: "Staging" }, ONE_CHOICE),
+        },
+        deps,
+      );
+
+      expect(result.acted).toBe(true);
+      expect(calls).toEqual(["resolvePrincipal", "spawn"]);
+    });
+
+    it("CONTRACT: an unconfirmed answer does NOT invite a second attempt", async () => {
+      // The opposite advice from the send path's, and the reason the outcome
+      // card is a separate function. A repeated answer is not deduped — the
+      // host settles this on the block leaving the pending set, so a retry
+      // lands as "not currently pending".
+      const deps = sendDeps({
+        resolvePrincipal: resolved,
+        // stdout MUST carry the outcome: a nonzero exit with nothing on
+        // stdout is the bridge failing to run, which is a different card
+        // ("Couldn't reach your Traycer host"). This is the host answering
+        // "I cannot confirm what happened", which is the case under test.
+        spawnFn: async () => ({
+          code: 1,
+          stdout: JSON.stringify({
+            kind: "failed",
+            reason: "reconcile window expired",
+          }),
+          stderr: "",
+          timedOut: false,
+        }),
+      });
+
+      const result = await dispatchActionInvoke(
+        {
+          verb: ANSWER_VERB,
+          conversationId: "conv-1",
+          data: answerData({ answer_0: "Staging" }, ONE_CHOICE),
+        },
+        deps,
+      );
+
+      const body = JSON.stringify(result.card.content);
+      expect(body).toContain("Couldn't confirm");
+      expect(body).toContain("Do NOT answer again");
+    });
+
+    it("a card whose question list is unreadable is refused, not partially answered", async () => {
+      let spawned = false;
+      const deps = sendDeps({
+        resolvePrincipal: resolved,
+        spawnFn: async () => {
+          spawned = true;
+          return { code: 0, stdout: "{}", stderr: "", timedOut: false };
+        },
+      });
+
+      for (const broken of ["not json", "[]", '[{"index":"one"}]']) {
+        const result = await dispatchActionInvoke(
+          {
+            verb: ANSWER_VERB,
+            conversationId: "conv-1",
+            data: {
+              chatId: CHAT_ID,
+              interviewBlockId: BLOCK_ID,
+              interviewQuestions: broken,
+              answer_0: "Staging",
+            },
+          },
+          deps,
+        );
+        expect(result.acted, broken).toBe(false);
+      }
+      expect(spawned).toBe(false);
+    });
   });
 });
 

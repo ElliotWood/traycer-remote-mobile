@@ -5,6 +5,7 @@ import type {
   VerifiedPrincipal,
 } from "@traycer-clients/shared/identity-registry/types";
 import {
+  answerInterviewAction,
   approveAction,
   getChatStatus,
   listAgents,
@@ -14,6 +15,7 @@ import {
   getTranscript,
   type BridgeCliConfig,
   type BridgeCliFailureReason,
+  type InterviewAnswerInput,
 } from "./bridge-cli";
 import type { EpicBindingStore } from "./epic-binding-store";
 import { logWarn } from "../logger";
@@ -271,6 +273,51 @@ export async function submitChatMessage(
   const result = await sendMessageAction(
     chatId,
     text,
+    env,
+    deps.bridgeCliConfig,
+  );
+
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", outcome: result.value };
+}
+
+/**
+ * Answers a pending interview, through the SAME identity seam as approvals
+ * and sends — `resolveTenant` first, act second. `blockId` arrives in the
+ * card's payload and is treated exactly as `chatId` is: it says WHICH
+ * interview, never who is answering it, so a forged payload can at worst
+ * name a different block on the acting user's own host.
+ *
+ * Carries the same attribution gap as {@link submitChatMessage}: the bridge
+ * stamps its own authenticated host user, so an answer given from Teams is
+ * indistinguishable from one given on the desktop. Single-user and
+ * env-gated today; the fix is a change of VALUE at this seam, not of shape.
+ */
+export async function submitInterviewAnswer(
+  principal: VerifiedPrincipal,
+  conversationId: string,
+  chatId: string,
+  blockId: string,
+  answers: readonly InterviewAnswerInput[],
+  deps: HostAccessDeps,
+): Promise<ActionResult> {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+
+  const env = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await answerInterviewAction(
+    chatId,
+    blockId,
+    answers,
     env,
     deps.bridgeCliConfig,
   );

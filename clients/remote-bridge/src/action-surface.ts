@@ -1,5 +1,8 @@
 import type { Transcript } from "./transcript-projection";
-import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
+import type {
+  InterviewAnswer,
+  InterviewQuestion,
+} from "@traycer/protocol/persistence/epic/content-blocks";
 
 /**
  * The bridge's entire public surface. Any channel adapter is implementable
@@ -212,4 +215,32 @@ export interface PendingApproval {
 export interface PendingInterview {
   readonly blockId: string;
   readonly requestedAt: number;
+  /** The interview's own heading, when the block carries one. */
+  readonly title: string | null;
+  /** Prose shown above the questions, when the block carries any. */
+  readonly description: string | null;
+  /**
+   * The questions to put in front of a person — and the reason this type is
+   * not just `{ blockId, requestedAt }`.
+   *
+   * The `interviewRequested` FRAME carries only the block id and a
+   * timestamp; the questions live in the persisted `interview` block inside
+   * `chat.messages`, which this bridge was already holding and discarding.
+   * So an adapter given only the frame's fields can announce that an
+   * interview exists and can never render one — which is exactly the state
+   * the Teams bot was in ("Answering interviews from Teams isn't built yet").
+   *
+   * NULL AND EMPTY ARE DIFFERENT ANSWERS, and a caller must not collapse
+   * them:
+   *   - `null`  — the block was not found in the snapshot. We do not know
+   *               what is being asked. Render "we can't read this one",
+   *               never a form.
+   *   - `[]`    — the block WAS found and genuinely carries no questions.
+   *
+   * Rendering `null` as an empty form would put a Submit button under zero
+   * questions and send `answers: []` to an agent waiting on a real answer —
+   * the "a card whose buttons silently do nothing" failure with an extra
+   * step.
+   */
+  readonly questions: readonly InterviewQuestion[] | null;
 }

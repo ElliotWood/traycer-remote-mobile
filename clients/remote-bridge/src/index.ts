@@ -10,6 +10,7 @@ import { BridgeClient } from "./bridge-client";
 import { createLogger } from "./logger";
 import { checkDeleteTarget } from "./delete-guard";
 import {
+  runAnswer,
   runApprove,
   runList,
   runReject,
@@ -157,6 +158,32 @@ program
     ) => {
       const logger = createLogger("info");
       await withBridge(opts, (bridge) => runSend(bridge, chatId, text, logger));
+    },
+  );
+
+program
+  .command("answer <chatId> <blockId> <answersJson>")
+  .description(
+    "Answer a pending interview. <answersJson> is a JSON array of " +
+      '{questionId, question, values, notes} — e.g. \'[{"questionId":"q1","question":null,"values":["Yes"],"notes":null}]\'. ' +
+      "Run `status <chatId>` first: its pendingInterviews now carry the questions.",
+  )
+  .option("--epic-id <id>", "Epic id (defaults to $TRAYCER_EPIC_ID)")
+  .option(
+    "--sender-agent-id <id>",
+    "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
+  )
+  .action(
+    async (
+      chatId: string,
+      blockId: string,
+      answersJson: string,
+      opts: { epicId?: string; senderAgentId?: string },
+    ) => {
+      const logger = createLogger("info");
+      await withBridge(opts, (bridge) =>
+        runAnswer(bridge, chatId, blockId, answersJson, logger),
+      );
     },
   );
 
