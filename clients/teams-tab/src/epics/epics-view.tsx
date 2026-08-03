@@ -41,6 +41,7 @@ import {
   FleetLoading,
   FleetStale,
 } from "../fleet/fleet-state";
+import { ViewportReadout } from "../shell/viewport-readout";
 import type { EpicsState } from "./use-epics";
 import { relativeTime } from "../fleet/fleet-grid";
 
@@ -246,6 +247,16 @@ export function EpicsView({
           {state.loadingMore ? "Loading…" : "Load more"}
         </Button>
       ) : null}
+      {/*
+        TEMPORARY INSTRUMENT — see `shell/viewport-readout.tsx` for why it
+        exists and the condition for deleting it.
+
+        It sits on THIS screen, below the list, because the tab opens here:
+        reading it costs a human one glance and no navigation, on desktop
+        Teams and on Teams mobile alike. Anywhere else and the measurement
+        would cost more human attention than the number is worth.
+      */}
+      <ViewportReadout />
     </>
   );
 }
