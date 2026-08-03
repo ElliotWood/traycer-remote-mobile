@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CANVAS_STORAGE_VERSION,
+  canvasStorageKey,
   loadCanvas,
   parseCanvasState,
   parseTileRef,
@@ -371,5 +372,33 @@ describe("version", () => {
       version: CANVAS_STORAGE_VERSION - 1,
     };
     expect(parseCanvasState(older).root?.kind).toBe("group");
+  });
+});
+
+describe("one canvas per epic", () => {
+  it("gives two epics two different keys", () => {
+    /*
+     * THE decision that had to be made before the first byte was written.
+     *
+     * A single global key was fine while nothing called `loadCanvas`, and
+     * stops being fine the instant the canvas is reachable — that is when it
+     * starts holding real user data. Two epics sharing a key would merge
+     * their layouts, and splitting them later is a migration over data a user
+     * cannot see.
+     *
+     * Mutation: return a constant. Both keys become equal and this fails.
+     */
+    expect(canvasStorageKey("epic-a")).not.toBe(canvasStorageKey("epic-b"));
+  });
+
+  it("puts the epic id in the key, so a stray key is attributable", () => {
+    // Not just "different" — a hash would satisfy the case above while
+    // leaving an operator unable to tell whose layout a key holds.
+    expect(canvasStorageKey("epic-a")).toContain("epic-a");
+  });
+
+  it("is stable for the same epic across calls", () => {
+    // A key that varied per call would silently orphan every previous save.
+    expect(canvasStorageKey("epic-a")).toBe(canvasStorageKey("epic-a"));
   });
 });

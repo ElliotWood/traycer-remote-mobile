@@ -48,7 +48,29 @@ import { EMPTY_CANVAS, reconcile, type CanvasState } from "./canvas-state";
 /** Bump when a stored shape changes meaning, not when a field is added. */
 export const CANVAS_STORAGE_VERSION = 1;
 
-export const CANVAS_STORAGE_KEY = "traycer.teams-tab.canvas";
+/**
+ * ONE CANVAS PER EPIC, and the key says so.
+ *
+ * This was a single global key — chosen when nothing called `loadCanvas`, so
+ * it did not matter. It stops not mattering the moment the canvas is
+ * reachable, because that is when it starts holding real user data.
+ *
+ * **The non-deferrable thing is cheap if done first and expensive if done
+ * second.** A global key would either merge every epic's layout into one, or
+ * need a migration when the canvas becomes per-epic — which is the desktop's
+ * model and therefore where this is going. And a shape change mid-flight is
+ * the case `parseCanvasState` handles by DISCARDING: a user's layout would
+ * vanish silently, correctly, for a decision made months earlier.
+ *
+ * So the scope is decided before the first byte is written rather than after.
+ *
+ * The epic id is not escaped: it is a host-issued identifier, and a
+ * localStorage key has no delimiter to break. If that ever stops being true
+ * the fix is here, not at the call sites.
+ */
+export function canvasStorageKey(epicId: string): string {
+  return `traycer.teams-tab.canvas.${epicId}`;
+}
 
 /**
  * The kinds this build can restore.
@@ -258,7 +280,8 @@ export interface CanvasStorage {
  * served by a canvas that resets than by an error about a storage policy they
  * do not control and cannot change from here.
  */
-export function browserCanvasStorage(key: string): CanvasStorage {
+export function browserCanvasStorage(epicId: string): CanvasStorage {
+  const key = canvasStorageKey(epicId);
   return {
     read: () => {
       try {
