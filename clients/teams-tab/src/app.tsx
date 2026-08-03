@@ -104,6 +104,17 @@ import { SignOutButton } from "./auth/sign-out-button";
 import { useAuthService, useAuthStatus } from "./auth/use-auth";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
+/**
+ * One timestamp for every preview fixture, captured at module load.
+ *
+ * `Date.now()` at these call sites was an impure call DURING RENDER - caught
+ * by `react-hooks`, and wrong for a second reason the lint rule does not
+ * know about: it re-evaluates every render, so a `stale` fixture's age would
+ * tick upward while the user looks at it, which is a live clock dressed as a
+ * frozen fixture. A screenshot taken twice would differ.
+ */
+const PREVIEW_EPOCH = Date.now();
+
 const useStyles = makeStyles({
   header: {
     display: "flex",
@@ -833,7 +844,7 @@ export function App(): ReactElement {
           chats: AGENTS_DEEP_FIXTURE,
           tree: buildChatTree(AGENTS_DEEP_FIXTURE),
           artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
-          updatedAt: Date.now(),
+          updatedAt: PREVIEW_EPOCH,
           connected: true,
         };
       case "error":
@@ -847,7 +858,7 @@ export function App(): ReactElement {
           chats: [],
           tree: buildChatTree([]),
           artifacts: buildArtifactTree([]),
-          updatedAt: Date.now(),
+          updatedAt: PREVIEW_EPOCH,
           connected: true,
         };
       /*
@@ -865,7 +876,7 @@ export function App(): ReactElement {
           chats: AGENTS_FIXTURE,
           tree: buildChatTree(AGENTS_FIXTURE),
           artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
-          updatedAt: Date.now() - 17 * 60_000,
+          updatedAt: PREVIEW_EPOCH - 17 * 60_000,
           connected: false,
         };
       default:
@@ -874,7 +885,7 @@ export function App(): ReactElement {
           chats: AGENTS_FIXTURE,
           tree: buildChatTree(AGENTS_FIXTURE),
           artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
-          updatedAt: Date.now(),
+          updatedAt: PREVIEW_EPOCH,
           connected: true,
         };
     }

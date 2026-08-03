@@ -16,6 +16,8 @@ import { describe, expect, it } from "vitest";
 import { toEpicConnectionState } from "../epic-connection";
 import type { EpicConnectionState } from "../epic-status-row";
 import type { EpicAgentsState } from "@/epics/use-epic-agents";
+import { buildChatTree } from "@traycer-clients/shared/epic/epic-doc-chats";
+import { buildArtifactTree } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 
 const NOW = 1_700_000_000_000;
 
@@ -23,22 +25,25 @@ function ready(args: {
   readonly connected: boolean;
   readonly updatedAt: number;
 }): EpicAgentsState {
+  /*
+   * BUILT THROUGH THE REAL BUILDERS, not cast into shape.
+   *
+   * The first version of this fixture read
+   * `{ roots: [], byId: {} } as unknown as ... extends ... ? T : never` -
+   * a chained assertion that compiles against ANY shape, which is the exact
+   * fixture trap this project has now hit five times and the one the lint
+   * rules deliberately do NOT cover. eslint caught it here (chained
+   * assertion + `as unknown`) where a rule written for it would have needed
+   * to be unlivably broad.
+   */
   return {
     kind: "ready",
     chats: [],
-    tree: { roots: [], byId: {} } as unknown as EpicAgentsState extends {
-      readonly tree: infer T;
-    }
-      ? T
-      : never,
-    artifacts: { roots: [], byId: {} } as unknown as EpicAgentsState extends {
-      readonly artifacts: infer A;
-    }
-      ? A
-      : never,
+    tree: buildChatTree([]),
+    artifacts: buildArtifactTree([]),
     connected: args.connected,
     updatedAt: args.updatedAt,
-  } as EpicAgentsState;
+  };
 }
 
 describe("every member of EpicConnectionState is reachable", () => {
