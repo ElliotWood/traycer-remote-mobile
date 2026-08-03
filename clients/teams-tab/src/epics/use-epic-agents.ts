@@ -124,8 +124,60 @@ export type EpicAgentsState =
        * already in memory.
        */
       readonly artifacts: ArtifactTree;
+      /**
+       * When these rows were last known good — i.e. when a snapshot or update
+       * last landed. Carried on the state rather than derived at render time
+       * because the deciding fact for a user looking at a stale view is HOW
+       * OLD it is, and only the code that received the data knows that.
+       */
+      readonly updatedAt: number;
+      /**
+       * Whether the socket is up RIGHT NOW.
+       *
+       * Separate from `updatedAt` on purpose: a live connection with no
+       * traffic for ten minutes is fine (nothing changed), while a dropped
+       * connection makes every row on screen a claim about the past. Only the
+       * second is staleness, and conflating them would put a warning on a
+       * healthy idle epic.
+       */
+      readonly connected: boolean;
     }
   | { readonly kind: "error"; readonly detail: string };
+
+/**
+ * How a socket status change moves `EpicAgentsState`.
+ *
+ * EXTRACTED FROM THE HANDLER so it can be asserted at its own level. It lived
+ * inline in a `setState` callback inside an effect inside a hook wired to a
+ * Y.Doc and a websocket - reachable by a test only through machinery whose
+ * failure modes would drown the one behaviour under test. A mutation to it
+ * reddened nothing, because nothing could reach it.
+ *
+ * THE BUG THIS FIXES. The old version began `if (prev.kind !== "loading")
+ * return prev`, so once the epic had data the screen NEVER learned the socket
+ * had dropped. `EpicConnectionState` has a `stale` member; the status strip
+ * renders it WITH the age and says in its own comment that the age is the
+ * whole decision - and nothing, anywhere, constructed it. A correct renderer
+ * for a state that could not occur.
+ */
+export function applyConnectionStatus(
+  prev: EpicAgentsState,
+  status: string,
+): EpicAgentsState {
+  const open = status === "open";
+  if (prev.kind === "ready") {
+    // Same-reference return when nothing changed: this fires on every
+    // heartbeat-driven status emit, and a fresh object each time re-renders
+    // every consumer of the epic for no reason.
+    return prev.connected === open ? prev : { ...prev, connected: open };
+  }
+  if (prev.kind !== "loading") return prev;
+  // Only ever advances toward the snapshot; a reconnect mid-load must not
+  // report "downloading" when the socket just dropped.
+  return open
+    ? { kind: "loading", phase: "subscribing" }
+    : { kind: "loading", phase: "connecting" };
+}
 
 /**
  * One `Y.Doc` per epic, for the lifetime of the tab.
@@ -202,6 +254,12 @@ export function useEpicAgents(
         chats,
         tree: buildChatTree(chats),
         artifacts: buildArtifactTree(readArtifactsFromEpicDoc(doc)),
+        updatedAt: Date.now(),
+        // Rendered from a CACHED doc before the socket is up. `connected:
+        // false` is the truth at this instant, and the status handler flips
+        // it when the socket opens - which is exactly the case the old code
+        // dropped, because it only ever updated a `loading` state.
+        connected: false,
       });
     } else {
       setState({ kind: "loading", phase: "connecting" });
@@ -264,6 +322,10 @@ export function useEpicAgents(
         chats,
         tree: buildChatTree(chats),
         artifacts: buildArtifactTree(artifacts),
+        updatedAt: Date.now(),
+        // Data just arrived over the wire, so the socket is up by
+        // construction.
+        connected: true,
       });
     };
 
@@ -356,13 +418,7 @@ export function useEpicAgents(
       onConnectionStatus: (status) => {
         if (disposed) return;
         if (status === "open") mark("socket-open");
-        setState((prev) => {
-          if (prev.kind !== "loading") return prev;
-          // Only ever advances toward the snapshot; a reconnect mid-load must
-          // not report "downloading" when the socket just dropped.
-          if (status === "open") return { kind: "loading", phase: "subscribing" };
-          return { kind: "loading", phase: "connecting" };
-        });
+        setState((prev) => applyConnectionStatus(prev, status));
       },
       onMigrationStarted: () => undefined,
       onMigrationProgress: () => undefined,

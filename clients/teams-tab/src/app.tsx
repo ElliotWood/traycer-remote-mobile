@@ -25,6 +25,7 @@ import { AppShell } from "./shell/app-shell";
 import { ErrorBoundary } from "./shell/error-boundary";
 import { type EpicConnectionState } from "./shell/epic-status-row";
 import { useShellStatus } from "./shell/shell-status";
+import { toEpicConnectionState } from "./shell/epic-connection";
 import { EpicDetail } from "./epics/epic-detail";
 import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
@@ -266,12 +267,20 @@ function EpicScreen({
    * The status derives from the SAME state the body renders from, so the
    * strip cannot say "live" while the list is still loading.
    */
-  const connection: EpicConnectionState =
-    agents.kind === "loading"
-      ? { kind: "loading" }
-      : agents.kind === "error"
-        ? { kind: "error" }
-        : { kind: "live" };
+  /*
+   * The mapping moved to `shell/epic-connection.ts`. It lived here as a
+   * ternary chain that produced THREE of `EpicConnectionState`'s four
+   * members - `stale` was never constructed, so the strip's `stale` branch,
+   * which renders the age and says in its own comment that the age is the
+   * whole decision, could not appear on screen.
+   *
+   * A chain is where that hides: adding a union member does not break one,
+   * it just quietly never produces it.
+   */
+  const connection: EpicConnectionState = toEpicConnectionState({
+    agents,
+    now,
+  });
   // Into the FRAME's status region. Cleared automatically when this screen
   // unmounts, so a "live" pill never outlives the epic it describes.
   useShellStatus(connection);
@@ -824,6 +833,8 @@ export function App(): ReactElement {
           chats: AGENTS_DEEP_FIXTURE,
           tree: buildChatTree(AGENTS_DEEP_FIXTURE),
           artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
+          updatedAt: Date.now(),
+          connected: true,
         };
       case "error":
         return {
@@ -836,6 +847,26 @@ export function App(): ReactElement {
           chats: [],
           tree: buildChatTree([]),
           artifacts: buildArtifactTree([]),
+          updatedAt: Date.now(),
+          connected: true,
+        };
+      /*
+       * THE STATE THAT COULD NOT BE PRODUCED ON DEMAND, which is part of why
+       * it went unbuilt: `stale` had a renderer, an age, and a comment
+       * explaining that the age is the whole decision - and no route, no
+       * fixture and no producer. Nobody could look at it.
+       *
+       * Seventeen minutes so the label is a real interval rather than
+       * "0s ago", which reads as a rendering fault rather than as an age.
+       */
+      case "stale":
+        return {
+          kind: "ready",
+          chats: AGENTS_FIXTURE,
+          tree: buildChatTree(AGENTS_FIXTURE),
+          artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
+          updatedAt: Date.now() - 17 * 60_000,
+          connected: false,
         };
       default:
         return {
@@ -843,6 +874,8 @@ export function App(): ReactElement {
           chats: AGENTS_FIXTURE,
           tree: buildChatTree(AGENTS_FIXTURE),
           artifacts: buildArtifactTree(ARTIFACTS_FIXTURE),
+          updatedAt: Date.now(),
+          connected: true,
         };
     }
   })();
