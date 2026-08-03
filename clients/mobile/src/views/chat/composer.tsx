@@ -181,8 +181,9 @@ export function Composer({
   // M2 item 3: the banner is derived from `providers.list`, which mobile
   // already polls — there is no rate-limit signal on `chat.subscribe`.
   const { providers } = useProviders(client);
+  const bannerProviderId = guiHarnessIdToProviderId(harnessId);
   const bannerProfiles =
-    providers.find((p) => p.providerId === guiHarnessIdToProviderId(harnessId))?.profiles ?? [];
+    providers.find((p) => p.providerId === bannerProviderId)?.profiles ?? [];
 
   const { harnesses, probing: harnessesProbing } = useGuiHarnesses(client);
   const availableHarnesses = selectableHarnesses(harnesses);
@@ -319,6 +320,7 @@ export function Composer({
       {!readOnly && (
         <RateLimitBanner
           profiles={bannerProfiles}
+          providerId={bannerProviderId ?? ""}
           currentProfileId={profileId}
           model={selectedModel}
           onSwitchProfile={setProfileId}

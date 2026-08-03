@@ -44,11 +44,14 @@ function limitDescription(
 export function RateLimitBanner({
   profiles,
   currentProfileId,
+  providerId,
   model,
   onSwitchProfile,
 }: {
   readonly profiles: readonly ProviderProfile[];
   readonly currentProfileId: string | null;
+  /** The provider these profiles belong to — a commit id is only unique within one. */
+  readonly providerId: string;
   readonly model: GuiAgentModelOption | null;
   readonly onSwitchProfile: (profileId: string | null) => void;
 }): ReactElement | null {
@@ -148,7 +151,11 @@ export function RateLimitBanner({
         <X size={13} aria-hidden="true" />
       </button>
       {limitsOpen && (
-        <UsageSheet onClose={() => setLimitsOpen(false)} anchorProfileId={currentProfileId} />
+        <UsageSheet
+          onClose={() => setLimitsOpen(false)}
+          anchorProfileId={currentProfileId}
+          anchorProviderId={providerId}
+        />
       )}
     </div>
   );

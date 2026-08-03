@@ -80,10 +80,18 @@ function hostWith(provider: ProviderCliState): {
   return { fake, usageProfileIds };
 }
 
-function renderSheet(fake: FakeHostClient, anchorProfileId: string | null | undefined): void {
+function renderSheet(
+  fake: FakeHostClient,
+  anchorProfileId: string | null | undefined,
+  anchorProviderId: string | undefined,
+): void {
   render(
     <HostClientProvider client={fake.client}>
-      <UsageSheet onClose={() => {}} anchorProfileId={anchorProfileId} />
+      <UsageSheet
+        onClose={() => {}}
+        anchorProfileId={anchorProfileId}
+        anchorProviderId={anchorProviderId}
+      />
     </HostClientProvider>,
   );
 }
@@ -97,7 +105,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake, undefined);
+    renderSheet(fake, undefined, undefined);
 
     await waitFor(() => {
       expect(usageProfileIds).toContain("p-one");
@@ -114,7 +122,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake, undefined);
+    renderSheet(fake, undefined, undefined);
 
     await waitFor(() => {
       expect(screen.getByText(/First account/)).toBeTruthy();
@@ -129,7 +137,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake, undefined);
+    renderSheet(fake, undefined, undefined);
 
     await waitFor(() => {
       expect(screen.getByText(/signed in on this machine/)).toBeTruthy();
@@ -138,7 +146,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
 
   it("does not label a lone profile — there is nothing to disambiguate", async () => {
     const { fake } = hostWith(providerRow([profile({ profileId: "p-only", label: "Only account" })]));
-    renderSheet(fake, undefined);
+    renderSheet(fake, undefined, undefined);
 
     await waitFor(() => {
       expect(screen.getByText("Claude Code")).toBeTruthy();
@@ -150,7 +158,7 @@ describe("UsageSheet — profile election (M2 item 1)", () => {
     // The pre-profile shape: `profileId: null` is the honest request, and the
     // card must not silently render nothing.
     const { fake, usageProfileIds } = hostWith(providerRow([]));
-    renderSheet(fake, undefined);
+    renderSheet(fake, undefined, undefined);
 
     await waitFor(() => {
       expect(usageProfileIds).toEqual(["<null>"]);
@@ -169,7 +177,7 @@ describe("UsageSheet — anchoring (M2 item 4)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake, "p-two");
+    renderSheet(fake, "p-two", "claude-code");
 
     await waitFor(() => {
       expect(screen.getByText(/Second account/)).toBeTruthy();
@@ -188,7 +196,7 @@ describe("UsageSheet — anchoring (M2 item 4)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake, null);
+    renderSheet(fake, null, "claude-code");
 
     await waitFor(() => {
       expect(document.querySelectorAll('[data-anchored="true"]')).toHaveLength(1);
@@ -202,11 +210,62 @@ describe("UsageSheet — anchoring (M2 item 4)", () => {
         profile({ profileId: "p-two", label: "Second account" }),
       ]),
     );
-    renderSheet(fake, undefined);
+    renderSheet(fake, undefined, undefined);
 
     await waitFor(() => {
       expect(screen.getByText(/First account/)).toBeTruthy();
     });
     expect(document.querySelectorAll('[data-anchored="true"]')).toHaveLength(0);
+  });
+});
+
+describe("UsageSheet — anchoring is provider-scoped", () => {
+  it("anchors ONE row when two providers each have an ambient profile", async () => {
+    /**
+     * Found by photographing the real sheet, not by unit test.
+     *
+     * Every provider has an ambient row and they all commit to `null`, so
+     * anchoring on the commit id alone highlighted one row PER PROVIDER — two
+     * on this host. The earlier tests used a single provider, which is exactly
+     * the shape that cannot see it: the same blind spot as `profiles[0]` being
+     * correct until there are two.
+     */
+    const usageProfileIds: string[] = [];
+    const claude = providerRow([
+      profile({ profileId: "ambient", kind: "ambient", label: "Claude terminal" }),
+    ]);
+    const codex = providerCliStateSchema.parse({
+      providerId: "codex",
+      enabled: true,
+      disabledBy: null,
+      selected: { kind: "path" },
+      candidates: [],
+      authPending: false,
+      checkedAt: null,
+      apiKey: { supported: false, configured: false, source: null },
+      auth: { status: "authenticated", label: null, badgeText: null, detail: null },
+      profiles: [profile({ profileId: "ambient", kind: "ambient", label: "Codex terminal" })],
+    });
+    const fake = createFakeHostClient((method, params) => {
+      if (method === "providers.list") return Promise.resolve({ providers: [claude, codex] });
+      if (method === "host.getRateLimitUsage") {
+        usageProfileIds.push((params as { profileId: string | null }).profileId ?? "<null>");
+        return Promise.resolve({
+          totalTokens: null,
+          remainingTokens: null,
+          providerRateLimits: { available: false, provider: "codex", reason: "timeout" },
+        });
+      }
+      return Promise.reject(new Error(`unexpected RPC: ${method}`));
+    });
+
+    renderSheet(fake, null, "codex");
+
+    // Wait for BOTH providers to have rendered before counting anchors —
+    // counting early could see one provider and pass for the wrong reason.
+    await waitFor(() => {
+      expect(usageProfileIds.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(document.querySelectorAll('[data-anchored="true"]')).toHaveLength(1);
   });
 });

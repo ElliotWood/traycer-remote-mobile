@@ -26,11 +26,28 @@ export interface UsageSheetProps {
    * these" rather than "this one".
    *
    * `undefined` means "opened from the toolbar, nothing to anchor to".
+   *
+   * Must be paired with {@link anchorProviderId}: a commit id is only unique
+   * WITHIN a provider. Every provider has an ambient row and they all commit
+   * to `null`, so anchoring on the id alone highlights one row per provider.
    */
   readonly anchorProfileId?: string | null;
+  /**
+   * The provider the anchored profile belongs to.
+   *
+   * Found by photographing the sheet: with `anchorProfileId: null` (ambient),
+   * TWO rows highlighted — codex's ambient and claude-code's ambient — because
+   * both commit to `null`. The unit test used a single provider, so it could
+   * not see it.
+   */
+  readonly anchorProviderId?: string;
 }
 
-export function UsageSheet({ onClose, anchorProfileId }: UsageSheetProps): ReactElement {
+export function UsageSheet({
+  onClose,
+  anchorProfileId,
+  anchorProviderId,
+}: UsageSheetProps): ReactElement {
   const client = useHostClientOrNull();
   const { providers, loading } = useProviders(client);
   const enabled = providers.filter((p) => p.enabled);
@@ -48,6 +65,7 @@ export function UsageSheet({ onClose, anchorProfileId }: UsageSheetProps): React
             client={client}
             provider={provider}
             anchorProfileId={anchorProfileId}
+            anchorProviderId={anchorProviderId}
           />
         ))
       )}
@@ -81,10 +99,12 @@ function ProviderUsageCard({
   client,
   provider,
   anchorProfileId,
+  anchorProviderId,
 }: {
   readonly client: MobileHostClient | null;
   readonly provider: ProviderCliState;
   readonly anchorProfileId: string | null | undefined;
+  readonly anchorProviderId: string | undefined;
 }): ReactElement {
   return (
     <div
@@ -144,6 +164,7 @@ function ProviderUsageCard({
             // matching on `profileId` would never anchor to it.
             anchored={
               anchorProfileId !== undefined &&
+              anchorProviderId === provider.providerId &&
               profileCommitId(profile) === anchorProfileId
             }
           />
