@@ -70,7 +70,7 @@ describe("CommandSheet", () => {
   });
 
   it("renders a row per command, with the kind visible on each", () => {
-    render(<CommandSheet commands={COMMANDS} loading={false} onPick={() => {}} onClose={() => {}} />);
+    render(<CommandSheet commands={COMMANDS} phase="loaded" onPick={() => {}} onClose={() => {}} />);
 
     const rows = commandRows();
     expect(rows).toHaveLength(COMMANDS.length);
@@ -92,7 +92,7 @@ describe("CommandSheet", () => {
 
   it("hands back the command that was TAPPED, not the first one sharing its name", () => {
     const onPick = vi.fn();
-    render(<CommandSheet commands={COMMANDS} loading={false} onPick={onPick} onClose={() => {}} />);
+    render(<CommandSheet commands={COMMANDS} phase="loaded" onPick={onPick} onClose={() => {}} />);
 
     const skillRow = commandRows().find((el) => (el.textContent ?? "").includes("Skill"));
     if (skillRow === undefined) throw new Error("no skill row");
@@ -112,7 +112,7 @@ describe("CommandSheet", () => {
     render(
       <CommandSheet
         commands={[command("deploy", {}), command("ship", { description: "Ship it." })]}
-        loading={false}
+        phase="loaded"
         onPick={() => {}}
         onClose={() => {}}
       />,
@@ -139,7 +139,7 @@ describe("CommandSheet", () => {
     function renderInNavHost(onClose: () => void, onPopRoutes: (count: number) => void): void {
       render(
         <NavHost routeDepth={1} onPopRoutes={onPopRoutes}>
-          <CommandSheet commands={COMMANDS} loading={false} onPick={() => {}} onClose={onClose} />
+          <CommandSheet commands={COMMANDS} phase="loaded" onPick={() => {}} onClose={onClose} />
         </NavHost>,
       );
     }
@@ -179,9 +179,13 @@ describe("CommandSheet", () => {
  * this epic has now found that shape four times. So the reachability of each
  * of the sheet's states gets asserted from the CALL SITE.
  *
- * These three tests are written to record what the composer does TODAY, and
- * two of them describe a gap rather than a feature — see the comment on each.
- * They are the evidence behind the finding, not an endorsement of it.
+ * These four began as a record of a GAP: the mount was gated on there being
+ * at least one row, so three of the four states below rendered nothing at
+ * all, and `/` went permanently inert after a single failed request. They now
+ * assert the fix. The set is kept together deliberately — each of the three
+ * empty states renders zero rows, so any one of them alone is satisfied by a
+ * component that renders zero rows for every reason. Only the contrast is
+ * evidence.
  */
 describe("Composer — which of the sheet's states are reachable", () => {
   beforeEach(() => {
@@ -237,25 +241,25 @@ describe("Composer — which of the sheet's states are reachable", () => {
     expect(commandRows()).toHaveLength(2);
   });
 
-  it("renders NOTHING while the catalogue is still in flight", async () => {
-    // GAP, not a feature. The sheet has a "Loading commands…" state whose own
-    // comment explains why it must be told apart from "no matches" — and the
-    // mount is gated on `sheetCommands.length > 0`, so it can never render.
-    // Typing `/` on a cold catalogue gives the user no feedback whatsoever.
+  it("says it is LOADING while the catalogue is in flight, rather than nothing", async () => {
     renderComposer(hostWith(() => new Promise(() => {/* never settles */})));
     typeSlash("/rev");
 
-    // A settle window, because an absence read immediately cannot fail for
-    // anything slow — the defect this workstream found in its own harness.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole("dialog", { name: "Commands" })).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("command-empty-loading")).toBeTruthy();
+    });
+    // The verdict, not the count. All three empty states render zero rows, so
+    // a test asserting "no rows" passes against every one of them — including
+    // the two that are wrong.
+    expect(screen.queryByTestId("command-empty-no-matches")).toBeNull();
+    expect(screen.queryByTestId("command-empty-undetermined")).toBeNull();
   });
 
-  it("renders NOTHING when the catalogue request FAILED", async () => {
-    // The sharper half of the same gap. `useGuiCommands` distinguishes `error`
-    // from `loaded`, and the composer discards that at `loading={phase ===
-    // "loading"}`. A dropped socket makes `/` silently inert, and the user
-    // cannot tell it from "this harness has no such command".
+  it("says it CANNOT TELL when the catalogue request failed — not 'no matches'", async () => {
+    // The arm the boolean discarded. A dropped socket used to make `/` inert
+    // for the rest of the session with nothing on screen; the nearest wrong
+    // answer available to it is "No matching commands.", which is a confident
+    // claim about a catalogue this client never received.
     const host = hostWith(() => Promise.reject(new Error("socket dropped")));
     renderComposer(host);
 
@@ -264,7 +268,23 @@ describe("Composer — which of the sheet's states are reachable", () => {
     });
     typeSlash("/rev");
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole("dialog", { name: "Commands" })).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("command-empty-undetermined")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("command-empty-no-matches")).toBeNull();
+  });
+
+  it("says NO MATCHES for a query the loaded catalogue really does not have", async () => {
+    // The pair that makes the two above falsifiable: this renders zero rows
+    // for a DIFFERENT reason, and must reach a different verdict. If the
+    // phase were dropped again, these three collapse onto one and two fail.
+    renderComposer(hostWith(loaded));
+    typeSlash("/zzzznotacommand");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("command-empty-no-matches")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("command-empty-undetermined")).toBeNull();
+    expect(screen.queryByTestId("command-empty-loading")).toBeNull();
   });
 });

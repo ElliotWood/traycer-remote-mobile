@@ -287,13 +287,23 @@ export function Composer({
    */
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const setSheetDismissed = (): void => setDismissedAt(trigger?.start ?? null);
-  const sheetCommands =
-    slashTrigger !== null && dismissedAt !== slashTrigger.start ? matchingCommands : [];
   /**
-   * Unlike the command sheet, this opens on an empty list. That IS the
-   * feature: "no matches" and "this workspace is unreadable" are the states
-   * the canary exists to tell apart, and a sheet that hides itself when empty
-   * can render neither.
+   * Openness and contents are separate, and conflating them was a defect: the
+   * sheet used to mount only when `sheetCommands` was non-empty, so a cold
+   * catalogue, a no-match and a FAILED request all rendered nothing at all.
+   * `/` was silently inert for the rest of the session after one rejection.
+   *
+   * The `@` sheet below hides on an absent SUBJECT (no roots to search), which
+   * is a different thing from hiding on an empty RESULT. The command catalogue
+   * is harness-scoped and always exists, so there is always a subject.
+   */
+  const commandSheetOpen =
+    slashTrigger !== null && dismissedAt !== slashTrigger.start;
+  const sheetCommands = commandSheetOpen ? matchingCommands : [];
+  /**
+   * Same rule, and it was always right here: "no matches" and "this workspace
+   * is unreadable" are the states the canary exists to tell apart, and a sheet
+   * that hides itself when empty can render neither.
    */
   const mentionSheetOpen =
     mentionTrigger !== null && dismissedAt !== mentionTrigger.start;
@@ -524,7 +534,7 @@ export function Composer({
               // Escape dismisses the sheet without touching the draft. The
               // ticket requires the text and caret to survive this intact,
               // which they do because dismissal is a caret-independent flag.
-              if (e.key === "Escape" && (sheetCommands.length > 0 || mentionSheetOpen)) {
+              if (e.key === "Escape" && (commandSheetOpen || mentionSheetOpen)) {
                 e.preventDefault();
                 setSheetDismissed();
                 return;
@@ -616,10 +626,10 @@ export function Composer({
             />
           </>
         )}
-        {sheetCommands.length > 0 && (
+        {commandSheetOpen && (
           <CommandSheet
             commands={sheetCommands}
-            loading={commandsPhase === "loading"}
+            phase={commandsPhase}
             onPick={pickCommand}
             onClose={setSheetDismissed}
           />

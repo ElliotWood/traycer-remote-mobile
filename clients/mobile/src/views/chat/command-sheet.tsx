@@ -9,38 +9,71 @@
  * `kind` is shown as a visible badge, not a colour or an icon alone —
  * `slash-command` and `skill` behave differently when run, and the host does
  * distinguish them (measured: 35 vs 31 on this host's Claude catalogue).
+ *
+ * ## Three empty states, and why the sheet opens on all of them
+ *
+ * This took `phase` rather than a `loading` boolean only after the boolean
+ * shipped: `useGuiCommands` distinguishes `error` from `loaded`, the composer
+ * collapsed that to `phase === "loading"`, and the ERROR arm was discarded on
+ * the way in. The mount was also gated on there being at least one row — so
+ * every state below was unreachable, including the one whose comment argued
+ * it had to be told apart from the others. **A `/` on a cold or broken
+ * catalogue rendered nothing at all**, which the user cannot tell from "this
+ * app has no slash commands".
+ *
+ * The `@` sheet hides itself when there are no roots, and that IS honest —
+ * with nothing to search there is no subject. It does not generalise here:
+ * the catalogue is harness-scoped and **always exists**, so hiding is not
+ * honesty, it is silence about a state this component can name.
  */
 import type { ReactElement } from "react";
 import { Slash, Sparkles } from "lucide-react";
 import type { GuiAgentCommandOption } from "@traycer/protocol/host/agent/gui/unary-schemas";
+import type { GuiCommandsPhase } from "@/host/use-gui-commands";
 import { BottomSheet } from "@/views/toolbar/bottom-sheet";
 import { radius, theme, type } from "@/views/design-tokens";
 
 export interface CommandSheetProps {
   readonly commands: readonly GuiAgentCommandOption[];
-  /** True while the catalogue is in flight — an empty list then is not "no matches". */
-  readonly loading: boolean;
+  /**
+   * The catalogue's own three-valued state, passed through rather than
+   * reduced. An empty list means something different under each of them, and
+   * a boolean cannot carry the difference.
+   */
+  readonly phase: GuiCommandsPhase;
   readonly onPick: (command: GuiAgentCommandOption) => void;
   readonly onClose: () => void;
 }
 
+/**
+ * Each verdict gets its own testid, so a test asserts WHICH state rendered
+ * rather than that zero rows did. All three render zero rows; the count is
+ * exactly the thing that cannot tell them apart.
+ */
+const EMPTY_COPY: Record<"loading" | "no-matches" | "undetermined", string> = {
+  loading: "Loading commands…",
+  "no-matches": "No matching commands.",
+  // Not "no commands": we do not know that, and saying so would be the
+  // confident wrong answer this arm exists to avoid.
+  undetermined: "Can't load commands right now.",
+};
+
 export function CommandSheet({
   commands,
-  loading,
+  phase,
   onPick,
   onClose,
 }: CommandSheetProps): ReactElement {
+  const verdict =
+    phase === "loading" ? "loading" : phase === "error" ? "undetermined" : "no-matches";
   return (
     <BottomSheet title="Commands" onClose={onClose}>
-      {loading && commands.length === 0 ? (
-        // Distinguished from "no matches" deliberately: they look identical on
-        // screen and mean opposite things about whether to keep typing.
-        <p style={{ ...type.bodySm, color: theme.mutedText, margin: "4px 8px" }}>
-          Loading commands&hellip;
-        </p>
-      ) : commands.length === 0 ? (
-        <p style={{ ...type.bodySm, color: theme.mutedText, margin: "4px 8px" }}>
-          No matching commands.
+      {commands.length === 0 ? (
+        <p
+          data-testid={`command-empty-${verdict}`}
+          style={{ ...type.bodySm, color: theme.mutedText, margin: "4px 8px" }}
+        >
+          {EMPTY_COPY[verdict]}
         </p>
       ) : (
         commands.map((command) => (
