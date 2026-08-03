@@ -92,7 +92,9 @@ import {
 import { NotificationsScreen } from "./notifications/notifications-screen";
 import { NOTIFICATIONS_FIXTURE, NOTIFICATIONS_NOW } from "./notifications/notifications-fixture";
 import { useShellNotifications } from "./shell/shell-notifications";
-import type { FleetEpic } from "@traycer-clients/shared/epic/epic-list";
+import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
+import { CanvasScreen } from "./canvas/canvas-screen";
+import { EMPTY_CANVAS, type CanvasState } from "./canvas/canvas-state";
 import {
   createTabHostConnection,
   type HostConnectionAuth,
@@ -451,6 +453,13 @@ function EpicsScreen({
   // that breaks on refresh.
   const [opened, setOpened] = useState<FleetEpic | null>(null);
   const [openedChat, setOpenedChat] = useState<EpicChatEntry | null>(null);
+  /*
+   * The canvas layout, held here rather than inside `CanvasScreen`, so it
+   * survives navigating away to a chat and back. Not persisted yet — see the
+   * `canvas` case below and `canvas-screen.tsx`'s docblock for why that is one
+   * more commit rather than one more line.
+   */
+  const [canvas, setCanvas] = useState<CanvasState>(EMPTY_CANVAS);
   // Null under preview, so no path from this screen can create against a host.
   const epicAuthoring = useCreateEpic(
     connection?.hostClient ?? null,
@@ -514,124 +523,194 @@ function EpicsScreen({
     openNotifications,
   );
 
-  if (route.name === "waiting") {
-    return (
-      <WaitingScreen
-        styles={styles}
-        state={waitingPreview ?? toAttentionState(notifications)}
-        // The FIXTURE clock under preview. Passing the real one floors every
-        // age to "now" — the fixture timestamps sit ahead of it, so
-        // `max(0, now - at)` is zero for all of them and the oldest-first
-        // sort becomes unverifiable. Caught in the image, not the types.
-        now={waitingPreview === null ? now : ATTENTION_NOW}
-      />
-    );
-  }
+  /*
+   * EXHAUSTIVE DISPATCH, and it takes a `switch` for that word to mean
+   * anything.
+   *
+   * This was a chain of `if (route.name === …)` returns with an unguarded
+   * trailing `return` for the epics list. That shape compiles clean when
+   * `Route` grows a member and renders the TRAILING branch for it — so a new
+   * route deep-links to the epics list, which is indistinguishable from the
+   * user having typed a bad URL.
+   *
+   * MEASURED BEFORE CHANGING IT, because "the union is discriminated so the
+   * compiler will find every consumer" is exactly the kind of claim this
+   * project has learned to distrust. A probe member added to `Route` and
+   * `tsc -b --force` run produced ONE error — `routeToPath`, the path builder.
+   * This file, the thing that puts a route on a screen, produced none.
+   *
+   * It is the defect this file already documents about ITSELF thirty lines
+   * up, in the opposite direction: `toEpicConnectionState` was extracted
+   * because a ternary chain never PRODUCES a new union member. A dispatch
+   * chain never CONSUMES one. The `never` below is what turns the next
+   * addition into a compile error instead of a wrong screen.
+   */
+  switch (route.name) {
+    case "waiting":
+      return (
+        <WaitingScreen
+          styles={styles}
+          state={waitingPreview ?? toAttentionState(notifications)}
+          // The FIXTURE clock under preview. Passing the real one floors every
+          // age to "now" — the fixture timestamps sit ahead of it, so
+          // `max(0, now - at)` is zero for all of them and the oldest-first
+          // sort becomes unverifiable. Caught in the image, not the types.
+          now={waitingPreview === null ? now : ATTENTION_NOW}
+        />
+      );
 
-  if (route.name === "notifications") {
-    return (
-      <div className={styles.screen}>
-        <NotificationsScreen
-          state={notifications}
-          // Already null under any preview, so the writes are disabled rather
-          // than faked — the same property every other preview surface holds.
-          client={connection?.hostClient ?? null}
-          now={notificationsPreview === null ? now : NOTIFICATIONS_NOW}
-          onOpenChat={(epicId, chatId) => {
-            navigate({ name: "chat", epicId, chatId });
-          }}
-          onOpenEpic={(epicId) => {
-            navigate({ name: "epic", epicId });
+    case "notifications":
+      return (
+        <div className={styles.screen}>
+          <NotificationsScreen
+            state={notifications}
+            // Already null under any preview, so the writes are disabled rather
+            // than faked — the same property every other preview surface holds.
+            client={connection?.hostClient ?? null}
+            now={notificationsPreview === null ? now : NOTIFICATIONS_NOW}
+            onOpenChat={(epicId, chatId) => {
+              navigate({ name: "chat", epicId, chatId });
+            }}
+            onOpenEpic={(epicId) => {
+              navigate({ name: "epic", epicId });
+            }}
+          />
+        </div>
+      );
+
+    case "chat":
+      return (
+        <ChatRoute
+          styles={styles}
+          streamConnection={streamConnection}
+          diffClient={connection?.hostClient ?? null}
+          epicId={route.epicId}
+          chatId={route.chatId}
+          // The agent row that opened it, so locality is known immediately. A
+          // DEEP LINK has none, and the chat screen treats that as unknown —
+          // not actionable — rather than assuming local.
+          entry={openedChat}
+          now={now}
+          onBack={() => {
+            navigate({ name: "epic", epicId: route.epicId });
           }}
         />
-      </div>
-    );
-  }
+      );
 
-  if (route.name === "chat") {
-    return (
-      <ChatRoute
-        styles={styles}
-        streamConnection={streamConnection}
-        diffClient={connection?.hostClient ?? null}
-        epicId={route.epicId}
-        chatId={route.chatId}
-        // The agent row that opened it, so locality is known immediately. A
-        // DEEP LINK has none, and the chat screen treats that as unknown —
-        // not actionable — rather than assuming local.
-        entry={openedChat}
-        now={now}
-        onBack={() => {
-          navigate({ name: "epic", epicId: route.epicId });
-        }}
-      />
-    );
-  }
+    case "epic":
+      return (
+        <EpicScreen
+          styles={styles}
+          preview={agentsPreview}
+          streamConnection={streamConnection}
+          // The UNARY client, not the stream one: `epic.createChat` is a
+          // request/response call, and it is null under preview so the
+          // "no path from here reaches the host" property still holds.
+          hostClient={connection?.hostClient ?? null}
+          epicId={route.epicId}
+          epic={opened !== null && opened.id === route.epicId ? opened : null}
+          now={now}
+          onBack={() => {
+            navigate({ name: "epics" });
+          }}
+          onOpenAgent={(chatId, entry) => {
+            setOpenedChat(entry);
+            navigate({ name: "chat", epicId: route.epicId, chatId });
+          }}
+        />
+      );
 
-  if (route.name === "epic") {
-    return (
-      <EpicScreen
-        styles={styles}
-        preview={agentsPreview}
-        streamConnection={streamConnection}
-        // The UNARY client, not the stream one: `epic.createChat` is a
-        // request/response call, and it is null under preview so the
-        // "no path from here reaches the host" property still holds.
-        hostClient={connection?.hostClient ?? null}
-        epicId={route.epicId}
-        epic={opened !== null && opened.id === route.epicId ? opened : null}
-        now={now}
-        onBack={() => {
-          navigate({ name: "epics" });
-        }}
-        onOpenAgent={(chatId, entry) => {
-          setOpenedChat(entry);
-          navigate({ name: "chat", epicId: route.epicId, chatId });
-        }}
-      />
-    );
-  }
+    /*
+     * BESIDE the `epic` case above, not replacing it. Both routes address the
+     * same epic and mean different things: `epic` is a list you read, this is
+     * a workspace you arrange. Nothing above changed.
+     *
+     * The layout is held in THIS component's state rather than the canvas's,
+     * so it survives navigating to a chat and back — and it is deliberately
+     * not persisted yet. `browserCanvasStorage(epicId)` is per-epic and the
+     * naive wiring shows one epic's layout under another's key; that lands
+     * with its own test rather than as a line in this one.
+     */
+    case "canvas":
+      return (
+        <CanvasScreen
+          epicId={route.epicId}
+          // Same rule as the detail screen: the row that was clicked when
+          // there was one, and nothing invented when there was not.
+          epicName={
+            opened !== null && opened.id === route.epicId
+              ? epicDisplayName(opened)
+              : null
+          }
+          state={canvas}
+          onChange={setCanvas}
+          onBack={() => {
+            navigate({ name: "epic", epicId: route.epicId });
+          }}
+        />
+      );
 
-  return (
-    <div className={styles.screen}>
-      <div className={styles.header}>
-        <Subtitle1>Epics</Subtitle1>
-        {state.kind === "ready" ? (
-          <Text size={200} className={styles.subtle}>
-            {state.epics.length} {state.epics.length === 1 ? "epic" : "epics"}
-          </Text>
-        ) : null}
-      </div>
-      <EpicsView
-        state={state}
-        now={now}
-        hostClientType={hostClientType}
-        onReload={reload}
-        onLoadMore={loadMore}
-        onOpen={(epic) => {
-          setOpened(epic);
-          navigate({ name: "epic", epicId: epic.id });
-        }}
-      />
-      {/*
-        NO NAVIGATION ON SUCCESS, and no fabricated row — the same rule the
-        agent create follows, reached the same way. Jumping to the new epic
-        would mean either inventing a `FleetEpic` from the request we just sent
-        (a row claiming to be replicated state) or landing on a detail screen
-        with nothing to show. Reloading asks the host and lets its own row
-        arrive in the list above.
-      */}
-      <Subtitle1>New epic</Subtitle1>
-      <CreateEpicForm
-        configuredHostId={CONFIGURED_HOST_ID}
-        userId={userId}
-        phase={epicAuthoring.phase}
-        onCreate={(instruction) => {
-          epicAuthoring.create(instruction);
-        }}
-      />
-    </div>
-  );
+    /*
+     * NAMED, not trailing. This was the fallthrough `return` at the bottom of
+     * the function, which made it the screen for the epics route AND the
+     * screen for every route nobody had written yet. Those are two jobs and
+     * only one of them was intended.
+     *
+     * Unknown PATHS still resolve here — `parseRoute` maps them to `epics`
+     * deliberately, with its reason on the record. That is a decision about
+     * strings arriving from outside. This is a decision about members of a
+     * union we control, and it is the opposite one.
+     */
+    case "epics":
+      return (
+        <div className={styles.screen}>
+          <div className={styles.header}>
+            <Subtitle1>Epics</Subtitle1>
+            {state.kind === "ready" ? (
+              <Text size={200} className={styles.subtle}>
+                {state.epics.length} {state.epics.length === 1 ? "epic" : "epics"}
+              </Text>
+            ) : null}
+          </div>
+          <EpicsView
+            state={state}
+            now={now}
+            hostClientType={hostClientType}
+            onReload={reload}
+            onLoadMore={loadMore}
+            onOpen={(epic) => {
+              setOpened(epic);
+              navigate({ name: "epic", epicId: epic.id });
+            }}
+          />
+          {/*
+            NO NAVIGATION ON SUCCESS, and no fabricated row — the same rule the
+            agent create follows, reached the same way. Jumping to the new epic
+            would mean either inventing a `FleetEpic` from the request we just
+            sent (a row claiming to be replicated state) or landing on a detail
+            screen with nothing to show. Reloading asks the host and lets its
+            own row arrive in the list above.
+          */}
+          <Subtitle1>New epic</Subtitle1>
+          <CreateEpicForm
+            configuredHostId={CONFIGURED_HOST_ID}
+            userId={userId}
+            phase={epicAuthoring.phase}
+            onCreate={(instruction) => {
+              epicAuthoring.create(instruction);
+            }}
+          />
+        </div>
+      );
+
+    default: {
+      // The whole point of the switch. `route` is `never` here only while
+      // every member above is handled; the day one is not, this line is the
+      // error — instead of a new route quietly rendering the epics list.
+      const unhandled: never = route;
+      return unhandled;
+    }
+  }
 }
 
 export function App(): ReactElement {
