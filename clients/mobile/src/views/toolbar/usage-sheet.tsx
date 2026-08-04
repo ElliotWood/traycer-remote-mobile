@@ -4,10 +4,10 @@
  * for the scoping simplification (openrouter/kilocode have no window
  * concept — balance-only fallback).
  */
-import { useEffect, useRef, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { ProviderCliState, ProviderProfile } from "@traycer/protocol/host/provider-schemas";
 import { useHostClientOrNull, type MobileHostClient } from "@/host/host-client-context";
-import { useProviders, useRateLimitUsage, extractUsageWindows, type UsageWindowRow } from "@/host/use-provider-usage";
+import { useProviders, useRateLimitUsage, extractUsageWindows, formatResetLine, type UsageWindowRow } from "@/host/use-provider-usage";
 import { PROVIDER_DISPLAY_NAMES } from "@traycer/protocol/host/provider-schemas";
 import { profileCommitId } from "@traycer-clients/shared/providers/provider-profile-model";
 import { radius, theme, type } from "@/views/design-tokens";
@@ -245,18 +245,19 @@ function ProfileUsageBlock({
   );
 }
 
-function formatResetLine(resetsAt: number | null): string {
-  if (resetsAt === null) return "";
-  const diffMs = resetsAt - Date.now();
-  if (diffMs <= 0) return "Resets soon";
-  const diffMinutes = Math.round(diffMs / 60_000);
-  if (diffMinutes < 180) return `Resets in ${diffMinutes}m`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 48) return `Resets in ${diffHours}h`;
-  return `Resets ${new Date(resetsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
-}
-
 function UsageWindowMeter({ row }: { readonly row: UsageWindowRow }): ReactElement {
+  /*
+   * The clock is read ONCE per mount, in a lazy initialiser, not during render.
+   *
+   * `formatResetLine` used to call `Date.now()` itself, which hid this from
+   * `react-hooks/purity` — moving the call into shared made the impurity
+   * visible and the rule fired immediately. It is a real one: a "Resets in 42m"
+   * label recomputed on every incidental re-render is exactly the unstable
+   * output the rule describes. Reading it once per mount is both pure by the
+   * rule and closer to what the label means, since the sheet re-mounts whenever
+   * it is reopened.
+   */
+  const [now] = useState(() => Date.now());
   const percent = Math.max(0, Math.min(100, Math.round(row.window.usedPercent)));
   const severe = percent >= 90;
   return (
@@ -264,7 +265,7 @@ function UsageWindowMeter({ row }: { readonly row: UsageWindowRow }): ReactEleme
       <div style={{ display: "flex", justifyContent: "space-between", ...type.bodyXs, color: theme.mutedText, marginBottom: 3 }}>
         <span>{row.label}</span>
         <span>
-          {percent}% used{row.window.resetsAt !== null ? ` · ${formatResetLine(row.window.resetsAt)}` : ""}
+          {percent}% used{row.window.resetsAt !== null ? ` · ${formatResetLine(row.window.resetsAt, now)}` : ""}
         </span>
       </div>
       <div style={{ height: 6, borderRadius: 999, background: theme.border, overflow: "hidden" }}>

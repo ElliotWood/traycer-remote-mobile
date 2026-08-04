@@ -448,6 +448,7 @@ function SettingsRoute({
       notifications={notifications}
       hostStatus={hostStatus}
       onSignOut={onSignOut}
+      client={client}
     />
   );
 }

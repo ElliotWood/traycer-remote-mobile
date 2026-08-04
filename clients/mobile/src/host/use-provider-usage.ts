@@ -1,74 +1,30 @@
 /**
  * Provider accounts + rate-limit usage — `providers.list` (poll, plain
- * unary) + `host.getRateLimitUsage` per provider (poll). Scoped down from
- * desktop's full multi-window/per-model/credit-detail rendering: this
- * normalizes each provider arm's own field names (codex's
- * primary/secondary/extraWindows, claude-code's fiveHour/sevenDay/
- * sevenDayOpus/sevenDaySonnet/modelScoped, grok's single `period`) into a
- * common `{label, window}[]` list wherever the arm actually carries
- * percent/reset window data — openrouter and kilocode report
- * credit-balance/spend fields instead (no window concept at all), so those
- * degrade to a plain balance line rather than a fabricated percent bar.
+ * unary) + `host.getRateLimitUsage` per provider (poll).
+ *
+ * THE ARM NORMALISATION MOVED. `windowLabel`, `extractUsageWindows` and
+ * `UsageWindowRow` now live in
+ * `@traycer-clients/shared/rate-limits/usage-windows` and are re-exported
+ * below, under the tab plan's decision 6 ("extract on demand, never
+ * duplicate") — `clients/teams-tab`'s settings screen needs the same
+ * normalisation and had deferred its usage row for want of it. The re-export
+ * is why every call site in this package is unchanged.
+ *
+ * What stays here is what is genuinely mobile's: the two polling hooks, typed
+ * on `MobileHostClient`.
  */
 import { useEffect, useState } from "react";
 import type { ProviderCliState, ProviderId } from "@traycer/protocol/host/provider-schemas";
-import type {
-  ProviderRateLimitWindow,
-  ProviderRateLimits,
-} from "@traycer/protocol/host/rate-limit/schemas";
+import type { ProviderRateLimits } from "@traycer/protocol/host/rate-limit/schemas";
 import { DEFAULT_ACCOUNT_CONTEXT } from "@traycer/protocol/common/schemas";
 import type { MobileHostClient } from "./host-client-context";
 
-export interface UsageWindowRow {
-  readonly label: string;
-  readonly window: ProviderRateLimitWindow;
-}
-
-/** `durationMinutes` → the Planner's exact desktop copy ("Current session"/"Weekly"); anything else falls back to a generic label. */
-export function windowLabel(durationMinutes: number | null): string {
-  if (durationMinutes === 300) return "Current session";
-  if (durationMinutes === 10080) return "Weekly";
-  return "Usage window";
-}
-
-/** `null` when the provider's arm has no window/percent concept at all (openrouter/kilocode) — callers show the balance-only fallback instead. */
-export function extractUsageWindows(rateLimits: ProviderRateLimits): readonly UsageWindowRow[] | null {
-  if (!rateLimits.available) return null;
-  switch (rateLimits.provider) {
-    case "codex": {
-      const rows: UsageWindowRow[] = [];
-      if (rateLimits.primary !== null) rows.push({ label: windowLabel(rateLimits.primary.durationMinutes), window: rateLimits.primary });
-      if (rateLimits.secondary !== null) rows.push({ label: windowLabel(rateLimits.secondary.durationMinutes), window: rateLimits.secondary });
-      for (const extra of rateLimits.extraWindows) {
-        if (extra.primary !== null) rows.push({ label: extra.limitName ?? windowLabel(extra.primary.durationMinutes), window: extra.primary });
-      }
-      return rows;
-    }
-    case "claude-code": {
-      const rows: UsageWindowRow[] = [];
-      if (rateLimits.fiveHour !== null) rows.push({ label: windowLabel(rateLimits.fiveHour.durationMinutes), window: rateLimits.fiveHour });
-      if (rateLimits.sevenDay !== null) rows.push({ label: windowLabel(rateLimits.sevenDay.durationMinutes), window: rateLimits.sevenDay });
-      if (rateLimits.sevenDayOpus !== null) rows.push({ label: "Opus (weekly)", window: rateLimits.sevenDayOpus });
-      if (rateLimits.sevenDaySonnet !== null) rows.push({ label: "Sonnet (weekly)", window: rateLimits.sevenDaySonnet });
-      for (const model of rateLimits.modelScoped) {
-        rows.push({ label: model.displayName, window: model });
-      }
-      return rows;
-    }
-    case "grok":
-      return rateLimits.period !== null
-        ? [{ label: windowLabel(rateLimits.period.durationMinutes), window: rateLimits.period }]
-        : [];
-    case "openrouter":
-    case "kilocode":
-      return null;
-    default:
-      // Defensive: a future rate-limit-capable provider arm this switch
-      // doesn't know about yet degrades to "no window data" rather than
-      // crashing the usage sheet.
-      return null;
-  }
-}
+export {
+  extractUsageWindows,
+  formatResetLine,
+  windowLabel,
+  type UsageWindowRow,
+} from "@traycer-clients/shared/rate-limits/usage-windows";
 
 export interface UseProvidersResult {
   readonly providers: readonly ProviderCliState[];

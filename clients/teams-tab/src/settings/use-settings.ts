@@ -35,6 +35,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { HostRequester } from "@traycer-clients/shared/host-client/host-client";
 import type { HostRpcRegistry } from "@traycer/protocol/host/index";
 import type { ProviderId } from "@traycer/protocol/host/provider-schemas";
+import type { ProviderRateLimits } from "@traycer/protocol/host/rate-limit";
+import { DEFAULT_ACCOUNT_CONTEXT } from "@traycer/protocol/common/schemas";
 import type {
   HostNotificationsChannelMatrix,
   HostNotificationsConfigResponse,
@@ -131,6 +133,51 @@ export interface ProviderSummary {
   readonly providerId: ProviderId;
   readonly enabled: boolean;
   readonly auth: { readonly status: string };
+  /**
+   * The accounts configured for this provider, for the usage rows below.
+   *
+   * `kind` is widened to `string` for the same reason `auth.status` is: this
+   * surface only ever compares it against `"ambient"`, and pinning the union
+   * would make a new profile kind a compile error in code that already handles
+   * it. `ProviderProfile` satisfies this structurally, so the real wire shape
+   * is still what arrives.
+   *
+   * MAY be empty, and that is a real state rather than a missing one — a
+   * provider that predates profiles reports none, and its usage is read with a
+   * `null` profile.
+   */
+  readonly profiles: ReadonlyArray<{
+    readonly profileId: string;
+    readonly kind: string;
+    readonly label: string;
+  }>;
+}
+
+/**
+ * A profile's COMMIT id — `null` for the ambient account, its own id
+ * otherwise. This is what `host.getRateLimitUsage` wants.
+ *
+ * Deliberately not `profileCommitId` from
+ * `@traycer-clients/shared/providers/provider-profile-model`: that function
+ * takes a full `ProviderProfile`, and taking it here would drag this screen's
+ * narrow summary back to the wide type the interface above exists to avoid.
+ * Same rule, one field.
+ *
+ * ⚠️ **`clients/mobile` passes the RAW `profileId` here instead**
+ * (`usage-sheet.tsx`: `profile?.profileId ?? null`), so its ambient row asks
+ * for usage under the literal `"ambient"` sentinel. `provider-profile-model.ts`
+ * says of exactly this case that a run-level profileId uses `null` "never the
+ * wire sentinel", and `clients/gui-app`'s own caller passes `profileId: null`.
+ * Two of the three clients agree and mobile is the odd one; that is a finding
+ * about mobile, not a licence for this client to copy it, and it is handed over
+ * rather than fixed here — changing mobile's request shape is a behaviour
+ * change in a package this change is only moving code out of.
+ */
+export function usageProfileId(profile: {
+  readonly profileId: string;
+  readonly kind: string;
+}): string | null {
+  return profile.kind === "ambient" ? null : profile.profileId;
 }
 
 export type ProvidersState =
@@ -163,6 +210,89 @@ export function useProviders(client: SettingsClient | null): ProvidersState {
         setState({ kind: "error", detail: describe(error) });
       });
   }, [client]);
+
+  const initialised = useRef(false);
+  useEffect(() => {
+    if (initialised.current) return;
+    initialised.current = true;
+    load();
+  }, [load]);
+
+  return state;
+}
+
+/* ── host.getRateLimitUsage ──────────────────────────────────────────────── */
+
+/**
+ * One profile's rate-limit windows.
+ *
+ * A FOURTH INDEPENDENT LOAD, per profile, and the reason is this module's
+ * opening argument applied one level down: a provider whose usage read fails
+ * must not take the Providers section — or the other providers' rows — with
+ * it. `host.getRateLimitUsage` is on the released floor, so unlike the
+ * notifications config there is no "host lacks the method" state to model;
+ * what there IS is a per-account failure, because the host reaches out to the
+ * provider to answer, and any one of those can fail while the rest succeed.
+ *
+ * `unavailable` is its own arm rather than folded into `error`. The host
+ * answering "I asked, and this account cannot report usage" (`cli_not_found`,
+ * `rate_limits_not_available`) is a fact about the ACCOUNT; a rejected request
+ * is a fact about the request. Mobile renders both as muted text and so does
+ * this, but they carry different copy, and collapsing them is the same
+ * question-substitution `use-epics.ts` documents at length.
+ */
+export type RateLimitUsageState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "ready"; readonly rateLimits: ProviderRateLimits }
+  | { readonly kind: "error"; readonly detail: string };
+
+export function useRateLimitUsage(
+  client: SettingsClient | null,
+  providerId: ProviderId,
+  profileId: string | null,
+): RateLimitUsageState {
+  const [state, setState] = useState<RateLimitUsageState>({ kind: "loading" });
+
+  const load = useCallback(() => {
+    if (client === null) {
+      setState({
+        kind: "error",
+        detail: "No Traycer host is configured for this build.",
+      });
+      return;
+    }
+    client
+      .request("host.getRateLimitUsage", {
+        accountContext: DEFAULT_ACCOUNT_CONTEXT,
+        providerId,
+        profileId,
+      })
+      .then((response) => {
+        const rateLimits = response.providerRateLimits ?? null;
+        if (rateLimits === null) {
+          /*
+           * The host answered and carried NO provider snapshot. Not an error —
+           * the request succeeded — but there is nothing to render either, so
+           * it takes the same shape a null-bearing response has always had on
+           * mobile: "unavailable", worded as a fact about the account.
+           *
+           * Modelled as `error` with account-shaped copy rather than a fifth
+           * arm, because the renderer's choice is binary here (windows, or a
+           * muted line saying why not) and a state nothing renders differently
+           * is a distinction the type system carries and the user never sees.
+           */
+          setState({
+            kind: "error",
+            detail: "This host reported no usage data for this account.",
+          });
+          return;
+        }
+        setState({ kind: "ready", rateLimits });
+      })
+      .catch((error: unknown) => {
+        setState({ kind: "error", detail: describe(error) });
+      });
+  }, [client, providerId, profileId]);
 
   const initialised = useRef(false);
   useEffect(() => {
