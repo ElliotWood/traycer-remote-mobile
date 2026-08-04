@@ -35,6 +35,17 @@ export interface ReproScenario {
   readonly interviews?: readonly number[];
   readonly approvalCount?: number;
   readonly fileEditCount?: number;
+  /**
+   * One entry per accumulated file change, given as its `filePath`. The paths
+   * are the scenario rather than a detail the fixture picks: the Review-all
+   * jump rail exists to tell deep paths under a common root apart, so the
+   * caller supplies the exact shape it wants measured.
+   *
+   * These arrive through the real `useChat` reducer (`snap.accumulatedFileChanges`),
+   * so this also exercises the wire → props → `LowerDock` → panel → sheet hop
+   * that a component-only harness rendering `ReviewAllSheet` directly skips.
+   */
+  readonly fileChanges?: readonly string[];
 }
 
 function interviewMessage(blockId: string, questionCount: number): object {
@@ -71,6 +82,32 @@ function interviewMessage(blockId: string, questionCount: number): object {
         metadata: null,
       },
     ],
+  };
+}
+
+/**
+ * One accumulated file change per path.
+ *
+ * The diff is deliberately several lines rather than one: with a one-line diff
+ * all twelve sections fit on a phone screen at once, and "tapping chip N brings
+ * section N into view" then passes against a jump-list that does NOTHING —
+ * every section is already in view. The fixture has to make the stack taller
+ * than the viewport or the measurement cannot fail.
+ */
+function accumulatedFileChange(filePath: string, index: number): object {
+  const before = Array.from({ length: 6 }, (_, i) => `line ${String(i + 1)} of ${filePath}`);
+  const after = before.map((line, i) =>
+    i % 2 === 0 ? `${line} — rewritten by change ${String(index + 1)}` : line,
+  );
+  return {
+    filePath,
+    operation: "edit",
+    diffSource: "snapshot",
+    beforeContent: `${before.join("\n")}\n`,
+    afterContent: `${after.join("\n")}\n`,
+    reason: "snapshot",
+    undoable: true,
+    artifact: null,
   };
 }
 
@@ -135,7 +172,7 @@ function snapshotFrame(scenario: ReproScenario): SnapshotFrame {
       pendingApprovals,
       pendingFileEditApprovals,
       pendingInterviews,
-      accumulatedFileChanges: [],
+      accumulatedFileChanges: (scenario.fileChanges ?? []).map(accumulatedFileChange),
       activeTurn: null,
       worktreeBinding: null,
       missingWorktreePaths: [],
