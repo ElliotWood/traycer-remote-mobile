@@ -375,8 +375,23 @@ export function Composer({
    * bare boolean because a plain flag stays true and suppresses the NEXT
    * `/` too — dismissing once would silently disable the feature for the rest
    * of the draft.
+   *
+   * Scoped to the LIVE OCCURRENCE, not the bare position: a position-only key
+   * outlives the trigger it was recorded against, so dismissing a `/` at 0
+   * (an empty or freshly-cleared draft — the single most common trigger
+   * position) permanently suppressed whatever next landed on 0 too, `/`
+   * retyped or `@` typed fresh, for the rest of the session. Cleared the
+   * moment `trigger` goes null, since that is what "the dismissed occurrence
+   * is gone" actually means — synced during render the same way
+   * `frozenTrigger` is above, with `effectiveDismissedAt` (not the state
+   * variable) driving this render's open checks so the reset applies
+   * immediately rather than one render late.
    */
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+  const effectiveDismissedAt = trigger === null ? null : dismissedAt;
+  if (effectiveDismissedAt !== dismissedAt) {
+    setDismissedAt(effectiveDismissedAt);
+  }
   const setSheetDismissed = (): void => setDismissedAt(trigger?.start ?? null);
   /**
    * Openness and contents are separate, and conflating them was a defect: the
@@ -389,7 +404,7 @@ export function Composer({
    * is harness-scoped and always exists, so there is always a subject.
    */
   const commandSheetOpen =
-    slashTrigger !== null && dismissedAt !== slashTrigger.start;
+    slashTrigger !== null && effectiveDismissedAt !== slashTrigger.start;
   const sheetCommands = commandSheetOpen ? matchingCommands : [];
   /**
    * Same rule, and it was always right here: "no matches" and "this workspace
@@ -397,7 +412,7 @@ export function Composer({
    * that hides itself when empty can render neither.
    */
   const mentionSheetOpen =
-    mentionTrigger !== null && dismissedAt !== mentionTrigger.start;
+    mentionTrigger !== null && effectiveDismissedAt !== mentionTrigger.start;
 
   const spliceToken = (token: string): void => {
     if (trigger === null) return;
