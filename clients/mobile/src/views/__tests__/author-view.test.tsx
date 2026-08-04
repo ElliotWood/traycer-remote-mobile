@@ -59,10 +59,33 @@ const MODELS_RESPONSE: ListHarnessModelsResponse = {
   ],
 };
 
-/** A `request` fake routed by method: models list then a create echo. */
+/**
+ * `epic.createChat`'s reply, parameterized on whether the host started the
+ * folded turn. No test may get this value by accident — see `requestImpl`.
+ */
+function createChatReply(
+  initialTurnStarted: boolean,
+): (params: { readonly chatId: string }) => Promise<{ chatId: string; initialTurnStarted: boolean }> {
+  return (params) => Promise.resolve({ chatId: params.chatId, initialTurnStarted });
+}
+
+/**
+ * A `request` fake routed by method: models list then a create echo.
+ *
+ * `createChat` has NO default. It used to fall back to
+ * `initialTurnStarted: true` — the branch the real host does not take
+ * (measured against a live Azure VM host with a real chatId, see
+ * `phone-authored-chat-lands-with-no-turn-running`'s Evidence section) — so
+ * every call site that omitted it was silently exercising the rare path.
+ * Flipping the default to `false` would only move the blind spot: some call
+ * sites don't observe this branch at all, and a `false` reply arms a 20s
+ * real-timer fallback (`FIRST_TURN_ACK_TIMEOUT_MS`) that those tests never
+ * drive to completion, which is a worse hidden dependency than the one it
+ * replaces. Stating it at every call site is the fix.
+ */
 function requestImpl(opts: {
   readonly models?: ListHarnessModelsResponse;
-  readonly createChat?: (params: {
+  readonly createChat: (params: {
     readonly chatId: string;
   }) => Promise<{ chatId: string; initialTurnStarted?: boolean }>;
 }): (method: string, params: unknown) => Promise<unknown> {
@@ -72,9 +95,7 @@ function requestImpl(opts: {
     }
     if (method === "epic.createChat") {
       const p = params as { chatId: string };
-      return opts.createChat !== undefined
-        ? opts.createChat(p)
-        : Promise.resolve({ chatId: p.chatId, initialTurnStarted: true });
+      return opts.createChat(p);
     }
     throw new Error(`unexpected method ${method}`);
   };
@@ -120,7 +141,10 @@ function createChatBody(fake: FakeHostClient): Record<string, unknown> {
 
 describe("AuthorView", () => {
   it("resolves a model then dispatches epic.createChat with the instruction and no workspace/settings", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only inspects the dispatched request body, never the
+    // create's outcome — `true` resolves the flow synchronously so nothing is
+    // left running after the assertions.
+    const fake = createFakeHostClient(requestImpl({ createChat: createChatReply(true) }));
     renderAuthor(fake, () => {}, createFakeStreamConnection());
 
     const user = userEvent.setup();
@@ -169,7 +193,10 @@ describe("AuthorView", () => {
   });
 
   it("navigates to the minted chat on a successful create", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: exercises the (rare) case where the host already started the
+    // folded turn, so navigation is immediate with no fallback session. The
+    // common case — `false` — gets its own dedicated coverage below.
+    const fake = createFakeHostClient(requestImpl({ createChat: createChatReply(true) }));
     const onCreated = vi.fn();
     renderAuthor(fake, onCreated, createFakeStreamConnection());
 
@@ -201,8 +228,13 @@ describe("AuthorView", () => {
   });
 
   it("shows an inline error and never creates when no model can be resolved", async () => {
+    // `createChat` is never invoked here — the flow dead-ends at model
+    // resolution — but the field is required so every call site says so.
     const fake = createFakeHostClient(
-      requestImpl({ models: { harnessId: "claude", models: [] } }),
+      requestImpl({
+        models: { harnessId: "claude", models: [] },
+        createChat: createChatReply(true),
+      }),
     );
     const onCreated = vi.fn();
     renderAuthor(fake, onCreated, createFakeStreamConnection());
@@ -221,7 +253,9 @@ describe("AuthorView", () => {
 
   it("refuses to create a chat when the host's real id is not configured (HA-1)", async () => {
     configMock.hostId = null;
-    const fake = createFakeHostClient(requestImpl({}));
+    // `createChat` is never invoked — the flow refuses before the host id
+    // check even reaches a request — but the field is required regardless.
+    const fake = createFakeHostClient(requestImpl({ createChat: createChatReply(true) }));
     const onCreated = vi.fn();
     renderAuthor(fake, onCreated, createFakeStreamConnection());
 
@@ -237,21 +271,25 @@ describe("AuthorView", () => {
   });
 
   // ── The turn-less agent ─────────────────────────────────────────────────
-  // Measured on a real host: `initialTurnStarted` comes back FALSE. This flow
-  // used to DISCARD that (`void response.initialTurnStarted`) and navigate
-  // regardless, so "Start agent" produced a chat holding a persisted
-  // instruction that nothing was acting on — no turn, no error, no spinner.
-  // A silent no-op, and indistinguishable from success.
+  // Measured on a real host: `initialTurnStarted` comes back FALSE — a real
+  // chatId from a live Azure VM host, not a repeated claim; see
+  // phone-authored-chat-lands-with-no-turn-running's Evidence section. This
+  // flow used to DISCARD that (`void response.initialTurnStarted`) and
+  // navigate regardless, so "Start agent" produced a chat holding a
+  // persisted instruction that nothing was acting on — no turn, no error, no
+  // spinner. A silent no-op, and indistinguishable from success.
   //
-  // NOTE on the fixture above: `requestImpl`'s default is
-  // `initialTurnStarted: true`, which is the branch the real host does NOT
-  // take. Every test before this point therefore exercises the path that
-  // rarely happens live; these three cover the one that does.
+  // `requestImpl` has no default for `initialTurnStarted` any more — every
+  // call site above states it explicitly, most choosing `true` because their
+  // assertions never touch the fallback and `false` would leave its 20s
+  // ack-wait timer armed and unobserved for the rest of that test. These
+  // three are where `false` — the branch the host actually takes — gets its
+  // own dedicated, mutation-verified coverage.
 
   it("re-sends the folded message over the chat stream when the host didn't start the turn", async () => {
     const fake = createFakeHostClient(
       requestImpl({
-        createChat: (p) => Promise.resolve({ chatId: p.chatId, initialTurnStarted: false }),
+        createChat: createChatReply(false),
       }),
     );
     const streams = createFakeStreamConnection();
@@ -312,7 +350,9 @@ describe("AuthorView", () => {
   });
 
   it("does not re-send when the host reports the folded turn already started", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true` is load-bearing here: this is the contrast that stops the test
+    // above from passing against a hook that re-sends unconditionally.
+    const fake = createFakeHostClient(requestImpl({ createChat: createChatReply(true) }));
     const streams = createFakeStreamConnection();
     const onCreated = vi.fn();
     renderAuthor(fake, onCreated, streams);
@@ -331,7 +371,7 @@ describe("AuthorView", () => {
   it("reports honestly instead of navigating when the first turn cannot be started", async () => {
     const fake = createFakeHostClient(
       requestImpl({
-        createChat: (p) => Promise.resolve({ chatId: p.chatId, initialTurnStarted: false }),
+        createChat: createChatReply(false),
       }),
     );
     const onCreated = vi.fn();
