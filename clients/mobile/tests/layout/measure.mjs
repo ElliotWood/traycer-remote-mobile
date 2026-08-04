@@ -342,6 +342,139 @@ async function measureReviewAll(browser, url) {
   }
 }
 
+// ── M3: caret restoration after a mention/slash-command PICK ────────────────
+//
+// `composer.tsx`'s `spliceToken` defers `node.setSelectionRange(...)` to the
+// next animation frame, because React controls the textarea's `value` but
+// never its `selectionStart` — without the defer, the comment at the call
+// site says the caret jumps to the end of the text and the on-screen
+// keyboard dismisses. jsdom cannot evaluate this at all (no real
+// focus/selection model), so this drives the fixture through a real
+// Chromium and reads `selectionStart`/`selectionEnd` off the ACTUAL DOM
+// node, never off React state.
+//
+// The fixture types the trigger with TRAILING content after it ("/pon needs
+// review", not "/pon"), then walks the caret back into the token with real
+// ArrowLeft presses before picking. That is deliberate: if the trigger sat
+// at the end of the draft, "caret lands at the token boundary" and "caret
+// jumps to the end" would read the same number, and the check could not
+// tell working code from the exact defect it exists to catch.
+const CARET_ROOT = "/repro/workspace";
+
+/** Where `applyTrigger` (composer-trigger.ts) puts the caret when the trigger starts at index 0. */
+function expectedCaretAfterPick(token) {
+  return token.length + 1; // the token plus the trailing space `applyTrigger` always inserts
+}
+
+async function measureCaretAfterPick(browser, url) {
+  const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+  const checks = [];
+  const notCovered = [];
+  const record = (ok, name, detail) => checks.push({ ok, name, detail });
+
+  const readCaret = () =>
+    page.evaluate(() => {
+      const el = document.querySelector("textarea");
+      return { value: el.value, start: el.selectionStart, end: el.selectionEnd };
+    });
+
+  /** Types `typed`, walks the caret back to `caretIndex` with real key presses, and returns the pre-pick DOM state. */
+  const typeAndPosition = async (typed, caretIndex) => {
+    const textarea = page.locator("textarea");
+    await textarea.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Delete");
+    await textarea.pressSequentially(typed);
+    for (let i = 0; i < typed.length - caretIndex; i += 1) {
+      await page.keyboard.press("ArrowLeft");
+    }
+    return readCaret();
+  };
+
+  try {
+    await page.goto(url);
+    await page.waitForFunction(() => window.__layoutRepro?.ready === true, { timeout: 10_000 });
+
+    // ── Case 1: `/` — picking a slash command ────────────────────────────
+    await page.evaluate(() => window.__layoutRepro.setScenario({}));
+    await page.waitForTimeout(80);
+
+    const slashTyped = "/pon needs review";
+    const slashCaretIndex = 4; // right after "/pon", before the space
+    const preSlash = await typeAndPosition(slashTyped, slashCaretIndex);
+    record(
+      preSlash.start === slashCaretIndex && preSlash.end === slashCaretIndex,
+      "slash: the caret actually sits INSIDE the token before picking",
+      `selectionStart=${preSlash.start} (expected ${slashCaretIndex}) — the precondition that makes the next two checks mean something`,
+    );
+
+    // Three commands share the `ponytail-` prefix (see FAKE_COMMANDS in
+    // layout-repro-view.tsx) specifically so this exact-text pick cannot
+    // succeed by being the only row on offer.
+    await page.getByText("/ponytail-help", { exact: true }).click();
+    await page.waitForTimeout(150); // longer than one animation frame
+
+    const postSlash = await readCaret();
+    const slashToken = "/ponytail-help";
+    const expectedSlashCaret = expectedCaretAfterPick(slashToken);
+    const expectedSlashValue = `${slashToken} ${slashTyped.slice(slashCaretIndex)}`;
+    record(
+      postSlash.value === expectedSlashValue,
+      "slash: the token and trailing text are spliced correctly",
+      `value=${JSON.stringify(postSlash.value)} expected=${JSON.stringify(expectedSlashValue)}`,
+    );
+    record(
+      postSlash.start === expectedSlashCaret && postSlash.end === expectedSlashCaret,
+      "slash: the caret lands at the TOKEN BOUNDARY, not at the string's end",
+      `start=${postSlash.start} end=${postSlash.end} expected=${expectedSlashCaret} (value.length=${postSlash.value.length}) — a caret stuck at value.length is exactly the "jumps to the end" defect the deferral exists to prevent`,
+    );
+
+    // ── Case 2: `@` — picking a file mention ─────────────────────────────
+    // Needs a BOUND chat: `@` hides itself entirely with no roots.
+    await page.evaluate((root) => window.__layoutRepro.setScenario({ boundRoot: root }), CARET_ROOT);
+    await page.waitForTimeout(80);
+
+    const mentionTyped = "@app needs review";
+    const mentionCaretIndex = 4; // right after "@app"
+    const preMention = await typeAndPosition(mentionTyped, mentionCaretIndex);
+    record(
+      preMention.start === mentionCaretIndex && preMention.end === mentionCaretIndex,
+      "mention: the caret actually sits INSIDE the token before picking",
+      `selectionStart=${preMention.start} (expected ${mentionCaretIndex})`,
+    );
+
+    // Two files (`app.ts`, `util.ts`) for the same reason as the three
+    // commands above — `app.ts` is not the only row the sheet can offer.
+    await page.locator("button").filter({ hasText: "app.ts" }).first().click();
+    await page.waitForTimeout(150);
+
+    const postMention = await readCaret();
+    const mentionToken = "@src/app.ts"; // primary root → bare relPath, per mention-model.ts
+    const expectedMentionCaret = expectedCaretAfterPick(mentionToken);
+    const expectedMentionValue = `${mentionToken} ${mentionTyped.slice(mentionCaretIndex)}`;
+    record(
+      postMention.value === expectedMentionValue,
+      "mention: the token and trailing text are spliced correctly",
+      `value=${JSON.stringify(postMention.value)} expected=${JSON.stringify(expectedMentionValue)}`,
+    );
+    record(
+      postMention.start === expectedMentionCaret && postMention.end === expectedMentionCaret,
+      "mention: the caret lands at the TOKEN BOUNDARY, not at the string's end",
+      `start=${postMention.start} end=${postMention.end} expected=${expectedMentionCaret} (value.length=${postMention.value.length})`,
+    );
+
+    notCovered.push(
+      "IME composition sequencing around the new onSelect handler, and caret survival across the composer's snapshot-arrival re-render — both named by H12 as real but secondary to the caret-after-pick mechanism measured here.",
+    );
+    notCovered.push(
+      "CDP-synthesized keystrokes, not a real on-screen mobile keyboard/IME — this measures the deferred setSelectionRange mechanism, not physical-device input.",
+    );
+    return { checks, notCovered };
+  } finally {
+    await page.close();
+  }
+}
+
 async function main() {
   const server = await createServer({ root: mobileRoot, server: { port: 0 }, logLevel: "error" });
   await server.listen();
@@ -353,8 +486,10 @@ async function main() {
   const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, headless: true });
   const results = [];
   let review = null;
+  let caret = null;
   try {
     review = await measureReviewAll(browser, url);
+    caret = await measureCaretAfterPick(browser, url);
     for (const viewport of VIEWPORTS) {
       for (const { name, scenario } of SCENARIOS) {
         const measurement = await measureScenario(browser, url, viewport, scenario);
@@ -390,19 +525,29 @@ async function main() {
   // something unmeasured while printing a clean total is lying by omission.
   for (const n of review.notCovered) console.log(`[NOT COVERED] ${n}`);
 
+  console.log(`\n── Caret restoration after a mention/slash-command pick ──`);
+  for (const c of caret.checks) {
+    console.log(`[${c.ok ? "PASS" : "FAIL"}] ${c.name}\n         ${c.detail}`);
+  }
+  for (const n of caret.notCovered) console.log(`[NOT COVERED] ${n}`);
+
   const failures = results.filter((r) => !r.ok);
   const reviewFailures = review.checks.filter((c) => !c.ok);
-  if (failures.length > 0 || reviewFailures.length > 0) {
+  const caretFailures = caret.checks.filter((c) => !c.ok);
+  if (failures.length > 0 || reviewFailures.length > 0 || caretFailures.length > 0) {
     if (failures.length > 0) {
       console.error(`\n${failures.length}/${results.length} scenario(s) clip the composer or a card's action row.`);
     }
     if (reviewFailures.length > 0) {
       console.error(`${reviewFailures.length}/${review.checks.length} Review-all rail check(s) failed.`);
     }
+    if (caretFailures.length > 0) {
+      console.error(`${caretFailures.length}/${caret.checks.length} caret-restoration check(s) failed.`);
+    }
     process.exit(1);
   }
   console.log(
-    `\nAll ${results.length} scenarios keep the composer and every card's action row reachable, and all ${review.checks.length} Review-all rail checks pass.`,
+    `\nAll ${results.length} scenarios keep the composer and every card's action row reachable, all ${review.checks.length} Review-all rail checks pass, and all ${caret.checks.length} caret-restoration checks pass.`,
   );
 }
 
