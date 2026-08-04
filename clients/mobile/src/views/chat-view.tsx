@@ -233,6 +233,28 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
   };
 
   const canMutate = hostClient !== null && connectionLive && chat.accessRole === "owner";
+  /**
+   * The same gate as `canMutate`, applied to approve/reject/interview-submit
+   * — decisions are the highest-stakes mutation on this screen, and used to
+   * be the one path in this file with NO connection gate at all (`busy` from
+   * `status?.phase === "submitting"` was the only check). PERMISSION FIRST,
+   * mirroring `clients/teams-tab/src/chat/actionability.ts`'s ordering: a
+   * viewer is told they can't act regardless of connection, rather than
+   * being told "reconnecting" for the wrong reason.
+   *
+   * This is the cheap half of the stale-approve-hazard fix (disable while
+   * disconnected, with the reason on the control). The harder half —
+   * re-validating at the moment of dispatch rather than trusting this render
+   * was still current when the tap landed — lives in `sendReply` itself
+   * (`use-chat.ts`), not here, so it still catches a decision dispatched
+   * between "this button looked live" and "the socket actually was."
+   */
+  const decisionBlockedReason: string | null =
+    chat.accessRole === "viewer"
+      ? "You have view-only access to this chat, so you can't approve or reject here."
+      : !canMutate
+        ? "Reconnecting to your host — approving is paused until the connection is back."
+        : null;
   const isRunning = chat.runStatus === "running" || chat.runStatus === "stopping";
   // The "while-running" preference — hold the screen awake only while a turn
   // is actually in flight. "always" is handled once, app-wide, in AppShell.
@@ -339,7 +361,9 @@ export function ChatView({ epicId, chatId, initialTitle, onTitleChange }: ChatVi
       </div>
 
       <footer style={footerStyle}>
-        {hasPending && <PendingSection chat={chat} />}
+        {hasPending && (
+          <PendingSection chat={chat} decisionBlockedReason={decisionBlockedReason} />
+        )}
         <LowerDock
           todoSnapshot={todoSnapshot}
           activeAgentRows={activeAgentRows}
@@ -486,7 +510,14 @@ const footerStyle: CSSProperties = {
  * shrunk or hidden (unlike a per-card cap, which can't help once there's
  * more than one card).
  */
-function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElement {
+function PendingSection({
+  chat,
+  decisionBlockedReason,
+}: {
+  readonly chat: UseChatResult;
+  /** Non-null disables Approve/Reject/Submit-answer and shows why — see `chat-view.tsx`'s definition. */
+  readonly decisionBlockedReason: string | null;
+}): ReactElement {
   return (
     <section style={{ marginBottom: 8 }}>
       <h2 style={{ ...type.bodySm, fontWeight: 600, margin: "0 0 8px", color: theme.danger }}>
@@ -499,6 +530,7 @@ function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElemen
             interview={interview}
             block={chat.resolveInterview(interview.blockId)}
             status={chat.replyStatusFor(interviewKey(interview.blockId))}
+            decisionBlockedReason={decisionBlockedReason}
             onSubmit={(answers) =>
               chat.sendReply({ kind: "interview", blockId: interview.blockId, answers })
             }
@@ -509,6 +541,7 @@ function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElemen
             key={approvalKey(approval.approvalId)}
             approval={approval}
             status={chat.replyStatusFor(approvalKey(approval.approvalId))}
+            decisionBlockedReason={decisionBlockedReason}
             onDecide={(approved) =>
               chat.sendReply({ kind: "approval", approvalId: approval.approvalId, approved })
             }
@@ -519,6 +552,7 @@ function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElemen
             key={fileEditKey(approval.approvalId)}
             approval={approval}
             status={chat.replyStatusFor(fileEditKey(approval.approvalId))}
+            decisionBlockedReason={decisionBlockedReason}
             onDecide={(approved) =>
               chat.sendReply({
                 kind: "fileEditApproval",
@@ -536,10 +570,12 @@ function PendingSection({ chat }: { readonly chat: UseChatResult }): ReactElemen
 function ApprovalCard({
   approval,
   status,
+  decisionBlockedReason,
   onDecide,
 }: {
   readonly approval: ChatApprovalState;
   readonly status: ReplyStatus | undefined;
+  readonly decisionBlockedReason: string | null;
   readonly onDecide: (approved: boolean) => void;
 }): ReactElement {
   return (
@@ -556,8 +592,12 @@ function ApprovalCard({
       }
       footer={
         <>
-          <ApproveRejectRow status={status} onDecide={onDecide} />
-          <ReplyStatusLine status={status} />
+          <ApproveRejectRow
+            status={status}
+            decisionBlockedReason={decisionBlockedReason}
+            onDecide={onDecide}
+          />
+          <ReplyStatusLine status={status} decisionBlockedReason={decisionBlockedReason} />
         </>
       }
     />
@@ -567,10 +607,12 @@ function ApprovalCard({
 function FileEditApprovalCard({
   approval,
   status,
+  decisionBlockedReason,
   onDecide,
 }: {
   readonly approval: ChatFileEditApprovalState;
   readonly status: ReplyStatus | undefined;
+  readonly decisionBlockedReason: string | null;
   readonly onDecide: (approved: boolean) => void;
 }): ReactElement {
   return (
@@ -595,8 +637,12 @@ function FileEditApprovalCard({
       }
       footer={
         <>
-          <ApproveRejectRow status={status} onDecide={onDecide} />
-          <ReplyStatusLine status={status} />
+          <ApproveRejectRow
+            status={status}
+            decisionBlockedReason={decisionBlockedReason}
+            onDecide={onDecide}
+          />
+          <ReplyStatusLine status={status} decisionBlockedReason={decisionBlockedReason} />
         </>
       }
     />
@@ -631,26 +677,32 @@ function PendingCardShell({
 
 function ApproveRejectRow({
   status,
+  decisionBlockedReason,
   onDecide,
 }: {
   readonly status: ReplyStatus | undefined;
+  readonly decisionBlockedReason: string | null;
   readonly onDecide: (approved: boolean) => void;
 }): ReactElement {
   const busy = status?.phase === "submitting";
+  // `decisionBlockedReason !== null` is the stale-approve-hazard cheap fix —
+  // see `chat-view.tsx`'s definition of `decisionBlockedReason` for why this
+  // is not the whole fix, only the render-time half of it.
+  const disabled = busy || decisionBlockedReason !== null;
   return (
     <div style={{ display: "flex", gap: 8 }}>
       <button
         type="button"
-        disabled={busy}
-        style={decisionButton(theme.primary, busy)}
+        disabled={disabled}
+        style={decisionButton(theme.primary, disabled)}
         onClick={() => onDecide(true)}
       >
         Approve
       </button>
       <button
         type="button"
-        disabled={busy}
-        style={decisionButton(theme.danger, busy)}
+        disabled={disabled}
+        style={decisionButton(theme.danger, disabled)}
         onClick={() => onDecide(false)}
       >
         Reject
@@ -668,11 +720,13 @@ function InterviewCard({
   interview,
   block,
   status,
+  decisionBlockedReason,
   onSubmit,
 }: {
   readonly interview: ChatPendingInterviewState;
   readonly block: InterviewBlock | null;
   readonly status: ReplyStatus | undefined;
+  readonly decisionBlockedReason: string | null;
   readonly onSubmit: (answers: readonly InterviewAnswer[]) => void;
 }): ReactElement {
   if (block === null) {
@@ -685,7 +739,14 @@ function InterviewCard({
       </article>
     );
   }
-  return <InterviewForm block={block} status={status} onSubmit={onSubmit} />;
+  return (
+    <InterviewForm
+      block={block}
+      status={status}
+      decisionBlockedReason={decisionBlockedReason}
+      onSubmit={onSubmit}
+    />
+  );
 }
 
 /**
@@ -736,10 +797,12 @@ function computeQuestionKeys(questions: readonly InterviewQuestion[]): readonly 
 function InterviewForm({
   block,
   status,
+  decisionBlockedReason,
   onSubmit,
 }: {
   readonly block: InterviewBlock;
   readonly status: ReplyStatus | undefined;
+  readonly decisionBlockedReason: string | null;
   readonly onSubmit: (answers: readonly InterviewAnswer[]) => void;
 }): ReactElement {
   const keys = computeQuestionKeys(block.questions);
@@ -826,7 +889,11 @@ function InterviewForm({
       notes: null,
     };
   });
-  const canSubmit = !busy && answers.every((a) => a.values.length > 0);
+  // Drafting an answer while blocked is fine (reading/local-only, same
+  // precedent as Review-all staying open to a viewer) — only the dispatch
+  // itself is gated, same as `ApproveRejectRow`.
+  const canSubmit =
+    !busy && decisionBlockedReason === null && answers.every((a) => a.values.length > 0);
 
   return (
     <PendingCardShell
@@ -914,7 +981,7 @@ function InterviewForm({
           >
             Submit answer
           </button>
-          <ReplyStatusLine status={status} />
+          <ReplyStatusLine status={status} decisionBlockedReason={decisionBlockedReason} />
         </>
       }
     />
@@ -928,10 +995,20 @@ interface QuestionDraft {
 
 function ReplyStatusLine({
   status,
+  decisionBlockedReason,
 }: {
   readonly status: ReplyStatus | undefined;
+  /** Shown only when there's no more specific reply status to report. */
+  readonly decisionBlockedReason?: string | null;
 }): ReactElement | null {
-  if (status === undefined) return null;
+  if (status === undefined) {
+    if (decisionBlockedReason == null) return null;
+    return (
+      <p role="status" style={{ color: theme.mutedText, fontSize: 13, margin: "8px 0 0" }}>
+        {decisionBlockedReason}
+      </p>
+    );
+  }
   if (status.phase === "submitting") {
     return (
       <p role="status" style={{ color: theme.mutedText, fontSize: 13, margin: "8px 0 0" }}>

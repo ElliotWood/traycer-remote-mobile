@@ -73,7 +73,17 @@ import { plainTextContent } from "./use-create-chat";
  */
 export type ReplyStatus =
   | { readonly phase: "submitting" }
-  | { readonly phase: "rejected"; readonly message: string };
+  | { readonly phase: "rejected"; readonly message: string }
+  /**
+   * The CLIENT refused to send this reply — the connection was not live at
+   * the moment of submit, so nothing went on the wire at all. Distinct from
+   * `"rejected"` (the host answered no) because the two are different facts
+   * a user might reasonably want told apart: here, retrying once reconnected
+   * is expected to work; a host rejection may not be. See `sendReply`'s
+   * docblock — this is the re-validate-on-submit half of the
+   * stale-approve-hazard fix, not merely the disabled-button half.
+   */
+  | { readonly phase: "refused"; readonly message: string };
 
 /** Discriminated reply request — each dispatches its OWN client frame. */
 export type SendReplyArg =
@@ -483,7 +493,18 @@ type ChatEvent =
       readonly type: "sendRetried";
       readonly messageId: string;
     }
-  | { readonly type: "blockDelta"; readonly event: RuntimeEvent };
+  | { readonly type: "blockDelta"; readonly event: RuntimeEvent }
+  | {
+      /**
+       * `sendReply` re-checked the connection at the moment of dispatch and
+       * it was not live — see that function's docblock. Fires INSTEAD of
+       * `replySubmitting`, never after it: no frame was sent, so there is
+       * nothing to time out or ack.
+       */
+      readonly type: "replyRefused";
+      readonly key: string;
+      readonly message: string;
+    };
 
 /** Drops a keyed entry from a record without mutating the input. */
 function without<V>(
@@ -705,6 +726,14 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         ...state,
         replies: { ...state.replies, [event.key]: { phase: "submitting" } },
         ackIndex: { ...state.ackIndex, [event.clientActionId]: event.key },
+      };
+    case "replyRefused":
+      return {
+        ...state,
+        replies: {
+          ...state.replies,
+          [event.key]: { phase: "refused", message: event.message },
+        },
       };
     case "actionAck": {
       const key = state.ackIndex[event.clientActionId];
@@ -1045,6 +1074,39 @@ export function useChat(
           : arg.kind === "fileEditApproval"
             ? fileEditKey(arg.approvalId)
             : interviewKey(arg.blockId);
+      /**
+       * Re-validated HERE, not just trusted from the caller having gated its
+       * button — the stale-approve-hazard's re-validate-on-submit half.
+       * `connectionRef` (not the `connection` state value, and not a prop the
+       * caller passed in) is read specifically because it updates
+       * synchronously off the connection-state subscription and can never be
+       * the stale value a render committed before the socket actually
+       * dropped — the exact gap a disabled-button check alone cannot close,
+       * because a tap already in flight when the connection drops still
+       * reaches this function with its ORIGINAL closure. `chat-view.tsx`
+       * disabling Approve/Reject while disconnected is the cheap, common-case
+       * fix; this is what still refuses when that guard was bypassed, raced,
+       * or simply never wired by some future caller.
+       *
+       * What this does NOT close: a decision dispatched while the connection
+       * genuinely IS live, against a `pendingApprovals` entry that the host
+       * already resolved seconds ago but no delta for that has arrived yet.
+       * Neither `approvalDecision` nor `fileEditApprovalDecision` nor
+       * `interviewAnswer` carries any expected-state/version field the host
+       * could use to detect and refuse a stale write — checked directly
+       * against `subscribe.ts`'s frame schemas, not assumed — so closing that
+       * half needs a protocol change, not a client-side check. Filed as a
+       * protocol gap rather than faked with a client-side heuristic that
+       * would look like it closes the class without actually doing so.
+       */
+      if (connectionRef.current !== "live") {
+        dispatch({
+          type: "replyRefused",
+          key,
+          message: "Connection isn't live — reconnect and try again.",
+        });
+        return;
+      }
       const clientActionId = lastReplyAttemptRef.current.get(key) ?? uuidv4();
       lastReplyAttemptRef.current.set(key, clientActionId);
       const base = {

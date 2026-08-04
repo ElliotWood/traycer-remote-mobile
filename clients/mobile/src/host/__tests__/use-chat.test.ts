@@ -8,7 +8,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@/test-utils/dom";
 import { createFakeStreamConnection } from "@/test-utils/fakes";
-import { REVERT_ALL_SCOPE, revertKey, useChat, type UseChatResult } from "@/host/use-chat";
+import {
+  approvalKey,
+  REVERT_ALL_SCOPE,
+  revertKey,
+  useChat,
+  type UseChatResult,
+} from "@/host/use-chat";
 
 function userMessage(messageId: string, text: string) {
   return {
@@ -286,6 +292,88 @@ describe("useChat — optimistic send + reconcile-not-replay retry (batch 1 #4/#
     expect(retryFrame.clientActionId).toBe(firstFrame.clientActionId);
 
     vi.useRealTimers();
+  });
+});
+
+/**
+ * mobile-approve-reject-no-connectivity-gate — the re-validate-on-submit
+ * half. `chat-view.tsx`'s render gate (disable Approve/Reject/Submit-answer
+ * while disconnected) is tested at that layer; THIS is the dispatch-layer
+ * check that still refuses even when a caller bypassed or never wired that
+ * gate — the invariant, not the UI convenience. No `ChatView` is mounted in
+ * this describe block at all: `sendReply` is called directly on the hook, so
+ * nothing here can pass because a disabled button happened to swallow a click.
+ */
+describe("useChat — sendReply re-validates the connection at the moment of dispatch", () => {
+  it("refuses and reports honestly when the connection is not live, WITHOUT sending a frame", () => {
+    const fake = createFakeStreamConnection();
+    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1", "u1"));
+    const session = () => fake.chatSessions[0];
+
+    act(() => {
+      session().callbacks.onSnapshot(snapshotFrame([]));
+    });
+    // Deliberately NOT calling applyStatus("open", ...) — the connection
+    // stays at its real default ("reconnecting"), the same state a tap that
+    // beat a genuine reconnect would land in.
+    act(() => {
+      result.current.sendReply({ kind: "approval", approvalId: "a1", approved: true });
+    });
+
+    // The observable that actually matters: nothing reached the wire.
+    expect(session().sendAction).not.toHaveBeenCalled();
+    // And the user is told the truth — not a silent no-op wearing "Approve".
+    expect(result.current.replyStatusFor(approvalKey("a1"))).toEqual({
+      phase: "refused",
+      message: "Connection isn't live — reconnect and try again.",
+    });
+  });
+
+  it("still sends once the connection genuinely IS live — the refusal above is connection-specific, not universal", () => {
+    // Contrast, per verification-practices #14: without this, the test above
+    // could pass against a `sendReply` that refuses EVERYTHING, which would
+    // prove nothing about connection-awareness specifically.
+    const fake = createFakeStreamConnection();
+    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1", "u1"));
+    const session = () => fake.chatSessions[0];
+
+    act(() => {
+      session().callbacks.onSnapshot(snapshotFrame([]));
+      session().connection.applyStatus("open", null);
+    });
+    act(() => {
+      result.current.sendReply({ kind: "approval", approvalId: "a1", approved: true });
+    });
+
+    expect(session().sendAction).toHaveBeenCalledTimes(1);
+    expect(result.current.replyStatusFor(approvalKey("a1"))?.phase).toBe("submitting");
+  });
+
+  it("a decision dispatched with a tap already in flight when the connection drops is refused, not queued", () => {
+    // The exact race the render-gate alone cannot close: the connection was
+    // live when the button was drawn enabled, and dropped before the tap's
+    // handler actually ran. `chat-view.tsx` cannot prevent this — a click
+    // event already dispatched by the browser still reaches whatever handler
+    // is current when it's processed. This is what still catches it.
+    const fake = createFakeStreamConnection();
+    const { result } = renderHook(() => useChat(fake.connection, "e1", "c1", "u1"));
+    const session = () => fake.chatSessions[0];
+
+    act(() => {
+      session().callbacks.onSnapshot(snapshotFrame([]));
+      session().connection.applyStatus("open", null);
+    });
+    // The connection drops BETWEEN the render that drew Approve enabled and
+    // the moment the (already-queued) tap actually dispatches.
+    act(() => {
+      session().connection.applyStatus("closed", null);
+    });
+    act(() => {
+      result.current.sendReply({ kind: "approval", approvalId: "a1", approved: true });
+    });
+
+    expect(session().sendAction).not.toHaveBeenCalled();
+    expect(result.current.replyStatusFor(approvalKey("a1"))?.phase).toBe("refused");
   });
 });
 
