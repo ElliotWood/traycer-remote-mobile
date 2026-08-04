@@ -653,16 +653,27 @@ export function Composer({
                 gate here, and greying them out during a blip just makes the
                 composer feel broken alongside the textarea. */}
             {/*
-              Every control below is also disabled while the settings are
-              UNKNOWN, so nothing invites a choice against a state the composer
-              has not been told yet. Stated as a residue rather than claimed as
-              complete: this stops the unknown state being ACTED on, it does not
-              stop it being DISPLAYED — a disabled permission toggle still shows
-              `full_access` before the snapshot lands. Suppressing the displayed
-              value outright is the stronger form of the same rule.
+              Every control below is disabled while the settings are UNKNOWN, so
+              nothing invites a choice against a state the composer has not been
+              told yet.
+
+              The permission toggle goes further and shows NO VALUE at all
+              (`value={null}`), because its displayed value is a claim about how
+              the agent will behave — see `PermissionModeToggle`. The gate is
+              `settingsLoaded`, NOT `chatSettings !== null`, and the difference is
+              load-bearing: a brand-new chat legitimately has null settings AFTER
+              its snapshot, and for that chat `Full access` is honest, since it is
+              exactly what the turn will carry. Only the pre-snapshot state is a
+              guess.
+
+              The other six chips still display their fallbacks. Left deliberately:
+              a harness or model chip reading `Claude Code` early is a wrong label,
+              while a permission chip reading `Full access` is a wrong SAFETY
+              claim. Naming it here so the asymmetry is a decision and not an
+              oversight someone has to rediscover.
             */}
             <PermissionModeToggle
-              value={permissionMode}
+              value={settingsLoaded ? permissionMode : null}
               onChange={(v) => setOverride((o) => ({ ...o, permissionMode: v }))}
               disabled={!canType || !settingsLoaded}
             />
@@ -873,30 +884,67 @@ function AttachmentChip({
   );
 }
 
+/**
+ * What the chip reads while the chat's permission mode is UNKNOWN. Not one of
+ * `PERMISSION_OPTIONS`, deliberately — the whole point is that no member of that
+ * set is being claimed.
+ */
+const UNKNOWN_PERMISSION_LABEL = "Checking…";
+
 function PermissionModeToggle({
   value,
   onChange,
   disabled,
 }: {
-  readonly value: PermissionMode;
+  /**
+   * `null` = the chat's settings have NOT arrived, and the composer must not
+   * name a permission mode it has not been told.
+   *
+   * The defect this closes is a display, not a dispatch: `handleSend` is already
+   * gated, so nothing could ACT on the unknown state — but a chat configured
+   * `supervised`, opened cold, read `Full access` on this chip. The value was
+   * `chatSettings?.permissionMode ?? "full_access"`, and pre-snapshot that
+   * fallback is not a default, it is a guess presented as a fact. A user reading
+   * `Full access` on a chat they set to `supervised` has been told something
+   * false about how the agent will behave.
+   */
+  readonly value: PermissionMode | null;
   readonly onChange: (v: PermissionMode) => void;
   readonly disabled: boolean;
 }): ReactElement {
-  const current = PERMISSION_OPTIONS.find((o) => o.id === value) ?? PERMISSION_OPTIONS[0];
-  const Icon = current.icon;
+  const current = value === null
+    ? null
+    : PERMISSION_OPTIONS.find((o) => o.id === value) ?? PERMISSION_OPTIONS[0];
+  // `LoaderCircle` rather than any mode's own icon: `ShieldCheck` would say
+  // "supervised" in pictures while the text says nothing, which is the same
+  // false claim moved one element over.
+  const Icon = current?.icon ?? LoaderCircle;
   return (
     <button
       type="button"
+      // A stable name for this control, independent of the value it shows —
+      // otherwise its accessible name IS the permission mode, so a test or an
+      // assistive reader has no way to refer to the control while it has no
+      // value. It also reads better: "Full access" alone names no subject.
+      aria-label="Permission mode"
       disabled={disabled}
-      title="Ask before commands and file changes / Auto-approve edits / Allow without prompts"
+      title={
+        current === null
+          ? "Waiting for this chat's permission mode"
+          : "Ask before commands and file changes / Auto-approve edits / Allow without prompts"
+      }
       onClick={() => {
+        // Guarded here rather than relying solely on `disabled`: the caller's
+        // gate and this component's correctness are different properties, and a
+        // cycle from "unknown" would have to invent a starting point.
+        if (value === null) return;
         const index = PERMISSION_OPTIONS.findIndex((o) => o.id === value);
         onChange(PERMISSION_OPTIONS[(index + 1) % PERMISSION_OPTIONS.length].id);
       }}
       style={chipStyle(disabled)}
     >
       <Icon size={13} aria-hidden="true" />
-      {current.label}
+      {current?.label ?? UNKNOWN_PERMISSION_LABEL}
     </button>
   );
 }

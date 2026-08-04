@@ -705,4 +705,132 @@ describe("Composer — the chat's settings arrive after mount", () => {
 
     expect(sent).toHaveLength(1);
   });
+
+  /**
+   * THE DISPLAY, which is a SEPARATE defect from the dispatch above.
+   *
+   * `handleSend`'s gate stops the unknown state being ACTED on. It does nothing
+   * about it being DISPLAYED: the chip read `chatSettings?.permissionMode ??
+   * "full_access"`, so a chat configured `supervised`, opened cold, showed
+   * `Full access` on screen. Pre-snapshot that fallback is not a default, it is
+   * a guess presented as a fact — and it is a claim about how the agent will
+   * behave, which is the one kind of label that must never be guessed.
+   *
+   * THESE TWO TESTS ARE INERT AGAINST THE SAFETY PROPERTY and must not be read
+   * as covering it: a display assertion stays green under every mutation that
+   * breaks what is SENT. `"does not run a turn on settings it has not received
+   * yet"` above is the one that binds that, and it stays.
+   */
+  it("names NO permission mode before the chat's settings arrive", async () => {
+    const fake = twoHarnessHost();
+    render(
+      <Composer
+        {...fullProps({ client: fake.client, chatSettings: null, settingsLoaded: false })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Permission mode" })).toBeTruthy();
+    });
+
+    const chip = screen.getByRole("button", { name: "Permission mode" });
+    // The control still EXISTS and still says something — the failure mode of a
+    // careless fix is a chip that vanishes or goes blank, which trades a wrong
+    // answer for no answer.
+    expect(chip.textContent ?? "").toContain("Checking…");
+    // And it names no member of the set. Asserted against ALL THREE, not just
+    // the fallback: a repair that swapped one guess for another would otherwise
+    // pass.
+    expect(chip.textContent ?? "").not.toContain("Full access");
+    expect(chip.textContent ?? "").not.toContain("Supervised");
+    expect(chip.textContent ?? "").not.toContain("Auto-accept edits");
+  });
+
+  /**
+   * THE CONTRAST, and it is what stops the test above from being an
+   * over-correction — the same pairing `settingsLoaded` needs everywhere else.
+   *
+   * A brand-new chat's settings are legitimately null AFTER its snapshot, and
+   * for that chat `Full access` is HONEST: it is exactly what the turn will
+   * carry, because nothing has chosen otherwise. Suppressing the value on
+   * `chatSettings === null` instead of on `settingsLoaded` would pass the test
+   * above and leave every new chat unable to say what it is about to do.
+   */
+  it("DOES name the mode for a new chat, whose settings are null after its snapshot", async () => {
+    const fake = twoHarnessHost();
+    render(
+      <Composer
+        {...fullProps({ client: fake.client, chatSettings: null, settingsLoaded: true })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
+    });
+
+    const chip = screen.getByRole("button", { name: "Permission mode" });
+    expect(chip.textContent ?? "").toContain("Full access");
+    expect(chip.textContent ?? "").not.toContain("Checking…");
+  });
+
+  /**
+   * TWO CLICKS, NOT ONE, and the reason is a trap in the widget's own state
+   * machine rather than in any data fixture.
+   *
+   * The cycle is supervised → auto_accept_edits → full_access, so from the
+   * `full_access` default ONE click lands on `supervised` — which is also the
+   * chat's configured value. An assertion after a single click cannot tell "the
+   * user's override won" from "the snapshot won"; both predict `supervised`.
+   * Two clicks reach `auto_accept_edits`, which is NEITHER, and discriminates.
+   *
+   * Asserted on what is EMITTED as well as what is shown: the display alone
+   * would go green against a composer that shows the override and sends the
+   * snapshot's value.
+   */
+  it("keeps the user's own permission choice when the snapshot lands afterwards", async () => {
+    const sent: ChatRunSettings[] = [];
+    const fake = twoHarnessHost();
+    const { rerender } = render(
+      <Composer
+        {...fullProps({
+          client: fake.client,
+          chatSettings: null,
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" })).toBeTruthy();
+    });
+
+    const chip = (): HTMLElement => screen.getByRole("button", { name: "Permission mode" });
+    fireEvent.click(chip()); // full_access -> supervised (== the chat's value)
+    fireEvent.click(chip()); // supervised   -> auto_accept_edits (neither)
+    expect(chip().textContent ?? "").toContain("Auto-accept edits");
+
+    // The chat's own settings arrive, naming a DIFFERENT mode.
+    rerender(
+      <Composer
+        {...fullProps({
+          client: fake.client,
+          chatSettings: settings({}),
+          onSend: (_t, s) => sent.push(s),
+        })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" }).textContent).toContain("GPT-5");
+    });
+
+    // A deliberate choice is never stomped by a late arrival — `override` is
+    // checked before `chatSettings`.
+    expect(chip().textContent ?? "").toContain("Auto-accept edits");
+
+    fireEvent.change(textarea(), { target: { value: "go" } });
+    fireEvent.click(sendButton());
+    expect(sent).toHaveLength(1);
+    expect(sent[0].permissionMode).toBe("auto_accept_edits");
+    // The rest of the tuple still comes from the chat — an override on one field
+    // must not detach the others.
+    expect(sent[0].harnessId).toBe("codex");
+    expect(sent[0].agentMode).toBe("epic");
+  });
 });
