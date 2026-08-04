@@ -92,6 +92,7 @@ import {
   detectTrigger,
   filterByName,
   type ComposerTrigger,
+  type TriggerKind,
 } from "@/views/chat/composer-trigger";
 import {
   AttachmentTooLargeError,
@@ -371,28 +372,49 @@ export function Composer({
   } = useMentionFiles(client, mentionRoots, mentionTrigger?.query ?? "", mentionTrigger !== null);
 
   /**
-   * Explicit dismissal, keyed to the trigger's position. Keyed rather than a
-   * bare boolean because a plain flag stays true and suppresses the NEXT
-   * `/` too — dismissing once would silently disable the feature for the rest
-   * of the draft.
+   * Explicit dismissal, keyed to the trigger's (kind, position) IDENTITY, not
+   * a bare boolean — a plain flag stays true and suppresses the NEXT `/` too,
+   * silently disabling the feature for the rest of the draft.
    *
-   * Scoped to the LIVE OCCURRENCE, not the bare position: a position-only key
-   * outlives the trigger it was recorded against, so dismissing a `/` at 0
-   * (an empty or freshly-cleared draft — the single most common trigger
-   * position) permanently suppressed whatever next landed on 0 too, `/`
-   * retyped or `@` typed fresh, for the rest of the session. Cleared the
-   * moment `trigger` goes null, since that is what "the dismissed occurrence
-   * is gone" actually means — synced during render the same way
-   * `frozenTrigger` is above, with `effectiveDismissedAt` (not the state
-   * variable) driving this render's open checks so the reset applies
-   * immediately rather than one render late.
+   * Two independent mechanisms, deliberately kept separable rather than
+   * folded into one check:
+   *
+   * 1. Scoped to the LIVE OCCURRENCE: a stale key outlives the trigger it was
+   *    recorded against, so dismissing a `/` at 0 (an empty or freshly-cleared
+   *    draft — the single most common trigger position) permanently
+   *    suppressed whatever next landed on 0, `/` retyped or `@` typed fresh,
+   *    for the rest of the session. Cleared the moment `trigger` goes null,
+   *    since that is what "the dismissed occurrence is gone" actually means —
+   *    synced during render the same way `frozenTrigger` is above, with
+   *    `effectiveDismissedTrigger` (not the state variable) driving this
+   *    render's open checks so the reset applies immediately rather than one
+   *    render late.
+   * 2. Keyed on `kind` as well as `start`: an ordinary typing sequence can
+   *    only change a trigger's identity by first passing through a caret
+   *    position `detectTrigger` reports as null (it returns null exactly at a
+   *    token's own start — see its docblock), which mechanism 1 above
+   *    catches. A single select-all-replace PASTE never routes through that
+   *    intermediate position — one `onChange` can swap `/bar` for `@foo` at
+   *    the same start index directly. Keying on kind closes that gap without
+   *    reopening the same-kind-retype case mechanism 1 exists for: two
+   *    dismissals of the same kind at the same position are still one
+   *    identity, so a same-kind retype (still caught by mechanism 1, since it
+   *    passes through null on the way) is unaffected by this.
    */
-  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
-  const effectiveDismissedAt = trigger === null ? null : dismissedAt;
-  if (effectiveDismissedAt !== dismissedAt) {
-    setDismissedAt(effectiveDismissedAt);
+  const [dismissedTrigger, setDismissedTrigger] = useState<{
+    readonly kind: TriggerKind;
+    readonly start: number;
+  } | null>(null);
+  const effectiveDismissedTrigger = trigger === null ? null : dismissedTrigger;
+  if (effectiveDismissedTrigger !== dismissedTrigger) {
+    setDismissedTrigger(effectiveDismissedTrigger);
   }
-  const setSheetDismissed = (): void => setDismissedAt(trigger?.start ?? null);
+  const setSheetDismissed = (): void =>
+    setDismissedTrigger(trigger === null ? null : { kind: trigger.kind, start: trigger.start });
+  const isDismissed = (t: ComposerTrigger): boolean =>
+    effectiveDismissedTrigger !== null &&
+    effectiveDismissedTrigger.start === t.start &&
+    effectiveDismissedTrigger.kind === t.kind;
   /**
    * Openness and contents are separate, and conflating them was a defect: the
    * sheet used to mount only when `sheetCommands` was non-empty, so a cold
@@ -403,16 +425,14 @@ export function Composer({
    * is a different thing from hiding on an empty RESULT. The command catalogue
    * is harness-scoped and always exists, so there is always a subject.
    */
-  const commandSheetOpen =
-    slashTrigger !== null && effectiveDismissedAt !== slashTrigger.start;
+  const commandSheetOpen = slashTrigger !== null && !isDismissed(slashTrigger);
   const sheetCommands = commandSheetOpen ? matchingCommands : [];
   /**
    * Same rule, and it was always right here: "no matches" and "this workspace
    * is unreadable" are the states the canary exists to tell apart, and a sheet
    * that hides itself when empty can render neither.
    */
-  const mentionSheetOpen =
-    mentionTrigger !== null && effectiveDismissedAt !== mentionTrigger.start;
+  const mentionSheetOpen = mentionTrigger !== null && !isDismissed(mentionTrigger);
 
   const spliceToken = (token: string): void => {
     if (trigger === null) return;

@@ -206,6 +206,35 @@ describe("dismissing `/` does not permanently suppress a RETYPED `/` at the same
   });
 });
 
+describe("a same-position KIND SWAP via a single paste (no intermediate null) is not suppressed", () => {
+  it("opens `@` after a select-all-replace paste over a dismissed `/` at the same start", async () => {
+    const fake = host();
+    renderComposer(fake);
+
+    type("/rev");
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Commands" })).toBeTruthy();
+    });
+
+    dismissViaEscape();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Commands" })).toBeNull();
+    });
+
+    // A single change event, as a select-all-replace paste delivers: the
+    // draft goes straight from "/rev" to "@foo" in one `onChange`, never
+    // passing through an intermediate value `detectTrigger` would read as
+    // null. If dismissal were keyed on position alone, `dismissedAt (0) ===
+    // mentionTrigger.start (0)` would suppress this exactly like the
+    // cross-suppression defect it was fixed alongside.
+    fireEvent.change(textarea(), { target: { value: "@foo", selectionStart: 4 } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Files" })).toBeTruthy();
+    });
+  });
+});
+
 describe("the property the dismissal exists for is preserved", () => {
   it("stays closed while the SAME trigger is still in the text — no unfreeze on the next keystroke", async () => {
     const fake = host();
