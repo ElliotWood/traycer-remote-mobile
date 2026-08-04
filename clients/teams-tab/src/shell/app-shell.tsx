@@ -24,7 +24,7 @@
  * `page` style and had no shell, which is the wrong layer inverted: the frame
  * is what should be common and the contents are what should differ.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { makeStyles, tokens } from "@fluentui/react-components";
 import {
   EpicStatusRow,
@@ -36,6 +36,7 @@ import {
   type ShellNotifications,
 } from "./shell-notifications";
 import { ShellSettingsProvider } from "./shell-settings";
+import { ChatScrollContainerProvider } from "./chat-scroll-container";
 import { NotificationBell } from "../notifications/notification-bell";
 
 /**
@@ -129,6 +130,11 @@ const useStyles = makeStyles({
   },
   /** Takes the remaining height and is the ONLY thing that scrolls. */
   body: {
+    // So an absolutely-positioned descendant (the chat route's jump-to-latest
+    // chip) anchors to THIS box's visible extent, not the scrolled content's
+    // full height, and not the page. No other screen positions a child
+    // absolutely today, so this has no effect on them.
+    position: "relative",
     flexGrow: 1,
     // The containment desktop uses 197 times and we used zero.
     //
@@ -209,6 +215,8 @@ export function AppShell({
   const [notifications, setNotifications] = useState<ShellNotifications | null>(
     null,
   );
+  /** The single scroll region below, handed out via context — see `./chat-scroll-container`. */
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   // Empty dep array: once per MOUNT, never on re-render. A remount is the
   // thing being detected, so anything that runs per-render would report the
   // opposite of the property.
@@ -259,13 +267,15 @@ export function AppShell({
         browser owns and cannot be faked by an attribute. An attribute
         asserting "this element persisted" was the probe that lied.
       */}
-      <div className={styles.body} data-shell-region="body">
+      <div ref={bodyRef} className={styles.body} data-shell-region="body">
         <ShellStatusProvider setStatus={setStatus}>
           <ShellNotificationsProvider setNotifications={setNotifications}>
             <ShellSettingsProvider
               setOpenSettings={setOpenSettings ?? NO_SETTINGS_SLOT}
             >
-              {children}
+              <ChatScrollContainerProvider value={bodyRef}>
+                {children}
+              </ChatScrollContainerProvider>
             </ShellSettingsProvider>
           </ShellNotificationsProvider>
         </ShellStatusProvider>

@@ -28,6 +28,7 @@ import {
 } from "@fluentui/react-components";
 import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
+import type { EpicArtifactEntry } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 import { AgentsList } from "./agents-list";
 import { ArtifactsTree } from "./artifacts-tree";
 import type { EpicAgentsState } from "./use-epic-agents";
@@ -67,7 +68,7 @@ export interface EpicDetailProps {
   readonly configuredHostId: string;
   readonly now: number;
   readonly onOpenAgent: (chatId: string, entry: EpicChatEntry) => void;
-  readonly onOpenArtifact: (artifactId: string) => void;
+  readonly onOpenArtifact: (entry: EpicArtifactEntry) => void;
 }
 
 export function EpicDetail({

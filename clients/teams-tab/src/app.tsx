@@ -10,7 +10,10 @@
  * below it comes from the Teams theme, so light / dark / high-contrast are
  * correct without a single colour being chosen here.
  */
-import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import { useChatScrollContainer } from "./shell/chat-scroll-container";
+import { useAutoScrollToBottom } from "./chat/use-auto-scroll-to-bottom";
+import { ScrollToBottomChip } from "./chat/scroll-to-bottom-chip";
 import {
   FluentProvider,
   makeStyles,
@@ -62,6 +65,8 @@ import {
   ARTIFACT_FIXTURE_BODY,
   ARTIFACT_FIXTURE_TITLE,
 } from "./artifacts/artifact-fixture";
+import type { EpicArtifactEntry } from "@traycer-clients/shared/epic/epic-doc-artifacts";
+import { ArtifactViewer } from "./artifacts/artifact-viewer";
 import { ChatScreen } from "./chat/chat-screen";
 import {
   CHAT_FIXTURE,
@@ -181,6 +186,31 @@ function ChatRoute({
   readonly onBack: () => void;
 }): ReactElement {
   const controller = useChat(streamConnection, epicId, chatId);
+  // The shell's single scroll region — see `./shell/chat-scroll-container`.
+  // `useRef` here is only a fallback for rendering outside `AppShell` (e.g.
+  // an isolated test); nothing scrolls off of it in that case.
+  const fallbackScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useChatScrollContainer() ?? fallbackScrollRef;
+  const { isAtBottom, handleScroll, scrollToBottom } = useAutoScrollToBottom(
+    scrollRef,
+    `${epicId}:${chatId}`,
+    controller.state.kind === "ready" ? controller.state.messages : null,
+  );
+  // The shell's shared body is the one that actually scrolls (see
+  // `app-shell.tsx`) — this listener rides its native `scroll` event rather
+  // than owning a second one.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+    // Runs once: `scrollRef` is a stable ref object (context-provided or the
+    // local fallback), and by the time an effect runs every ref in the tree
+    // has already been attached — reading `.current` in the deps array
+    // itself (rather than here, inside the effect) is what `react-hooks/refs`
+    // rejects, because that read would happen during render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className={styles.screen}>
       <ChatScreen
@@ -191,6 +221,7 @@ function ChatRoute({
         now={now}
         chrome={{ kind: "screen", onBack }}
       />
+      <ScrollToBottomChip visible={!isAtBottom} onClick={() => scrollToBottom(true)} />
     </div>
   );
 }
@@ -278,6 +309,20 @@ function EpicScreen({
     preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST;
   const authoring = useCreateAgent(hostClient, epicId, configuredHostId);
   const artifactAuthoring = useCreateArtifact(hostClient, epicId);
+  // The artifact currently open in this screen, or `null` for the tree +
+  // authoring forms. Reset on epic switch — this component is NOT remounted
+  // when `epicId` changes (same route, new props), so a stale artifact from
+  // the previous epic would otherwise still read as "open".
+  const [openedArtifact, setOpenedArtifact] = useState<EpicArtifactEntry | null>(null);
+  // Reset-state-on-prop-change, the React-docs pattern (render-phase setState
+  // guarded by a comparison) rather than an effect — this component is NOT
+  // remounted on epic switch (same route, new props), so a stale artifact
+  // from the previous epic would otherwise still read as "open".
+  const [artifactResetForEpicId, setArtifactResetForEpicId] = useState(epicId);
+  if (epicId !== artifactResetForEpicId) {
+    setArtifactResetForEpicId(epicId);
+    setOpenedArtifact(null);
+  }
   /*
    * THE FIRST SCREEN IN THE SHELL, and deliberately the only one for now.
    *
@@ -322,42 +367,51 @@ function EpicScreen({
      * that debt bought.
      */
     <div className={styles.screen}>
-      <EpicDetail
-        // The row that was clicked, else the header from `earlyMeta` — which
-        // lands in ~543ms, so a DEEP LINK stops showing a bare id after half a
-        // second instead of after forty-seven.
-        epic={epic ?? live.header}
-        epicId={epicId}
-        onBack={onBack}
-        agents={agents}
-        configuredHostId={configuredHostId}
-        now={preview === null ? now : AGENTS_FIXTURE_NOW}
-        onOpenArtifact={() => {
-          // Artifact reading lands next; a no-op keeps the affordance honest
-          // about being unfinished rather than silently doing nothing.
-        }}
-        onOpenAgent={onOpenAgent}
-      />
-      {/*
-        NO NAVIGATION ON SUCCESS, deliberately. Jumping to the new chat would
-        need an `EpicChatEntry`, and the only way to have one here is to
-        fabricate it from the request we just sent — inventing a row that
-        claims to be replicated state. The agents stream is already open on
-        this screen and delivers the real entry within its normal update, so
-        the new agent appears in the tree above on its own. Slower by a beat,
-        and it is the host's row rather than our guess at it.
-      */}
-      <Subtitle1>New agent</Subtitle1>
-      <AuthorAgent
-        configuredHostId={configuredHostId}
-        phase={authoring.phase}
-        onCreate={authoring.create}
-      />
-      <Subtitle1>New artifact</Subtitle1>
-      <CreateArtifact
-        phase={artifactAuthoring.phase}
-        onCreate={artifactAuthoring.create}
-      />
+      {openedArtifact !== null ? (
+        <ArtifactViewer
+          entry={openedArtifact}
+          registry={live.artifactRooms}
+          onBack={() => {
+            setOpenedArtifact(null);
+          }}
+        />
+      ) : (
+        <>
+          <EpicDetail
+            // The row that was clicked, else the header from `earlyMeta` — which
+            // lands in ~543ms, so a DEEP LINK stops showing a bare id after half a
+            // second instead of after forty-seven.
+            epic={epic ?? live.header}
+            epicId={epicId}
+            onBack={onBack}
+            agents={agents}
+            configuredHostId={configuredHostId}
+            now={preview === null ? now : AGENTS_FIXTURE_NOW}
+            onOpenArtifact={setOpenedArtifact}
+            onOpenAgent={onOpenAgent}
+          />
+          {/*
+            NO NAVIGATION ON SUCCESS, deliberately. Jumping to the new chat would
+            need an `EpicChatEntry`, and the only way to have one here is to
+            fabricate it from the request we just sent — inventing a row that
+            claims to be replicated state. The agents stream is already open on
+            this screen and delivers the real entry within its normal update, so
+            the new agent appears in the tree above on its own. Slower by a beat,
+            and it is the host's row rather than our guess at it.
+          */}
+          <Subtitle1>New agent</Subtitle1>
+          <AuthorAgent
+            configuredHostId={configuredHostId}
+            phase={authoring.phase}
+            onCreate={authoring.create}
+          />
+          <Subtitle1>New artifact</Subtitle1>
+          <CreateArtifact
+            phase={artifactAuthoring.phase}
+            onCreate={artifactAuthoring.create}
+          />
+        </>
+      )}
     </div>
   );
 }

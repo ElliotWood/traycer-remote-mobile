@@ -196,15 +196,23 @@ function TilePlaceholder({
  * the commit that gives a branch something to return, exactly as the previous
  * docblock said it would.
  *
- * **The artifact branches are still placeholders and are NOT the same claim
- * as the old uniform one.** They name a specific, recorded blocker rather
- * than "not yet": the renderer exists and is good (`artifacts/artifact-markdown.tsx`),
- * but turning an artifact room's `Y.Doc` into markdown lives only in
- * `clients/mobile/host/artifact-body/artifact-body-markdown.ts`, which pulls
- * **seven `@tiptap/*` packages** this bundle does not depend on. That is a
- * bundle-size decision for a Teams iframe, not a rendering problem — see
- * `parity-contract` §*Two renderers with no door*. Wiring it here without
- * taking that decision would be the tail wagging the dog.
+ * **The artifact branches are still placeholders, and the reason changed
+ * underneath this docblock — corrected rather than left stale.** The
+ * `@tiptap/*` bundle-size blocker this paragraph used to name is gone: the
+ * deps are now in `package.json` and `artifacts/use-artifact-body.ts` +
+ * `artifacts/artifact-body/` (lifted from `clients/mobile`) render a real
+ * artifact from the epic-tree door (`epic-detail.tsx` → `onOpenArtifact`) —
+ * see `parity-contract` §*Two renderers with no door*.
+ *
+ * **What still blocks a CANVAS tile specifically** is narrower and
+ * structural, not a dependency question: an artifact's `Y.Doc` bytes ride
+ * the SAME `epic.subscribe` session as its `ArtifactRoomRegistry`, and that
+ * registry is built by `useEpicAgents` inside `EpicScreen` — this screen's
+ * own subscription invariant (see the file docblock above) forbids a tile
+ * from opening a second one. Threading `EpicScreen`'s registry down to
+ * `CanvasScreen` (the same way `chatEntry` is threaded, currently as
+ * `() => null` for the same underlying reason) is the shape of the fix, not
+ * a rendering change to this file.
  */
 function renderTile(tile: TileRef, deps: TileDeps): ReactNode {
   switch (tile.type) {
@@ -228,7 +236,7 @@ function renderTile(tile: TileRef, deps: TileDeps): ReactNode {
       return (
         <TilePlaceholder
           tile={tile}
-          detail="Artifact bodies need a Y.Doc-to-markdown step that only the mobile client has; it carries a ProseMirror stack this tab does not. Open it in Traycer for now."
+          detail="Open this from the epic's Artifacts list for now — a canvas pane can't reach an artifact's document yet."
         />
       );
 

@@ -204,18 +204,20 @@ describe("tile bodies", () => {
 
   it("CONTRACT: an artifact tile names its actual blocker, not 'placeholder'", () => {
     /*
-     * These four kinds are still unbuilt, and the previous uniform body said
-     * so in words that fit any of them. That was honest while nothing could
-     * render; it is not now, because a reader seeing a generic placeholder
-     * beside a working chat concludes the artifact body is merely unfinished.
-     * It is BLOCKED, on a bundle-size decision recorded in the parity
-     * contract — and the body has to say which.
+     * These four kinds are still unbuilt IN A PANE specifically, and the
+     * previous uniform body said so in words that fit any of them. That was
+     * honest while nothing could render; it is not now, because a reader
+     * seeing a generic placeholder beside a working chat concludes the
+     * artifact body is merely unfinished. It is BLOCKED — no longer on the
+     * @tiptap bundle (that shipped; see `artifacts/use-artifact-body.ts`),
+     * now on the canvas route's own subscription invariant — and the body
+     * has to say which, and where to go instead.
      *
      * The assertion is on the attribution, the same shape as the empty-state
      * one above: swap the detail for "arrives later" and this fails.
      */
     render(draw(withTile(SPEC_TILE), "Ship the thing", noop));
-    expect(screen.getByText(/ProseMirror stack this tab does not/)).toBeTruthy();
+    expect(screen.getByText(/epic's Artifacts list/)).toBeTruthy();
   });
 
   it("a blank tab invites content rather than reporting a blocker", () => {

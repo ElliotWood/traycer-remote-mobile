@@ -45,13 +45,15 @@
  * prop threaded through a component whose only other job is to call one hook,
  * and the two would still diverge the moment either surface gains a wrapper.
  */
-import type { ReactElement } from "react";
+import { useRef, type ReactElement } from "react";
 import { makeStyles, tokens } from "@fluentui/react-components";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
 import { ChatScreen } from "../chat/chat-screen";
 import { useChat } from "../chat/use-chat";
 import type { SnapshotDiffClient } from "../chat/blocks/use-snapshot-diff";
+import { useAutoScrollToBottom } from "../chat/use-auto-scroll-to-bottom";
+import { ScrollToBottomChip } from "../chat/scroll-to-bottom-chip";
 
 const useStyles = makeStyles({
   /**
@@ -63,8 +65,13 @@ const useStyles = makeStyles({
    * refuses to shrink below its content and the transcript pushes the pane
    * past its allotted extent instead of scrolling inside it, which presents
    * as the split handle "not working".
+   *
+   * `position: relative` so the jump-to-latest chip below anchors to THIS
+   * box's visible extent, not the scrolled content's full height — the same
+   * reason mobile's `ScrollToBottomChip` lives inside its own scrollRef div.
    */
   body: {
+    position: "relative",
     display: "flex",
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
@@ -99,9 +106,15 @@ export function ChatTile({
 }: ChatTileProps): ReactElement {
   const styles = useStyles();
   const controller = useChat(streamConnection, epicId, chatId);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { isAtBottom, handleScroll, scrollToBottom } = useAutoScrollToBottom(
+    scrollRef,
+    `${epicId}:${chatId}`,
+    controller.state.kind === "ready" ? controller.state.messages : null,
+  );
 
   return (
-    <div className={styles.body}>
+    <div ref={scrollRef} onScroll={handleScroll} className={styles.body}>
       <ChatScreen
         controller={controller}
         entry={entry}
@@ -110,6 +123,7 @@ export function ChatTile({
         now={now}
         chrome={{ kind: "pane" }}
       />
+      <ScrollToBottomChip visible={!isAtBottom} onClick={() => scrollToBottom(true)} />
     </div>
   );
 }

@@ -184,7 +184,7 @@ const MAX_INDENT_DEPTH = 3;
 export interface ArtifactsTreeProps {
   readonly tree: ArtifactTree;
   readonly now: number;
-  readonly onOpen: (artifactId: string) => void;
+  readonly onOpen: (entry: EpicArtifactEntry) => void;
 }
 
 export function ArtifactsTree({
@@ -268,7 +268,7 @@ export function ArtifactsTree({
                 .filter((part) => part !== null)
                 .join(", ")}
               onClick={() => {
-                onOpen(entry.id);
+                onOpen(entry);
               }}
             >
               <span aria-hidden className={styles.icon}>
