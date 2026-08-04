@@ -15,8 +15,35 @@
  * entirely client-local and, per a dedicated research pass, never actually
  * populated on any real model today — porting it would be faking a check
  * off data neither client has (flagged + approved, not silently skipped).
- * @-mention/slash pickers and mic input stay deferred per the accepted P2
- * contract (no file-search/command-list RPC, no STT infra).
+ * Mic input stays deferred (no STT infra) — see M4.
+ *
+ * M3: the `/` picker is BUILT. The claim that stood here — that `@`/`/` were
+ * deferred because there is "no file-search/command-list RPC" — was false.
+ * `agent.gui.listCommands`, `workspace.mentionFiles` and `workspace.mentionFolders`
+ * were all in the released floor the whole time (`released-floor.ts:8,96,97`).
+ *
+ * `/` needs no worktree binding: the host ignores `workingDirectory`
+ * (measured — two different repositories return byte-identical lists), so the
+ * sheet works in a folderless chat, which is every chat mobile can currently
+ * create. `harnessId` IS honoured and is why this had to wait for M1.
+ *
+ * `@` is now wired, on the per-root canary in `mention-model.ts` — an empty
+ * result from `workspace.mentionFiles` is indistinguishable from a bad root or
+ * no roots at all, so the client earns its own evidence that the roots are
+ * readable rather than trusting a count. In a folderless chat there are no
+ * roots and the affordance HIDES ITSELF: `@` stays plain text. That is a
+ * client-side precondition rather than a response check precisely because the
+ * response cannot be checked.
+ *
+ * No rich-text editor, deliberately: a mention already serializes to the agent
+ * as plain text, so a token spliced into this textarea IS the payload. Porting
+ * desktop's Tiptap stack would have risked the draft/prefill/IME behaviour
+ * below for no wire benefit.
+ *
+ * M1: the model / harness / reasoning-effort / speed-tier controls now come
+ * from `agent.gui.listModels` + `agent.gui.listHarnesses` and live in
+ * `run-settings-controls.tsx`. `reasoningEffort`, `serviceTier` and the
+ * harness are no longer hard-coded — see `handleSend`.
  */
 import { useRef, useState, type ChangeEvent, type ReactElement } from "react";
 import {
@@ -35,15 +62,45 @@ import {
 } from "lucide-react";
 import type { ChatRunSettings, PermissionMode } from "@traycer/protocol/persistence/epic/foundation";
 import type { AgentMode } from "@traycer/protocol/common/schemas";
+import type { GuiHarnessId } from "@traycer/protocol/host/agent/shared";
+import type { GuiAgentCommandOption } from "@traycer/protocol/host/agent/gui/unary-schemas";
+import {
+  normalizeReasoningForModel,
+  normalizeServiceTierForModel,
+} from "@traycer-clients/shared/agent-models/model-selection";
 import type { MobileHostClient } from "@/host/host-client-context";
-import { useHarnessModels } from "@/host/use-harness-models";
+import { useGuiModels } from "@/host/use-gui-models";
+import { selectableHarnesses, useGuiHarnesses } from "@/host/use-gui-harnesses";
+import {
+  HarnessChip,
+  ModelChip,
+  ReasoningChip,
+  ServiceTierChip,
+} from "@/views/chat/run-settings-controls";
+import { ProfileChip } from "@/views/chat/profile-chip";
+import { RateLimitBanner } from "@/views/chat/rate-limit-banner";
+import { useProviders } from "@/host/use-provider-usage";
+import { guiHarnessIdToProviderId } from "@traycer-clients/shared/providers/provider-ordering";
 import { chatDraftKey, useDraft } from "@/router/drafts";
+import { useGuiCommands } from "@/host/use-gui-commands";
+import { useMentionFiles } from "@/host/use-mention-files";
+import { CommandSheet } from "@/views/chat/command-sheet";
+import { MentionSheet } from "@/views/chat/mention-sheet";
+import { mentionToken, type MentionSuggestion } from "@/views/chat/mention-model";
+import {
+  applyTrigger,
+  detectTrigger,
+  filterByName,
+  type ComposerTrigger,
+  type TriggerKind,
+} from "@/views/chat/composer-trigger";
 import {
   AttachmentTooLargeError,
   MAX_ATTACHMENTS_PER_MESSAGE,
   prepareImageAttachment,
   type PreparedAttachment,
 } from "@/host/image-attachment";
+import { chipStyle, UNKNOWN_SETTING_LABEL } from "@/views/chat/run-settings-controls";
 import { radius, theme, type } from "@/views/design-tokens";
 
 interface AttachmentDraft {
@@ -73,11 +130,54 @@ const AGENT_MODE_OPTIONS: readonly { readonly id: AgentMode; readonly shortLabel
 
 const DEFAULT_HARNESS = "claude" as const;
 
+/** Structural, not referential — `detectTrigger` returns a fresh object every call, so `===` would never match and the frozen-trigger sync below would setState (and re-render) every non-composing keystroke for no reason. */
+function triggersEqual(a: ComposerTrigger | null, b: ComposerTrigger | null): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  return a.kind === b.kind && a.start === b.start && a.query === b.query;
+}
+
+/**
+ * What the USER has explicitly chosen this session, layered over the chat's own
+ * settings. A field is absent until they touch its control — presence is the
+ * whole signal, which is why the two nullable fields are read with `in`.
+ */
+interface RunSettingsOverride {
+  readonly harnessId?: GuiHarnessId;
+  readonly model?: string | null;
+  readonly permissionMode?: PermissionMode;
+  readonly agentMode?: AgentMode;
+  readonly reasoningEffort?: string;
+  readonly serviceTier?: string;
+  readonly profileId?: string | null;
+}
+
 export interface ComposerProps {
-  readonly epicId: string;
+  /**
+   * No `epicId`: it existed only to satisfy `agent.listHarnessModels`, whose
+   * request took one. `agent.gui.listModels` is scoped by harness and takes a
+   * nullable `workingDirectory` instead, so the composer no longer needs to
+   * know which epic it is in. M3 may reintroduce it for `epic.mention*`.
+   */
   /** Scopes the preserved draft, so backing out of two chats keeps two separate unsent messages. */
   readonly chatId: string;
   readonly client: MobileHostClient | null;
+  /**
+   * Directories `@` searches, one per binding entry
+   * (`mentionRootsForBinding`). Empty in a folderless chat — which is every
+   * chat mobile can create without M5's picker — and that emptiness is what
+   * hides the affordance. Passed in rather than derived here so the composer
+   * keeps taking projections instead of wire shapes.
+   */
+  readonly mentionRoots: readonly string[];
+  /**
+   * Which of `mentionRoots` the agent's process runs in — i.e. the one root a
+   * bare relative path resolves against (`primaryMentionRoot`). `null` in a
+   * folderless chat, and in the never-observed state where a multi-root
+   * binding names no primary. A suggestion from any OTHER root is serialized
+   * absolute; see `mentionToken`, which is where the reasoning lives.
+   */
+  readonly primaryMentionRoot: string | null;
   /**
    * Perf fix: the composer owns its OWN draft text internally now (below) —
    * every keystroke used to live in `ChatView`'s state, re-rendering the
@@ -91,6 +191,18 @@ export interface ComposerProps {
   readonly prefillText: string | null;
   readonly prefillNonce: number;
   readonly chatSettings: ChatRunSettings | null;
+  /**
+   * Has the chat's snapshot arrived? This is the `unknown` arm, and it is NOT
+   * `chatSettings !== null`: a brand-new chat legitimately has `settings: null`
+   * after its snapshot, because nothing has picked a harness or model yet, and
+   * the mobile composer is the only surface that can. Collapsing the two would
+   * make the first turn of a new chat unsendable.
+   *
+   *   no snapshot          -> unknown   : do not display or commit a setting
+   *   snapshot, null       -> none yet  : defaults are honest, composer usable
+   *   snapshot, populated  -> known     : the chat's own settings
+   */
+  readonly settingsLoaded: boolean;
   readonly canStop: boolean;
   readonly stopping: boolean;
   readonly accessRole: "owner" | "viewer";
@@ -101,12 +213,14 @@ export interface ComposerProps {
 }
 
 export function Composer({
-  epicId,
   chatId,
   client,
+  mentionRoots,
+  primaryMentionRoot,
   prefillText,
   prefillNonce,
   chatSettings,
+  settingsLoaded,
   canStop,
   stopping,
   accessRole,
@@ -122,15 +236,236 @@ export function Composer({
   const draftText = draft.value;
   const setDraftText = draft.set;
   const [attachments, setAttachments] = useState<readonly AttachmentDraft[]>([]);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
-    chatSettings?.permissionMode ?? "full_access",
-  );
-  const [agentMode, setAgentMode] = useState<AgentMode>(chatSettings?.agentMode ?? "regular");
-  const [modelSlug, setModelSlug] = useState<string | null>(chatSettings?.model ?? null);
-  const { models, phase: modelsPhase } = useHarnessModels(client, epicId, DEFAULT_HARNESS);
-  const resolvedModel = modelSlug ?? models[0]?.id ?? null;
+  /**
+   * DERIVED, never seeded. These used to be seven `useState(chatSettings?.x ??
+   * default)` initializers — which run ONCE, while `chatSettings` is still
+   * `null` on every cold open (chat-view mounts this before the snapshot
+   * lands, and nothing re-read the prop). A chat configured `supervised` then
+   * armed its composer at `full_access` and never corrected, and `handleSend`
+   * commits this state as the turn's settings, so the defect GRANTED
+   * privilege rather than merely misinforming.
+   *
+   * The repair is not an adoption effect. An effect leaves a clobber window
+   * and a key to get wrong; deriving makes the whole class — "initialised once
+   * from something that wasn't there yet" — inexpressible. `override` holds
+   * only what the USER has explicitly chosen this session, and it is checked
+   * first, so a late-arriving snapshot flows in on its own and can never stomp
+   * a deliberate choice.
+   */
+  const [override, setOverride] = useState<RunSettingsOverride>({});
+  const permissionMode = override.permissionMode ?? chatSettings?.permissionMode ?? "full_access";
+  const agentMode = override.agentMode ?? chatSettings?.agentMode ?? "regular";
+  const harnessId = override.harnessId ?? chatSettings?.harnessId ?? DEFAULT_HARNESS;
+  /**
+   * The user's RAW effort / tier preference, kept sticky across model changes
+   * and clamped only on the way out (below). Storing the clamped value instead
+   * would silently forget a preference the moment you passed through a model
+   * that doesn't support it — desktop keeps the raw value in its toolbar store
+   * for the same reason.
+   */
+  const reasoningRaw = override.reasoningEffort ?? chatSettings?.reasoningEffort ?? "";
+  const serviceTierRaw = override.serviceTier ?? chatSettings?.serviceTier ?? "";
+  /**
+   * These two test PRESENCE with `in` rather than falling through `??`,
+   * because `null` is a meaningful choice for both and `??` cannot tell
+   * "the user chose null" from "the user chose nothing":
+   *
+   * - `model: null` is what a harness switch sets, meaning "reset to the new
+   *   harness's first model". Under `??` it would fall through to the chat's
+   *   stored slug — a slug belonging to the OLD harness, which is exactly what
+   *   that reset exists to prevent.
+   * - `profileId: null` is AMBIENT (M2 item 2), not "unset" — the wire's
+   *   ambient sentinel never reaches this state (see `profile-chip.tsx`), so
+   *   picking ambient must override a stored profile rather than be ignored.
+   */
+  const modelSlug = "model" in override ? override.model ?? null : chatSettings?.model ?? null;
+  const profileId =
+    "profileId" in override ? override.profileId ?? null : chatSettings?.profileId ?? null;
+
+  // M2 item 3: the banner is derived from `providers.list`, which mobile
+  // already polls — there is no rate-limit signal on `chat.subscribe`.
+  const { providers } = useProviders(client);
+  const bannerProviderId = guiHarnessIdToProviderId(harnessId);
+  const bannerProfiles =
+    providers.find((p) => p.providerId === bannerProviderId)?.profiles ?? [];
+
+  const { harnesses, probing: harnessesProbing } = useGuiHarnesses(client);
+  const availableHarnesses = selectableHarnesses(harnesses);
+  const { models, phase: modelsPhase } = useGuiModels(client, harnessId);
+  const resolvedModel = modelSlug ?? models[0]?.slug ?? null;
+  const selectedModel = models.find((m) => m.slug === resolvedModel) ?? null;
+
+  /**
+   * Derived, never stored. `selectedModel` is null while the catalogue is in
+   * flight, and both normalizers pass the value straight through in that case
+   * rather than clamping against a model they can't see — otherwise the first
+   * paint after a harness switch would overwrite a valid preference with "".
+   *
+   * These are what `handleSend` emits, so what is displayed and what is sent
+   * cannot disagree.
+   */
+  const effectiveReasoning = normalizeReasoningForModel(reasoningRaw, selectedModel);
+  const effectiveServiceTier = normalizeServiceTierForModel(serviceTierRaw, selectedModel);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  /**
+   * M3. The trigger is derived from (value, caret) on every change/selection
+   * rather than stored — storing it means a second source of truth that can
+   * disagree with the textarea after a prefill adoption or an undo.
+   *
+   * `caret` IS stored, because `selectionStart` is only readable from the
+   * event that produced it; keeping it lets the sheet survive a re-render.
+   */
+  const [caret, setCaret] = useState(0);
+  const { commands, phase: commandsPhase } = useGuiCommands(client, harnessId);
+  /**
+   * IME-aware. `draftText`/`caret` update on every native `input` event no
+   * matter what — composing text must stay visible, or the textarea goes
+   * blank while the user is mid-word. But trigger detection, and everything
+   * derived from it (sheet open/close, the filtered query, the `@` RPC),
+   * must NOT: measured against real Chromium (CDP `Input.imeSetComposition`,
+   * the browser-process-to-renderer pipeline a real platform IME's updates
+   * travel through — not a JS-dispatched `CompositionEvent`, which doesn't
+   * drive the renderer's text-insertion path at all), a plain `input`-driven
+   * `onChange` fires once per composition update, each carrying the
+   * intermediate, pre-commit buffer. Without this, composing a mention query
+   * fires one `workspace.mentionFiles` RPC per keystroke of romaji/kana the
+   * user hasn't actually typed yet — `@tiptap/suggestion` (desktop's `@`/`/`)
+   * gates its own suggestion matching on `editor.view.composing` for exactly
+   * this reason; this is that same gate, restated for a plain textarea.
+   *
+   * The freeze is `useState`, not a ref: `eslint-plugin-react-hooks`'s
+   * `react-hooks/refs` rule bans reading OR writing a ref during render
+   * outright (a ref surviving a thrown-away render is exactly what breaks
+   * under concurrent rendering), so this uses the same "adjust state during
+   * render" pattern `lastPrefillNonce` already uses below — compare first,
+   * `setState` only on an actual change, matching React's documented
+   * exception to "don't setState during render."
+   */
+  const [composing, setComposing] = useState(false);
+  const [frozenTrigger, setFrozenTrigger] = useState<ComposerTrigger | null>(null);
+  const liveTrigger = detectTrigger(draftText, caret);
+  if (!composing && !triggersEqual(frozenTrigger, liveTrigger)) {
+    setFrozenTrigger(liveTrigger);
+  }
+  const trigger = composing ? frozenTrigger : liveTrigger;
+  const slashTrigger = trigger?.kind === "slash" ? trigger : null;
+  const matchingCommands = slashTrigger === null
+    ? []
+    : filterByName(commands, slashTrigger.query, (c) => c.name);
+
+  /**
+   * The `@` affordance hides itself when there is nothing to search. Not a
+   * cosmetic choice: with no roots the host answers an empty SUCCESS, which is
+   * byte-identical to a no-match, so an opened sheet would be indistinguishable
+   * from a working one that found nothing. Hiding is the only honest state
+   * available before a request is made.
+   */
+  const mentionTrigger =
+    trigger?.kind === "mention" && mentionRoots.length > 0 ? trigger : null;
+  const {
+    suggestions,
+    loading: mentionsLoading,
+    rootStatuses,
+  } = useMentionFiles(client, mentionRoots, mentionTrigger?.query ?? "", mentionTrigger !== null);
+
+  /**
+   * Explicit dismissal, keyed to the trigger's (kind, position) IDENTITY, not
+   * a bare boolean — a plain flag stays true and suppresses the NEXT `/` too,
+   * silently disabling the feature for the rest of the draft.
+   *
+   * Two independent mechanisms, deliberately kept separable rather than
+   * folded into one check:
+   *
+   * 1. Scoped to the LIVE OCCURRENCE: a stale key outlives the trigger it was
+   *    recorded against, so dismissing a `/` at 0 (an empty or freshly-cleared
+   *    draft — the single most common trigger position) permanently
+   *    suppressed whatever next landed on 0, `/` retyped or `@` typed fresh,
+   *    for the rest of the session. Cleared the moment `trigger` goes null,
+   *    since that is what "the dismissed occurrence is gone" actually means —
+   *    synced during render the same way `frozenTrigger` is above, with
+   *    `effectiveDismissedTrigger` (not the state variable) driving this
+   *    render's open checks so the reset applies immediately rather than one
+   *    render late.
+   * 2. Keyed on `kind` as well as `start`: an ordinary typing sequence can
+   *    only change a trigger's identity by first passing through a caret
+   *    position `detectTrigger` reports as null (it returns null exactly at a
+   *    token's own start — see its docblock), which mechanism 1 above
+   *    catches. A single select-all-replace PASTE never routes through that
+   *    intermediate position — one `onChange` can swap `/bar` for `@foo` at
+   *    the same start index directly. Keying on kind closes that gap without
+   *    reopening the same-kind-retype case mechanism 1 exists for: two
+   *    dismissals of the same kind at the same position are still one
+   *    identity, so a same-kind retype (still caught by mechanism 1, since it
+   *    passes through null on the way) is unaffected by this.
+   */
+  const [dismissedTrigger, setDismissedTrigger] = useState<{
+    readonly kind: TriggerKind;
+    readonly start: number;
+  } | null>(null);
+  const effectiveDismissedTrigger = trigger === null ? null : dismissedTrigger;
+  if (effectiveDismissedTrigger !== dismissedTrigger) {
+    setDismissedTrigger(effectiveDismissedTrigger);
+  }
+  const setSheetDismissed = (): void =>
+    setDismissedTrigger(trigger === null ? null : { kind: trigger.kind, start: trigger.start });
+  const isDismissed = (t: ComposerTrigger): boolean =>
+    effectiveDismissedTrigger !== null &&
+    effectiveDismissedTrigger.start === t.start &&
+    effectiveDismissedTrigger.kind === t.kind;
+  /**
+   * Openness and contents are separate, and conflating them was a defect: the
+   * sheet used to mount only when `sheetCommands` was non-empty, so a cold
+   * catalogue, a no-match and a FAILED request all rendered nothing at all.
+   * `/` was silently inert for the rest of the session after one rejection.
+   *
+   * The `@` sheet below hides on an absent SUBJECT (no roots to search), which
+   * is a different thing from hiding on an empty RESULT. The command catalogue
+   * is harness-scoped and always exists, so there is always a subject.
+   */
+  const commandSheetOpen = slashTrigger !== null && !isDismissed(slashTrigger);
+  const sheetCommands = commandSheetOpen ? matchingCommands : [];
+  /**
+   * Same rule, and it was always right here: "no matches" and "this workspace
+   * is unreadable" are the states the canary exists to tell apart, and a sheet
+   * that hides itself when empty can render neither.
+   */
+  const mentionSheetOpen = mentionTrigger !== null && !isDismissed(mentionTrigger);
+
+  const spliceToken = (token: string): void => {
+    if (trigger === null) return;
+    const next = applyTrigger(draftText, trigger, caret, token);
+    setDraftText(next.value);
+    setCaret(next.caret);
+    // The caret must be set on the DOM node, not just in state: React controls
+    // `value` but never `selectionStart`, so without this the caret jumps to
+    // the end of the text and the keyboard dismisses. Deferred to the next
+    // frame because the node still holds the OLD value until React commits.
+    requestAnimationFrame(() => {
+      const node = textareaRef.current;
+      if (node === null) return;
+      node.focus();
+      node.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  const pickCommand = (command: GuiAgentCommandOption): void => {
+    if (slashTrigger === null) return;
+    spliceToken(`/${command.name}`);
+  };
+
+  /**
+   * The token IS the payload — mobile sends plain text, so whatever this
+   * splices is the entire mechanism by which the agent finds the file. Which
+   * root the suggestion came from decides its form; `mentionToken` carries the
+   * measurement and the parity argument.
+   */
+  const pickMention = (suggestion: MentionSuggestion): void => {
+    if (mentionTrigger === null) return;
+    spliceToken(mentionToken(suggestion, primaryMentionRoot));
+  };
 
   // Adjusted DURING render, not in an effect that fires after commit — an
   // effect here means the render that bumps `prefillNonce` still paints the
@@ -193,8 +528,25 @@ export function Composer({
   const readyAttachments = attachments.filter((a): a is AttachmentDraft & { prepared: PreparedAttachment } => a.status === "ready" && a.prepared !== null);
   const isIngestingAttachments = attachments.some((a) => a.status === "ingesting");
   const hasContent = draftText.trim().length > 0 || readyAttachments.length > 0;
+  /**
+   * `settingsLoaded` is a SAFETY term, not a cosmetic one, and it is the half
+   * of this fix that deriving does not cover. Deriving stops the composer
+   * being permanently wrong; it still reads `?? "full_access"` in the window
+   * before the snapshot arrives, so without this a turn sent in that window
+   * runs at a privilege nobody chose.
+   *
+   * The window is reachable, not theoretical: nothing else here is a snapshot
+   * term. The model catalogue is a unary RPC racing the chat stream, and the
+   * transcript paints from cache before `hasSnapshot` flips, so a cold open of
+   * a cached chat looks completely ready while its settings are still absent.
+   */
   const canSubmit =
-    canType && connectionLive && hasContent && !isIngestingAttachments && resolvedModel !== null;
+    canType &&
+    connectionLive &&
+    settingsLoaded &&
+    hasContent &&
+    !isIngestingAttachments &&
+    resolvedModel !== null;
   // `canSubmit` above already requires a resolved model, but `sendDisabledHint`
   // (the parent's reason: foreign host / offline / view-only) knows nothing
   // about the model fetch — when it's null and the ONLY thing blocking Send is
@@ -205,20 +557,34 @@ export function Composer({
     modelsPhase === "error" && resolvedModel === null
       ? "Couldn't load available models — check your connection and try again."
       : null;
-  const effectiveSendHint = sendDisabledHint ?? modelsUnavailableHint;
+  /**
+   * A newly disabling condition needs its own hint or it recreates the defect
+   * this file's docblock opens with — a Send that does nothing and says
+   * "Send". Ranked above the models hint because it is the more immediate
+   * truth when both hold.
+   */
+  const settingsPendingHint = settingsLoaded ? null : "Loading this chat's settings…";
+  const effectiveSendHint = sendDisabledHint ?? settingsPendingHint ?? modelsUnavailableHint;
 
   const handleSend = (): void => {
     if (!canSubmit || resolvedModel === null) return;
     onSend(
       draftText,
       {
-        harnessId: DEFAULT_HARNESS,
+        harnessId,
         model: resolvedModel,
         permissionMode,
-        reasoningEffort: null,
-        serviceTier: null,
+        // `""` is this client's "no selection"; the wire's is `null`. Emitting
+        // the empty string would persist a reasoning effort of "" on the turn,
+        // which is neither a valid option id nor the absence of one.
+        reasoningEffort: effectiveReasoning === "" ? null : effectiveReasoning,
+        serviceTier: effectiveServiceTier === "" ? null : effectiveServiceTier,
         agentMode,
-        profileId: null,
+        // Already mapped through `profileCommitId()` at selection time, so
+        // ambient is `null` here and never the `"ambient"` sentinel. Nothing
+        // downstream would reject the sentinel, which is why the mapping
+        // happens at the chip rather than being trusted to a schema.
+        profileId,
       },
       readyAttachments.map((a) => a.prepared),
     );
@@ -237,6 +603,15 @@ export function Composer({
         padding: 8,
       }}
     >
+      {!readOnly && (
+        <RateLimitBanner
+          profiles={bannerProfiles}
+          providerId={bannerProviderId ?? ""}
+          currentProfileId={profileId}
+          model={selectedModel}
+          onSwitchProfile={(id) => setOverride((o) => ({ ...o, profileId: id }))}
+        />
+      )}
       {readOnly ? (
         <p style={{ ...type.bodySm, color: theme.mutedText, margin: "4px 4px 8px" }}>
           You have view-only access to this chat.
@@ -247,8 +622,20 @@ export function Composer({
             <AttachmentStrip attachments={attachments} onRemove={removeAttachment} />
           )}
           <textarea
+            ref={textareaRef}
             value={draftText}
-            onChange={(e) => setDraftText(e.target.value)}
+            onChange={(e) => {
+              setDraftText(e.target.value);
+              setCaret(e.target.selectionStart ?? e.target.value.length);
+            }}
+            // Arrow keys and taps move the caret WITHOUT firing `onChange`, so
+            // without this the sheet stays open after the caret has left the
+            // token it belongs to.
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+            // The only source of truth for "an IME is mid-edit right now" —
+            // see `composing`/`frozenTrigger` above for what this gates and why.
+            onCompositionStart={() => setComposing(true)}
+            onCompositionEnd={() => setComposing(false)}
             placeholder="Message this agent…"
             rows={2}
             // Gated on ACCESS, not on connection. Disabling a focused
@@ -275,6 +662,36 @@ export function Composer({
               marginBottom: 6,
             }}
             onKeyDown={(e) => {
+              // While the command sheet is up, Enter completes the highlighted
+              // suggestion instead of sending. Sending a half-typed `/rev`
+              // when the sheet is showing `/review` is the wrong reading of
+              // the keypress, and it is unrecoverable — the turn has started.
+              if (e.key === "Enter" && !e.shiftKey && sheetCommands.length > 0) {
+                e.preventDefault();
+                pickCommand(sheetCommands[0]);
+                return;
+              }
+              // Same reading for `@`, but gated on there being a suggestion:
+              // with the sheet open on an empty state, Enter is an ordinary
+              // send and swallowing it would strand the message.
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                mentionSheetOpen &&
+                suggestions.length > 0
+              ) {
+                e.preventDefault();
+                pickMention(suggestions[0]);
+                return;
+              }
+              // Escape dismisses the sheet without touching the draft. The
+              // ticket requires the text and caret to survive this intact,
+              // which they do because dismissal is a caret-independent flag.
+              if (e.key === "Escape" && (commandSheetOpen || mentionSheetOpen)) {
+                e.preventDefault();
+                setSheetDismissed();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
@@ -320,15 +737,99 @@ export function Composer({
                 actually sent — there is nothing for a live connection to
                 gate here, and greying them out during a blip just makes the
                 composer feel broken alongside the textarea. */}
-            <PermissionModeToggle value={permissionMode} onChange={setPermissionMode} disabled={!canType} />
-            <AgentModeToggle value={agentMode} onChange={setAgentMode} disabled={!canType} />
+            {/*
+              Every control below is disabled while the settings are UNKNOWN, so
+              nothing invites a choice against a state the composer has not been
+              told yet.
+
+              And NONE of them names a value it has not been told: every one
+              takes `unknown={!settingsLoaded}`. Four render the shared
+              "Checking…" label; three render nothing at all, because whether
+              THEY should exist is itself downstream of a harness or model the
+              composer is still guessing. The split and its reasoning live on
+              `UNKNOWN_SETTING_LABEL`, in one place rather than seven.
+
+              The gate is `settingsLoaded`, NOT `chatSettings !== null`, and the
+              difference is load-bearing: a brand-new chat legitimately has null
+              settings AFTER its snapshot, and for that chat `Full access` is
+              honest — it is exactly what the turn will carry. Only the
+              pre-snapshot state is a guess.
+            */}
+            <PermissionModeToggle
+              value={permissionMode}
+              unknown={!settingsLoaded}
+              onChange={(v) => setOverride((o) => ({ ...o, permissionMode: v }))}
+              disabled={!canType || !settingsLoaded}
+            />
+            <AgentModeToggle
+              value={agentMode}
+              unknown={!settingsLoaded}
+              onChange={(v) => setOverride((o) => ({ ...o, agentMode: v }))}
+              disabled={!canType || !settingsLoaded}
+            />
+            <HarnessChip
+              harnesses={availableHarnesses}
+              value={harnessId}
+              probing={harnessesProbing}
+              unknown={!settingsLoaded}
+              onChange={(id) =>
+                // The catalogue is per harness, so the old slug is meaningless
+                // here. Null resets to the new harness's first model rather
+                // than carrying a slug the new harness has never heard of —
+                // and it is set PRESENT-as-null, which is why `modelSlug` reads
+                // this field with `in` rather than `??`.
+                setOverride((o) => ({ ...o, harnessId: id, model: null }))
+              }
+              disabled={!connectionLive || !settingsLoaded}
+            />
             <ModelChip
               models={models}
               value={resolvedModel}
-              onChange={setModelSlug}
-              disabled={!connectionLive}
+              unknown={!settingsLoaded}
+              onChange={(slug) => setOverride((o) => ({ ...o, model: slug }))}
+              disabled={!connectionLive || !settingsLoaded}
+            />
+            <ReasoningChip
+              model={selectedModel}
+              value={effectiveReasoning}
+              unknown={!settingsLoaded}
+              onChange={(v) => setOverride((o) => ({ ...o, reasoningEffort: v }))}
+              disabled={!connectionLive || !settingsLoaded}
+            />
+            <ServiceTierChip
+              model={selectedModel}
+              value={effectiveServiceTier}
+              unknown={!settingsLoaded}
+              onChange={(v) => setOverride((o) => ({ ...o, serviceTier: v }))}
+              disabled={!connectionLive || !settingsLoaded}
+            />
+            <ProfileChip
+              client={client}
+              harnessId={harnessId}
+              value={profileId}
+              unknown={!settingsLoaded}
+              onChange={(id) => setOverride((o) => ({ ...o, profileId: id }))}
+              disabled={!connectionLive || !settingsLoaded}
             />
           </>
+        )}
+        {commandSheetOpen && (
+          <CommandSheet
+            commands={sheetCommands}
+            phase={commandsPhase}
+            onPick={pickCommand}
+            onClose={setSheetDismissed}
+          />
+        )}
+        {mentionSheetOpen && (
+          <MentionSheet
+            suggestions={suggestions}
+            loading={mentionsLoading}
+            connected={client !== null}
+            rootStatuses={rootStatuses}
+            onPick={pickMention}
+            onClose={setSheetDismissed}
+          />
         )}
         <div style={{ flex: 1 }} />
         <SendStopButton
@@ -343,23 +844,6 @@ export function Composer({
       </div>
     </div>
   );
-}
-
-function chipStyle(disabled: boolean) {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    minHeight: 32,
-    padding: "0 8px",
-    border: `1px solid ${theme.border}`,
-    borderRadius: radius.md,
-    background: "transparent",
-    color: theme.mutedText,
-    fontSize: 12,
-    cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-  } as const;
 }
 
 function AttachButton({
@@ -492,91 +976,108 @@ function AttachmentChip({
 
 function PermissionModeToggle({
   value,
+  unknown,
   onChange,
   disabled,
 }: {
   readonly value: PermissionMode;
+  /**
+   * The chat's settings have NOT arrived, and the composer must not name a
+   * permission mode it has not been told.
+   *
+   * The defect this closes is a display, not a dispatch: `handleSend` is already
+   * gated, so nothing could ACT on the unknown state — but a chat configured
+   * `supervised`, opened cold, read `Full access` on this chip. The value was
+   * `chatSettings?.permissionMode ?? "full_access"`, and pre-snapshot that
+   * fallback is not a default, it is a guess presented as a fact. A user reading
+   * `Full access` on a chat they set to `supervised` has been told something
+   * false about how the agent will behave.
+   *
+   * A flag rather than a null `value` so all seven controls share one shape —
+   * see `UNKNOWN_SETTING_LABEL`, where the null-collision reasoning lives.
+   */
+  readonly unknown: boolean;
   readonly onChange: (v: PermissionMode) => void;
   readonly disabled: boolean;
 }): ReactElement {
-  const current = PERMISSION_OPTIONS.find((o) => o.id === value) ?? PERMISSION_OPTIONS[0];
-  const Icon = current.icon;
+  const current = unknown
+    ? null
+    : PERMISSION_OPTIONS.find((o) => o.id === value) ?? PERMISSION_OPTIONS[0];
+  // `LoaderCircle` rather than any mode's own icon: `ShieldCheck` would say
+  // "supervised" in pictures while the text says nothing, which is the same
+  // false claim moved one element over.
+  const Icon = current?.icon ?? LoaderCircle;
   return (
     <button
       type="button"
+      // A stable name for this control, independent of the value it shows —
+      // otherwise its accessible name IS the permission mode, so a test or an
+      // assistive reader has no way to refer to the control while it has no
+      // value. It also reads better: "Full access" alone names no subject.
+      aria-label="Permission mode"
       disabled={disabled}
-      title="Ask before commands and file changes / Auto-approve edits / Allow without prompts"
+      title={
+        current === null
+          ? "Waiting for this chat's permission mode"
+          : "Ask before commands and file changes / Auto-approve edits / Allow without prompts"
+      }
       onClick={() => {
+        // Guarded here rather than relying solely on `disabled`: the caller's
+        // gate and this component's correctness are different properties, and a
+        // cycle from "unknown" would have to invent a starting point.
+        if (unknown) return;
         const index = PERMISSION_OPTIONS.findIndex((o) => o.id === value);
         onChange(PERMISSION_OPTIONS[(index + 1) % PERMISSION_OPTIONS.length].id);
       }}
       style={chipStyle(disabled)}
     >
       <Icon size={13} aria-hidden="true" />
-      {current.label}
+      {current?.label ?? UNKNOWN_SETTING_LABEL}
     </button>
   );
 }
 
 function AgentModeToggle({
   value,
+  unknown,
   onChange,
   disabled,
 }: {
   readonly value: AgentMode;
+  /** The chat's settings have not arrived; `value` is the composer's default, not this chat's mode. */
+  readonly unknown: boolean;
   readonly onChange: (v: AgentMode) => void;
   readonly disabled: boolean;
 }): ReactElement {
-  const current = AGENT_MODE_OPTIONS.find((o) => o.id === value) ?? AGENT_MODE_OPTIONS[0];
-  const Icon = current.icon;
-  const title =
-    value === "regular"
+  const current = unknown
+    ? null
+    : AGENT_MODE_OPTIONS.find((o) => o.id === value) ?? AGENT_MODE_OPTIONS[0];
+  // Neutral while unknown: either mode's own icon would keep making the claim
+  // in pictures that the text has stopped making in words.
+  const Icon = current?.icon ?? LoaderCircle;
+  const title = unknown
+    ? "Waiting for this chat's agent mode"
+    : value === "regular"
       ? "Regular mode: general-purpose coding agent experience."
       : "Epic mode: plan and coordinate larger changes with Traycer artifacts.";
   return (
     <button
       type="button"
+      // Named independently of its value, for the same reason as the permission
+      // toggle: without this its accessible name IS the mode, so nothing can
+      // refer to the control while it has none.
+      aria-label="Agent mode"
       disabled={disabled}
       title={title}
-      onClick={() => onChange(value === "regular" ? "epic" : "regular")}
+      onClick={() => {
+        if (unknown) return;
+        onChange(value === "regular" ? "epic" : "regular");
+      }}
       style={chipStyle(disabled)}
     >
       <Icon size={13} aria-hidden="true" />
-      {current.shortLabel}
+      {current?.shortLabel ?? UNKNOWN_SETTING_LABEL}
     </button>
-  );
-}
-
-function ModelChip({
-  models,
-  value,
-  onChange,
-  disabled,
-}: {
-  readonly models: readonly { readonly id: string }[];
-  readonly value: string | null;
-  readonly onChange: (id: string) => void;
-  readonly disabled: boolean;
-}): ReactElement | null {
-  if (models.length === 0) return null;
-  return (
-    <select
-      aria-label="Model"
-      disabled={disabled}
-      value={value ?? models[0]?.id}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        ...chipStyle(disabled),
-        appearance: "none",
-        paddingRight: 8,
-      }}
-    >
-      {models.map((m) => (
-        <option key={m.id} value={m.id}>
-          {m.id}
-        </option>
-      ))}
-    </select>
   );
 }
 

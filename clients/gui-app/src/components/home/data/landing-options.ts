@@ -11,6 +11,21 @@ import {
   type AgentMode as ProtocolAgentMode,
 } from "@traycer/protocol/host/index";
 import type { TuiHarnessId } from "@traycer/protocol/persistence/epic/schemas";
+/**
+ * Reasoning-effort / service-tier selection rules moved to `clients/shared`
+ * (M1) so the mobile composer applies the SAME clamp rather than a fork of it
+ * — see that module's docblock. Re-exported from here unchanged so every
+ * existing desktop consumer and test keeps importing from `landing-options`.
+ */
+import {
+  findReasoningOptionsForModel as sharedFindReasoningOptionsForModel,
+  normalizeReasoningForModel as sharedNormalizeReasoningForModel,
+  findReasoningLabel as sharedFindReasoningLabel,
+  findUpgradeServiceTierForModel as sharedFindUpgradeServiceTierForModel,
+  normalizeServiceTierForModel as sharedNormalizeServiceTierForModel,
+  type ReasoningLevel as SharedReasoningLevel,
+  type ServiceTier as SharedServiceTier,
+} from "@traycer-clients/shared/agent-models/model-selection";
 import {
   Code2,
   FileCheck2,
@@ -146,7 +161,7 @@ export function isReasoningLevel(value: string): value is ReasoningLevel {
   return value.trim().length > 0;
 }
 
-export type ReasoningLevel = string;
+export type ReasoningLevel = SharedReasoningLevel;
 export type ReasoningLevelOption = AgentReasoningEffortOption;
 
 // Service / speed tier (e.g. Codex `"priority"` for the Fast upgrade). The
@@ -158,7 +173,7 @@ export type ReasoningLevelOption = AgentReasoningEffortOption;
 // Claude `"fast"`); the raw preference stays sticky for a later model that
 // honors it. The codex-adapter additionally re-filters against the model's
 // `supportedServiceTiers` at thread/start as defense-in-depth.
-export type ServiceTier = string;
+export type ServiceTier = SharedServiceTier;
 export type ServiceTierOption = AgentServiceTierOption;
 
 export type AgentMode = ProtocolAgentMode;
@@ -300,38 +315,11 @@ function stripProviderPrefix(label: string, providerLabel: string): string {
   return label;
 }
 
-const NO_REASONING_OPTIONS: ReadonlyArray<ReasoningLevelOption> = [];
-
-export function findReasoningOptionsForModel(
-  model: ModelOption | null,
-): ReadonlyArray<ReasoningLevelOption> {
-  return model?.supportedReasoningEfforts ?? NO_REASONING_OPTIONS;
-}
-
-export function normalizeReasoningForModel(
-  value: ReasoningLevel,
-  model: ModelOption | null,
-): ReasoningLevel {
-  if (model === null) return value;
-  const options = findReasoningOptionsForModel(model);
-  if (options.length === 0) return "";
-  if (options.some((option) => option.id === value)) return value;
-  const defaultReasoningEffort = model.defaultReasoningEffort;
-  if (
-    defaultReasoningEffort !== null &&
-    options.some((option) => option.id === defaultReasoningEffort)
-  ) {
-    return defaultReasoningEffort;
-  }
-  return options[0]?.id ?? value;
-}
-
-export function findReasoningLabel(
-  level: ReasoningLevel,
-  options: ReadonlyArray<ReasoningLevelOption>,
-): string {
-  return options.find((option) => option.id === level)?.label ?? level;
-}
+// Bodies live in `clients/shared/agent-models/model-selection.ts` (M1) so the
+// mobile composer clamps identically. Re-exported unchanged.
+export const findReasoningOptionsForModel = sharedFindReasoningOptionsForModel;
+export const normalizeReasoningForModel = sharedNormalizeReasoningForModel;
+export const findReasoningLabel = sharedFindReasoningLabel;
 
 // Identify the model's "upgrade" tier - the one the toolbar toggle should
 // flip TO when activated. We deliberately do not assume `supportedServiceTiers[0]`
@@ -340,19 +328,8 @@ export function findReasoningLabel(
 // any option whose id matches the model's declared `defaultServiceTier`; if
 // every advertised option matches the default (or none do), fall through to
 // the first option so a model that advertises only an upgrade still works.
-export function findUpgradeServiceTierForModel(
-  model: ModelOption | null,
-): ServiceTierOption | null {
-  if (model === null) return null;
-  const options = model.supportedServiceTiers;
-  if (options.length === 0) return null;
-  const defaultId = model.defaultServiceTier;
-  if (defaultId !== null) {
-    const upgrade = options.find((option) => option.id !== defaultId);
-    if (upgrade !== undefined) return upgrade;
-  }
-  return options[0] ?? null;
-}
+export const findUpgradeServiceTierForModel =
+  sharedFindUpgradeServiceTierForModel;
 
 // Clamp the composer's sticky service-tier preference to the selected model -
 // the service-tier analogue of `normalizeReasoningForModel`. The raw value
@@ -369,12 +346,4 @@ export function findUpgradeServiceTierForModel(
 // - Otherwise keep the value only when it is the model's upgrade tier - the
 //   same `findUpgradeServiceTierForModel` comparison the toggle uses - so the
 //   emitted / recorded tier can never disagree with what the picker displays.
-export function normalizeServiceTierForModel(
-  value: ServiceTier,
-  model: ModelOption | null,
-): ServiceTier {
-  if (model === null) return value;
-  const upgrade = findUpgradeServiceTierForModel(model);
-  if (upgrade === null) return "";
-  return value.trim() === upgrade.id ? upgrade.id : "";
-}
+export const normalizeServiceTierForModel = sharedNormalizeServiceTierForModel;

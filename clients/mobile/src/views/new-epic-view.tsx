@@ -9,12 +9,15 @@
  * the Fleet it launches from, rather than `author-view.tsx`'s older `ui.ts`
  * styling.
  *
- * The copy states plainly that the agent runs without a repo — this creates a
- * FOLDERLESS epic (see `use-create-epic.ts` for why that is the honest option
- * from a device with no view of the host's filesystem), and the user should not
- * have to discover that by watching an agent fail to find their code.
+ * M5: the epic is no longer ALWAYS folderless. A workspace picker offers the
+ * repos and worktrees the host already has, sourced from
+ * `worktree.listAllForHost` + `workspace.resolvePathsByRepoIdentifiers`.
+ * Folderless remains the default and a clearly-labelled row rather than a
+ * silent fallback — the copy below changes with the pick, so a user who leaves
+ * it folderless is still told what that means instead of discovering it by
+ * watching an agent fail to find their code.
  */
-import type { CSSProperties, ReactElement } from "react";
+import { useState, type CSSProperties, type ReactElement } from "react";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import {
@@ -23,6 +26,12 @@ import {
   useCreateEpic,
 } from "@/host/use-create-epic";
 import { NEW_EPIC_DRAFT_KEY, useDraft } from "@/router/drafts";
+import { useWorkspaceTargets } from "@/host/use-workspace-targets";
+import {
+  FOLDERLESS_TARGET,
+  type WorkspaceTarget,
+} from "@/host/workspace-selection";
+import { WorkspacePicker } from "@/views/workspace-picker";
 import { Button, SectionHeading, radius, screen, theme, type } from "./design-tokens";
 
 interface NewEpicViewProps {
@@ -43,6 +52,12 @@ export function NewEpicView({
   // rule is "preserve" and not "confirm before discarding".
   const instruction = useDraft(NEW_EPIC_DRAFT_KEY);
   const streamConnection = useStreamConnectionOrNull();
+  const [target, setTarget] = useState<WorkspaceTarget>(FOLDERLESS_TARGET);
+  const {
+    targets,
+    phase: targetsPhase,
+    truncated,
+  } = useWorkspaceTargets(client, true);
   const { phase, error, submit } = useCreateEpic({
     client,
     streamConnection,
@@ -78,9 +93,9 @@ export function NewEpicView({
       <header style={{ marginBottom: 12 }}>
         <SectionHeading>New epic</SectionHeading>
         <p style={{ ...type.bodySm, color: theme.mutedText, margin: "4px 0 0" }}>
-          Describe the work. Traycer starts an epic with a first agent on it. The
-          agent runs without a repo attached — attach folders from the desktop app
-          when it needs your code.
+          {target.kind === "folderless"
+            ? "Describe the work. Traycer starts an epic with a first agent on it. The agent runs without a repo attached — pick one below if it needs your code."
+            : "Describe the work. Traycer starts an epic with a first agent on it, bound to the workspace you pick below."}
         </p>
       </header>
 
@@ -94,8 +109,19 @@ export function NewEpicView({
         onChange={(e) => instruction.set(e.target.value)}
       />
 
+      <div style={{ marginTop: 12 }}>
+        <WorkspacePicker
+          targets={targets}
+          phase={targetsPhase}
+          truncated={truncated}
+          value={target}
+          onChange={setTarget}
+          disabled={submitting}
+        />
+      </div>
+
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Button variant="primary" disabled={!canSubmit} onClick={() => submit(instruction.value)}>
+        <Button variant="primary" disabled={!canSubmit} onClick={() => submit(instruction.value, target)}>
           {submitting ? "Creating…" : "Create epic"}
         </Button>
         <Button variant="ghost" disabled={submitting} onClick={onCancel}>

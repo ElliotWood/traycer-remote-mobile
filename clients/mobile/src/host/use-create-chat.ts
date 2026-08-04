@@ -32,7 +32,13 @@ import type {
   CreateChatInitialMessage,
   CreateChatRequest,
 } from "@traycer/protocol/host/epic/unary-schemas";
+import type { ChatRunSettings } from "@traycer/protocol/persistence/epic/foundation";
 import type { MobileHostClient } from "@/host/host-client-context";
+import type { HostStreamConnection } from "@/host/stream-connection";
+import {
+  FIRST_TURN_ACK_TIMEOUT_MS,
+  startFoldedFirstTurn,
+} from "@/host/first-turn-fallback";
 // HA-1: `MOBILE_HOST_ID` is deliberately NOT imported here any more. It stays a
 // valid local UI label in `connection.ts`, but nothing in this module may reach
 // for it as a durable `hostId` — the absence of the import is the guardrail.
@@ -89,6 +95,16 @@ export interface BuildInitialMessageArgs {
   readonly userId: string;
   readonly model: string;
   readonly instruction: string;
+  /**
+   * M1 item 6, inherited by M5: the run settings the user actually chose.
+   *
+   * `null` (or omitted) keeps the historical behaviour — `model` as resolved
+   * by the caller, `supervised`, `regular`, and every capacity setting null.
+   * When present, `model` here is authoritative over the `model` argument,
+   * because a caller that resolved a whole settings tuple has already chosen
+   * a slug and the two disagreeing silently would be worse than either.
+   */
+  readonly settings?: ChatRunSettings | null;
 }
 
 /**
@@ -104,7 +120,7 @@ export function buildInitialMessage(
     clientActionId: args.clientActionId,
     content: plainTextContent(args.instruction),
     sender: { type: "user", userId: args.userId },
-    settings: {
+    settings: args.settings ?? {
       harnessId: AUTHOR_HARNESS_ID,
       model: args.model,
       permissionMode: AUTHOR_PERMISSION_MODE,
@@ -241,6 +257,12 @@ export interface UseCreateChatArgs {
   readonly epicId: string;
   /** P1: nests the new chat under this parent (Agents-row "+" action). Omitted/`null` for a top-level chat. */
   readonly parentId?: string | null;
+  /**
+   * Used ONLY for the send-after-subscribe fallback when the host reports the
+   * folded first turn didn't start. `null` (no host stream) degrades to an
+   * honest "created but not running" error rather than a silent no-op.
+   */
+  readonly streamConnection: HostStreamConnection | null;
   /** Called with the minted `chatId` once the host accepts the create. */
   readonly onCreated: (chatId: string) => void;
 }
@@ -249,6 +271,7 @@ export function useCreateChat({
   client,
   epicId,
   parentId = null,
+  streamConnection,
   onCreated,
 }: UseCreateChatArgs): UseCreateChatResult {
   const [phase, setPhase] = useState<CreateChatPhase>("idle");
@@ -306,13 +329,58 @@ export function useCreateChat({
           });
 
           const response = await client.request("epic.createChat", request);
-          // `initialTurnStarted === true` → the host already kicked the turn
-          // from `initialMessage`, so there is nothing more to send. When it is
-          // false/absent the send-after-subscribe fallback would be needed; that
-          // second path is a documented follow-up (not built in T7). Either way
-          // the chat now exists, so land in it.
-          // ponytail: no send-after-subscribe fallback when initialTurnStarted is false — T7 follow-up.
-          void response.initialTurnStarted;
+          /**
+           * `initialTurnStarted === true` → the host already kicked the turn from
+           * `initialMessage` and there is nothing more to send. FALSE is the case
+           * that used to be discarded here (`void response.initialTurnStarted`),
+           * and discarding it made "Start agent" a SILENT NO-OP: the chat exists,
+           * the instruction is persisted on it, nothing is running, and both
+           * branches navigated into the chat identically — so a started turn and a
+           * dead one were indistinguishable to the user. Worse than a failed send,
+           * which at least tells you to try again.
+           *
+           * Measured on a real host, `initialTurnStarted` comes back FALSE, so
+           * this is the NORMAL path and not an edge case. Epic creation already
+           * handled it (`use-create-epic.ts`); chat creation did not, and that
+           * inconsistency between two adjacent paths is the whole defect.
+           *
+           * Re-sending is idempotent — the frame reuses the folded message's
+           * `messageId` and the host dedupes on it. See `first-turn-fallback.ts`,
+           * whose mechanism this REUSES rather than reimplementing.
+           */
+          if (response.initialTurnStarted !== true) {
+            /**
+             * Narrowing, not defensive padding: `initialMessage` is optional on
+             * the wire even though `buildCreateChatRequest` always supplies it.
+             *
+             * Absent lands in the SAME error arm rather than skipping the
+             * fallback, which is where this deliberately differs from
+             * `use-create-epic.ts`. There, a missing folded message means the
+             * epic was created without a chat seed and navigating is correct.
+             * Here we are already inside "the host did not start a turn", so no
+             * message to re-send means nothing is running and nothing can be —
+             * exactly the state the user must be told about.
+             */
+            const foldedMessage = request.initialMessage ?? null;
+            const outcome =
+              foldedMessage === null
+                ? "no-connection"
+                : await startFoldedFirstTurn(
+                    streamConnection,
+                    { epicId, chatId, initialMessage: foldedMessage },
+                    FIRST_TURN_ACK_TIMEOUT_MS,
+                  );
+            if (outcome !== "accepted") {
+              // The chat and its message exist but nothing is acting on them.
+              // Say so rather than navigating into apparent success — replacing a
+              // silent no-op with a differently-silent one would not be a fix.
+              setPhase("error");
+              setError(
+                "Agent created, but it didn't start. Open it from this epic and send the message again.",
+              );
+              return;
+            }
+          }
           onCreated(chatId);
         } catch (cause) {
           setPhase("error");
@@ -320,7 +388,7 @@ export function useCreateChat({
         }
       })();
     },
-    [client, epicId, parentId, onCreated, phase],
+    [client, epicId, parentId, streamConnection, onCreated, phase],
   );
 
   return { phase, error, submit };

@@ -16,8 +16,10 @@ import type {
   ChatSubscribeServerFrame,
 } from "@traycer/protocol/host/agent/gui/subscribe";
 import { ChatView } from "@/views/chat-view";
+import { HostClientProvider } from "@/host/host-client-context";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import {
+  createFakeHostClient,
   createFakeStreamConnection,
   type FakeChatSession,
   type FakeStreamConnection,
@@ -130,10 +132,19 @@ const ackFrame = (opts: {
   }) as unknown as AckFrame;
 
 function renderChatView(fake: FakeStreamConnection): void {
+  // A host client is required for `canMutate`/the stale-approve-hazard gate
+  // to ever read `true` — its absence used to be indistinguishable from a
+  // disconnected one, which is why every reply-dispatch test below also
+  // drives the connection to "live".
+  const host = createFakeHostClient(() => {
+    throw new Error("no request expected in this suite");
+  });
   render(
-    <StreamConnectionProvider connection={fake.connection}>
-      <ChatView epicId="e1" chatId="c1" initialTitle={null} onTitleChange={() => {}} />
-    </StreamConnectionProvider>,
+    <HostClientProvider client={host.client}>
+      <StreamConnectionProvider connection={fake.connection}>
+        <ChatView epicId="e1" chatId="c1" initialTitle={null} onTitleChange={() => {}} />
+      </StreamConnectionProvider>
+    </HostClientProvider>,
   );
 }
 
@@ -153,7 +164,11 @@ describe("ChatView reply dispatch", () => {
   it("sends an approvalDecision frame when a tool approval is approved", async () => {
     const fake = createFakeStreamConnection();
     renderChatView(fake);
+    // Approve/Reject are gated on a LIVE connection (the stale-approve-hazard
+    // fix) — established here the same way chat-view-undo.test.tsx does for
+    // canMutate, or the button renders disabled and this test measures nothing.
     act(() => {
+      chatSession(fake).connection.applyStatus("open", null);
       chatSession(fake).callbacks.onSnapshot(
         snapshotFrame({ approvals: [toolApproval("a1")] }),
       );
@@ -178,6 +193,7 @@ describe("ChatView reply dispatch", () => {
     const fake = createFakeStreamConnection();
     renderChatView(fake);
     act(() => {
+      chatSession(fake).connection.applyStatus("open", null);
       chatSession(fake).callbacks.onSnapshot(
         snapshotFrame({ fileEditApprovals: [fileEditApproval("f1")] }),
       );
@@ -198,6 +214,7 @@ describe("ChatView reply dispatch", () => {
     const fake = createFakeStreamConnection();
     renderChatView(fake);
     act(() => {
+      chatSession(fake).connection.applyStatus("open", null);
       chatSession(fake).callbacks.onSnapshot(
         snapshotFrame({
           interviews: [{ blockId: "iv1", requestedAt: 0 }],
@@ -243,6 +260,7 @@ describe("ChatView reply dispatch", () => {
     const fake = createFakeStreamConnection();
     renderChatView(fake);
     act(() => {
+      chatSession(fake).connection.applyStatus("open", null);
       chatSession(fake).callbacks.onSnapshot(
         snapshotFrame({ approvals: [toolApproval("a1")] }),
       );

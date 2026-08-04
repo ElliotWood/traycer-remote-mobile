@@ -73,7 +73,17 @@ import { plainTextContent } from "./use-create-chat";
  */
 export type ReplyStatus =
   | { readonly phase: "submitting" }
-  | { readonly phase: "rejected"; readonly message: string };
+  | { readonly phase: "rejected"; readonly message: string }
+  /**
+   * The CLIENT refused to send this reply — the connection was not live at
+   * the moment of submit, so nothing went on the wire at all. Distinct from
+   * `"rejected"` (the host answered no) because the two are different facts
+   * a user might reasonably want told apart: here, retrying once reconnected
+   * is expected to work; a host rejection may not be. See `sendReply`'s
+   * docblock — this is the re-validate-on-submit half of the
+   * stale-approve-hazard fix, not merely the disabled-button half.
+   */
+  | { readonly phase: "refused"; readonly message: string };
 
 /** Discriminated reply request — each dispatches its OWN client frame. */
 export type SendReplyArg =
@@ -161,6 +171,21 @@ export interface UseChatResult {
     }) => ChatSubscribeClientFrame,
   ) => void;
   /**
+   * `dispatchAction` whose outcome is CORRELATED: the pending key moves to
+   * `submitting`, an `accepted` ack clears it and a `rejected` ack parks the
+   * host's reason on it, readable via `replyStatusFor`. Use this for anything
+   * destructive; the untracked form cannot report a refusal.
+   */
+  readonly dispatchTrackedAction: (
+    key: string,
+    build: (base: {
+      readonly hasBinaryPayload: false;
+      readonly epicId: string;
+      readonly chatId: string;
+      readonly clientActionId: string;
+    }) => ChatSubscribeClientFrame,
+  ) => void;
+  /**
    * True once the first `snapshot` frame has landed for this (epicId, chatId).
    * S5 (C, F1 fix): distinguishes "not yet observed" from "observed and
    * unblocked" — `INITIAL_STATE` has `pendingApprovals: []` etc. BEFORE any
@@ -178,6 +203,26 @@ export interface UseChatResult {
 export const approvalKey = (approvalId: string): string => `approval:${approvalId}`;
 export const fileEditKey = (approvalId: string): string => `fileEdit:${approvalId}`;
 export const interviewKey = (blockId: string): string => `interview:${blockId}`;
+
+/** The scope name Undo-all reverts under — every file, versus a single path. */
+export const REVERT_ALL_SCOPE = "all";
+/** Pending key for a `revertFileChanges` dispatch: {@link REVERT_ALL_SCOPE} or one file path. */
+export const revertKey = (scope: string): string => `revert:${scope}`;
+/**
+ * A revert's pending key does NOT correspond to any item in a snapshot.
+ *
+ * Approvals and interviews are pending ITEMS: the snapshot lists them, so it is
+ * authoritative for whether they are still outstanding, and pruning the reply
+ * index to the surviving ones is correct. A revert is a pending ACTION — its
+ * whole lifecycle is dispatch → `actionAck`, and no snapshot ever mentions it.
+ *
+ * Pruning it on the next snapshot would therefore drop the ack index entry
+ * BEFORE the ack lands — and a revert's own effect produces a snapshot, so that
+ * race is the common case, not the corner. The `rejected` ack would then find
+ * no key and be silently discarded, which is exactly the defect this wiring
+ * exists to remove, reintroduced one layer down.
+ */
+const isRevertKey = (key: string): boolean => key.startsWith("revert:");
 
 interface ChatState {
   readonly runStatus: ChatRunStatus;
@@ -448,7 +493,18 @@ type ChatEvent =
       readonly type: "sendRetried";
       readonly messageId: string;
     }
-  | { readonly type: "blockDelta"; readonly event: RuntimeEvent };
+  | { readonly type: "blockDelta"; readonly event: RuntimeEvent }
+  | {
+      /**
+       * `sendReply` re-checked the connection at the moment of dispatch and
+       * it was not live — see that function's docblock. Fires INSTEAD of
+       * `replySubmitting`, never after it: no frame was sent, so there is
+       * nothing to time out or ack.
+       */
+      readonly type: "replyRefused";
+      readonly key: string;
+      readonly message: string;
+    };
 
 /** Drops a keyed entry from a record without mutating the input. */
 function without<V>(
@@ -476,13 +532,16 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         ...snap.pendingFileEditApprovals.map((a) => fileEditKey(a.approvalId)),
         ...snap.pendingInterviews.map((i) => interviewKey(i.blockId)),
       ]);
+      // A revert is a pending ACTION, not a pending item — the snapshot is not
+      // authoritative about it and never mentions it. See `isRevertKey`.
+      const survives = (key: string): boolean => liveKeys.has(key) || isRevertKey(key);
       const replies: Record<string, ReplyStatus> = {};
       for (const [key, status] of Object.entries(state.replies)) {
-        if (liveKeys.has(key)) replies[key] = status;
+        if (survives(key)) replies[key] = status;
       }
       const ackIndex: Record<string, string> = {};
       for (const [id, key] of Object.entries(state.ackIndex)) {
-        if (liveKeys.has(key)) ackIndex[id] = key;
+        if (survives(key)) ackIndex[id] = key;
       }
       // Preserve our OWN still-unconfirmed optimistic sends across the
       // reset below — otherwise an unrelated snapshot (a reconnect, not
@@ -667,6 +726,14 @@ function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         ...state,
         replies: { ...state.replies, [event.key]: { phase: "submitting" } },
         ackIndex: { ...state.ackIndex, [event.clientActionId]: event.key },
+      };
+    case "replyRefused":
+      return {
+        ...state,
+        replies: {
+          ...state.replies,
+          [event.key]: { phase: "refused", message: event.message },
+        },
       };
     case "actionAck": {
       const key = state.ackIndex[event.clientActionId];
@@ -1007,6 +1074,39 @@ export function useChat(
           : arg.kind === "fileEditApproval"
             ? fileEditKey(arg.approvalId)
             : interviewKey(arg.blockId);
+      /**
+       * Re-validated HERE, not just trusted from the caller having gated its
+       * button — the stale-approve-hazard's re-validate-on-submit half.
+       * `connectionRef` (not the `connection` state value, and not a prop the
+       * caller passed in) is read specifically because it updates
+       * synchronously off the connection-state subscription and can never be
+       * the stale value a render committed before the socket actually
+       * dropped — the exact gap a disabled-button check alone cannot close,
+       * because a tap already in flight when the connection drops still
+       * reaches this function with its ORIGINAL closure. `chat-view.tsx`
+       * disabling Approve/Reject while disconnected is the cheap, common-case
+       * fix; this is what still refuses when that guard was bypassed, raced,
+       * or simply never wired by some future caller.
+       *
+       * What this does NOT close: a decision dispatched while the connection
+       * genuinely IS live, against a `pendingApprovals` entry that the host
+       * already resolved seconds ago but no delta for that has arrived yet.
+       * Neither `approvalDecision` nor `fileEditApprovalDecision` nor
+       * `interviewAnswer` carries any expected-state/version field the host
+       * could use to detect and refuse a stale write — checked directly
+       * against `subscribe.ts`'s frame schemas, not assumed — so closing that
+       * half needs a protocol change, not a client-side check. Filed as a
+       * protocol gap rather than faked with a client-side heuristic that
+       * would look like it closes the class without actually doing so.
+       */
+      if (connectionRef.current !== "live") {
+        dispatch({
+          type: "replyRefused",
+          key,
+          message: "Connection isn't live — reconnect and try again.",
+        });
+        return;
+      }
       const clientActionId = lastReplyAttemptRef.current.get(key) ?? uuidv4();
       lastReplyAttemptRef.current.set(key, clientActionId);
       const base = {
@@ -1204,6 +1304,45 @@ export function useChat(
     [epicId, chatId],
   );
 
+  /**
+   * `dispatchAction` with the action's outcome actually tracked.
+   *
+   * The untracked form fires and forgets, which is right for a queue pause but
+   * wrong for anything destructive: `revertFileChanges` was dispatched that way
+   * and its `rejected` ack — carrying the host's own `reason` — was discarded,
+   * so a refused Undo rendered for three seconds and then looked exactly like
+   * success. This routes the same frame through the correlation pipeline the
+   * approvals and interviews a few lines away have always used, so `submitting`
+   * ends on the ACK rather than on a timer, and a rejection surfaces.
+   */
+  const dispatchTrackedAction = useCallback(
+    (
+      key: string,
+      build: (base: {
+        readonly hasBinaryPayload: false;
+        readonly epicId: string;
+        readonly chatId: string;
+        readonly clientActionId: string;
+      }) => ChatSubscribeClientFrame,
+    ): void => {
+      const stream = streamRef.current;
+      if (stream === null) return;
+      const base = {
+        hasBinaryPayload: false as const,
+        epicId,
+        chatId,
+        clientActionId: uuidv4(),
+      };
+      dispatch({ type: "replySubmitting", key, clientActionId: base.clientActionId });
+      stream.sendAction(build(base));
+      // Without this a host that never acks leaves the control disabled
+      // forever — the mirror of the timer bug, and the reason the reply path
+      // has always had one.
+      scheduleReplyTimeout(key, base.clientActionId);
+    },
+    [epicId, chatId, scheduleReplyTimeout],
+  );
+
   const resolveInterview = useCallback(
     (blockId: string): InterviewBlock | null =>
       interviewBlockFor(state.messages, blockId),
@@ -1262,5 +1401,6 @@ export function useChat(
     sendMessage,
     stopTurn,
     dispatchAction,
+    dispatchTrackedAction,
   };
 }

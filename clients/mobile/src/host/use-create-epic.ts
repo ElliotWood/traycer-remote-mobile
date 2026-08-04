@@ -38,6 +38,12 @@ import { useCallback, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { CURRENT_EPIC_VERSION } from "@traycer-clients/shared/epic/epic-version";
 import type { CreateEpicRequest } from "@traycer/protocol/host/epic/unary-schemas";
+import type { ChatRunSettings } from "@traycer/protocol/persistence/epic/foundation";
+import {
+  toEpicWorkspaceFields,
+  toWorktreeIntent,
+  type WorkspaceTarget,
+} from "@/host/workspace-selection";
 import type { MobileHostClient } from "@/host/host-client-context";
 import type { HostStreamConnection } from "@/host/stream-connection";
 import {
@@ -82,6 +88,18 @@ export interface BuildCreateEpicRequestArgs {
   readonly hostId: string;
   /** Stamped on both `createdAt` and `updatedAt`; injected so the contract test is deterministic. */
   readonly now: number;
+  /**
+   * M5 item 3/4: what the user picked. `FOLDERLESS_TARGET` reproduces the
+   * exact request this flow sent before a picker existed, so the folderless
+   * path is preserved rather than re-derived.
+   */
+  readonly target: WorkspaceTarget;
+  /**
+   * M5's inherited M1 item 6: the run settings to stamp on the folded first
+   * message. `null` keeps the previous behaviour (first model of the default
+   * harness, every other setting null).
+   */
+  readonly settings: ChatRunSettings | null;
 }
 
 /**
@@ -127,6 +145,7 @@ export function buildCreateEpicRequest(
   // empty instruction, so the first line is always non-empty by the time it
   // gets here.
   const title = deriveChatTitle(args.instruction);
+  const workspaceFields = toEpicWorkspaceFields(args.target);
   return {
     epic: {
       id: args.epicId,
@@ -146,22 +165,25 @@ export function buildCreateEpicRequest(
       createdBy: args.userId,
       version: CURRENT_EPIC_VERSION,
     },
-    // Folderless: no local paths, therefore no repo identifiers to derive.
-    repoIdentifiers: [],
-    workspaces: [],
+    // M5: derived from the pick rather than hardcoded empty. Folderless still
+    // yields `[]` / `[]` / `"folderless"`, so that path is byte-identical to
+    // what this flow sent before the picker existed.
+    repoIdentifiers: [...workspaceFields.repoIdentifiers],
+    workspaces: [...workspaceFields.workspaces],
     chat: {
       chatId: args.chatId,
       parentId: null,
       hostId: args.hostId,
       title,
-      workspaceMode: "folderless",
-      worktreeIntent: null,
+      workspaceMode: workspaceFields.workspaceMode,
+      worktreeIntent: toWorktreeIntent(args.target),
       initialMessage: buildInitialMessage({
         messageId: args.messageId,
         clientActionId: args.clientActionId,
         userId: args.userId,
         model: args.model,
         instruction: args.instruction,
+        settings: args.settings,
       }),
     },
   };
@@ -173,7 +195,7 @@ export interface UseCreateEpicResult {
   readonly phase: CreateEpicPhase;
   readonly error: string | null;
   /** Ignored when the instruction is blank or a submit is already in flight. */
-  readonly submit: (instruction: string) => void;
+  readonly submit: (instruction: string, target: WorkspaceTarget) => void;
 }
 
 export interface UseCreateEpicArgs {
@@ -204,7 +226,7 @@ export function useCreateEpic({
   const inFlightRef = useRef(false);
 
   const submit = useCallback(
-    (instruction: string): void => {
+    (instruction: string, target: WorkspaceTarget): void => {
       const text = instruction.trim();
       if (text.length === 0 || inFlightRef.current) {
         return;
@@ -254,6 +276,11 @@ export function useCreateEpic({
             instruction: text,
             hostId,
             now: Date.now(),
+            // Until the picker UI lands, this flow still creates folderless
+            // epics — but the request is now DERIVED from a target rather than
+            // hardcoded, so wiring the picker is a prop change, not a rewrite.
+            target,
+            settings: null,
           });
 
           const response = await client.request("epic.create", request);

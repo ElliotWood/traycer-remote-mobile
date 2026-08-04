@@ -13,6 +13,7 @@
 import { useState, type CSSProperties, type ReactElement } from "react";
 import type { MobileHostClient } from "@/host/host-client-context";
 import { useCreateChat } from "@/host/use-create-chat";
+import { useStreamConnectionOrNull } from "@/host/stream-connection-context";
 import { colors, primaryButton, screen, secondaryButton } from "./ui";
 
 interface AuthorViewProps {
@@ -33,7 +34,17 @@ export function AuthorView({
   onCancel,
 }: AuthorViewProps): ReactElement {
   const [instruction, setInstruction] = useState("");
-  const { phase, error, submit } = useCreateChat({ client, epicId, parentId, onCreated });
+  // Only for the folded-first-turn fallback — the host reports the turn didn't
+  // start far more often than not, and without a stream to re-send over this
+  // form would land the user in a chat that will never do anything.
+  const streamConnection = useStreamConnectionOrNull();
+  const { phase, error, submit } = useCreateChat({
+    client,
+    epicId,
+    parentId,
+    streamConnection,
+    onCreated,
+  });
 
   const submitting = phase === "submitting";
   const canSubmit = instruction.trim().length > 0 && !submitting;

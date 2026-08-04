@@ -13,6 +13,7 @@ import { profileCommitId } from "@/components/providers/provider-profile-model";
 import {
   assessProfileRateLimit,
   effectiveProfileRateLimitSeverity,
+  limitedFamiliesForCopy,
   matchingRateLimitScopes,
   rateLimitSeverityTier,
   type ProfileRateLimitSeverity,
@@ -75,7 +76,6 @@ interface ProfileRateLimitWarningProjection {
 }
 
 const NO_PROFILES: ReadonlyArray<ProviderProfile> = [];
-const NO_FAMILIES: ReadonlyArray<string> = [];
 function noop(): void {}
 
 function hiddenPrompt(): HiddenProfileRateLimitPrompt {
@@ -166,26 +166,12 @@ function destinationsForLimitedProfile(
 }
 
 /**
- * Families named in the banner line - only the scopes AT the effective
- * severity (a hard-limit banner must not name a merely near-limit family),
- * and only when every scope behind the warning names a model family.
+ * `limitedFamiliesForCopy` used to live here. It MOVED to
+ * `clients/shared/rate-limits/` alongside the severity rules it belongs with:
+ * mobile re-derived these two rules by hand and got both wrong, which is the
+ * drift the M2 item 5 relocation exists to prevent — the rule had simply been
+ * left behind when its neighbours moved. Imported below; nothing renamed.
  */
-function limitedFamiliesForCopy(
-  current: ProviderProfile,
-  selectedModel: ModelOption | null,
-  severity: ProfileRateLimitSeverity,
-): ReadonlyArray<string> {
-  const matching = matchingRateLimitScopes(current, selectedModel);
-  if (matching === null || matching.length === 0) return NO_FAMILIES;
-  if (!matching.every((scope) => scope.family !== null)) return NO_FAMILIES;
-  return [
-    ...new Set(
-      matching
-        .filter((scope) => scope.severity === severity)
-        .map((scope) => scope.family),
-    ),
-  ].filter((family): family is string => family !== null);
-}
 
 function warningProjection(input: {
   readonly harnessId: GuiHarnessId;
