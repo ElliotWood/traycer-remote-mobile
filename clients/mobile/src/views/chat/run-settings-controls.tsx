@@ -40,6 +40,34 @@ import {
 import { BottomSheet } from "@/views/toolbar/bottom-sheet";
 import { radius, theme, type } from "@/views/design-tokens";
 
+/**
+ * What a chip reads while the chat's settings are UNKNOWN — i.e. before its
+ * snapshot has arrived. Shared by all seven run-settings controls so the row
+ * says one thing rather than seven.
+ *
+ * ## Why an `unknown` FLAG and not a null value
+ *
+ * Several of these controls already give `null` a meaning: `ProfileChip`'s null
+ * is AMBIENT (a real choice), and `ModelChip`'s is "the catalogue hasn't
+ * resolved a slug yet". Overloading null with a third meaning would collide
+ * with an existing one in exactly the way that makes a fixture polite — the
+ * unknown state would be indistinguishable from a legitimate value, in the code
+ * as well as on screen.
+ *
+ * ## Two different treatments, and the split is not cosmetic
+ *
+ * - **Existence known, value unknown** — permission, agent mode, harness, model.
+ *   The control is rendered with this label. It will still be there afterwards,
+ *   so showing it now promises nothing false.
+ * - **Existence ITSELF unknown** — reasoning effort, service tier, account.
+ *   These render NOTHING while unknown. All three are downstream of a harness
+ *   or model the composer has not been told: 20 of 420 measured models advertise
+ *   no reasoning efforts, a model may offer no upgrade tier, and `ProfileChip`
+ *   hides itself below two profiles. A chip that appears and then VANISHES is a
+ *   worse lie than one that arrives late.
+ */
+export const UNKNOWN_SETTING_LABEL = "Checking…";
+
 export function chipStyle(disabled: boolean) {
   return {
     display: "inline-flex",
@@ -138,6 +166,7 @@ export function HarnessChip({
   harnesses,
   value,
   probing,
+  unknown,
   onChange,
   disabled,
 }: {
@@ -145,6 +174,8 @@ export function HarnessChip({
   readonly value: GuiHarnessId;
   /** The host's availability probe is still running — say so rather than showing a short list as if it were the whole one. */
   readonly probing: boolean;
+  /** The chat's settings have not arrived; `value` is the composer's default, not this chat's harness. */
+  readonly unknown: boolean;
   readonly onChange: (id: GuiHarnessId) => void;
   readonly disabled: boolean;
 }): ReactElement | null {
@@ -161,7 +192,9 @@ export function HarnessChip({
         style={chipStyle(disabled)}
       >
         <Cpu size={13} aria-hidden="true" />
-        {current?.label ?? value}
+        {/* The harness LIST is host-wide, so this control will still be here
+            once the snapshot lands — only which one is selected is unknown. */}
+        {unknown ? UNKNOWN_SETTING_LABEL : current?.label ?? value}
         <ChevronDown size={12} aria-hidden="true" />
       </button>
       {open && (
@@ -191,11 +224,18 @@ export function HarnessChip({
 export function ModelChip({
   models,
   value,
+  unknown,
   onChange,
   disabled,
 }: {
   readonly models: readonly GuiAgentModelOption[];
   readonly value: string | null;
+  /**
+   * The chat's settings have not arrived. Distinct from `value === null`, which
+   * means the catalogue has not yet resolved a slug — a state this control
+   * already renders as the bare word "Model".
+   */
+  readonly unknown: boolean;
   readonly onChange: (slug: string) => void;
   readonly disabled: boolean;
 }): ReactElement | null {
@@ -225,8 +265,13 @@ export function ModelChip({
         style={chipStyle(disabled)}
       >
         {/* The LABEL, not the slug. This is the field that only the GUI
-            catalogue carries, and the visible proof the RPC swap landed. */}
-        {selected?.label ?? value ?? "Model"}
+            catalogue carries, and the visible proof the RPC swap landed.
+
+            Pre-snapshot the catalogue itself is fetched for the composer's
+            DEFAULT harness, so `selected` may be a real model from the wrong
+            one — which is why this suppresses on `unknown` rather than trusting
+            a resolved slug to mean the chat's own model. */}
+        {unknown ? UNKNOWN_SETTING_LABEL : selected?.label ?? value ?? "Model"}
         <ChevronDown size={12} aria-hidden="true" />
       </button>
       {open && (
@@ -305,16 +350,25 @@ export function ModelChip({
 export function ReasoningChip({
   model,
   value,
+  unknown,
   onChange,
   disabled,
 }: {
   readonly model: GuiAgentModelOption | null;
   readonly value: ReasoningLevel;
+  /** The chat's settings have not arrived, so `model` is a guess and so is this control's very existence. */
+  readonly unknown: boolean;
   readonly onChange: (level: ReasoningLevel) => void;
   readonly disabled: boolean;
 }): ReactElement | null {
   const [open, setOpen] = useState(false);
   const options = findReasoningOptionsForModel(model);
+  // Nothing at all while unknown, rather than a suppressed value: `model` here
+  // is derived from the composer's DEFAULT harness pre-snapshot, and 20 of 420
+  // measured models advertise no efforts — so whether this control should exist
+  // is itself unknown. A chip that appears and then vanishes is worse than one
+  // that arrives late.
+  if (unknown) return null;
   if (options.length === 0) return null;
   return (
     <>
@@ -360,15 +414,22 @@ export function ReasoningChip({
 export function ServiceTierChip({
   model,
   value,
+  unknown,
   onChange,
   disabled,
 }: {
   readonly model: GuiAgentModelOption | null;
   readonly value: ServiceTier;
+  /** The chat's settings have not arrived, so `model` is a guess and so is this control's very existence. */
+  readonly unknown: boolean;
   readonly onChange: (tier: ServiceTier) => void;
   readonly disabled: boolean;
 }): ReactElement | null {
   const upgrade = findUpgradeServiceTierForModel(model);
+  // Same reasoning as `ReasoningChip`, and stronger here: this control is NAMED
+  // after the model's upgrade tier (`aria-label={upgrade.label}`), so while the
+  // model is a guess the chip cannot even say what it is.
+  if (unknown) return null;
   if (upgrade === null) return null;
   const on = value === upgrade.id;
   return (

@@ -68,6 +68,7 @@ export function ProfileChip({
   client,
   harnessId,
   value,
+  unknown,
   onChange,
   disabled,
 }: {
@@ -75,6 +76,12 @@ export function ProfileChip({
   readonly harnessId: GuiHarnessId;
   /** The committed `ChatRunSettings.profileId`: `null` is ambient, never the sentinel. */
   readonly value: string | null;
+  /**
+   * The chat's settings have not arrived. A SEPARATE flag rather than a null
+   * `value`, because null already means AMBIENT here — collapsing the two would
+   * make "we haven't been told" indistinguishable from a deliberate choice.
+   */
+  readonly unknown: boolean;
   readonly onChange: (profileId: string | null) => void;
   readonly disabled: boolean;
 }): ReactElement | null {
@@ -87,6 +94,13 @@ export function ProfileChip({
     const provider = providers.find((p) => p.providerId === providerId);
     return provider === undefined ? [] : orderProfiles(provider.profiles);
   }, [providers, providerId]);
+
+  // Nothing at all while the chat's settings are unknown: the profile set is
+  // scoped by `harnessId`, which pre-snapshot is the composer's DEFAULT rather
+  // than this chat's — so both the account shown AND whether this control
+  // should exist are guesses. It already hides itself below two profiles, so a
+  // suppressed-value chip here could appear and then vanish.
+  if (unknown) return null;
 
   // One profile is not a choice — showing a picker with a single row implies
   // an alternative exists. Zero means the provider has no profile concept.

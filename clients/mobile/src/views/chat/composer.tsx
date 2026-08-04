@@ -98,7 +98,7 @@ import {
   prepareImageAttachment,
   type PreparedAttachment,
 } from "@/host/image-attachment";
-import { chipStyle } from "@/views/chat/run-settings-controls";
+import { chipStyle, UNKNOWN_SETTING_LABEL } from "@/views/chat/run-settings-controls";
 import { radius, theme, type } from "@/views/design-tokens";
 
 interface AttachmentDraft {
@@ -657,28 +657,28 @@ export function Composer({
               nothing invites a choice against a state the composer has not been
               told yet.
 
-              The permission toggle goes further and shows NO VALUE at all
-              (`value={null}`), because its displayed value is a claim about how
-              the agent will behave — see `PermissionModeToggle`. The gate is
-              `settingsLoaded`, NOT `chatSettings !== null`, and the difference is
-              load-bearing: a brand-new chat legitimately has null settings AFTER
-              its snapshot, and for that chat `Full access` is honest, since it is
-              exactly what the turn will carry. Only the pre-snapshot state is a
-              guess.
+              And NONE of them names a value it has not been told: every one
+              takes `unknown={!settingsLoaded}`. Four render the shared
+              "Checking…" label; three render nothing at all, because whether
+              THEY should exist is itself downstream of a harness or model the
+              composer is still guessing. The split and its reasoning live on
+              `UNKNOWN_SETTING_LABEL`, in one place rather than seven.
 
-              The other six chips still display their fallbacks. Left deliberately:
-              a harness or model chip reading `Claude Code` early is a wrong label,
-              while a permission chip reading `Full access` is a wrong SAFETY
-              claim. Naming it here so the asymmetry is a decision and not an
-              oversight someone has to rediscover.
+              The gate is `settingsLoaded`, NOT `chatSettings !== null`, and the
+              difference is load-bearing: a brand-new chat legitimately has null
+              settings AFTER its snapshot, and for that chat `Full access` is
+              honest — it is exactly what the turn will carry. Only the
+              pre-snapshot state is a guess.
             */}
             <PermissionModeToggle
-              value={settingsLoaded ? permissionMode : null}
+              value={permissionMode}
+              unknown={!settingsLoaded}
               onChange={(v) => setOverride((o) => ({ ...o, permissionMode: v }))}
               disabled={!canType || !settingsLoaded}
             />
             <AgentModeToggle
               value={agentMode}
+              unknown={!settingsLoaded}
               onChange={(v) => setOverride((o) => ({ ...o, agentMode: v }))}
               disabled={!canType || !settingsLoaded}
             />
@@ -686,6 +686,7 @@ export function Composer({
               harnesses={availableHarnesses}
               value={harnessId}
               probing={harnessesProbing}
+              unknown={!settingsLoaded}
               onChange={(id) =>
                 // The catalogue is per harness, so the old slug is meaningless
                 // here. Null resets to the new harness's first model rather
@@ -699,18 +700,21 @@ export function Composer({
             <ModelChip
               models={models}
               value={resolvedModel}
+              unknown={!settingsLoaded}
               onChange={(slug) => setOverride((o) => ({ ...o, model: slug }))}
               disabled={!connectionLive || !settingsLoaded}
             />
             <ReasoningChip
               model={selectedModel}
               value={effectiveReasoning}
+              unknown={!settingsLoaded}
               onChange={(v) => setOverride((o) => ({ ...o, reasoningEffort: v }))}
               disabled={!connectionLive || !settingsLoaded}
             />
             <ServiceTierChip
               model={selectedModel}
               value={effectiveServiceTier}
+              unknown={!settingsLoaded}
               onChange={(v) => setOverride((o) => ({ ...o, serviceTier: v }))}
               disabled={!connectionLive || !settingsLoaded}
             />
@@ -718,6 +722,7 @@ export function Composer({
               client={client}
               harnessId={harnessId}
               value={profileId}
+              unknown={!settingsLoaded}
               onChange={(id) => setOverride((o) => ({ ...o, profileId: id }))}
               disabled={!connectionLive || !settingsLoaded}
             />
@@ -884,21 +889,16 @@ function AttachmentChip({
   );
 }
 
-/**
- * What the chip reads while the chat's permission mode is UNKNOWN. Not one of
- * `PERMISSION_OPTIONS`, deliberately — the whole point is that no member of that
- * set is being claimed.
- */
-const UNKNOWN_PERMISSION_LABEL = "Checking…";
-
 function PermissionModeToggle({
   value,
+  unknown,
   onChange,
   disabled,
 }: {
+  readonly value: PermissionMode;
   /**
-   * `null` = the chat's settings have NOT arrived, and the composer must not
-   * name a permission mode it has not been told.
+   * The chat's settings have NOT arrived, and the composer must not name a
+   * permission mode it has not been told.
    *
    * The defect this closes is a display, not a dispatch: `handleSend` is already
    * gated, so nothing could ACT on the unknown state — but a chat configured
@@ -907,12 +907,15 @@ function PermissionModeToggle({
    * fallback is not a default, it is a guess presented as a fact. A user reading
    * `Full access` on a chat they set to `supervised` has been told something
    * false about how the agent will behave.
+   *
+   * A flag rather than a null `value` so all seven controls share one shape —
+   * see `UNKNOWN_SETTING_LABEL`, where the null-collision reasoning lives.
    */
-  readonly value: PermissionMode | null;
+  readonly unknown: boolean;
   readonly onChange: (v: PermissionMode) => void;
   readonly disabled: boolean;
 }): ReactElement {
-  const current = value === null
+  const current = unknown
     ? null
     : PERMISSION_OPTIONS.find((o) => o.id === value) ?? PERMISSION_OPTIONS[0];
   // `LoaderCircle` rather than any mode's own icon: `ShieldCheck` would say
@@ -937,43 +940,58 @@ function PermissionModeToggle({
         // Guarded here rather than relying solely on `disabled`: the caller's
         // gate and this component's correctness are different properties, and a
         // cycle from "unknown" would have to invent a starting point.
-        if (value === null) return;
+        if (unknown) return;
         const index = PERMISSION_OPTIONS.findIndex((o) => o.id === value);
         onChange(PERMISSION_OPTIONS[(index + 1) % PERMISSION_OPTIONS.length].id);
       }}
       style={chipStyle(disabled)}
     >
       <Icon size={13} aria-hidden="true" />
-      {current?.label ?? UNKNOWN_PERMISSION_LABEL}
+      {current?.label ?? UNKNOWN_SETTING_LABEL}
     </button>
   );
 }
 
 function AgentModeToggle({
   value,
+  unknown,
   onChange,
   disabled,
 }: {
   readonly value: AgentMode;
+  /** The chat's settings have not arrived; `value` is the composer's default, not this chat's mode. */
+  readonly unknown: boolean;
   readonly onChange: (v: AgentMode) => void;
   readonly disabled: boolean;
 }): ReactElement {
-  const current = AGENT_MODE_OPTIONS.find((o) => o.id === value) ?? AGENT_MODE_OPTIONS[0];
-  const Icon = current.icon;
-  const title =
-    value === "regular"
+  const current = unknown
+    ? null
+    : AGENT_MODE_OPTIONS.find((o) => o.id === value) ?? AGENT_MODE_OPTIONS[0];
+  // Neutral while unknown: either mode's own icon would keep making the claim
+  // in pictures that the text has stopped making in words.
+  const Icon = current?.icon ?? LoaderCircle;
+  const title = unknown
+    ? "Waiting for this chat's agent mode"
+    : value === "regular"
       ? "Regular mode: general-purpose coding agent experience."
       : "Epic mode: plan and coordinate larger changes with Traycer artifacts.";
   return (
     <button
       type="button"
+      // Named independently of its value, for the same reason as the permission
+      // toggle: without this its accessible name IS the mode, so nothing can
+      // refer to the control while it has none.
+      aria-label="Agent mode"
       disabled={disabled}
       title={title}
-      onClick={() => onChange(value === "regular" ? "epic" : "regular")}
+      onClick={() => {
+        if (unknown) return;
+        onChange(value === "regular" ? "epic" : "regular");
+      }}
       style={chipStyle(disabled)}
     >
       <Icon size={13} aria-hidden="true" />
-      {current.shortLabel}
+      {current?.shortLabel ?? UNKNOWN_SETTING_LABEL}
     </button>
   );
 }

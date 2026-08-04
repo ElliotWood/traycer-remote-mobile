@@ -772,6 +772,104 @@ describe("Composer — the chat's settings arrive after mount", () => {
   });
 
   /**
+   * The DEFAULT harness advertises efforts and tiers here, and that is the
+   * whole point of this fixture.
+   *
+   * `twoHarnessHost`'s claude model advertises neither — so pre-snapshot the
+   * reasoning and tier chips would be absent ANYWAY, and asserting their
+   * absence against it would be a check that cannot fail. Giving the default
+   * harness capacity makes their absence attributable to the unknown state
+   * rather than to the fixture.
+   */
+  function defaultHarnessWithCapacity(): FakeHostClient {
+    return createFakeHostClient((method) => {
+      if (method === "agent.gui.listHarnesses") {
+        return Promise.resolve({ harnesses: [guiHarness({})] });
+      }
+      if (method === "agent.gui.listModels") {
+        return Promise.resolve({
+          harnessId: "claude",
+          models: [
+            guiModel({
+              slug: "m1",
+              label: "Model One",
+              supportedReasoningEfforts: [{ id: "high", label: "High", description: null }],
+              supportedServiceTiers: [
+                { id: "priority", label: "Priority", description: null },
+                { id: "standard", label: "Standard", description: null },
+              ],
+            }),
+          ],
+        });
+      }
+      return Promise.reject(new Error(`unexpected RPC in this test: ${method}`));
+    });
+  }
+
+  /**
+   * ALL SEVEN, not just the permission chip.
+   *
+   * One control saying "Checking…" beside six confidently wrong ones is worse
+   * than either extreme: it signals that the row knows when it doesn't know,
+   * which makes the other six read as KNOWN.
+   *
+   * Two treatments, and the split is asserted rather than described. Four chips
+   * are rendered with no value; three render nothing at all, because whether
+   * THEY should exist is itself downstream of a harness the composer is still
+   * guessing.
+   */
+  it("names no run setting at all before the chat's settings arrive", async () => {
+    const fake = defaultHarnessWithCapacity();
+    render(
+      <Composer
+        {...fullProps({ client: fake.client, chatSettings: null, settingsLoaded: false })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Harness" })).toBeTruthy();
+    });
+
+    for (const name of ["Permission mode", "Agent mode", "Harness", "Model"]) {
+      expect(screen.getByRole("button", { name }).textContent ?? "").toContain("Checking…");
+    }
+    // And none of them leaks the value it would otherwise have guessed.
+    expect(document.body.textContent ?? "").not.toContain("Full access");
+    expect(document.body.textContent ?? "").not.toContain("Claude Code");
+    expect(document.body.textContent ?? "").not.toContain("Model One");
+
+    // The two whose EXISTENCE is unknown are gone entirely. Both would render
+    // against this fixture without the guard — see its docblock.
+    expect(screen.queryByRole("button", { name: "Reasoning effort" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Priority" })).toBeNull();
+  });
+
+  /**
+   * THE CONTRAST for the four that stay: they name real values once the
+   * snapshot lands, and the two conditional ones come back.
+   *
+   * Without this, "renders nothing" passes against a composer that renders
+   * nothing ever.
+   */
+  it("names every run setting once the chat's settings have arrived", async () => {
+    const fake = defaultHarnessWithCapacity();
+    render(
+      <Composer
+        {...fullProps({ client: fake.client, chatSettings: null, settingsLoaded: true })}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Model" }).textContent).toContain("Model One");
+    });
+
+    expect(screen.getByRole("button", { name: "Permission mode" }).textContent ?? "").toContain("Full access");
+    expect(screen.getByRole("button", { name: "Agent mode" }).textContent ?? "").toContain("Regular");
+    expect(screen.getByRole("button", { name: "Harness" }).textContent ?? "").toContain("Claude Code");
+    expect(screen.queryByRole("button", { name: "Reasoning effort" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Priority" })).not.toBeNull();
+    expect(document.body.textContent ?? "").not.toContain("Checking…");
+  });
+
+  /**
    * TWO CLICKS, NOT ONE, and the reason is a trap in the widget's own state
    * machine rather than in any data fixture.
    *
