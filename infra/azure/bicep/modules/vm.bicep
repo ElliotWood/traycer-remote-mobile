@@ -76,8 +76,6 @@ var healthProbeTimerTemplate = loadTextContent('../../systemd/traycer-health-pro
 // "committed, looks done, silently absent on rebuild" gap this epic keeps
 // finding, so they are wired in together rather than left to a manual
 // step someone has to remember.
-var wsDeflateProxyScript = loadTextContent('../../scripts/traycer-ws-deflate-proxy.mjs')
-var wsDeflateUnitTemplate = loadTextContent('../../systemd/traycer-ws-deflate.service')
 var relayProbeScript = loadTextContent('../../scripts/traycer-relay-probe.mjs')
 var relayProbeUnitTemplate = loadTextContent('../../systemd/traycer-relay-probe.service')
 var relayProbeTimerTemplate = loadTextContent('../../systemd/traycer-relay-probe.timer')
@@ -114,6 +112,20 @@ var provisionRepoCloneScript = loadTextContent('../../scripts/provision-repo-clo
 // recovers without a rebuild.
 var agentRuntimeScript = loadTextContent('../../scripts/provision-agent-runtime.sh')
 
+// A2's identity routing - the piece that existed ONLY as a manual change on
+// the running VM. A rebuild from the previous version of this file silently
+// reproduced the pre-A2 single-tenant relay, with nothing failing at deploy
+// time to say so.
+//
+// `tenant-router.generated.mjs` is a tracked build output (see
+// router/build.sh for why it is tracked rather than in dist/, and what
+// checks that it is not stale). It is ~16 KB because `ws` and `zod` are
+// external and installed by bootstrap.sh, not bundled - fully bundled it was
+// 600 KB, which is what made it undeliverable and kept it off this path.
+var tenantRouterScript = loadTextContent('../../router/tenant-router.generated.mjs')
+var tenantRouterUnitTemplate = loadTextContent('../../systemd/traycer-tenant-router.service')
+var registryGenerateScript = loadTextContent('../../scripts/traycer-registry-generate.sh')
+
 // Tenant id format (lowercase, digits, hyphen - a safe systemd instance
 // name / POSIX directory-name fragment) is validated at VM-boot time in
 // bootstrap.sh, NOT here. Bicep's expression language has no regex
@@ -137,7 +149,7 @@ var agentRuntimeScript = loadTextContent('../../scripts/provision-agent-runtime.
 // strings only allow `\n` for newlines, not literal ones - hence the
 // unusual single-line-with-escapes shape below; it is correctness-tested
 // via `az bicep build`'s compiled output, not just visually reviewed.
-var customDataScript = '#!/bin/bash\nset -euo pipefail\nexport TRAYCER_OS_USER="${osUser}"\nexport TRAYCER_HOME_ROOT="${homeRoot}"\nexport TRAYCER_TENANT_IDS="${tenantIdsSpaceSeparated}"\nexport TRAYCER_PUBLIC_HOSTNAME="${publicHostname}"\nexport TRAYCER_ACME_EMAIL="${acmeContactEmail}"\nexport TRAYCER_REPOS="${repoSpecsSpaceSeparated}"\n\nmkdir -p /usr/local/bin\ncat > /usr/local/bin/traycer-host-guard.sh <<\'TRAYCER_GUARD_EOF\'\n${guardScript}\nTRAYCER_GUARD_EOF\ncat > /usr/local/bin/traycer-alert.sh <<\'TRAYCER_ALERT_EOF\'\n${alertScript}\nTRAYCER_ALERT_EOF\ncat > /usr/local/bin/traycer-host-failure-alert.sh <<\'TRAYCER_HOSTFAIL_EOF\'\n${hostFailureAlertScript}\nTRAYCER_HOSTFAIL_EOF\ncat > /usr/local/bin/traycer-worktree-rescue.sh <<\'TRAYCER_RESCUE_EOF\'\n${worktreeRescueScript}\nTRAYCER_RESCUE_EOF\ncat > /usr/local/bin/traycer-health-probe.sh <<\'TRAYCER_PROBE_EOF\'\n${healthProbeScript}\nTRAYCER_PROBE_EOF\ncat > /usr/local/bin/traycer-agent-probe.sh <<\'TRAYCER_AGENTPROBE_EOF\'\n${agentProbeScript}\nTRAYCER_AGENTPROBE_EOF\ncat > /usr/local/bin/ensure-repo-deploy-key.sh <<\'TRAYCER_DEPLOYKEY_EOF\'\n${ensureDeployKeyScript}\nTRAYCER_DEPLOYKEY_EOF\ncat > /usr/local/bin/provision-repo-clone.sh <<\'TRAYCER_REPOCLONE_EOF\'\n${provisionRepoCloneScript}\nTRAYCER_REPOCLONE_EOF\ncat > /usr/local/bin/provision-agent-runtime.sh <<\'TRAYCER_AGENTRUNTIME_EOF\'\n${agentRuntimeScript}\nTRAYCER_AGENTRUNTIME_EOF\nchmod +x /usr/local/bin/traycer-host-guard.sh /usr/local/bin/traycer-alert.sh /usr/local/bin/traycer-host-failure-alert.sh /usr/local/bin/traycer-worktree-rescue.sh /usr/local/bin/traycer-health-probe.sh /usr/local/bin/traycer-agent-probe.sh /usr/local/bin/ensure-repo-deploy-key.sh /usr/local/bin/provision-repo-clone.sh /usr/local/bin/provision-agent-runtime.sh\n\nmkdir -p /etc/systemd/system\ncat > /etc/systemd/system/traycer-host@.service <<\'TRAYCER_UNIT_EOF\'\n${unitTemplate}\nTRAYCER_UNIT_EOF\ncat > /etc/systemd/system/traycer-host-alert@.service <<\'TRAYCER_HOSTALERT_UNIT_EOF\'\n${hostAlertUnitTemplate}\nTRAYCER_HOSTALERT_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.service <<\'TRAYCER_PROBE_UNIT_EOF\'\n${healthProbeUnitTemplate}\nTRAYCER_PROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.timer <<\'TRAYCER_PROBE_TIMER_EOF\'\n${healthProbeTimerTemplate}\nTRAYCER_PROBE_TIMER_EOF\ncat > /etc/systemd/system/traycer-ws-deflate.service <<\'TRAYCER_WSDEFLATE_UNIT_EOF\'\n${wsDeflateUnitTemplate}\nTRAYCER_WSDEFLATE_UNIT_EOF\ncat > /etc/systemd/system/traycer-relay-probe.service <<\'TRAYCER_RELAYPROBE_UNIT_EOF\'\n${relayProbeUnitTemplate}\nTRAYCER_RELAYPROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-relay-probe.timer <<\'TRAYCER_RELAYPROBE_TIMER_EOF\'\n${relayProbeTimerTemplate}\nTRAYCER_RELAYPROBE_TIMER_EOF\ncat > /etc/systemd/system/traycer-agent-probe@.service <<\'TRAYCER_AGENTPROBE_UNIT_EOF\'\n${agentProbeUnitTemplate}\nTRAYCER_AGENTPROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-agent-probe@.timer <<\'TRAYCER_AGENTPROBE_TIMER_EOF\'\n${agentProbeTimerTemplate}\nTRAYCER_AGENTPROBE_TIMER_EOF\ncat > /etc/systemd/system/traycer-agent-spawn-probe@.service <<\'TRAYCER_AGENTSPAWN_UNIT_EOF\'\n${agentSpawnProbeUnitTemplate}\nTRAYCER_AGENTSPAWN_UNIT_EOF\ncat > /etc/systemd/system/traycer-agent-spawn-probe@.timer <<\'TRAYCER_AGENTSPAWN_TIMER_EOF\'\n${agentSpawnProbeTimerTemplate}\nTRAYCER_AGENTSPAWN_TIMER_EOF\nsed -i "s|__TRAYCER_OS_USER__|${osUser}|g; s|__TRAYCER_HOME_ROOT__|${homeRoot}|g" /etc/systemd/system/traycer-host@.service /etc/systemd/system/traycer-host-alert@.service /etc/systemd/system/traycer-health-probe@.service /etc/systemd/system/traycer-relay-probe.service /etc/systemd/system/traycer-agent-probe@.service /etc/systemd/system/traycer-agent-spawn-probe@.service\n\n# The relay and its probe both `import ... from "ws"`, and Node resolves\n# bare specifiers by walking up from the SCRIPT\'s directory - so both must\n# live beside the one node_modules/ws on the box, NOT in /usr/local/bin.\n# Putting the probe in /usr/local/bin first is exactly how this was found\n# (ERR_MODULE_NOT_FOUND on the very first run).\nmkdir -p /usr/local/lib/traycer\ncat > /usr/local/lib/traycer/traycer-ws-deflate-proxy.mjs <<\'TRAYCER_WSDEFLATE_EOF\'\n${wsDeflateProxyScript}\nTRAYCER_WSDEFLATE_EOF\ncat > /usr/local/lib/traycer/traycer-relay-probe.mjs <<\'TRAYCER_RELAYPROBE_EOF\'\n${relayProbeScript}\nTRAYCER_RELAYPROBE_EOF\n\n${bootstrapScript}\n'
+var provisionScript = '#!/bin/bash\nset -euo pipefail\nexport TRAYCER_OS_USER="${osUser}"\nexport TRAYCER_HOME_ROOT="${homeRoot}"\nexport TRAYCER_TENANT_IDS="${tenantIdsSpaceSeparated}"\nexport TRAYCER_PUBLIC_HOSTNAME="${publicHostname}"\nexport TRAYCER_ACME_EMAIL="${acmeContactEmail}"\nexport TRAYCER_REPOS="${repoSpecsSpaceSeparated}"\n\nmkdir -p /usr/local/bin\ncat > /usr/local/bin/traycer-host-guard.sh <<\'TRAYCER_GUARD_EOF\'\n${guardScript}\nTRAYCER_GUARD_EOF\ncat > /usr/local/bin/traycer-alert.sh <<\'TRAYCER_ALERT_EOF\'\n${alertScript}\nTRAYCER_ALERT_EOF\ncat > /usr/local/bin/traycer-host-failure-alert.sh <<\'TRAYCER_HOSTFAIL_EOF\'\n${hostFailureAlertScript}\nTRAYCER_HOSTFAIL_EOF\ncat > /usr/local/bin/traycer-worktree-rescue.sh <<\'TRAYCER_RESCUE_EOF\'\n${worktreeRescueScript}\nTRAYCER_RESCUE_EOF\ncat > /usr/local/bin/traycer-health-probe.sh <<\'TRAYCER_PROBE_EOF\'\n${healthProbeScript}\nTRAYCER_PROBE_EOF\ncat > /usr/local/bin/traycer-agent-probe.sh <<\'TRAYCER_AGENTPROBE_EOF\'\n${agentProbeScript}\nTRAYCER_AGENTPROBE_EOF\ncat > /usr/local/bin/ensure-repo-deploy-key.sh <<\'TRAYCER_DEPLOYKEY_EOF\'\n${ensureDeployKeyScript}\nTRAYCER_DEPLOYKEY_EOF\ncat > /usr/local/bin/provision-repo-clone.sh <<\'TRAYCER_REPOCLONE_EOF\'\n${provisionRepoCloneScript}\nTRAYCER_REPOCLONE_EOF\ncat > /usr/local/bin/provision-agent-runtime.sh <<\'TRAYCER_AGENTRUNTIME_EOF\'\n${agentRuntimeScript}\nTRAYCER_AGENTRUNTIME_EOF\ncat > /usr/local/bin/traycer-registry-generate.sh <<\'TRAYCER_REGISTRYGEN_EOF\'\n${registryGenerateScript}\nTRAYCER_REGISTRYGEN_EOF\nchmod +x /usr/local/bin/traycer-host-guard.sh /usr/local/bin/traycer-alert.sh /usr/local/bin/traycer-host-failure-alert.sh /usr/local/bin/traycer-worktree-rescue.sh /usr/local/bin/traycer-health-probe.sh /usr/local/bin/traycer-agent-probe.sh /usr/local/bin/ensure-repo-deploy-key.sh /usr/local/bin/provision-repo-clone.sh /usr/local/bin/provision-agent-runtime.sh /usr/local/bin/traycer-registry-generate.sh\n\nmkdir -p /etc/systemd/system\ncat > /etc/systemd/system/traycer-host@.service <<\'TRAYCER_UNIT_EOF\'\n${unitTemplate}\nTRAYCER_UNIT_EOF\ncat > /etc/systemd/system/traycer-host-alert@.service <<\'TRAYCER_HOSTALERT_UNIT_EOF\'\n${hostAlertUnitTemplate}\nTRAYCER_HOSTALERT_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.service <<\'TRAYCER_PROBE_UNIT_EOF\'\n${healthProbeUnitTemplate}\nTRAYCER_PROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-health-probe@.timer <<\'TRAYCER_PROBE_TIMER_EOF\'\n${healthProbeTimerTemplate}\nTRAYCER_PROBE_TIMER_EOF\ncat > /etc/systemd/system/traycer-tenant-router.service <<\'TRAYCER_TENANTROUTER_UNIT_EOF\'\n${tenantRouterUnitTemplate}\nTRAYCER_TENANTROUTER_UNIT_EOF\ncat > /etc/systemd/system/traycer-relay-probe.service <<\'TRAYCER_RELAYPROBE_UNIT_EOF\'\n${relayProbeUnitTemplate}\nTRAYCER_RELAYPROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-relay-probe.timer <<\'TRAYCER_RELAYPROBE_TIMER_EOF\'\n${relayProbeTimerTemplate}\nTRAYCER_RELAYPROBE_TIMER_EOF\ncat > /etc/systemd/system/traycer-agent-probe@.service <<\'TRAYCER_AGENTPROBE_UNIT_EOF\'\n${agentProbeUnitTemplate}\nTRAYCER_AGENTPROBE_UNIT_EOF\ncat > /etc/systemd/system/traycer-agent-probe@.timer <<\'TRAYCER_AGENTPROBE_TIMER_EOF\'\n${agentProbeTimerTemplate}\nTRAYCER_AGENTPROBE_TIMER_EOF\ncat > /etc/systemd/system/traycer-agent-spawn-probe@.service <<\'TRAYCER_AGENTSPAWN_UNIT_EOF\'\n${agentSpawnProbeUnitTemplate}\nTRAYCER_AGENTSPAWN_UNIT_EOF\ncat > /etc/systemd/system/traycer-agent-spawn-probe@.timer <<\'TRAYCER_AGENTSPAWN_TIMER_EOF\'\n${agentSpawnProbeTimerTemplate}\nTRAYCER_AGENTSPAWN_TIMER_EOF\nsed -i "s|__TRAYCER_OS_USER__|${osUser}|g; s|__TRAYCER_HOME_ROOT__|${homeRoot}|g" /etc/systemd/system/traycer-host@.service /etc/systemd/system/traycer-host-alert@.service /etc/systemd/system/traycer-health-probe@.service /etc/systemd/system/traycer-relay-probe.service /etc/systemd/system/traycer-agent-probe@.service /etc/systemd/system/traycer-tenant-router.service /etc/systemd/system/traycer-agent-spawn-probe@.service\n\n# The relay and its probe both `import ... from "ws"`, and Node resolves\n# bare specifiers by walking up from the SCRIPT\'s directory - so both must\n# live beside the one node_modules/ws on the box, NOT in /usr/local/bin.\n# Putting the probe in /usr/local/bin first is exactly how this was found\n# (ERR_MODULE_NOT_FOUND on the very first run).\nmkdir -p /usr/local/lib/traycer\ncat > /usr/local/lib/traycer/tenant-router.mjs <<\'TRAYCER_TENANTROUTER_EOF\'\n${tenantRouterScript}\nTRAYCER_TENANTROUTER_EOF\ncat > /usr/local/lib/traycer/traycer-relay-probe.mjs <<\'TRAYCER_RELAYPROBE_EOF\'\n${relayProbeScript}\nTRAYCER_RELAYPROBE_EOF\n\n${bootstrapScript}\n'
 
 resource pip 'Microsoft.Network/publicIPAddresses@2023-11-01' = {
   name: pipName
@@ -199,7 +211,6 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
     osProfile: {
       computerName: vmName
       adminUsername: adminUsername
-      customData: base64(customDataScript)
       linuxConfiguration: {
         disablePasswordAuthentication: true
         ssh: {
@@ -233,6 +244,146 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
         }
       ]
     }
+  }
+}
+
+// PROVISIONING RUNS HERE, NOT IN customData - and the reason is a hard Azure
+// limit, measured rather than read.
+//
+// `osProfile.customData` caps at 87,380 base64 characters (65,535 raw bytes -
+// the same limit in two units, worth stating out loud, because two different
+// numbers for one constraint is how a future reader "corrects" it into a
+// wrong one). This module's assembled script passed that ceiling some time
+// ago: 132,660 base64 characters, ~1.5x over, BEFORE A2's router was added.
+//
+// THE TRAP, and why nobody noticed: `az deployment group validate` returns
+// "error": null on the oversized template. So does what-if. Only
+// `az deployment group create` rejects it:
+//   InvalidParameter, target osProfile.customData:
+//   "Custom data in OSProfile must be in Base64 encoding and with a maximum
+//    length of 87380 characters."
+// A validator that passes what the API refuses is not a check. Anyone who
+// audited this file with `validate` got a green that meant nothing.
+//
+// THE SECOND CEILING, and it is the one that decided the mechanism below.
+//
+// An earlier version of this comment claimed the CustomScript extension's
+// ceiling was "far higher" and that this template "sits well inside it". That
+// was wrong and is corrected here rather than deleted, because a confident
+// comment recording a disproved belief answers the question for the next
+// reader and stops them looking.
+//
+// ARM refuses any template expression whose EVALUATED RESULT exceeds 131,072
+// characters. `base64(provisionScript)` is such an expression, and base64
+// inflates by 4/3, so the operative budget for the raw script under any
+// mechanism that needs base64 is 98,304 bytes - not 131,072.
+//
+//   raw provisionScript   117,927 bytes
+//   base64 of it          157,236 characters
+//   ARM's limit           131,072
+//   headroom, plaintext    13,145 characters (10.0%)
+//
+// Regenerate those numbers, do not trust them:
+//   node infra/azure/scripts/measure-provision-payload.mjs
+// It evaluates this template's own `provisionScript` expression rather than
+// summing the loadTextContent sources - `wc -c` over those undercounts, since
+// the assembly wraps every one of them in heredoc scaffolding. That script
+// exits non-zero when the payload no longer fits, so this is a gate and not
+// only a report.
+//
+// THE SPLIT THAT DOES NOT WORK, recorded so it is not re-attempted. Splitting
+// the script into two under-limit literals joined with `concat()` fails, and
+// it fails DIFFERENTLY, which is what makes it look like it might have worked:
+//
+//   one expression, 157,256 chars:
+//     "The template language expression literal limit exceeded.
+//      Limit: '131072' and actual: '157256'."
+//   concat() of two 78,628-char halves, each individually under the limit:
+//     "The result of the template language expression exceeds the maximum
+//      length limit of 131072 characters."
+//
+// Same ceiling, applied to the RESULT. A split only buys anything when the
+// halves land in SEPARATE PROPERTIES - which is what multiple `runCommands`
+// resources give you, and what a `concat()` inside one property never can.
+//
+// Both of those are reproducible in about a minute with NO resource group, NO
+// VM and NO public IP - a subscription-scoped deployment with `resources: []`
+// and the expression under test in an `outputs` block:
+//   infra/azure/scripts/probe-arm-expression-limit.sh
+// Run it before believing any size claim in this file, these included. It
+// carries a negative control (130,668 chars, just under: ACCEPTED) precisely
+// so that the two refusals cannot be explained by "the probe refuses
+// everything" - a check that cannot pass proves as little as one that cannot
+// fail.
+//
+// AND `validate` PASSES ALL OF THEM. `az deployment ... validate` returns
+// "error": null for every case above, including the two the identical
+// template is about to be refused for. A validator that passes what the API
+// refuses is not a check, and "validate was clean" is not evidence about size.
+//
+// WHY runCommands AND NOT CustomScript. `runCommands` takes the script as
+// PLAINTEXT, so it pays no base64 tax: 117,939 < 131,072 fits today with
+// ~11% headroom. `runCommands` is also an ordinary child resource type, so
+// there can be MANY per VM - when this payload does outgrow one, the fix is a
+// second resource split at a phase boundary, and that split works precisely
+// because the halves are then separate properties. A VM may have only one
+// CustomScript extension, so that escape route does not exist there.
+//
+// WHY THIS AND NOT A FETCH. Everything the VM needs is still inline in this
+// template, via `loadTextContent` over tracked files. No storage account, no
+// blob, no clone at boot - nothing whose contents can differ from the sources
+// that produced them. Swapping a size limit for bytes living outside the IaC
+// would relocate the exact drift this change exists to remove.
+//
+// THE REAL REASON, beyond size: this is re-appliable to a RUNNING VM. The
+// live host has never executed this template's provisioning at all - its
+// cloud-init payload predates almost everything in this directory - and under
+// customData that could only be corrected by rebuilding a production box,
+// which nobody was ever going to do. "The repo and the VM disagree" now has a
+// remedy rather than only a diagnosis.
+//
+// 🔴 NOTHING SECRET MAY GO IN `source.script`. This body is readable by
+// anyone who can read the resource (`az vm run-command show --instance-view`)
+// - unlike an extension's `protectedSettings`, which the previous draft used
+// for exactly that reason. It is safe TODAY only because every byte of it is
+// already-public tracked repo content. A credential, a token or a private key
+// added here is a disclosure at the moment it is added, and nothing about
+// adding it would look like publishing a secret. Secrets go in
+// `protectedParameters` (write-only, never returned by the API) and are
+// referenced from the script as positional parameters - never inlined.
+//
+// `treatFailureAsDeploymentFailure` is why a broken provisioning script now
+// fails the deployment. CustomScript's own success status was not usable for
+// this: it reports success for scripts it declines to re-run.
+resource provisioning 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
+  parent: vm
+  name: 'traycer-provisioning'
+  location: location
+  properties: {
+    source: {
+      script: provisionScript
+    }
+    // The deployment must WAIT for provisioning and fail if it fails. Async
+    // would report the deployment green while bootstrap.sh was still running
+    // - or had already died - which is the entire failure class this file is
+    // being rewritten to remove.
+    asyncExecution: false
+    treatFailureAsDeploymentFailure: true
+    timeoutInSeconds: 3600
+    runAsUser: 'root'
+  }
+  // A content-derived tag, playing the part `forceUpdateTag` played for the
+  // extension. Changing `source.script` should be enough on its own to make
+  // the RP re-execute, since it changes the resource - but that is a belief
+  // about the provider's update semantics, not something observed, and the
+  // whole point of this file is not to rely on those. The tag makes the
+  // resource definitely differ when the script differs. uniqueString() is
+  // deterministic, so an unchanged script does not churn it.
+  //
+  // UNVERIFIED until a scratch deploy shows a second run picking up an edited
+  // script. Stated as open rather than assumed.
+  tags: {
+    'traycer-provision-content': uniqueString(provisionScript)
   }
 }
 
