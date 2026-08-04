@@ -162,3 +162,65 @@ describe("route dispatch — every member reaches a screen", () => {
     expect(app).not.toMatch(/if\s*\(\s*route\.name\s*===/);
   });
 });
+
+/**
+ * The epic and canvas routes share ONE `epic.subscribe`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHY THIS IS A SOURCE TEST AND NOT A RENDER TEST
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `artifact-tile.test.tsx` proves a registry reaching a tile renders a real
+ * artifact. It proves nothing about the ROUTE handing one over, because it
+ * renders `CanvasScreen` directly and supplies the lookups itself — so
+ * restoring `chatEntry={() => null}` at the route survives that whole suite,
+ * and so would passing `artifactRooms={null}`. That is the same gap
+ * `canvas-screen.test.tsx` names about its own file, one layer up.
+ *
+ * The render instrument that WOULD catch it needs auth, config and a host
+ * connection stubbed to mount `App`. This file already exists to make exactly
+ * that trade for the dispatch switch, and the argument transfers unchanged:
+ * the property is structural, a lexical check can fail honestly, and the
+ * alternative is asserting nothing.
+ *
+ * Stated limit, in the spirit of the one above: this proves the wiring is
+ * SHAPED right, not that the values flowing through it are correct.
+ */
+describe("epic and canvas share one subscription", () => {
+  it("CONTRACT: `useEpicAgents` is called from exactly one place", () => {
+    const app = readCode("app.tsx");
+    /*
+     * THE load-bearing assertion of the whole change. Two call sites is two
+     * `epic.subscribe` sessions for one epic — the thing `canvas-screen.tsx`'s
+     * docblock forbids, and the thing the naive repair ("just call the hook in
+     * the canvas route too") does. It would work, it would render correctly,
+     * and it would double a ~47s snapshot per epic while looking like a fix.
+     *
+     * Counting the CALL — the trailing paren excludes the import, which names
+     * the symbol without invoking it.
+     */
+    const callSites = app.split("useEpicAgents(").length - 1;
+    expect(callSites, "expected exactly one useEpicAgents() call site").toBe(1);
+  });
+
+  it("CONTRACT: both epic-scoped routes render the same component", () => {
+    const app = readCode("app.tsx");
+    // Separately, not as a loop over ["epic", "canvas"]: the two cases differ
+    // in what they pass, and a loop would read as though they were the same
+    // case twice.
+    expect(app).toMatch(/case "epic":\s*return \(\s*<EpicSession/);
+    expect(app).toMatch(/case "canvas":\s*return \(\s*<EpicSession/);
+  });
+
+  it("CONTRACT: the canvas is not handed a null chat lookup", () => {
+    const app = readCode("app.tsx");
+    /*
+     * The literal that was there, kept as its own assertion because it is the
+     * cheapest thing to reintroduce by accident — it is what a merge conflict
+     * resolved in the wrong direction restores, and it fails silently: a chat
+     * in a pane renders its transcript perfectly and simply cannot be acted
+     * on, which reads as "approvals are broken" somewhere else entirely.
+     */
+    expect(app).not.toMatch(/chatEntry=\{\(\)\s*=>\s*null\}/);
+  });
+});
