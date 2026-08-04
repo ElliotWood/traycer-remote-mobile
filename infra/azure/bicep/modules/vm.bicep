@@ -278,13 +278,23 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
 // inflates by 4/3, so the operative budget for the raw script under any
 // mechanism that needs base64 is 98,304 bytes - not 131,072.
 //
-//   raw provisionScript   117,927 bytes
-//   base64 of it          157,236 characters
+//   raw provisionScript   120,701 bytes
+//   base64 of it          160,936 characters
 //   ARM's limit           131,072
-//   headroom, plaintext    13,145 characters (10.0%)
+//   headroom, plaintext    10,371 characters (7.9%)
 //
-// Regenerate those numbers, do not trust them:
-//   node infra/azure/scripts/measure-provision-payload.mjs
+// 🔴 THOSE FOUR NUMBERS ARE A SNAPSHOT AND THEY MOVE. Measured at
+// `node infra/azure/scripts/measure-provision-payload.mjs`, 2026-08-04. They
+// changed by 2,774 bytes DURING the change that introduced them, because a
+// comment was added to one provisioned script - every byte of every file this
+// template carries lands in this budget, comments included, and this repo
+// comments heavily on purpose. Do not trust the figures above; run the
+// command. It exits non-zero when the payload no longer fits, so it is a gate
+// and not only a report - wire it into anything that gates this directory.
+//
+// It evaluates this template's own `provisionScript` expression rather than
+// summing the loadTextContent sources: `wc -c` over those undercounts, since
+// the assembly wraps each one in heredoc scaffolding.
 // It evaluates this template's own `provisionScript` expression rather than
 // summing the loadTextContent sources - `wc -c` over those undercounts, since
 // the assembly wraps every one of them in heredoc scaffolding. That script
