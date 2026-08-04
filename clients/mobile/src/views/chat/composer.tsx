@@ -91,6 +91,7 @@ import {
   applyTrigger,
   detectTrigger,
   filterByName,
+  type ComposerTrigger,
 } from "@/views/chat/composer-trigger";
 import {
   AttachmentTooLargeError,
@@ -311,7 +312,32 @@ export function Composer({
    */
   const [caret, setCaret] = useState(0);
   const { commands, phase: commandsPhase } = useGuiCommands(client, harnessId);
-  const trigger = detectTrigger(draftText, caret);
+  /**
+   * IME-aware. `draftText`/`caret` update on every native `input` event no
+   * matter what — composing text must stay visible, or the textarea goes
+   * blank while the user is mid-word. But trigger detection, and everything
+   * derived from it (sheet open/close, the filtered query, the `@` RPC),
+   * must NOT: measured against real Chromium (CDP `Input.imeSetComposition`,
+   * the browser-process-to-renderer pipeline a real platform IME's updates
+   * travel through — not a JS-dispatched `CompositionEvent`, which doesn't
+   * drive the renderer's text-insertion path at all), a plain `input`-driven
+   * `onChange` fires once per composition update, each carrying the
+   * intermediate, pre-commit buffer. Without this, composing a mention query
+   * fires one `workspace.mentionFiles` RPC per keystroke of romaji/kana the
+   * user hasn't actually typed yet — `@tiptap/suggestion` (desktop's `@`/`/`)
+   * gates its own suggestion matching on `editor.view.composing` for exactly
+   * this reason; this is that same gate, restated for a plain textarea.
+   *
+   * `composing` is state, not a ref, so a composition-start/end genuinely
+   * re-renders and the frozen trigger is visible to this render. The freeze
+   * itself is a ref: it must survive across renders WITHOUT itself causing
+   * one, and only needs updating on the non-composing branch.
+   */
+  const [composing, setComposing] = useState(false);
+  const frozenTrigger = useRef<ComposerTrigger | null>(null);
+  const liveTrigger = detectTrigger(draftText, caret);
+  if (!composing) frozenTrigger.current = liveTrigger;
+  const trigger = composing ? frozenTrigger.current : liveTrigger;
   const slashTrigger = trigger?.kind === "slash" ? trigger : null;
   const matchingCommands = slashTrigger === null
     ? []
@@ -559,6 +585,10 @@ export function Composer({
             // without this the sheet stays open after the caret has left the
             // token it belongs to.
             onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+            // The only source of truth for "an IME is mid-edit right now" —
+            // see `composing`/`frozenTrigger` above for what this gates and why.
+            onCompositionStart={() => setComposing(true)}
+            onCompositionEnd={() => setComposing(false)}
             placeholder="Message this agent…"
             rows={2}
             // Gated on ACCESS, not on connection. Disabling a focused

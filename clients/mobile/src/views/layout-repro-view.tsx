@@ -271,6 +271,8 @@ interface FakeHostClient {
   readonly client: MobileHostClient;
   /** `setScenario` calls this before pushing the snapshot, so the RPC handlers below see the new binding before any effect they trigger re-fires. */
   setBoundRoot(root: string | null): void;
+  /** How many times `workspace.mentionFiles` has been asked, total. The IME-composition measurement's whole point is this count, not the sheet's rendered content — a driver watching only the DOM would miss a client hammering the host mid-composition. */
+  mentionFilesCallCount(): number;
 }
 
 /** No repro run needs cache invalidation — nothing here is TanStack-Query-backed. */
@@ -299,12 +301,14 @@ const noopInvalidator: IHostQueryInvalidator = {
  */
 function createFakeHostClient(): FakeHostClient {
   let boundRoot: string | null = null;
+  let mentionFilesCalls = 0;
   const handlers: MockHandlerMap<HostRpcRegistry> = {
     "agent.gui.listCommands": (params) => ({
       harnessId: params.harnessId,
       commands: [...FAKE_COMMANDS],
     }),
     "workspace.mentionFiles": (params) => {
+      mentionFilesCalls += 1;
       const files = boundRoot === null ? [] : fakeMentionFiles(boundRoot);
       const needle = params.query.toLowerCase();
       const matched = files.filter(
@@ -344,6 +348,7 @@ function createFakeHostClient(): FakeHostClient {
     setBoundRoot: (root) => {
       boundRoot = root;
     },
+    mentionFilesCallCount: () => mentionFilesCalls,
   };
 }
 
@@ -352,6 +357,7 @@ declare global {
     __layoutRepro?: {
       readonly ready: true;
       readonly setScenario: (scenario: ReproScenario) => void;
+      readonly mentionFilesCallCount: () => number;
     };
   }
 }
@@ -379,6 +385,7 @@ export function LayoutReproView(): ReactElement {
         hostClient.setBoundRoot(scenario.boundRoot ?? null);
         callbacks.onSnapshot(snapshotFrame(scenario));
       },
+      mentionFilesCallCount: () => hostClient.mentionFilesCallCount(),
     };
     callbacks.onSnapshot(snapshotFrame({ interviews: [2] }));
     return () => {

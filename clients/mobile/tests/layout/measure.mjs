@@ -464,7 +464,7 @@ async function measureCaretAfterPick(browser, url) {
     );
 
     notCovered.push(
-      "IME composition sequencing around the new onSelect handler, and caret survival across the composer's snapshot-arrival re-render — both named by H12 as real but secondary to the caret-after-pick mechanism measured here.",
+      "Caret survival across the composer's snapshot-arrival re-render — named by H12 as real but secondary to the caret-after-pick mechanism measured here, and not yet attempted by anyone. IME composition sequencing (H12's other runner-up) is now measured separately below.",
     );
     notCovered.push(
       "CDP-synthesized keystrokes, not a real on-screen mobile keyboard/IME — this measures the deferred setSelectionRange mechanism, not physical-device input.",
@@ -472,6 +472,178 @@ async function measureCaretAfterPick(browser, url) {
     return { checks, notCovered };
   } finally {
     await page.close();
+  }
+}
+
+/**
+ * IME composition sequencing. Measured against real Chromium's own
+ * composition pipeline via CDP `Input.imeSetComposition` / `Input.insertText`
+ * — the browser-process-to-renderer route a real platform IME's updates
+ * travel through — NOT `element.dispatchEvent(new CompositionEvent(...))`,
+ * which is observable to listeners but does not drive the renderer's actual
+ * text-insertion path and would prove nothing about real browser behaviour.
+ * Confirmed directly (`tmp/probe-ime-composition.mjs`, not committed): a
+ * plain `input`-driven `onChange` fires once per composition update, each
+ * carrying the intermediate, pre-commit buffer, with `isComposing: true`.
+ *
+ * Two things are asserted, and they are different claims:
+ * 1. The command/mention sheet must not react — open/filter/reopen — to any
+ *    intermediate composition state. Read off the RENDERED sheet contents at
+ *    every step, not just the final one.
+ * 2. `workspace.mentionFiles` must not be asked once per composition step.
+ *    The sheet staying visually frozen is necessary but not sufficient — a
+ *    guard that froze only the rendered list while still letting the query
+ *    effect's dependency change underneath would still hammer the host. This
+ *    is why the RPC count (`window.__layoutRepro.mentionFilesCallCount()`) is
+ *    asserted directly rather than inferred from the DOM.
+ *
+ * `useMentionFiles`'s query effect is debounced 250ms; composition steps here
+ * are spaced 300ms apart specifically so an UNFROZEN implementation would
+ * fire one real request per step rather than having the debounce coincidentally
+ * collapse them — the check must fail for the right reason if the guard is
+ * removed, not pass by accident of timing.
+ */
+async function measureImeComposition(browser, url) {
+  const checks = [];
+  const notCovered = [];
+  const record = (ok, name, detail) => checks.push({ ok, name, detail });
+
+  // Two independent pages, one per trigger kind — NOT one page reused across
+  // both. `dismissedAt` (composer.tsx) is keyed by TRIGGER START POSITION
+  // alone, not by kind or session: dismissing case 1's sheet with `Escape`
+  // sets `dismissedAt = 0` (the `/` sat at index 0), and case 2's `@` — also
+  // typed into an emptied draft, also landing at index 0 — collided with
+  // that stale value and stayed permanently suppressed. Found by running
+  // this, not reasoned in advance; separate pages remove the collision
+  // structurally instead of working around it with careful positioning.
+  const slashPage = await browser.newPage({ viewport: { width: 414, height: 896 } });
+  const mentionPage = await browser.newPage({ viewport: { width: 414, height: 896 } });
+
+  const readState = (page) =>
+    page.evaluate(() => {
+      const el = document.querySelector("textarea");
+      const buttons = Array.from(document.querySelectorAll("button")).map((b) => b.textContent ?? "");
+      return { value: el.value, buttons };
+    });
+
+  const mentionFilesCallCount = (page) => page.evaluate(() => window.__layoutRepro.mentionFilesCallCount());
+
+  try {
+    // ── Case 1: `/` — composing a query that WOULD filter the catalogue if it leaked ──
+    const page = slashPage;
+    await page.goto(url);
+    await page.waitForFunction(() => window.__layoutRepro?.ready === true, { timeout: 10_000 });
+    const client = await page.context().newCDPSession(page);
+
+    // Three commands (ponytail-help, ponytail-review, ponytail-gain) share
+    // the "ponytail" prefix but diverge after it, so "h"/"he"/"hel" already
+    // discriminates: an unfrozen trigger narrows to ponytail-help alone at
+    // the FIRST composition step, which is exactly the failure this catches.
+    await page.evaluate(() => window.__layoutRepro.setScenario({}));
+    await page.waitForTimeout(80);
+
+    const textarea = page.locator("textarea");
+    await textarea.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Delete");
+    await page.keyboard.type("/"); // literal keystroke, real keydown — the trigger char itself is never composed
+    await page.waitForTimeout(80);
+
+    const preCompose = await readState(page);
+    const hasAllThree = (buttons) =>
+      buttons.some((t) => t.includes("ponytail-help")) &&
+      buttons.some((t) => t.includes("ponytail-review")) &&
+      buttons.some((t) => t.includes("ponytail-gain"));
+    record(
+      hasAllThree(preCompose.buttons),
+      "slash: the sheet opens on the literal `/` showing the unfiltered catalogue",
+      `buttons=${JSON.stringify(preCompose.buttons.filter((t) => t.startsWith("/ponytail")))} — precondition for the freeze checks below`,
+    );
+
+    for (const step of ["h", "he", "hel"]) {
+      await client.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+      await page.waitForTimeout(300); // > the 250ms query debounce, deliberately
+      const mid = await readState(page);
+      record(
+        hasAllThree(mid.buttons),
+        `slash: the sheet still shows the unfiltered catalogue during composition ("${step}")`,
+        `value=${JSON.stringify(mid.value)} buttons=${JSON.stringify(mid.buttons.filter((t) => t.startsWith("/ponytail")))}`,
+      );
+    }
+
+    await client.send("Input.imeSetComposition", { text: "", selectionStart: 0, selectionEnd: 0 });
+    await client.send("Input.insertText", { text: "help" });
+    await page.waitForTimeout(150);
+
+    const postCommit = await readState(page);
+    const onlyHelp =
+      postCommit.buttons.some((t) => t.includes("ponytail-help")) &&
+      !postCommit.buttons.some((t) => t.includes("ponytail-review")) &&
+      !postCommit.buttons.some((t) => t.includes("ponytail-gain"));
+    record(
+      onlyHelp,
+      "slash: AFTER commit, the sheet filters to the final composed query and only the final one",
+      `value=${JSON.stringify(postCommit.value)} buttons=${JSON.stringify(postCommit.buttons.filter((t) => t.startsWith("/ponytail")))} — proves the freeze isn't just permanent (a check that never unfroze would pass the checks above for the wrong reason)`,
+    );
+
+    // ── Case 2: `@` — the RPC count is the real harm, not just the sheet's look ──
+    // Fresh page/mount (see the comment above) — no leftover `dismissedAt`,
+    // no leftover draft.
+    const mp = mentionPage;
+    await mp.goto(url);
+    await mp.waitForFunction(() => window.__layoutRepro?.ready === true, { timeout: 10_000 });
+    const mentionClient = await mp.context().newCDPSession(mp);
+    await mp.evaluate((root) => window.__layoutRepro.setScenario({ boundRoot: root }), CARET_ROOT);
+    await mp.waitForTimeout(80);
+
+    const mentionTextarea = mp.locator("textarea");
+    await mentionTextarea.click();
+    await mp.keyboard.type("@");
+    // Typing "@" starts TWO async things on two different clocks (per
+    // `use-mention-files.ts`): an immediate per-root canary, and a
+    // 250ms-debounced query for query="" — both real, both legitimate, both
+    // must be SETTLED before baselining, or the empty-query request landing
+    // mid-composition-wait reads as a false "reacted to composition".
+    await mp.waitForTimeout(500);
+
+    const baselineCalls = await mentionFilesCallCount(mp);
+
+    for (const step of ["a", "ap", "app"]) {
+      await mentionClient.send("Input.imeSetComposition", { text: step, selectionStart: step.length, selectionEnd: step.length });
+      await mp.waitForTimeout(300); // > the 250ms debounce — an unfrozen query would fire here
+    }
+
+    const duringComposeCalls = await mentionFilesCallCount(mp);
+    record(
+      duringComposeCalls === baselineCalls,
+      "mention: workspace.mentionFiles is NOT re-asked for any intermediate composition state",
+      `baseline=${baselineCalls} afterComposing=${duringComposeCalls} — canary + empty-query already settled before baselining; this asserts nothing ELSE fired while composing`,
+    );
+
+    await mentionClient.send("Input.imeSetComposition", { text: "", selectionStart: 0, selectionEnd: 0 });
+    await mentionClient.send("Input.insertText", { text: "app" });
+    await mp.waitForTimeout(400); // > debounce, so the post-commit query has actually resolved
+
+    const afterCommitCalls = await mentionFilesCallCount(mp);
+    const afterCommit = await readState(mp);
+    record(
+      afterCommitCalls === baselineCalls + 1,
+      "mention: exactly ONE new request fires, for the committed query, after compositionend",
+      `baseline=${baselineCalls} afterCommit=${afterCommitCalls} — proves the freeze releases rather than permanently suppressing the RPC`,
+    );
+    record(
+      afterCommit.buttons.some((t) => t.includes("app.ts")) && !afterCommit.buttons.some((t) => t.includes("util.ts")),
+      "mention: the committed query's results are the right, filtered ones",
+      `buttons=${JSON.stringify(afterCommit.buttons.filter((t) => t.includes(".ts")))}`,
+    );
+
+    notCovered.push(
+      "CDP-synthesized composition, not a real on-screen mobile keyboard/IME — this measures Chromium's own composition-event pipeline (compositionstart/update/end, isComposing), which is what the fix reads; it does not speak to a physical device's IME quirks.",
+    );
+    return { checks, notCovered };
+  } finally {
+    await slashPage.close();
+    await mentionPage.close();
   }
 }
 
@@ -487,9 +659,11 @@ async function main() {
   const results = [];
   let review = null;
   let caret = null;
+  let ime = null;
   try {
     review = await measureReviewAll(browser, url);
     caret = await measureCaretAfterPick(browser, url);
+    ime = await measureImeComposition(browser, url);
     for (const viewport of VIEWPORTS) {
       for (const { name, scenario } of SCENARIOS) {
         const measurement = await measureScenario(browser, url, viewport, scenario);
@@ -531,10 +705,17 @@ async function main() {
   }
   for (const n of caret.notCovered) console.log(`[NOT COVERED] ${n}`);
 
+  console.log(`\n── IME composition sequencing ──`);
+  for (const c of ime.checks) {
+    console.log(`[${c.ok ? "PASS" : "FAIL"}] ${c.name}\n         ${c.detail}`);
+  }
+  for (const n of ime.notCovered) console.log(`[NOT COVERED] ${n}`);
+
   const failures = results.filter((r) => !r.ok);
   const reviewFailures = review.checks.filter((c) => !c.ok);
   const caretFailures = caret.checks.filter((c) => !c.ok);
-  if (failures.length > 0 || reviewFailures.length > 0 || caretFailures.length > 0) {
+  const imeFailures = ime.checks.filter((c) => !c.ok);
+  if (failures.length > 0 || reviewFailures.length > 0 || caretFailures.length > 0 || imeFailures.length > 0) {
     if (failures.length > 0) {
       console.error(`\n${failures.length}/${results.length} scenario(s) clip the composer or a card's action row.`);
     }
@@ -544,10 +725,13 @@ async function main() {
     if (caretFailures.length > 0) {
       console.error(`${caretFailures.length}/${caret.checks.length} caret-restoration check(s) failed.`);
     }
+    if (imeFailures.length > 0) {
+      console.error(`${imeFailures.length}/${ime.checks.length} IME-composition check(s) failed.`);
+    }
     process.exit(1);
   }
   console.log(
-    `\nAll ${results.length} scenarios keep the composer and every card's action row reachable, all ${review.checks.length} Review-all rail checks pass, and all ${caret.checks.length} caret-restoration checks pass.`,
+    `\nAll ${results.length} scenarios keep the composer and every card's action row reachable, all ${review.checks.length} Review-all rail checks pass, all ${caret.checks.length} caret-restoration checks pass, and all ${ime.checks.length} IME-composition checks pass.`,
   );
 }
 
