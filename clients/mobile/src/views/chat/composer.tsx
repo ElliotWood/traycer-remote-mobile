@@ -129,6 +129,13 @@ const AGENT_MODE_OPTIONS: readonly { readonly id: AgentMode; readonly shortLabel
 
 const DEFAULT_HARNESS = "claude" as const;
 
+/** Structural, not referential — `detectTrigger` returns a fresh object every call, so `===` would never match and the frozen-trigger sync below would setState (and re-render) every non-composing keystroke for no reason. */
+function triggersEqual(a: ComposerTrigger | null, b: ComposerTrigger | null): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  return a.kind === b.kind && a.start === b.start && a.query === b.query;
+}
+
 /**
  * What the USER has explicitly chosen this session, layered over the chat's own
  * settings. A field is absent until they touch its control — presence is the
@@ -328,16 +335,21 @@ export function Composer({
    * gates its own suggestion matching on `editor.view.composing` for exactly
    * this reason; this is that same gate, restated for a plain textarea.
    *
-   * `composing` is state, not a ref, so a composition-start/end genuinely
-   * re-renders and the frozen trigger is visible to this render. The freeze
-   * itself is a ref: it must survive across renders WITHOUT itself causing
-   * one, and only needs updating on the non-composing branch.
+   * The freeze is `useState`, not a ref: `eslint-plugin-react-hooks`'s
+   * `react-hooks/refs` rule bans reading OR writing a ref during render
+   * outright (a ref surviving a thrown-away render is exactly what breaks
+   * under concurrent rendering), so this uses the same "adjust state during
+   * render" pattern `lastPrefillNonce` already uses below — compare first,
+   * `setState` only on an actual change, matching React's documented
+   * exception to "don't setState during render."
    */
   const [composing, setComposing] = useState(false);
-  const frozenTrigger = useRef<ComposerTrigger | null>(null);
+  const [frozenTrigger, setFrozenTrigger] = useState<ComposerTrigger | null>(null);
   const liveTrigger = detectTrigger(draftText, caret);
-  if (!composing) frozenTrigger.current = liveTrigger;
-  const trigger = composing ? frozenTrigger.current : liveTrigger;
+  if (!composing && !triggersEqual(frozenTrigger, liveTrigger)) {
+    setFrozenTrigger(liveTrigger);
+  }
+  const trigger = composing ? frozenTrigger : liveTrigger;
   const slashTrigger = trigger?.kind === "slash" ? trigger : null;
   const matchingCommands = slashTrigger === null
     ? []
