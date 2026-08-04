@@ -34,6 +34,25 @@ const useStyles = makeStyles({
   },
 });
 
+/**
+ * Where this chat is being drawn, and therefore what chrome it owns.
+ *
+ * A canvas pane ALREADY names the chat — `tab-strip.tsx` renders
+ * `tileTitle(ref)` — and `canvas-screen.tsx` already carries a breadcrumb. So
+ * a chat rendered in a pane must draw neither. The naive wiring (render the
+ * screen inside the pane and change nothing) produces two breadcrumbs stacked
+ * and the title twice, which reads as a rendering bug rather than a layout.
+ *
+ * A UNION rather than a `showChrome` boolean, because `onBack` exists in only
+ * one of the two states. A pane has no "back" — it has a close button that
+ * belongs to the strip, and closing is not going back. Modelling this as an
+ * optional callback would leave every pane caller passing a function that
+ * must never be called, which is the shape that eventually gets called.
+ */
+export type ChatChrome =
+  | { readonly kind: "screen"; readonly onBack: () => void }
+  | { readonly kind: "pane" };
+
 export interface ChatScreenProps {
   readonly controller: ChatController;
   /** The chat's epic-doc row, for locality. `null` on a deep link. */
@@ -46,7 +65,7 @@ export interface ChatScreenProps {
    */
   readonly diffClient: SnapshotDiffClient | null;
   readonly now: number;
-  readonly onBack: () => void;
+  readonly chrome: ChatChrome;
 }
 
 export function ChatScreen({
@@ -55,7 +74,7 @@ export function ChatScreen({
   configuredHostId,
   diffClient,
   now,
-  onBack,
+  chrome,
 }: ChatScreenProps): ReactElement {
   const styles = useStyles();
   const { state, phases, approve, reject, answerInterview } = controller;
@@ -75,19 +94,23 @@ export function ChatScreen({
 
   return (
     <>
-      <Breadcrumb aria-label="Location">
-        <BreadcrumbItem>
-          <BreadcrumbButton onClick={onBack}>Epics</BreadcrumbButton>
-        </BreadcrumbItem>
-        <BreadcrumbDivider />
-        <BreadcrumbItem>
-          <BreadcrumbButton current>
-            {state.kind === "ready" ? state.title : "Chat"}
-          </BreadcrumbButton>
-        </BreadcrumbItem>
-      </Breadcrumb>
+      {chrome.kind === "screen" ? (
+        <>
+          <Breadcrumb aria-label="Location">
+            <BreadcrumbItem>
+              <BreadcrumbButton onClick={chrome.onBack}>Epics</BreadcrumbButton>
+            </BreadcrumbItem>
+            <BreadcrumbDivider />
+            <BreadcrumbItem>
+              <BreadcrumbButton current>
+                {state.kind === "ready" ? state.title : "Chat"}
+              </BreadcrumbButton>
+            </BreadcrumbItem>
+          </Breadcrumb>
 
-      <Subtitle1>{state.kind === "ready" ? state.title : "Chat"}</Subtitle1>
+          <Subtitle1>{state.kind === "ready" ? state.title : "Chat"}</Subtitle1>
+        </>
+      ) : null}
 
       {state.kind === "loading" ? (
         <FleetLoading rows={4} slowAfterMs={2500} label="Opening the chat…" />

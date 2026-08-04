@@ -62,6 +62,17 @@ function draw(
         onBack={onBack}
         hostId="host-1"
         ids={idSource()}
+        /*
+         * NO HOST. A chat tile then reports "no host configured" rather than
+         * loading forever, which is the state these tests want: they are about
+         * the screen, and a real stream would make every one of them depend on
+         * a socket. The chat body's own behaviour is covered in
+         * `chat-tile.test.tsx`.
+         */
+        streamConnection={null}
+        diffClient={null}
+        now={1_700_000_000_000}
+        chatEntry={() => null}
       />
     </FluentProvider>
   );
@@ -135,5 +146,83 @@ describe("canvas screen", () => {
     // repair that hides a render leak, which this project has already paid for
     // once.
     expect(screen.getAllByText("Parity contract").length).toBe(2);
+  });
+});
+
+/**
+ * The tile body switch.
+ *
+ * Every case here opens a tab through `openTile` rather than hand-building a
+ * `CanvasState`, so these also cover the path a restored layout takes.
+ */
+describe("tile bodies", () => {
+  function withTile(tile: TileRef): CanvasState {
+    return openTile({ state: EMPTY_CANVAS, tile, preview: false, ids: idSource() });
+  }
+
+  const CHAT_TILE: TileRef = {
+    type: "chat",
+    id: "c-1",
+    instanceId: "inst-1",
+    name: "Migrate config loader",
+    hostId: "host-1",
+  };
+
+  const SPEC_TILE: TileRef = {
+    type: "spec",
+    id: "art-1",
+    instanceId: "inst-2",
+    name: "Parity contract",
+    hostId: "host-1",
+  };
+
+  it("CONTRACT: a chat tile renders a CHAT, not a placeholder", () => {
+    /*
+     * The assertion that carries the change. `streamConnection` is null here,
+     * so the chat reports having no host — which is the chat surface's OWN
+     * error state and is reachable only by having actually rendered
+     * `ChatScreen`. A placeholder body cannot produce it.
+     *
+     * Asserting on the error rather than on a transcript is deliberate: a
+     * transcript needs a live subscription, and a test that stubs one deep
+     * enough to produce messages stops being a test of this switch.
+     */
+    render(draw(withTile(CHAT_TILE), "Ship the thing", noop));
+    expect(screen.getByText(/Couldn’t open this chat/)).toBeTruthy();
+  });
+
+  it("CONTRACT: a chat tile draws no second breadcrumb inside the pane", () => {
+    /*
+     * The canvas screen owns the only breadcrumb on this screen. One is the
+     * canvas's; a second would be the chat's, and that is the defect
+     * `ChatChrome` exists to prevent — asserted here at the composition, not
+     * only at `ChatScreen` in isolation, because this is where the two meet.
+     */
+    render(draw(withTile(CHAT_TILE), "Ship the thing", noop));
+    expect(screen.getAllByLabelText("Location").length).toBe(1);
+  });
+
+  it("CONTRACT: an artifact tile names its actual blocker, not 'placeholder'", () => {
+    /*
+     * These four kinds are still unbuilt, and the previous uniform body said
+     * so in words that fit any of them. That was honest while nothing could
+     * render; it is not now, because a reader seeing a generic placeholder
+     * beside a working chat concludes the artifact body is merely unfinished.
+     * It is BLOCKED, on a bundle-size decision recorded in the parity
+     * contract — and the body has to say which.
+     *
+     * The assertion is on the attribution, the same shape as the empty-state
+     * one above: swap the detail for "arrives later" and this fails.
+     */
+    render(draw(withTile(SPEC_TILE), "Ship the thing", noop));
+    expect(screen.getByText(/ProseMirror stack this tab does not/)).toBeTruthy();
+  });
+
+  it("a blank tab invites content rather than reporting a blocker", () => {
+    // The two placeholders must not collapse into one message: "nothing is
+    // here yet" and "this cannot be built yet" are different facts and a
+    // shared string would make the artifact one unfalsifiable.
+    render(draw(EMPTY_CANVAS, "Ship the thing", noop));
+    expect(screen.queryByText(/ProseMirror/)).toBeNull();
   });
 });
