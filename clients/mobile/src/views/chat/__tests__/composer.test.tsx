@@ -594,8 +594,31 @@ describe("Composer — the chat's settings arrive after mount", () => {
     fireEvent.click(sendButton());
 
     expect(sent).toHaveLength(1);
-    expect(sent[0].permissionMode).toBe("supervised");
-    expect(sent[0].harnessId).toBe("codex");
+    /**
+     * THE WHOLE TUPLE, and `toEqual` rather than `toMatchObject`.
+     *
+     * This assertion used to name `permissionMode` and `harnessId` only. A
+     * per-field mutation showed what that costs: `permissionMode` was bound by
+     * two tests and `agentMode` by exactly ONE, so reverting `agentMode`'s
+     * derivation alone left this test — the only one that watches a REUSED
+     * instance — green. A field bound by one assertion in one place is how a
+     * field gets quietly dropped from a later fix.
+     *
+     * `toEqual` because the failure mode is a field going MISSING (or a new one
+     * arriving unnoticed), and `toMatchObject` is blind to both: it checks the
+     * keys it is given and ignores the rest of the object. The emitted tuple is
+     * exactly these seven — `handleSend`'s payload — so pinning it exactly makes
+     * "the composer stopped emitting X" a test failure rather than a silence.
+     */
+    expect(sent[0]).toEqual({
+      harnessId: "codex",
+      model: "gpt-5-codex",
+      permissionMode: "supervised",
+      agentMode: "epic",
+      reasoningEffort: "high",
+      serviceTier: "priority",
+      profileId: "profile-9",
+    });
   });
 
   /**
