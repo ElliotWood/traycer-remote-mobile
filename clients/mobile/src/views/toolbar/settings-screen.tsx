@@ -176,7 +176,7 @@ function ProviderRow({
 }
 
 function NotificationsSection({ client }: { readonly client: MobileHostClient | null }): ReactElement {
-  const { config, loading, setRendererSeverity } = useNotificationConfig(client);
+  const { config, loading, loadError, setRendererSeverity } = useNotificationConfig(client);
   const [permission, setPermission] = useState(getNotificationPermission);
   const secureBlocked = isNotificationsSecureContextBlocked();
 
@@ -217,8 +217,17 @@ function NotificationsSection({ client }: { readonly client: MobileHostClient | 
       </div>
 
       <div style={{ ...type.bodySm, color: theme.text, marginBottom: 6 }}>Notify me for</div>
-      {loading || config === null ? (
+      {loading ? (
         <p style={{ ...type.bodyXs, color: theme.mutedText }}>Loading…</p>
+      ) : loadError !== null || config === null ? (
+        // `config === null` alongside this branch is the honest fallback for
+        // a state that should be unreachable (a successful read always sets
+        // it) — NOT another spelling of "still loading". If it ever fires
+        // without `loadError` set, that is itself a bug to chase, not a
+        // reason to spin.
+        <p role="alert" style={{ ...type.bodyXs, color: theme.danger }}>
+          {loadError ?? "Couldn't load notification settings."}
+        </p>
       ) : (
         (Object.keys(SEVERITY_LABELS) as HostNotificationSeverity[]).map((severity) => (
           <label
