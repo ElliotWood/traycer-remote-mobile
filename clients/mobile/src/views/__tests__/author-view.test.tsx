@@ -15,9 +15,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { createChatRequestSchema } from "@traycer/protocol/host/epic/unary-schemas";
 import type { ListHarnessModelsResponse } from "@traycer/protocol/host/agent/shared";
+import type { ReactNode } from "react";
+import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { AuthorView } from "@/views/author-view";
 import { buildCreateChatRequest } from "@/host/use-create-chat";
-import { createFakeHostClient, type FakeHostClient } from "@/test-utils/fakes";
+import {
+  createFakeHostClient,
+  createFakeStreamConnection,
+  type FakeHostClient,
+  type FakeStreamConnection,
+} from "@/test-utils/fakes";
 import { render, screen, waitFor } from "@/test-utils/dom";
 
 /**
@@ -73,10 +80,24 @@ function requestImpl(opts: {
   };
 }
 
+/**
+ * `streams` is REQUIRED rather than defaulted — "no host stream to fall back
+ * over" is a real scenario with its own test below, so it gets chosen at every
+ * call site rather than inherited silently. (ESLint bans default parameter
+ * values here anyway.)
+ */
 function renderAuthor(
   fake: FakeHostClient,
   onCreated: (chatId: string) => void,
+  streams: FakeStreamConnection | null,
 ): void {
+  function Wrapper({ children }: { readonly children: ReactNode }) {
+    return (
+      <StreamConnectionProvider connection={streams === null ? null : streams.connection}>
+        {children}
+      </StreamConnectionProvider>
+    );
+  }
   render(
     <AuthorView
       epicId="e1"
@@ -84,6 +105,7 @@ function renderAuthor(
       onCreated={onCreated}
       onCancel={() => {}}
     />,
+    { wrapper: Wrapper },
   );
 }
 
@@ -99,7 +121,7 @@ function createChatBody(fake: FakeHostClient): Record<string, unknown> {
 describe("AuthorView", () => {
   it("resolves a model then dispatches epic.createChat with the instruction and no workspace/settings", async () => {
     const fake = createFakeHostClient(requestImpl({}));
-    renderAuthor(fake, () => {});
+    renderAuthor(fake, () => {}, createFakeStreamConnection());
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "Add a health check");
@@ -149,7 +171,7 @@ describe("AuthorView", () => {
   it("navigates to the minted chat on a successful create", async () => {
     const fake = createFakeHostClient(requestImpl({}));
     const onCreated = vi.fn();
-    renderAuthor(fake, onCreated);
+    renderAuthor(fake, onCreated, createFakeStreamConnection());
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "Do the thing");
@@ -167,7 +189,7 @@ describe("AuthorView", () => {
       }),
     );
     const onCreated = vi.fn();
-    renderAuthor(fake, onCreated);
+    renderAuthor(fake, onCreated, createFakeStreamConnection());
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "Break something");
@@ -183,7 +205,7 @@ describe("AuthorView", () => {
       requestImpl({ models: { harnessId: "claude", models: [] } }),
     );
     const onCreated = vi.fn();
-    renderAuthor(fake, onCreated);
+    renderAuthor(fake, onCreated, createFakeStreamConnection());
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "No model here");
@@ -201,7 +223,7 @@ describe("AuthorView", () => {
     configMock.hostId = null;
     const fake = createFakeHostClient(requestImpl({}));
     const onCreated = vi.fn();
-    renderAuthor(fake, onCreated);
+    renderAuthor(fake, onCreated, createFakeStreamConnection());
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Instruction"), "Would be unreachable");
@@ -211,6 +233,122 @@ describe("AuthorView", () => {
     expect(alert.textContent ?? "").toMatch(/VITE_HOST_ID is unset/i);
     // Nothing durable was stamped: no chat exists to be unreachable.
     expect(fake.request.mock.calls.some((c) => c[0] === "epic.createChat")).toBe(false);
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  // ── The turn-less agent ─────────────────────────────────────────────────
+  // Measured on a real host: `initialTurnStarted` comes back FALSE. This flow
+  // used to DISCARD that (`void response.initialTurnStarted`) and navigate
+  // regardless, so "Start agent" produced a chat holding a persisted
+  // instruction that nothing was acting on — no turn, no error, no spinner.
+  // A silent no-op, and indistinguishable from success.
+  //
+  // NOTE on the fixture above: `requestImpl`'s default is
+  // `initialTurnStarted: true`, which is the branch the real host does NOT
+  // take. Every test before this point therefore exercises the path that
+  // rarely happens live; these three cover the one that does.
+
+  it("re-sends the folded message over the chat stream when the host didn't start the turn", async () => {
+    const fake = createFakeHostClient(
+      requestImpl({
+        createChat: (p) => Promise.resolve({ chatId: p.chatId, initialTurnStarted: false }),
+      }),
+    );
+    const streams = createFakeStreamConnection();
+    const onCreated = vi.fn();
+    renderAuthor(fake, onCreated, streams);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Instruction"), "Start the work");
+    await user.click(screen.getByRole("button", { name: "Start agent" }));
+
+    // A chat session is opened for the just-created chat.
+    await waitFor(() => expect(streams.chatSessions.length).toBe(1));
+    const session = streams.chatSessions[0];
+    const body = createChatBody(fake);
+    const folded = body.initialMessage as { messageId: string };
+    expect(session?.chatId).toBe(body.chatId);
+    expect(session?.epicId).toBe("e1");
+
+    // Nothing is written while the session is still connecting — the transport
+    // DROPS frames when it isn't subscribed, so an eager write would vanish
+    // and the fallback would be a no-op wearing a success.
+    expect(session?.sendAction).not.toHaveBeenCalled();
+
+    // Once live, the folded message is re-sent carrying the SAME messageId,
+    // which is what makes the re-send idempotent (the host dedupes on it)
+    // rather than a duplicate-turn risk.
+    session?.connection.applyStatus("open", null);
+    await waitFor(() => expect(session?.sendAction).toHaveBeenCalledTimes(1));
+    const frame = session?.sendAction.mock.calls[0]?.[0] as {
+      kind: string;
+      messageId: string;
+      chatId: string;
+    };
+    expect(frame.kind).toBe("send");
+    expect(frame.messageId).toBe(folded.messageId);
+    expect(frame.chatId).toBe(body.chatId);
+
+    // Navigation waits for the host's ack — landing the user in the chat before
+    // then is the very thing this fixes.
+    expect(onCreated).not.toHaveBeenCalled();
+
+    // An ack for a DIFFERENT message must not be mistaken for this turn
+    // starting; a racing send elsewhere in the app would otherwise resolve the
+    // fallback early and report success for a turn that never began.
+    session?.callbacks.onMessageAccepted({
+      kind: "messageAccepted",
+      message: { messageId: "some-other-message" },
+    } as unknown as never);
+    await Promise.resolve();
+    expect(onCreated).not.toHaveBeenCalled();
+
+    session?.callbacks.onMessageAccepted({
+      kind: "messageAccepted",
+      message: { messageId: folded.messageId },
+    } as unknown as never);
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(onCreated).toHaveBeenCalledWith(body.chatId);
+  });
+
+  it("does not re-send when the host reports the folded turn already started", async () => {
+    const fake = createFakeHostClient(requestImpl({}));
+    const streams = createFakeStreamConnection();
+    const onCreated = vi.fn();
+    renderAuthor(fake, onCreated, streams);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Instruction"), "Already running");
+    await user.click(screen.getByRole("button", { name: "Start agent" }));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    // No fallback session at all — re-sending would be needless traffic, and
+    // this is the contrast that stops the test above from passing against a
+    // hook that re-sends unconditionally.
+    expect(streams.chatSessions.length).toBe(0);
+  });
+
+  it("reports honestly instead of navigating when the first turn cannot be started", async () => {
+    const fake = createFakeHostClient(
+      requestImpl({
+        createChat: (p) => Promise.resolve({ chatId: p.chatId, initialTurnStarted: false }),
+      }),
+    );
+    const onCreated = vi.fn();
+    // No stream connection to fall back over. The failure mode of the FALLBACK
+    // itself: replacing a silent no-op with a differently-silent one would not
+    // be a fix, so this asserts the user is told.
+    renderAuthor(fake, onCreated, null);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Instruction"), "Nothing can run this");
+    await user.click(screen.getByRole("button", { name: "Start agent" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent ?? "").toMatch(/didn't start/i);
+    // The chat DOES exist, so the copy must not claim the create failed — it
+    // has to point the user at the thing that is really there.
+    expect(alert.textContent ?? "").toMatch(/created/i);
     expect(onCreated).not.toHaveBeenCalled();
   });
 
