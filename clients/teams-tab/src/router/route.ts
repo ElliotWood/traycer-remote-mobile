@@ -44,6 +44,15 @@ export type Route =
   /** The app-level notifications screen, reached from the frame's bell. */
   | { readonly name: "notifications" }
   /**
+   * App settings, reached from the frame's account menu.
+   *
+   * A ROUTE rather than a dialog, for the reason the canvas is one: a Teams
+   * tab reloads more often than a page, and settings is where a user lands
+   * when something is wrong and they want to read the host version back to
+   * someone. A dialog cannot be linked to or reloaded into.
+   */
+  | { readonly name: "settings" }
+  /**
    * The tile canvas for one epic — panes, tab strips, splits.
    *
    * BESIDE the `epic` drill-in, not instead of it. `epic` is a list you read
@@ -91,6 +100,7 @@ export function parseRoute(pathname: string): Route {
 
   if (segments[0] === "waiting") return { name: "waiting" };
   if (segments[0] === "notifications") return { name: "notifications" };
+  if (segments[0] === "settings") return { name: "settings" };
   if (segments[0] === "epics" && typeof segments[1] === "string") {
     if (segments[2] === "chats" && typeof segments[3] === "string") {
       return { name: "chat", epicId: segments[1], chatId: segments[3] };
@@ -120,6 +130,8 @@ export function routeToPath(route: Route): string {
       return `${BASE}/waiting`;
     case "notifications":
       return `${BASE}/notifications`;
+    case "settings":
+      return `${BASE}/settings`;
     case "epics":
       return `${BASE}/epics`;
   }

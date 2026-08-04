@@ -103,7 +103,15 @@ import {
 import { themeFor } from "./theme/teams-theme";
 import { configProblems } from "./config";
 import { SignIn } from "./auth/sign-in";
-import { SignOutButton } from "./auth/sign-out-button";
+import { AccountMenu } from "./account/account-menu";
+import { SettingsScreen } from "./settings/settings-screen";
+import {
+  useHostStatus,
+  useNotificationConfig,
+  useProviders,
+  type SettingsClient,
+} from "./settings/use-settings";
+import { useShellSettings } from "./shell/shell-settings";
 import { useAuthService, useAuthStatus } from "./auth/use-auth";
 import { useTeamsTheme } from "./theme/use-teams-theme";
 
@@ -355,6 +363,42 @@ function EpicScreen({
 }
 
 /**
+ * The settings route's own component, and it is one for a reason worth stating.
+ *
+ * The three settings loads are hooks, and hooks cannot be conditional — so
+ * calling them in `EpicsScreen` would issue `host.status`, `providers.list`
+ * and `host.notifications.getConfig` on EVERY route, for a screen the user
+ * may never open. `useCanvas` is deliberately the opposite (it runs on every
+ * route because per-epic layout must survive navigation); this is the case
+ * where the request genuinely belongs to the screen, so the screen is the
+ * component.
+ *
+ * The client is already `null` under any preview — the connection is not
+ * constructed at all — so `?preview=settings` renders the three error states
+ * and reaches no host, which is the same property every other preview here
+ * holds and is enforced by the wiring rather than promised in a comment.
+ */
+function SettingsRoute({
+  client,
+  onSignOut,
+}: {
+  readonly client: SettingsClient | null;
+  readonly onSignOut: () => void;
+}): ReactElement {
+  const providers = useProviders(client);
+  const notifications = useNotificationConfig(client);
+  const hostStatus = useHostStatus(client);
+  return (
+    <SettingsScreen
+      providers={providers}
+      notifications={notifications}
+      hostStatus={hostStatus}
+      onSignOut={onSignOut}
+    />
+  );
+}
+
+/**
  * The signed-in screen: the user's real epics.
  *
  * A separate component because the host connection is built ONCE and must not
@@ -376,9 +420,20 @@ function EpicsScreen({
   waitingPreview,
   notificationsPreview,
   hostClientType,
+  onSignOut,
 }: {
   readonly styles: Record<string, string>;
   readonly auth: HostConnectionAuth & StreamConnectionAuth;
+  /**
+   * Ends the session, from the settings screen's About section.
+   *
+   * Threaded as a callback rather than reached through `auth` above, because
+   * that prop is deliberately typed as only the two transport-facing
+   * interfaces. Widening it to the whole `MobileAuthService` so one screen can
+   * call `signOut` would give every screen below here the ability to, which is
+   * the opposite of what the narrow type is for.
+   */
+  readonly onSignOut: () => void;
   /**
    * The signed-in user's id, stamped as a new epic's `createdBy`.
    *
@@ -514,6 +569,22 @@ function EpicsScreen({
   }, [navigate]);
 
   /**
+   * Stable for the same reason `openNotifications` is — it sits in the
+   * publishing effect's dependency list, so a fresh closure each render would
+   * republish each render.
+   *
+   * PUBLISHED UNDER PREVIEW TOO, on the same argument: this is `navigate`,
+   * which is `history.pushState` and nothing else. No host, no socket, no
+   * request. The settings screen it reaches has a null client under preview
+   * and so renders its three unreachable-host states, which is exactly what a
+   * preview URL is for.
+   */
+  const openSettings = useCallback(() => {
+    navigate({ name: "settings" });
+  }, [navigate]);
+  useShellSettings(openSettings);
+
+  /**
    * Into the FRAME's trailing cluster.
    *
    * PUBLISHED UNDER PREVIEW TOO, deliberately, and it is the one host-touching
@@ -581,6 +652,14 @@ function EpicsScreen({
             }}
           />
         </div>
+      );
+
+    case "settings":
+      return (
+        <SettingsRoute
+          client={connection?.hostClient ?? null}
+          onSignOut={onSignOut}
+        />
       );
 
     case "chat":
@@ -725,6 +804,17 @@ export function App(): ReactElement {
   const { themeName, inTeams, ready, hostClientType } = useTeamsTheme();
   const { auth, restoring } = useAuthService();
   const status = useAuthStatus(auth);
+  /**
+   * The screen's "open settings" handler, or `null` while no screen publishes
+   * one.
+   *
+   * HELD HERE rather than inside `AppShell`, unlike the bell's data, because
+   * the account menu that consumes it is rendered by THIS component into the
+   * shell's `trailing` slot — it needs `auth`, which the shell deliberately
+   * knows nothing about. So the value is born below the shell, passes through
+   * it, and is consumed above it. See `shell/shell-settings.tsx`.
+   */
+  const [openSettings, setOpenSettings] = useState<(() => void) | null>(null);
 
   /**
    * ONE frame, for every route.
@@ -754,6 +844,7 @@ export function App(): ReactElement {
     <FluentProvider theme={themeFor(ready ? themeName : "default")}>
       <AppShell
         leading={<Text weight="semibold">Traycer</Text>}
+        setOpenSettings={setOpenSettings}
         /*
          * SIGN-OUT LIVES IN THE FRAME, not on a screen.
          *
@@ -767,11 +858,24 @@ export function App(): ReactElement {
          * Absent unless genuinely signed in: under preview there is no
          * session to end, and rendering a dead control would be the
          * "affordance that silently does nothing" this project keeps finding.
+         *
+         * NOW AN ACCOUNT MENU, not a bare button. The identity was already in
+         * hand — `status.user.user` carries `name`, `email` and `avatarUrl`,
+         * and only `.id` was ever read, which is why the old control rendered
+         * a truncated user id its own docblock admitted answers nothing.
+         *
+         * `onOpenSettings` is the value that travelled up. It is `null` when
+         * no screen is mounted to navigate with — after a screen throws, the
+         * boundary unmounts it and the publisher's cleanup clears the slot —
+         * and the menu HIDES the row rather than disabling it. Sign-out is
+         * NOT conditional on it: it comes straight from `auth` here, so it
+         * still works in exactly that state.
          */
         trailing={
           status.kind === "signed-in" ? (
-            <SignOutButton
-              userId={status.user.user.id}
+            <AccountMenu
+              user={status.user}
+              onOpenSettings={openSettings}
               onSignOut={() => {
                 auth.signOut();
               }}
@@ -1331,6 +1435,9 @@ export function App(): ReactElement {
         waitingPreview={waitingPreview}
         notificationsPreview={notificationsPreview}
         hostClientType={hostClientType}
+        onSignOut={() => {
+          auth.signOut();
+        }}
       />,
   );
 }
