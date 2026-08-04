@@ -86,6 +86,28 @@ export type TranscriptBlock =
       readonly questions: readonly {
         readonly questionId: string | null;
         readonly question: string;
+        /**
+         * `header`, `options` and `multiSelect` are carried for the SAME reason
+         * `question` is, stated four lines up: they can be found nowhere else.
+         *
+         * They were dropped here until 2026-08-04, and the consequence was not
+         * a missing label — it was a WRONG ANSWER SHAPE. A client that cannot
+         * see the options cannot submit one, so it submits free text, which is
+         * a legitimate `values` member (desktop's "Other"). The answer is
+         * therefore indistinguishable on the wire from a considered choice,
+         * and nothing errors. Dropping a field at a projection is not a
+         * rendering loss when the field is what the reply is built from.
+         *
+         * `preview` is NOT carried: no client renders it. Deliberate, and the
+         * reason it is written down is that this comment is the only thing
+         * standing between that and the defect above.
+         */
+        readonly header: string | null;
+        readonly options: readonly {
+          readonly label: string;
+          readonly description: string | null;
+        }[];
+        readonly multiSelect: boolean;
       }[];
       readonly answered: boolean;
     }
@@ -233,6 +255,9 @@ export function toTranscriptBlock(raw: unknown): TranscriptBlock {
         const question = q as Record<string, unknown>;
         const text = question["question"];
         if (typeof text !== "string") return [];
+        const rawOptions = Array.isArray(question["options"])
+          ? (question["options"] as unknown[])
+          : [];
         return [
           {
             questionId:
@@ -240,6 +265,29 @@ export function toTranscriptBlock(raw: unknown): TranscriptBlock {
                 ? question["questionId"]
                 : null,
             question: text,
+            header:
+              typeof question["header"] === "string"
+                ? question["header"]
+                : null,
+            // An option with no `label` is DROPPED, not defaulted to "": the
+            // label IS the value submitted, so an empty one would render a
+            // blank button that answers the question with "".
+            options: rawOptions.flatMap((o) => {
+              if (typeof o !== "object" || o === null) return [];
+              const option = o as Record<string, unknown>;
+              const label = option["label"];
+              if (typeof label !== "string" || label.length === 0) return [];
+              return [
+                {
+                  label,
+                  description:
+                    typeof option["description"] === "string"
+                      ? option["description"]
+                      : null,
+                },
+              ];
+            }),
+            multiSelect: question["multiSelect"] === true,
           },
         ];
       }),

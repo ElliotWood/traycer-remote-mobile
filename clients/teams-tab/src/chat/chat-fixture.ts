@@ -106,7 +106,13 @@ export const CHAT_FIXTURE: readonly TranscriptMessage[] = [
         blockId: "iv-answered",
         title: "Which behaviour should a missing variable keep?",
         questions: [
-          { questionId: "q1", question: "Throw on load, or degrade?" },
+          {
+            questionId: "q1",
+            question: "Throw on load, or degrade?",
+            header: null,
+            options: [],
+            multiSelect: false,
+          },
         ],
         // ANSWERED — history. Must render as prose, never as a live prompt.
         answered: true,
@@ -129,13 +135,32 @@ export const CHAT_FIXTURE: readonly TranscriptMessage[] = [
         blockId: "iv-open",
         title: "Two things before I finish",
         questions: [
+          // OPTION-BEARING, deliberately, and paired with a free-text question
+          // below so `?preview=chat` shows BOTH branches in one card. A regression
+          // that puts a textarea back under an option question is then visible
+          // on the served bundle, not only in a unit test.
           {
             questionId: "q2",
             question: "Should the relative-URL check stay a hard failure?",
+            header: "Validation",
+            options: [
+              {
+                label: "Keep it failing",
+                description: "A relative URL is always a config mistake here.",
+              },
+              {
+                label: "Warn and continue",
+                description: "Resolve against the host origin instead.",
+              },
+            ],
+            multiSelect: false,
           },
           {
             questionId: "q3",
             question: "Do you want the schema exported for the tests?",
+            header: null,
+            options: [],
+            multiSelect: false,
           },
         ],
         answered: false,

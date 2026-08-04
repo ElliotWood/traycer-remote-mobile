@@ -88,7 +88,7 @@ export interface ChatController {
     answers: readonly {
       readonly questionId: string | null;
       readonly question: string;
-      readonly value: string;
+      readonly values: readonly string[];
     }[],
   ) => void;
 }
@@ -235,7 +235,7 @@ export function useChat(
       answers: readonly {
         readonly questionId: string | null;
         readonly question: string;
-        readonly value: string;
+        readonly values: readonly string[];
       }[],
     ) => {
       const tracker = trackerRef.current;
@@ -258,7 +258,7 @@ export function useChat(
             answers: answers.map((a) => ({
               questionId: a.questionId,
               question: a.question,
-              values: [a.value],
+              values: [...a.values],
               notes: null,
             })),
           } as ChatSubscribeClientFrame,
