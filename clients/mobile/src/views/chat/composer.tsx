@@ -162,6 +162,14 @@ export interface ComposerProps {
    */
   readonly mentionRoots: readonly string[];
   /**
+   * Which of `mentionRoots` the agent's process runs in — i.e. the one root a
+   * bare relative path resolves against (`primaryMentionRoot`). `null` in a
+   * folderless chat, and in the never-observed state where a multi-root
+   * binding names no primary. A suggestion from any OTHER root is serialized
+   * absolute; see `mentionToken`, which is where the reasoning lives.
+   */
+  readonly primaryMentionRoot: string | null;
+  /**
    * Perf fix: the composer owns its OWN draft text internally now (below) —
    * every keystroke used to live in `ChatView`'s state, re-rendering the
    * whole chat screen (transcript included) on every character. These two
@@ -199,6 +207,7 @@ export function Composer({
   chatId,
   client,
   mentionRoots,
+  primaryMentionRoot,
   prefillText,
   prefillNonce,
   chatSettings,
@@ -375,15 +384,14 @@ export function Composer({
   };
 
   /**
-   * The token is `@<relPath>` and nothing else — that is the exact string
-   * desktop's mention node serializes to for the agent
-   * (`json-content-serializer.ts:368-372`), so a phone-typed mention and a
-   * desktop-clicked one reach the model identically. The label would not
-   * resolve and the absolute path is what the WORKTREE kind uses, not this one.
+   * The token IS the payload — mobile sends plain text, so whatever this
+   * splices is the entire mechanism by which the agent finds the file. Which
+   * root the suggestion came from decides its form; `mentionToken` carries the
+   * measurement and the parity argument.
    */
   const pickMention = (suggestion: MentionSuggestion): void => {
     if (mentionTrigger === null) return;
-    spliceToken(mentionToken(suggestion));
+    spliceToken(mentionToken(suggestion, primaryMentionRoot));
   };
 
   // Adjusted DURING render, not in an effect that fires after commit — an

@@ -49,6 +49,11 @@ import { fireEvent, render, screen, waitFor } from "@/test-utils/dom";
 const ROOT_A = "C:\\repos\\alpha";
 const ROOT_B = "C:\\repos\\beta";
 const BOGUS = "C:\\repos\\gone";
+/**
+ * A SECOND real root, used only by the secondary-root insertion tests, so
+ * adding it cannot move any row count the existing tests assert on.
+ */
+const ROOT_C = "C:\\repos\\gamma";
 
 function fileRow(root: string, relPath: string): WorkspaceFileMentionSuggestion {
   return workspaceFileMentionSuggestionSchema.parse({
@@ -81,10 +86,15 @@ function folderRow(root: string, relPath: string): WorkspaceFolderMentionSuggest
 const FILES: Record<string, readonly WorkspaceFileMentionSuggestion[]> = {
   [ROOT_A]: [fileRow(ROOT_A, "src/app.tsx"), fileRow(ROOT_A, "src/deep/app.tsx")],
   [ROOT_B]: [fileRow(ROOT_B, "lib/beta-util.ts")],
+  // Deliberately the SAME relPath ROOT_A already offers: the two rows read
+  // identically in the sheet, so nothing but the root can tell the resulting
+  // tokens apart.
+  [ROOT_C]: [fileRow(ROOT_C, "src/app.tsx")],
 };
 const FOLDERS: Record<string, readonly WorkspaceFolderMentionSuggestion[]> = {
   [ROOT_A]: [folderRow(ROOT_A, "src/")],
   [ROOT_B]: [],
+  [ROOT_C]: [],
 };
 
 function command(name: string): GuiAgentCommandOption {
@@ -131,12 +141,22 @@ function mentionHost(): FakeHostClient {
   });
 }
 
-function renderComposer(roots: readonly string[], client: FakeHostClient): void {
+/**
+ * `primaryRoot` is explicit rather than derived from `roots[0]`: which root the
+ * agent runs in is a fact from the binding, and a helper that guessed it would
+ * make every two-root test agree with itself by construction.
+ */
+function renderComposer(
+  roots: readonly string[],
+  client: FakeHostClient,
+  primaryRoot: string | null,
+): void {
   render(
     <Composer
       chatId="c1"
       client={client.client}
       mentionRoots={roots}
+      primaryMentionRoot={primaryRoot}
       prefillText={null}
       prefillNonce={0}
       chatSettings={null}
@@ -180,7 +200,7 @@ beforeEach(() => {
 
 describe("the canary distinguishes states the host cannot", () => {
   it("a readable root with no match renders NO-MATCHES, not unavailable", async () => {
-    renderComposer([ROOT_A], mentionHost());
+    renderComposer([ROOT_A], mentionHost(), ROOT_A);
     type("@zzzznotafile");
     await waitFor(() => {
       expect(screen.getByTestId("mention-empty-no-matches")).toBeTruthy();
@@ -190,7 +210,7 @@ describe("the canary distinguishes states the host cannot", () => {
   });
 
   it("an UNREADABLE root renders UNAVAILABLE for the very same empty result", async () => {
-    renderComposer([BOGUS], mentionHost());
+    renderComposer([BOGUS], mentionHost(), BOGUS);
     type("@zzzznotafile");
     await waitFor(() => {
       expect(screen.getByTestId("mention-empty-unavailable")).toBeTruthy();
@@ -203,7 +223,7 @@ describe("the canary distinguishes states the host cannot", () => {
     // never issued, both would land on one verdict and one of these two tests
     // would fail. Neither can pass by rendering nothing.
     const good = mentionHost();
-    renderComposer([ROOT_A], good);
+    renderComposer([ROOT_A], good, ROOT_A);
     type("@nomatch");
     await waitFor(() => {
       expect(screen.getByTestId("mention-empty-no-matches")).toBeTruthy();
@@ -229,7 +249,7 @@ describe("ignorance is never reported as a verdict", () => {
       }
       return Promise.reject(new Error(`unexpected RPC in this test: ${method}`));
     });
-    renderComposer([ROOT_A], host);
+    renderComposer([ROOT_A], host, ROOT_A);
     type("@app");
     return waitFor(() => {
       expect(screen.getByTestId("mention-empty-undetermined")).toBeTruthy();
@@ -242,7 +262,7 @@ describe("ignorance is never reported as a verdict", () => {
 describe("the canary is per root", () => {
   it("issues one single-row canary per root, not one per query", async () => {
     const host = mentionHost();
-    renderComposer([ROOT_A, ROOT_B], host);
+    renderComposer([ROOT_A, ROOT_B], host, ROOT_A);
     type("@app");
     await waitFor(() => {
       expect(screen.getByText("src/app.tsx")).toBeTruthy();
@@ -259,7 +279,7 @@ describe("the canary is per root", () => {
     // Measured on the live host: roots=[real, BOGUS] returns a full 25 rows,
     // order-independently. An aggregate canary calls that full health and the
     // user never learns a repository is missing from their results.
-    renderComposer([ROOT_A, BOGUS], mentionHost());
+    renderComposer([ROOT_A, BOGUS], mentionHost(), ROOT_A);
     type("@app");
     await waitFor(() => {
       expect(screen.getByText("src/app.tsx")).toBeTruthy();
@@ -270,7 +290,7 @@ describe("the canary is per root", () => {
   });
 
   it("does NOT cry partial failure when every root is healthy", async () => {
-    renderComposer([ROOT_A, ROOT_B], mentionHost());
+    renderComposer([ROOT_A, ROOT_B], mentionHost(), ROOT_A);
     type("@app");
     await waitFor(() => {
       expect(screen.getByText("src/app.tsx")).toBeTruthy();
@@ -281,7 +301,7 @@ describe("the canary is per root", () => {
 
 describe("insertion", () => {
   it("inserts @<relPath> — the exact string desktop serializes for the agent", async () => {
-    renderComposer([ROOT_A], mentionHost());
+    renderComposer([ROOT_A], mentionHost(), ROOT_A);
     type("look at @app");
     await waitFor(() => {
       expect(screen.getByText("src/app.tsx")).toBeTruthy();
@@ -294,7 +314,7 @@ describe("insertion", () => {
   });
 
   it("survives the path separator the first trigger implementation died on", async () => {
-    renderComposer([ROOT_A], mentionHost());
+    renderComposer([ROOT_A], mentionHost(), ROOT_A);
     type("@src/deep");
     await waitFor(() => {
       expect(screen.getByText("src/deep/app.tsx")).toBeTruthy();
@@ -305,10 +325,50 @@ describe("insertion", () => {
   });
 });
 
+describe("insertion across TWO roots — the token has to resolve, not just look right", () => {
+  /**
+   * Both roots offer `src/app.tsx`, so a `@<relPath>` token is IDENTICAL for
+   * the two. That is the only fixture shape that can fail: with one root, or
+   * with two different relPaths, the pre-fix composer passes both of these.
+   *
+   * Measured live before these existed: a secondary-root `@wrangler.toml`
+   * reached the agent as inert prose, and the agent then read against its cwd
+   * — the PRIMARY root — and errored. The primary-root file in the same chat
+   * "passed" by that same cwd fallback, which is why one root could never have
+   * caught this.
+   *
+   * These bind the CALL, not `mentionToken`: reverting the composer's second
+   * argument to `null` leaves every `mention-model` unit test green.
+   */
+  it("keeps the primary root's file relative — byte-identical to desktop", async () => {
+    renderComposer([ROOT_A, ROOT_C], mentionHost(), ROOT_A);
+    type("look at @src/app");
+    await waitFor(() => {
+      expect(screen.getAllByText("src/app.tsx")).toHaveLength(2);
+    });
+    fireEvent.click(screen.getAllByText("src/app.tsx")[0]);
+    const textarea = screen.getByPlaceholderText("Message this agent…") as HTMLTextAreaElement;
+    expect(textarea.value).toBe("look at @src/app.tsx ");
+  });
+
+  it("serializes the SECONDARY root's file absolutely, from an identical-looking row", async () => {
+    renderComposer([ROOT_A, ROOT_C], mentionHost(), ROOT_A);
+    type("look at @src/app");
+    await waitFor(() => {
+      expect(screen.getAllByText("src/app.tsx")).toHaveLength(2);
+    });
+    // Row order follows the roots array, and both rows read the same, so the
+    // count assertion above is what makes this index mean anything.
+    fireEvent.click(screen.getAllByText("src/app.tsx")[1]);
+    const textarea = screen.getByPlaceholderText("Message this agent…") as HTMLTextAreaElement;
+    expect(textarea.value).toBe("look at @C:\\repos\\gamma\\src\\app.tsx ");
+  });
+});
+
 describe("a folderless chat", () => {
   it("hides `@` entirely — no sheet, no request, not an empty sheet", async () => {
     const host = mentionHost();
-    renderComposer([], host);
+    renderComposer([], host, null);
     type("@app");
     await new Promise((resolve) => setTimeout(resolve, 350));
     expect(screen.queryByText("Files")).toBeNull();
@@ -320,7 +380,7 @@ describe("a folderless chat", () => {
   });
 
   it("still offers `/` in that same chat — the contrast is the check", async () => {
-    renderComposer([], mentionHost());
+    renderComposer([], mentionHost(), null);
     type("/rev");
     await waitFor(() => {
       expect(screen.getByText("/review")).toBeTruthy();
@@ -347,7 +407,7 @@ describe("a folderless chat", () => {
  */
 describe("the relPath renders in reading order without giving up left-truncation", () => {
   it("isolates the path's direction inside an RTL box", async () => {
-    renderComposer([ROOT_A], mentionHost());
+    renderComposer([ROOT_A], mentionHost(), ROOT_A);
     type("@src/deep");
     await waitFor(() => {
       expect(screen.getByText("src/deep/app.tsx")).toBeTruthy();

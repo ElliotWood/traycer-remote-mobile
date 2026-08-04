@@ -13,10 +13,15 @@ import {
   type WorktreeBindingEntry,
 } from "@traycer/protocol/host/worktree-schemas";
 import {
+  workspaceFileMentionSuggestionSchema,
+  workspaceFolderMentionSuggestionSchema,
+} from "@traycer/protocol/host/workspace/unary-schemas";
+import {
   mentionEmptyState,
   mentionRootsForBinding,
   mentionToken,
   partiallyUnavailableRoots,
+  primaryMentionRoot,
   type MentionRootStatus,
   type MentionSuggestion,
 } from "@/views/chat/mention-model";
@@ -83,19 +88,150 @@ describe("mentionRootsForBinding", () => {
   });
 });
 
-describe("mentionToken", () => {
-  it("is @<relPath> — not the label, which would not resolve", () => {
-    const file = {
-      kind: "file",
-      relPath: "src/deep/app.tsx",
-      label: "app.tsx",
-    } as MentionSuggestion;
-    expect(mentionToken(file)).toBe("@src/deep/app.tsx");
+describe("primaryMentionRoot", () => {
+  it("has no answer for a folderless chat", () => {
+    expect(primaryMentionRoot(null)).toBeNull();
+    expect(primaryMentionRoot(binding([]))).toBeNull();
   });
 
-  it("leaves a folder's trailing slash alone — the host's own convention", () => {
-    const folder = { kind: "folder", relPath: "src/views/", label: "views" } as MentionSuggestion;
-    expect(mentionToken(folder)).toBe("@src/views/");
+  it("picks the flagged entry out of TWO, and not the first one", () => {
+    // The flag is deliberately on the SECOND entry: with `isPrimary` on the
+    // first, "reads the flag" and "takes entries[0]" are the same test and the
+    // second is not what this should be doing.
+    const root = primaryMentionRoot(
+      binding([
+        entry({ workspacePath: "C:\\wt\\secondary", isPrimary: false }),
+        entry({ workspacePath: "C:\\wt\\primary", isPrimary: true }),
+      ]),
+    );
+    expect(root).toBe("C:\\wt\\primary");
+  });
+
+  it("names the worktree, not the source workspace — the agent runs in the worktree", () => {
+    const root = primaryMentionRoot(
+      binding([
+        entry({ workspacePath: "C:\\repos\\beta", worktreePath: "C:\\wt\\other", isPrimary: false }),
+        entry({ workspacePath: "C:\\repos\\alpha", worktreePath: "C:\\wt\\feature", isPrimary: true }),
+      ]),
+    );
+    expect(root).toBe("C:\\wt\\feature");
+  });
+
+  it("treats a lone root as primary even when the flag says otherwise", () => {
+    // There is nowhere else for the agent to be running, so a bare relPath
+    // resolves against it whatever the flag claims.
+    const root = primaryMentionRoot(
+      binding([entry({ workspacePath: "C:\\wt\\only", isPrimary: false })]),
+    );
+    expect(root).toBe("C:\\wt\\only");
+  });
+
+  it("refuses to guess when TWO roots and neither is flagged", () => {
+    // Never observed on a real host. The `null` routes `mentionToken` back to
+    // the old relPath behaviour on purpose: not knowing which root is primary
+    // means not knowing which are secondary either.
+    const root = primaryMentionRoot(
+      binding([
+        entry({ workspacePath: "C:\\wt\\a", isPrimary: false }),
+        entry({ workspacePath: "C:\\wt\\b", isPrimary: false }),
+      ]),
+    );
+    expect(root).toBeNull();
+  });
+});
+
+/**
+ * TWO roots, and the two suggestions differ in NOTHING a bare `@<relPath>`
+ * token can see: same `relPath`, same `label`, same `description`. That is the
+ * defect's own shape — the composer used to discard the only field that told
+ * them apart — so a fixture where the relPaths differ would pass against the
+ * broken code and prove nothing.
+ */
+const PRIMARY_ROOT = "C:\\wt\\primary";
+const SECONDARY_ROOT = "C:\\wt\\secondary";
+
+function fileIn(root: string): MentionSuggestion {
+  return workspaceFileMentionSuggestionSchema.parse({
+    kind: "file",
+    id: `file:${root}:config/app.toml`,
+    label: "app.toml",
+    relPath: "config/app.toml",
+    absolutePath: `${root}\\config\\app.toml`,
+    workspacePath: root,
+    description: "config",
+  });
+}
+
+function folderIn(root: string): MentionSuggestion {
+  return workspaceFolderMentionSuggestionSchema.parse({
+    kind: "folder",
+    id: `folder:${root}:config/`,
+    label: "config",
+    relPath: "config/",
+    // Measured: the host answers a folder's `absolutePath` WITHOUT the
+    // trailing separator its `relPath` carries.
+    absolutePath: `${root}\\config`,
+    workspacePath: root,
+    description: "",
+  });
+}
+
+describe("mentionToken", () => {
+  it("is @<relPath> for the primary root — byte-identical to desktop", () => {
+    expect(mentionToken(fileIn(PRIMARY_ROOT), PRIMARY_ROOT)).toBe("@config/app.toml");
+  });
+
+  it("leaves a primary-root folder's trailing slash alone — the host's own convention", () => {
+    expect(mentionToken(folderIn(PRIMARY_ROOT), PRIMARY_ROOT)).toBe("@config/");
+  });
+
+  it("serializes a SECONDARY root's file absolutely, or it cannot resolve", () => {
+    // The measured defect: this token used to be `@config/app.toml`, which the
+    // agent reads against cwd — the primary root — and finds the wrong file or
+    // no file. Nothing else in the suggestion distinguishes the two roots.
+    expect(mentionToken(fileIn(SECONDARY_ROOT), PRIMARY_ROOT)).toBe(
+      "@C:\\wt\\secondary\\config\\app.toml",
+    );
+  });
+
+  it("keeps a secondary-root FOLDER marked as a folder", () => {
+    // `relPath` carries the trailing separator and `absolutePath` does not, so
+    // a naive swap silently drops the one thing that says "directory".
+    expect(mentionToken(folderIn(SECONDARY_ROOT), PRIMARY_ROOT)).toBe(
+      "@C:\\wt\\secondary\\config\\",
+    );
+  });
+
+  it("uses the separator the path already speaks, not a hardcoded one", () => {
+    const posixFolder = workspaceFolderMentionSuggestionSchema.parse({
+      kind: "folder",
+      id: "folder:/srv/other:config/",
+      label: "config",
+      relPath: "config/",
+      absolutePath: "/srv/other/config",
+      workspacePath: "/srv/other",
+      description: "",
+    });
+    expect(mentionToken(posixFolder, "/srv/primary")).toBe("@/srv/other/config/");
+  });
+
+  it("falls back to relPath when no primary root is known", () => {
+    // Parity with desktop beats a divergence invented in a state nobody has
+    // observed — see `primaryMentionRoot`.
+    expect(mentionToken(fileIn(SECONDARY_ROOT), null)).toBe("@config/app.toml");
+  });
+
+  it("falls back to relPath rather than emitting an empty absolute path", () => {
+    const noAbsolute = workspaceFileMentionSuggestionSchema.parse({
+      kind: "file",
+      id: "file:C:\\wt\\secondary:config/app.toml",
+      label: "app.toml",
+      relPath: "config/app.toml",
+      absolutePath: "",
+      workspacePath: SECONDARY_ROOT,
+      description: "config",
+    });
+    expect(mentionToken(noAbsolute, PRIMARY_ROOT)).toBe("@config/app.toml");
   });
 });
 

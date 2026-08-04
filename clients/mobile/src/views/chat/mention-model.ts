@@ -86,27 +86,123 @@ function rootForEntry(entry: WorktreeBindingEntry): string {
 }
 
 /**
+ * The root the agent's process actually runs in — i.e. what a bare relative
+ * path resolves against.
+ *
+ * `isPrimary` is the host's own word for this: *"which directory an AGENT runs
+ * in"* (`worktree-schemas.ts:496`). It is what makes a `@<relPath>` token
+ * resolvable, and it is the only thing that distinguishes the root where that
+ * token works from the roots where it silently cannot.
+ *
+ * Returns `null` when the binding names no primary entry AND has more than one
+ * root. That is a state this host has never produced (`isPrimary` is a required
+ * boolean, and every multi-root chat measured reports exactly one), and the
+ * `null` is deliberately routed to the OLD behaviour by `mentionToken` rather
+ * than to the new one: if we cannot say which root is primary we cannot say
+ * which are secondary either, and inventing a divergence from desktop in a
+ * state nobody has observed is worse than carrying a defect that only shows up
+ * in the same state.
+ *
+ * A single root is primary by construction whether or not the flag says so —
+ * there is nowhere else for the agent to be running.
+ */
+export function primaryMentionRoot(binding: WorktreeBinding | null): string | null {
+  if (binding === null) return null;
+  const flagged = binding.entries.find((entry) => entry.isPrimary);
+  if (flagged !== undefined) return rootForEntry(flagged);
+  const roots = mentionRootsForBinding(binding);
+  return roots.length === 1 ? roots[0] : null;
+}
+
+/**
  * What gets spliced into the textarea, and it is the payload.
  *
- * Mobile sends plain text, so the token has to be the exact string desktop's
- * mention node serializes to for the agent. That is `@<relPath>` —
- * workspace-relative and POSIX-separated — from
- * `json-content-serializer.ts:368-372` (`atRef(attrs.relPath || attrs.id)`),
- * NOT the label and NOT the absolute path. Folder `relPath` already carries
- * its trailing slash by convention, so folders need no special case.
+ * Mobile sends plain text, so the token has to be a string the agent can
+ * actually resolve. There is no attachment, no node, no second channel: the
+ * token is the whole mechanism.
  *
- * Worth stating because the claim "a token IS the payload" was cited to the
- * WORKTREE schema's docblock, which serializes an ABSOLUTE `@<worktreePath>`.
- * Files are the opposite. Reading that citation as covering files would have
- * shipped absolute paths to the agent.
+ * ## What a mention token really is, measured
+ *
+ * `@<relPath>` does not "resolve a mention" anywhere — on either client. It
+ * hands the agent a path and the agent reads it **relative to its own cwd**.
+ * That is why it works: cwd is the primary root. Measured live, with the
+ * agent's own words: `@wrangler.toml`, offered by this sheet from a SECONDARY
+ * binding root, reached the host as inert prose (*"it wasn't provided in the
+ * system input"*), and the agent then reached for its Read tool against cwd
+ * and errored. A primary-root file in the same chat "passed" — by the same cwd
+ * fallback, not by any mention machinery. **One root is a check that cannot
+ * fail; two roots is an experiment.**
+ *
+ * So a secondary root does not break mentions. It is the first case that makes
+ * them observable.
+ *
+ * ## Why this is not a divergence from desktop
+ *
+ * Desktop's serializer has the identical defect, in shared code:
+ * `protocol/src/common/json-content-serializer.ts:369-372` emits
+ * `atRef(attrs.relPath || attrs.id)` for File and Folder — a bare relPath —
+ * although the node's attrs carry `absolutePath`. **Its own `Worktree` arm two
+ * lines below emits the ABSOLUTE path**, with the comment *"a worktree lives
+ * outside the workspace root, so its absolute directory is the only path that
+ * resolves for the agent."* A secondary workspace root is the same condition
+ * and the same fix; it just was not applied there. (The `Chat`/`TerminalAgent`
+ * arm settles that the string is the whole channel: the agent id was already
+ * in the attrs and still had to be written INTO the text for the runtime to
+ * have it — `json-content-serializer-agent-mentions.test.ts:9-20`.)
+ *
+ * That defect is filed against the shared line. Both clients converge on this
+ * behaviour; only the shipping vehicles differ — mobile emits its own string,
+ * so the fix lands here first. **If a later parity sweep finds mobile ahead of
+ * `json-content-serializer.ts:369-372`, that is this fix arriving first, not
+ * mobile drifting. Do not revert it to match.**
+ *
+ * ## The rule
+ *
+ * Primary root → `@<relPath>`, byte-identical to desktop, because cwd resolves
+ * it. Any other root → `@<absolutePath>`, mirroring the `Worktree` arm's
+ * precedent exactly rather than inventing a policy.
+ *
+ * Classification is an exact string comparison, and that is measured rather
+ * than assumed: `workspace.mentionFiles`/`mentionFolders` echo the REQUESTED
+ * root back verbatim in `workspacePath` (`tmp/probe-mention-roots.mjs`: 25
+ * exact-echo rows per root, and the distinct `workspacePath` values on the
+ * wire are exactly the two strings requested). The roots we compare against
+ * are the same strings the request was built from, so no normaliser is needed
+ * — and a case-folding one would be wrong on a POSIX host.
+ *
+ * Folders need the one special case. Measured on the same host, a folder's
+ * `relPath` carries its trailing slash (`scripts/`) and its `absolutePath`
+ * does NOT (`…\scripts`), so the separator is re-appended — taking the one the
+ * path already uses rather than picking one, since the agent is told the
+ * absolute path in the host's own separator convention.
  *
  * A relPath containing a space produces a token the agent will read as ending
  * at the space. Desktop's LLM serializer does not quote either, so this is
  * parity rather than a regression, and quoting unilaterally would emit a
  * string desktop never emits.
  */
-export function mentionToken(suggestion: MentionSuggestion): string {
-  return `@${suggestion.relPath}`;
+export function mentionToken(
+  suggestion: MentionSuggestion,
+  primaryRoot: string | null,
+): string {
+  if (primaryRoot === null) return `@${suggestion.relPath}`;
+  if (suggestion.workspacePath === primaryRoot) return `@${suggestion.relPath}`;
+  if (suggestion.absolutePath.length === 0) return `@${suggestion.relPath}`;
+  return `@${withTrailingSeparatorLike(suggestion.absolutePath, suggestion.relPath)}`;
+}
+
+/**
+ * Re-applies `relPath`'s trailing separator to an absolute path that lost it.
+ *
+ * The separator is read off the absolute path itself — the host answers
+ * Windows roots in backslashes and POSIX roots in slashes, and appending the
+ * other one produces a path in neither convention.
+ */
+function withTrailingSeparatorLike(absolutePath: string, relPath: string): string {
+  const trailing = relPath.endsWith("/") || relPath.endsWith("\\");
+  if (!trailing) return absolutePath;
+  if (absolutePath.endsWith("/") || absolutePath.endsWith("\\")) return absolutePath;
+  return `${absolutePath}${absolutePath.includes("\\") ? "\\" : "/"}`;
 }
 
 /**

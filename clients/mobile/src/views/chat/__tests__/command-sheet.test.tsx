@@ -209,6 +209,7 @@ describe("Composer — which of the sheet's states are reachable", () => {
         chatId="c1"
         client={client.client}
         mentionRoots={[]}
+        primaryMentionRoot={null}
         prefillText={null}
         prefillNonce={0}
         chatSettings={null}

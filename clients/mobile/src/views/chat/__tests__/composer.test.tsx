@@ -106,6 +106,7 @@ function renderComposer(props: {
       chatId="c1"
       client={props.client}
       mentionRoots={[]}
+      primaryMentionRoot={null}
       prefillText={null}
       prefillNonce={0}
       chatSettings={null}
@@ -126,6 +127,7 @@ function fullProps(overrides: Partial<ComposerProps>): ComposerProps {
     chatId: "c1",
     client: null,
     mentionRoots: [],
+    primaryMentionRoot: null,
     prefillText: null,
     prefillNonce: 0,
     // Snapshot HAS arrived, this chat just has nothing chosen yet — the

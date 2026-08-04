@@ -130,6 +130,7 @@ function renderComposer(
         chatId="c1"
         client={fake.client}
         mentionRoots={[]}
+        primaryMentionRoot={null}
         prefillText={null}
         prefillNonce={0}
         chatSettings={null}
