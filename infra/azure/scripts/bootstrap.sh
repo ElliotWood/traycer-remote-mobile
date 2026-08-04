@@ -444,7 +444,13 @@ TRAYCER_NGINX_TLS_EOF
     echo "bootstrap: phase-2 nginx config failed validation; leaving certbot's config in place" >&2
   fi
 else
-  echo "bootstrap: certbot did not obtain a certificate - DNS likely isn't pointed at this VM yet. nginx is serving HTTP-only on :80. Re-run certbot manually once DNS resolves, then re-run this script to apply phase 2; see infra/azure/README.md." >&2
+  # DO NOT NAME A CAUSE HERE. This read "DNS likely isn't pointed at this VM
+  # yet" - a cause the script has not checked. Observed on a scratch deploy
+  # where DNS was correct and certbot had failed at ACCOUNT REGISTRATION over
+  # a .invalid contact address, with its own accurate error two lines above.
+  # A confident wrong diagnosis is worse than none: it says where to stop.
+  echo "bootstrap: certbot did not obtain a certificate. THE REASON IS CERTBOT'S OWN OUTPUT ABOVE; this script does not know it and will not guess. Seen in practice: DNS for ${TRAYCER_PUBLIC_HOSTNAME} not resolving here; a contact address ACME refuses at registration (.invalid/.test/.local); issuance limits on the registrable domain - note *.cloudapp.azure.com is absent from the Public Suffix List, so ACME reads its registrable domain as azure.com." >&2
+  echo "bootstrap: PHASE 2 WAS NOT APPLIED - nginx is HTTP-only on :80 and every path returns the 38-byte placeholder with a 200, including paths that should 404. Fix the above, run 'certbot --nginx -d ${TRAYCER_PUBLIC_HOSTNAME}', re-run this script." >&2
 fi
 
 # --- private repo checkouts ----------------------------------------------
