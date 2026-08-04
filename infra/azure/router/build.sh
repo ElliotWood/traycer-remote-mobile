@@ -50,6 +50,34 @@ if [ ! -x "$BUN" ]; then
 fi
 
 mkdir -p "$(dirname "$OUT")"
+
+# 🔴 THE BUILD MUST RUN FROM THE REPO ROOT, AND THIS IS NOT TIDINESS.
+#
+# `bun build` writes each module's path into the output as a comment, RELATIVE
+# TO THE PROCESS CWD. So the same sources produce different bytes depending on
+# where the caller happened to be standing:
+#
+#   cwd = repo root   // infra/azure/router/tenant-router.ts              16,431 bytes
+#   cwd = anywhere    // ../../worktrees/<machine-specific path>/…        17,103 bytes
+#
+# verify-iac-parity.sh's step 0 rebuilds from source and compares against the
+# tracked artifact, so without this `cd` its verdict depends on the caller's
+# directory: run it from the repo root and the bundle is "ok", run it from a
+# scratch directory and the SAME COMMIT is reported STALE. Measured, both ways,
+# during the A0 scratch deploy - it is what that run hit first.
+#
+# The failure is worse than a false red, because the check tells you to act on
+# it: "Rebuild it and commit the result." Doing that commits one machine's
+# directory layout into a tracked file, which then reads STALE for everyone
+# else - a flip-flop that never converges, and a local path leaked into the
+# repo on top of it.
+#
+# `$OUT` is made absolute FIRST: it may have been passed relative to the
+# caller's cwd (verify-iac-parity.sh passes a mktemp path), and resolving it
+# after the `cd` would write the bundle somewhere nobody looks.
+OUT="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
+cd "$REPO_ROOT"
+
 "$BUN" build "${REPO_ROOT}/infra/azure/router/tenant-router.ts" \
   --target=node \
   --format=esm \
