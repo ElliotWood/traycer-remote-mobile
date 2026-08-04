@@ -17,12 +17,25 @@
  * becomes a diagram and ` ```wireframe ` becomes a sandboxed preview. Every
  * other fence stays a fence — including an unrecognised one, which renders as
  * its own source rather than disappearing.
+ *
+ * LINKS ARE INTERCEPTED TOO, and that is not cosmetic. This component is this
+ * package's UNIVERSAL prose renderer — nine call sites, most of them chat
+ * transcript blocks — so every link an agent writes anywhere in the tab comes
+ * through here. Until `AnchorRenderer` below, every one of them rendered as a
+ * bare `<a href>` with no `target`, which in a Teams personal tab navigates
+ * the IFRAME THE APP IS. There is no address bar and no back button in that
+ * frame, so the only recovery is re-selecting the tab. Mobile fixed the same
+ * defect on a surface where it merely rebooted the SPA; see
+ * `clients/mobile/src/views/markdown/mobile-markdown.tsx` and its U1 note.
  */
-import type { ReactElement, ReactNode } from "react";
+import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import Markdown from "react-markdown";
+import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { makeStyles, tokens } from "@fluentui/react-components";
+import { deriveArtifactPathLayoutRootAgnostic } from "@traycer/protocol/common/artifact-path";
+import { useArtifactLink } from "./artifact-link-context";
 import { MermaidBlock } from "./mermaid-block";
 import { WireframeBlock } from "./wireframe-block";
 
@@ -97,6 +110,127 @@ function textOf(children: ReactNode): string {
   return "";
 }
 
+/** A real `http(s)://` URL — a genuine external page, not an in-app reference. */
+const EXTERNAL_URL_PATTERN = /^https?:\/\//i;
+/** Protocol handoffs (mail client / dialer). Not a page navigation, so safe to leave native. */
+const PASSTHROUGH_SCHEME_PATTERN = /^(mailto|tel):/i;
+
+/**
+ * The link policy. Four branches, and EVERY ONE of them is here so that no
+ * click navigates the tab's iframe away from the app.
+ *
+ * | href shape | what happens |
+ * | --- | --- |
+ * | empty · `#fragment` · `mailto:`/`tel:` | left native — none of these load a page |
+ * | `…/epics/<id>/artifacts/<chain>/index.md` | resolved via `epic.resolveArtifactByPath` and opened IN-APP |
+ * | `https://…` | `target="_blank"` + `rel="noopener noreferrer"` — the one case that leaves, and it leaves in a NEW tab |
+ * | anything else internal-shaped | `preventDefault`, no-op |
+ *
+ * The external branch is the one most likely to fire in practice — agents
+ * paste ordinary web links into chat constantly — and it is the one whose
+ * absence was most costly, because without `target` it replaces the app with
+ * the linked page inside Teams' own frame.
+ *
+ * The last branch looks like the least important and is not: a relative href
+ * such as `src/foo.ts` would resolve against the tab's base path, hit the SPA
+ * fallback, and `parseRoute` would return `epics` — so the click would land
+ * the reader silently on the epic LIST. Route parsing already records that
+ * unknown paths fall back rather than 404, which is right for a stale link and
+ * wrong as the result of pressing something.
+ *
+ * Only the structurally artifact-shaped path is resolved, matching mobile: a
+ * relative link authored from inside an artifact's own folder needs that
+ * artifact's folder chain to resolve against, which this projection does not
+ * carry. That shape falls through to the no-op branch — it degrades safely, it
+ * just does not resolve. Flagged rather than silent.
+ */
+function AnchorRenderer(props: ComponentPropsWithoutRef<"a">): ReactElement {
+  const { href, children, target: _ignoredTarget, ...rest } = props;
+  const { resolveArtifact, openArtifact } = useArtifactLink();
+  const [failed, setFailed] = useState(false);
+
+  if (
+    href === undefined ||
+    href.length === 0 ||
+    href.startsWith("#") ||
+    PASSTHROUGH_SCHEME_PATTERN.test(href)
+  ) {
+    return (
+      <a {...rest} href={href}>
+        {children}
+      </a>
+    );
+  }
+
+  const layout = deriveArtifactPathLayoutRootAgnostic(href, null);
+  if (layout !== null) {
+    const onArtifactClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+      event.preventDefault();
+      resolveArtifact(layout.epicId, href)
+        .then((artifactId) => {
+          // Two different failures, deliberately collapsed into one message
+          // for the reader and kept apart here: the host resolved nothing, or
+          // it resolved something this screen cannot open (a foreign epic).
+          // Neither may fall through to a navigation.
+          if (artifactId === null || !openArtifact(layout.epicId, artifactId)) {
+            setFailed(true);
+          }
+        })
+        .catch(() => {
+          setFailed(true);
+        });
+    };
+    return (
+      <a {...rest} href={href} onClick={onArtifactClick}>
+        {children}
+        {failed ? <span> (couldn&apos;t open that artifact)</span> : null}
+      </a>
+    );
+  }
+
+  if (EXTERNAL_URL_PATTERN.test(href)) {
+    return (
+      <a {...rest} href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  }
+
+  const onNoOpClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+    event.preventDefault();
+  };
+  return (
+    <a {...rest} href={href} onClick={onNoOpClick}>
+      {children}
+    </a>
+  );
+}
+
+/**
+ * MODULE SCOPE, not an object literal in the render body, and this is
+ * load-bearing rather than a micro-optimisation. `AnchorRenderer` calls hooks;
+ * a map rebuilt every render gives react-markdown a new component identity
+ * every time, so every anchor remounts on each render and `failed` — the state
+ * that carries the "couldn't open that artifact" message — is discarded before
+ * the reader sees it. Mobile's renderer records the same constraint.
+ */
+const COMPONENTS: Components = {
+  a: AnchorRenderer,
+  code({ className, children, ...rest }) {
+    const language = fenceLanguage(className);
+    const source = textOf(children).replace(/\n$/, "");
+    if (language === "mermaid") return <MermaidBlock code={source} />;
+    if (language === "wireframe") return <WireframeBlock code={source} />;
+    // Everything else, including an unrecognised language, stays a fence. A
+    // fence we do not understand renders as its own source — never as nothing.
+    return (
+      <code className={className} {...rest}>
+        {children}
+      </code>
+    );
+  },
+};
+
 export function ArtifactMarkdown({ body }: { body: string }): ReactElement {
   const styles = useStyles();
   return (
@@ -104,23 +238,7 @@ export function ArtifactMarkdown({ body }: { body: string }): ReactElement {
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
-        components={{
-          code({ className, children, ...rest }) {
-            const language = fenceLanguage(className);
-            const source = textOf(children).replace(/\n$/, "");
-            if (language === "mermaid") return <MermaidBlock code={source} />;
-            if (language === "wireframe")
-              return <WireframeBlock code={source} />;
-            // Everything else, including an unrecognised language, stays a
-            // fence. A fence we do not understand renders as its own source —
-            // never as nothing.
-            return (
-              <code className={className} {...rest}>
-                {children}
-              </code>
-            );
-          },
-        }}
+        components={COMPONENTS}
       >
         {body}
       </Markdown>
