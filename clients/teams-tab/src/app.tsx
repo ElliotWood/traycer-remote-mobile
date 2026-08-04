@@ -33,7 +33,11 @@ import { EpicDetail } from "./epics/epic-detail";
 import { EPICS_FIXTURE, EPICS_FIXTURE_NOW } from "./epics/epics-fixture";
 import { EpicsView } from "./epics/epics-view";
 import { useEpics, type EpicsState } from "./epics/use-epics";
-import { useEpicAgents, type EpicAgentsState } from "./epics/use-epic-agents";
+import {
+  useEpicAgents,
+  type EpicAgentsState,
+  type EpicScreenData,
+} from "./epics/use-epic-agents";
 import {
   AGENTS_DEEP_FIXTURE,
   AGENTS_FIXTURE,
@@ -99,6 +103,16 @@ import { NOTIFICATIONS_FIXTURE, NOTIFICATIONS_NOW } from "./notifications/notifi
 import { useShellNotifications } from "./shell/shell-notifications";
 import { epicDisplayName, type FleetEpic } from "@traycer-clients/shared/epic/epic-list";
 import { CanvasScreen, uuidIds } from "./canvas/canvas-screen";
+/*
+ * `CanvasState` MUST be imported even though it is only used as a type
+ * annotation, and the reason is worth the line: `lib.dom` declares a global
+ * interface of the same name (`save`/`restore`/`reset`), so the bare name
+ * resolves to THAT and type-checks as a different shape entirely. Here it
+ * surfaced as four confusing "missing properties from type 'CanvasState'"
+ * errors naming the same type on both sides.
+ */
+import type { CanvasState } from "./canvas/canvas-state";
+import type { SnapshotDiffClient } from "./chat/blocks/use-snapshot-diff";
 import { useCanvas } from "./canvas/use-canvas";
 import { browserCanvasStorage } from "./canvas/canvas-persistence";
 import {
@@ -268,15 +282,18 @@ function WaitingScreen({
 }
 
 /**
- * One epic: its agents, from `epic.subscribe`.
+ * One epic's LIST view. The subscription is no longer opened here — see
+ * `EpicSession` below, which owns it for this screen and for the canvas.
  *
- * A separate component because the subscription must not be opened by a
- * conditional branch of a larger component — hooks cannot live behind an
- * `if`, and the epic route is exactly that.
+ * Still a separate component, and still for the original reason: hooks cannot
+ * live behind an `if`, and `useCreateAgent`/`useCreateArtifact` belong to this
+ * screen alone. What moved out is only `useEpicAgents`, because it is the one
+ * hook two routes need to SHARE rather than each own.
  */
 function EpicScreen({
   styles,
-  streamConnection,
+  live,
+  agents,
   hostClient,
   epicId,
   epic,
@@ -286,7 +303,10 @@ function EpicScreen({
   preview,
 }: {
   readonly styles: Record<string, string>;
-  readonly streamConnection: HostStreamConnection | null;
+  /** The shared subscription's output, opened by `EpicSession`. */
+  readonly live: EpicScreenData;
+  /** `preview ?? live.agents`, resolved once by `EpicSession`. */
+  readonly agents: EpicAgentsState;
   /**
    * The unary requester, feeding BOTH creates. Named as both rather than as
    * one: the two client types are structurally identical, so declaring only
@@ -301,10 +321,6 @@ function EpicScreen({
   readonly onOpenAgent: (chatId: string, entry: EpicChatEntry) => void;
   readonly preview: EpicAgentsState | null;
 }): ReactElement {
-  // The hook runs either way — hooks cannot be conditional — but it is handed
-  // a null connection under preview, so it opens no stream.
-  const live = useEpicAgents(preview === null ? streamConnection : null, epicId);
-  const agents = preview ?? live.agents;
   const configuredHostId =
     preview === null ? CONFIGURED_HOST_ID : AGENTS_FIXTURE_HOST;
   const authoring = useCreateAgent(hostClient, epicId, configuredHostId);
@@ -413,6 +429,136 @@ function EpicScreen({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * ONE `epic.subscribe` for the two routes that address the same epic.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHY THIS COMPONENT EXISTS, AND WHY THE PREDICTED FIX WAS THE WRONG SHAPE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `canvas-screen.tsx` predicted this repair as *"threading `EpicScreen`'s
+ * registry down to `CanvasScreen`"*. There was nothing to thread: the two are
+ * SIBLING branches of the route switch below, so no registry was ever in
+ * scope. Reading the render site said "pass a prop"; reading the routing said
+ * the owner has to move.
+ *
+ * So the subscription moved UP, to the one component both branches sit under.
+ * That is what makes an artifact tile possible at all — an artifact's `Y.Doc`
+ * bytes and its `ArtifactRoomRegistry` ride the same session, and the canvas
+ * route held no session.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHAT THIS DELIBERATELY DOES NOT DO
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * It does not hoist the hook to `App`. `useEpicAgents` would then run on the
+ * fleet, epics, settings and notifications routes, opening a subscription for
+ * an epic the user is not looking at — the exact cost `SettingsRoute`'s own
+ * docblock refuses one line of RPC for. The hook belongs to *"a route about
+ * one epic"*, and this component IS that scope.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * A PROPERTY WORTH KEEPING WHEN SOMEONE REFACTORS THIS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Because one component now serves both routes, navigating epic ⇄ canvas does
+ * NOT unmount it, so the ~47s snapshot is not re-fetched on every toggle. That
+ * is a consequence of the structure rather than a cache, and splitting this
+ * back into two components would silently give it up — there would be no
+ * failing test, only a slower app.
+ */
+function EpicSession({
+  view,
+  styles,
+  streamConnection,
+  hostClient,
+  diffClient,
+  epicId,
+  epic,
+  now,
+  preview,
+  canvasState,
+  onCanvasChange,
+  onBack,
+  onOpenAgent,
+}: {
+  readonly view: "epic" | "canvas";
+  readonly styles: Record<string, string>;
+  readonly streamConnection: HostStreamConnection | null;
+  readonly hostClient: (CreateChatClient & CreateArtifactClient) | null;
+  /** The unary client, for a pane transcript's diff bodies. */
+  readonly diffClient: SnapshotDiffClient | null;
+  readonly epicId: string;
+  readonly epic: FleetEpic | null;
+  readonly now: number;
+  readonly preview: EpicAgentsState | null;
+  readonly canvasState: CanvasState;
+  readonly onCanvasChange: (next: CanvasState) => void;
+  /** Where each view's back control goes — they differ, so the caller says. */
+  readonly onBack: () => void;
+  readonly onOpenAgent: (chatId: string, entry: EpicChatEntry) => void;
+}): ReactElement {
+  // The hook runs either way — hooks cannot be conditional — but it is handed
+  // a null connection under preview, so it opens no stream.
+  const live = useEpicAgents(preview === null ? streamConnection : null, epicId);
+  const agents = preview ?? live.agents;
+
+  if (view === "canvas") {
+    /*
+     * `?? null` is not decoration. `byId` is a `Record<string, T>` and this
+     * project does not set `noUncheckedIndexedAccess`, so a missing key types
+     * as `T` and arrives as `undefined` — which would reach `ArtifactTile` as
+     * a present entry and be read for an `artifactRoomId` it does not have.
+     * The lookup is the one place that can still be honest about absence.
+     */
+    const ready = agents.kind === "ready";
+    return (
+      <CanvasScreen
+        epicId={epicId}
+        epicName={epic === null ? null : epicDisplayName(epic)}
+        state={canvasState}
+        onChange={onCanvasChange}
+        hostId={CONFIGURED_HOST_ID}
+        ids={uuidIds}
+        streamConnection={streamConnection}
+        diffClient={diffClient}
+        now={now}
+        /*
+         * REAL NOW, where it was `() => null`. The comment this replaces said
+         * a chat in a pane "is NOT actionable — approve/reject and interview
+         * answers are disabled, exactly as on a deep link", and named the
+         * cause: this route did not hold the epic subscription. It does now,
+         * so the consequence is gone with it.
+         */
+        chatEntry={(chatId) =>
+          agents.kind === "ready" ? (agents.tree.byId[chatId] ?? null) : null
+        }
+        artifactEntry={(artifactId) =>
+          agents.kind === "ready" ? (agents.artifacts.byId[artifactId] ?? null) : null
+        }
+        artifactRooms={live.artifactRooms}
+        epicContentReady={ready}
+        onBack={onBack}
+      />
+    );
+  }
+
+  return (
+    <EpicScreen
+      styles={styles}
+      live={live}
+      agents={agents}
+      preview={preview}
+      hostClient={hostClient}
+      epicId={epicId}
+      epic={epic}
+      now={now}
+      onBack={onBack}
+      onOpenAgent={onOpenAgent}
+    />
   );
 }
 
@@ -737,7 +883,8 @@ function EpicsScreen({
 
     case "epic":
       return (
-        <EpicScreen
+        <EpicSession
+          view="epic"
           styles={styles}
           preview={agentsPreview}
           streamConnection={streamConnection}
@@ -745,9 +892,12 @@ function EpicsScreen({
           // request/response call, and it is null under preview so the
           // "no path from here reaches the host" property still holds.
           hostClient={connection?.hostClient ?? null}
+          diffClient={connection?.hostClient ?? null}
           epicId={route.epicId}
           epic={opened !== null && opened.id === route.epicId ? opened : null}
           now={now}
+          canvasState={canvas.state}
+          onCanvasChange={canvas.setState}
           onBack={() => {
             navigate({ name: "epics" });
           }}
@@ -761,7 +911,12 @@ function EpicsScreen({
     /*
      * BESIDE the `epic` case above, not replacing it. Both routes address the
      * same epic and mean different things: `epic` is a list you read, this is
-     * a workspace you arrange. Nothing above changed.
+     * a workspace you arrange.
+     *
+     * They now share ONE component, `EpicSession`, because they must share one
+     * `epic.subscribe` — see its docblock. The two cases stay separate here
+     * rather than falling through together: they differ in where `onBack`
+     * goes, and a fallthrough would hide that behind a ternary in a switch.
      *
      * The layout is held in THIS component's state rather than the canvas's,
      * so it survives navigating to a chat and back — and it is deliberately
@@ -771,42 +926,29 @@ function EpicsScreen({
      */
     case "canvas":
       return (
-        <CanvasScreen
+        <EpicSession
+          view="canvas"
+          styles={styles}
+          // No preview addresses the canvas, so this is always null here —
+          // written as the same expression the epic case uses rather than a
+          // literal, so adding `?preview=canvas` needs no change at this site.
+          preview={agentsPreview}
+          streamConnection={streamConnection}
+          hostClient={connection?.hostClient ?? null}
+          diffClient={connection?.hostClient ?? null}
           epicId={route.epicId}
           // Same rule as the detail screen: the row that was clicked when
           // there was one, and nothing invented when there was not.
-          epicName={
-            opened !== null && opened.id === route.epicId
-              ? epicDisplayName(opened)
-              : null
-          }
-          state={canvas.state}
-          onChange={canvas.setState}
-          hostId={CONFIGURED_HOST_ID}
-          ids={uuidIds}
-          streamConnection={streamConnection}
-          diffClient={connection?.hostClient ?? null}
+          epic={opened !== null && opened.id === route.epicId ? opened : null}
           now={now}
-          /*
-           * ALWAYS NULL, and the consequence is stated rather than left to be
-           * discovered: a chat in a pane renders its transcript but is NOT
-           * actionable — approve/reject and interview answers are disabled,
-           * exactly as on a deep link.
-           *
-           * The row comes from the epic doc, and this route does not hold that
-           * subscription; `EpicScreen` does. Opening one here would be the
-           * second `epic.subscribe` per epic that `canvas-screen.tsx` warns
-           * against, to serve a screen no user can currently reach a chat from.
-           *
-           * The opener is where this is answered, not here. `onOpenAgent`
-           * already carries the clicked row (`setOpenedChat(entry)`) for the
-           * full-screen route; the canvas opener will carry it the same way,
-           * because the thing that knows which chat was clicked is the list
-           * that was clicked — not the canvas.
-           */
-          chatEntry={() => null}
+          canvasState={canvas.state}
+          onCanvasChange={canvas.setState}
           onBack={() => {
             navigate({ name: "epic", epicId: route.epicId });
+          }}
+          onOpenAgent={(chatId, entry) => {
+            setOpenedChat(entry);
+            navigate({ name: "chat", epicId: route.epicId, chatId });
           }}
         />
       );

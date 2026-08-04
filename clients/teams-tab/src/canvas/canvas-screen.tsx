@@ -63,9 +63,12 @@ import {
 } from "@fluentui/react-components";
 import { v4 as uuidv4 } from "uuid";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
+import type { EpicArtifactEntry } from "@traycer-clients/shared/epic/epic-doc-artifacts";
+import type { ArtifactRoomRegistry } from "@traycer-clients/shared/epic/artifact-room-registry";
 import { TileCanvas } from "./tile-canvas";
 import { makeBlankTile } from "./opener";
 import { ChatTile } from "./chat-tile";
+import { ArtifactTile } from "./artifact-tile";
 import { tileTitle, type TileRef } from "./tile-ref";
 import { openTile, type CanvasState, type IdSource } from "./canvas-state";
 import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
@@ -90,6 +93,9 @@ interface TileDeps {
   readonly hostId: string;
   readonly now: number;
   readonly chatEntry: (chatId: string) => EpicChatEntry | null;
+  readonly artifactEntry: (artifactId: string) => EpicArtifactEntry | null;
+  readonly artifactRooms: ArtifactRoomRegistry | null;
+  readonly epicContentReady: boolean;
 }
 
 const useStyles = makeStyles({
@@ -146,6 +152,28 @@ export interface CanvasScreenProps {
    * invite a tile body to iterate it.
    */
   readonly chatEntry: (chatId: string) => EpicChatEntry | null;
+  /**
+   * The epic-doc row for an artifact, or `null` when the doc has no row under
+   * that id. A lookup for the same reason `chatEntry` is one: a tile that
+   * captured the row at open time would go stale against a rename, and — the
+   * case that actually bites — against an `artifactRoomId` that had not
+   * arrived when the tab was opened.
+   */
+  readonly artifactEntry: (artifactId: string) => EpicArtifactEntry | null;
+  /**
+   * The room replicas from the epic's ONE subscription. `null` until the
+   * stream opens. Passed in rather than built here, per the subscription
+   * invariant in this file's docblock.
+   */
+  readonly artifactRooms: ArtifactRoomRegistry | null;
+  /**
+   * Whether the epic doc's chats and artifacts have landed.
+   *
+   * Distinguishes *"this artifact has not arrived yet"* from *"this artifact
+   * is not in this epic"* — a `null` lookup alone cannot, and the two want
+   * opposite screens.
+   */
+  readonly epicContentReady: boolean;
 }
 
 /**
@@ -196,23 +224,20 @@ function TilePlaceholder({
  * the commit that gives a branch something to return, exactly as the previous
  * docblock said it would.
  *
- * **The artifact branches are still placeholders, and the reason changed
- * underneath this docblock — corrected rather than left stale.** The
- * `@tiptap/*` bundle-size blocker this paragraph used to name is gone: the
- * deps are now in `package.json` and `artifacts/use-artifact-body.ts` +
- * `artifacts/artifact-body/` (lifted from `clients/mobile`) render a real
- * artifact from the epic-tree door (`epic-detail.tsx` → `onOpenArtifact`) —
- * see `parity-contract` §*Two renderers with no door*.
+ * **The artifact branches now render, and the fix was NOT in this file** —
+ * recorded because the previous version of this docblock predicted the wrong
+ * shape for it and a reader following that prediction would go the wrong way.
  *
- * **What still blocks a CANVAS tile specifically** is narrower and
- * structural, not a dependency question: an artifact's `Y.Doc` bytes ride
- * the SAME `epic.subscribe` session as its `ArtifactRoomRegistry`, and that
- * registry is built by `useEpicAgents` inside `EpicScreen` — this screen's
- * own subscription invariant (see the file docblock above) forbids a tile
- * from opening a second one. Threading `EpicScreen`'s registry down to
- * `CanvasScreen` (the same way `chatEntry` is threaded, currently as
- * `() => null` for the same underlying reason) is the shape of the fix, not
- * a rendering change to this file.
+ * It said *"threading `EpicScreen`'s registry down to `CanvasScreen`"*. There
+ * was nothing to thread down: `EpicScreen` and this screen are SIBLING route
+ * branches in `app.tsx`, not parent and child, so no registry was ever in
+ * scope to pass. The registry is built by `useEpicAgents`, and the real fix
+ * was to move that ONE subscription above the route switch so both branches
+ * read it — `EpicSession` in `app.tsx`. Same conclusion about the invariant,
+ * wrong conclusion about where it is honoured.
+ *
+ * `chatEntry` was `() => null` for exactly the same underlying reason and is
+ * now real for exactly the same fix, so a chat in a pane is actionable.
  */
 function renderTile(tile: TileRef, deps: TileDeps): ReactNode {
   switch (tile.type) {
@@ -234,9 +259,11 @@ function renderTile(tile: TileRef, deps: TileDeps): ReactNode {
     case "story":
     case "review":
       return (
-        <TilePlaceholder
-          tile={tile}
-          detail="Open this from the epic's Artifacts list for now — a canvas pane can't reach an artifact's document yet."
+        <ArtifactTile
+          entry={deps.artifactEntry(tile.id)}
+          registry={deps.artifactRooms}
+          listReady={deps.epicContentReady}
+          title={tileTitle(tile)}
         />
       );
 
@@ -273,6 +300,9 @@ export function CanvasScreen({
   diffClient,
   now,
   chatEntry,
+  artifactEntry,
+  artifactRooms,
+  epicContentReady,
 }: CanvasScreenProps): ReactElement {
   const styles = useStyles();
   const title = epicName ?? `Epic ${epicId.slice(0, 8)}`;
@@ -292,6 +322,9 @@ export function CanvasScreen({
     hostId,
     now,
     chatEntry,
+    artifactEntry,
+    artifactRooms,
+    epicContentReady,
   };
 
   return (

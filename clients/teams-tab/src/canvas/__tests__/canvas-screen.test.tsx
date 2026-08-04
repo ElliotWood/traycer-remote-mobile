@@ -73,6 +73,17 @@ function draw(
         diffClient={null}
         now={1_700_000_000_000}
         chatEntry={() => null}
+        /*
+         * NO EPIC DOC either, and `epicContentReady` is deliberately `true`
+         * rather than `false`. These tests are about the SCREEN, and `false`
+         * would put every artifact tile into the loading branch — a spinner
+         * asserts nothing about the tile it is standing in for. `true` with an
+         * empty lookup is the honest "the list arrived and this is not in it"
+         * state, which is a real screen with real text.
+         */
+        artifactEntry={() => null}
+        artifactRooms={null}
+        epicContentReady
       />
     </FluentProvider>
   );
@@ -140,12 +151,24 @@ describe("canvas screen", () => {
     });
 
     render(draw(state, "Ship the thing", noop));
-    // Twice: once in the tab strip, once in the placeholder body. Asserting
-    // `getAllByText` length rather than `getByText` because `getByText` throws
-    // on multiple matches — and narrowing the query to make one match is the
-    // repair that hides a render leak, which this project has already paid for
-    // once.
-    expect(screen.getAllByText("Parity contract").length).toBe(2);
+    /*
+     * ONCE, and this count changed from 2 deliberately — read before
+     * "correcting" it back.
+     *
+     * The old body was a placeholder that repeated the tile's title, so the
+     * title appeared in the tab strip AND in the body. The real artifact body
+     * renders no title at all (`artifact-tile.tsx`: a pane's tab strip already
+     * carries the name, so repeating it is chrome duplicated where space is
+     * scarcest). The strip is now the only place it appears.
+     *
+     * The original comment's warning still applies and is why the second
+     * assertion is here: narrowing a query until it matches once is how a
+     * render leak gets hidden. So this pins the count AND pins that the body
+     * rendered something of its own — 1 with an empty pane would otherwise
+     * pass.
+     */
+    expect(screen.getAllByText("Parity contract").length).toBe(1);
+    expect(screen.getByText(/no longer in this epic/)).toBeTruthy();
   });
 });
 
@@ -202,22 +225,38 @@ describe("tile bodies", () => {
     expect(screen.getAllByLabelText("Location").length).toBe(1);
   });
 
-  it("CONTRACT: an artifact tile names its actual blocker, not 'placeholder'", () => {
+  it("CONTRACT: an artifact tile no longer sends the user somewhere else", () => {
     /*
-     * These four kinds are still unbuilt IN A PANE specifically, and the
-     * previous uniform body said so in words that fit any of them. That was
-     * honest while nothing could render; it is not now, because a reader
-     * seeing a generic placeholder beside a working chat concludes the
-     * artifact body is merely unfinished. It is BLOCKED — no longer on the
-     * @tiptap bundle (that shipped; see `artifacts/use-artifact-body.ts`),
-     * now on the canvas route's own subscription invariant — and the body
-     * has to say which, and where to go instead.
+     * REPLACES an assertion on the old placeholder's wording ("Open this from
+     * the epic's Artifacts list for now"). That string was the blocker being
+     * named honestly while a pane genuinely could not reach an artifact's
+     * document; a pane can now, so the sentence would be a false instruction
+     * rather than a stale one.
      *
-     * The assertion is on the attribution, the same shape as the empty-state
-     * one above: swap the detail for "arrives later" and this fails.
+     * Kept as a NEGATIVE here, and the positive — a real Y.Doc rendering as
+     * real markdown inside a pane — lives in `artifact-tile.test.tsx`, where
+     * the registry fixture belongs. This one guards the direction of travel:
+     * if the tile ever regresses to a redirect, this fails.
      */
     render(draw(withTile(SPEC_TILE), "Ship the thing", noop));
-    expect(screen.getByText(/epic's Artifacts list/)).toBeTruthy();
+    expect(screen.queryByText(/epic's Artifacts list/)).toBeNull();
+  });
+
+  it("CONTRACT: with the list in, a missing artifact says GONE, not 'loading'", () => {
+    /*
+     * `draw` passes `epicContentReady` true with an empty lookup, which is the
+     * state where the doc has arrived and this artifact is not in it. The two
+     * `null`-entry branches must not collapse: a deleted artifact that spins
+     * forever is indistinguishable from a slow one, and only one of them is
+     * worth waiting on.
+     *
+     * Paired with a positive so it cannot pass on a tile that rendered
+     * nothing — `queryByText` returning null describes an empty pane equally
+     * well.
+     */
+    render(draw(withTile(SPEC_TILE), "Ship the thing", noop));
+    expect(screen.getByText(/no longer in this epic/)).toBeTruthy();
+    expect(screen.queryByText(/Opening the artifact/)).toBeNull();
   });
 
   it("a blank tab invites content rather than reporting a blocker", () => {
