@@ -67,10 +67,34 @@ const MODELS_RESPONSE: ListHarnessModelsResponse = {
   ],
 };
 
-/** A `request` fake routed by method: models list, then a create echo. */
+/**
+ * `epic.create`'s reply, parameterized on whether the host started the
+ * folded turn. No test may get this value by accident — see `requestImpl`.
+ */
+function createEpicReply(
+  initialTurnStarted: boolean,
+): () => Promise<{ roomInfo: null; task: null; initialTurnStarted: boolean }> {
+  return () => Promise.resolve({ roomInfo: null, task: null, initialTurnStarted });
+}
+
+/**
+ * A `request` fake routed by method: models list, then a create echo.
+ *
+ * `createEpic` has NO default. It used to fall back to
+ * `initialTurnStarted: true` — the branch the real host does not take
+ * (same measured evidence as `author-view.test.tsx`'s sibling fixture: a
+ * real chatId from a live host, see
+ * phone-authored-chat-lands-with-no-turn-running's Evidence section) — so
+ * every call site that omitted it was silently exercising the rare path.
+ * As in that file, the fix is NOT flipping the default: a `false` reply
+ * arms the same `startFoldedFirstTurn` / `FIRST_TURN_ACK_TIMEOUT_MS` (20s)
+ * fallback `use-create-epic.ts` reuses from `use-create-chat.ts`, and a
+ * test that doesn't drive it to completion would be left with a real timer
+ * running unobserved. Stating it at every call site is the fix.
+ */
 function requestImpl(opts: {
   readonly models?: ListHarnessModelsResponse;
-  readonly createEpic?: () => Promise<unknown>;
+  readonly createEpic: () => Promise<unknown>;
   readonly worktrees?: readonly unknown[];
   readonly mappings?: readonly unknown[];
 }): (method: string, params: unknown) => Promise<unknown> {
@@ -79,9 +103,7 @@ function requestImpl(opts: {
       return Promise.resolve(opts.models ?? MODELS_RESPONSE);
     }
     if (method === "epic.create") {
-      return opts.createEpic !== undefined
-        ? opts.createEpic()
-        : Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: true });
+      return opts.createEpic();
     }
     // M5: the workspace picker's two RPCs. Absent by default, so the existing
     // folderless tests exercise the honest-degrade path (picker unavailable,
@@ -141,7 +163,10 @@ async function typeAndSubmit(instruction: string): Promise<void> {
 
 describe("NewEpicView", () => {
   it("resolves a host-scoped model then dispatches epic.create as a folderless epic", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only inspects the dispatched request body, never the
+    // create's outcome — `true` resolves the flow synchronously so nothing is
+    // left running after the assertions.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
     await typeAndSubmit("Plan the billing migration");
@@ -193,7 +218,10 @@ describe("NewEpicView", () => {
   });
 
   it("navigates into the minted epic on a successful create", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: exercises the (rare) case where the host already started the
+    // folded turn, so navigation is immediate with no fallback session. The
+    // common case — `false` — gets its own dedicated coverage below.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, createFakeStreamConnection());
 
@@ -222,8 +250,13 @@ describe("NewEpicView", () => {
   });
 
   it("shows an inline error and never creates when no model can be resolved", async () => {
+    // `createEpic` is never invoked — the flow dead-ends at model resolution
+    // — but the field is required so every call site says so.
     const fake = createFakeHostClient(
-      requestImpl({ models: { harnessId: "claude", models: [] } }),
+      requestImpl({
+        models: { harnessId: "claude", models: [] },
+        createEpic: createEpicReply(true),
+      }),
     );
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, createFakeStreamConnection());
@@ -244,7 +277,9 @@ describe("NewEpicView", () => {
 
   it("refuses to create at all when the host's real id is not configured", async () => {
     configMock.hostId = null;
-    const fake = createFakeHostClient(requestImpl({}));
+    // `createEpic` is never invoked — the flow refuses before the host id
+    // check even reaches a request — but the field is required regardless.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, createFakeStreamConnection());
 
@@ -281,12 +316,18 @@ describe("NewEpicView", () => {
   // ── The turn-less first run ─────────────────────────────────────────────
   // Measured on a real host: `initialTurnStarted` comes back FALSE, so without
   // a fallback "Create epic" yields a persisted message nothing is acting on.
+  //
+  // `requestImpl` has no default for `initialTurnStarted` any more — every
+  // call site above states it explicitly, all choosing `true` because none of
+  // them observe this outcome and `false` would leave the 20s ack-wait
+  // fallback armed and unobserved for the rest of that test. These two are
+  // where `false` — the branch the host actually takes — gets its own
+  // dedicated, mutation-verified coverage.
 
   it("re-sends the folded message over the chat stream when the host didn't start the turn", async () => {
     const fake = createFakeHostClient(
       requestImpl({
-        createEpic: () =>
-          Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: false }),
+        createEpic: createEpicReply(false),
       }),
     );
     const streams = createFakeStreamConnection();
@@ -340,7 +381,9 @@ describe("NewEpicView", () => {
   });
 
   it("does not re-send when the host reports the folded turn already started", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true` is load-bearing here: this is the contrast that stops the test
+    // above from passing against a hook that re-sends unconditionally.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const streams = createFakeStreamConnection();
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, streams);
@@ -355,8 +398,7 @@ describe("NewEpicView", () => {
   it("reports honestly instead of navigating when the first turn cannot be started", async () => {
     const fake = createFakeHostClient(
       requestImpl({
-        createEpic: () =>
-          Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: false }),
+        createEpic: createEpicReply(false),
       }),
     );
     const onCreated = vi.fn();
@@ -379,7 +421,9 @@ describe("NewEpicView", () => {
     // even if that guard is broken. Driving the hook directly is the only way
     // to measure it: two synchronous calls share one closure, so a guard that
     // reads `phase` from state sees a stale "idle" both times.
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only counts `epic.create` invocations, never awaits
+    // the outcome — `true` resolves synchronously so nothing is left running.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const streams = createFakeStreamConnection();
     const { result } = renderHook(() =>
       useCreateEpic({
@@ -401,7 +445,9 @@ describe("NewEpicView", () => {
   });
 
   it("creates exactly one epic when the button is double-tapped", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only counts `epic.create` invocations, never awaits
+    // the outcome — `true` resolves synchronously so nothing is left running.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
     const user = userEvent.setup();
@@ -477,8 +523,10 @@ describe("NewEpicView — workspace picker (M5)", () => {
   };
 
   it("still defaults to folderless, and says so", async () => {
+    // `createEpic` is unexercised beyond request construction in this block —
+    // `true` keeps each test fast and side-effect-free.
     const fake = createFakeHostClient(
-      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING] }),
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING], createEpic: createEpicReply(true) }),
     );
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
@@ -498,7 +546,7 @@ describe("NewEpicView — workspace picker (M5)", () => {
 
   it("binds the epic to a picked REPO — the capability the phone did not have", async () => {
     const fake = createFakeHostClient(
-      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING] }),
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING], createEpic: createEpicReply(true) }),
     );
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
@@ -529,7 +577,7 @@ describe("NewEpicView — workspace picker (M5)", () => {
     // `import` adopts an existing worktree; `worktree` would CREATE one, which
     // this ticket forbids from a phone.
     const fake = createFakeHostClient(
-      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING] }),
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING], createEpic: createEpicReply(true) }),
     );
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
@@ -557,7 +605,7 @@ describe("NewEpicView — workspace picker (M5)", () => {
   it("still creates folderless when the host's worktree list is unreachable", async () => {
     // Honest degrade: a phone that cannot read the repo list must still be
     // able to do the thing it could always do.
-    const fake = createFakeHostClient(requestImpl({}));
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
     await typeAndSubmit("Plan something anyway");
