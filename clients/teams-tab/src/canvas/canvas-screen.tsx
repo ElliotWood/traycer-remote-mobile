@@ -62,10 +62,35 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { v4 as uuidv4 } from "uuid";
+import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { TileCanvas } from "./tile-canvas";
 import { makeBlankTile } from "./opener";
+import { ChatTile } from "./chat-tile";
 import { tileTitle, type TileRef } from "./tile-ref";
 import { openTile, type CanvasState, type IdSource } from "./canvas-state";
+import type { HostStreamConnection } from "@traycer-clients/shared/host-transport/single-host-stream-connection";
+import type { SnapshotDiffClient } from "../chat/blocks/use-snapshot-diff";
+
+/**
+ * What a tile body needs that the tile itself does not carry.
+ *
+ * A `TileRef` is content IDENTITY — id, name, host — and deliberately nothing
+ * else, so that persisting a layout persists no live state. Everything a body
+ * needs to actually render is therefore ambient to the screen, and this is
+ * the one place it is named.
+ *
+ * `chatEntry` is a LOOKUP, not a list, because the answer changes as the epic
+ * doc streams in and a tile that captured a row at open time would go stale
+ * against a rename or a locality change.
+ */
+interface TileDeps {
+  readonly streamConnection: HostStreamConnection | null;
+  readonly diffClient: SnapshotDiffClient | null;
+  readonly epicId: string;
+  readonly hostId: string;
+  readonly now: number;
+  readonly chatEntry: (chatId: string) => EpicChatEntry | null;
+}
 
 const useStyles = makeStyles({
   screen: {
@@ -108,6 +133,19 @@ export interface CanvasScreenProps {
    * the tree it produced; `uuidIds` is what the app passes.
    */
   readonly ids: IdSource;
+  /** The chat stream, for chat tiles. `null` when no host is configured. */
+  readonly streamConnection: HostStreamConnection | null;
+  /** The unary client — a transcript's diff bodies are requests, not frames. */
+  readonly diffClient: SnapshotDiffClient | null;
+  readonly now: number;
+  /**
+   * The epic-doc row for a chat, or `null` when the doc has not got there.
+   *
+   * A function rather than the rows themselves: the screen has no use for the
+   * list, only for the row a given tile names, and passing the list would
+   * invite a tile body to iterate it.
+   */
+  readonly chatEntry: (chatId: string) => EpicChatEntry | null;
 }
 
 /**
@@ -124,38 +162,95 @@ export const uuidIds: IdSource = {
 };
 
 /**
- * One tile's body.
+ * A tile whose body is genuinely not built yet, saying which one and why.
  *
- * UNIFORM, not a switch over the six kinds, and that is a claim about what is
- * known rather than a shortcut. No tile can be created yet and nothing
- * persists a layout, so every kind is equally unrenderable today; six
- * branches that each say "not yet" in slightly different words would be
- * structure standing in for capability — the shape that reads as coverage in
- * a diff and is not.
- *
- * The exhaustive switch appears in the commit that gives the branches
- * something to return, where `never` will be load-bearing instead of
- * decorative.
+ * A COMPONENT, not a helper that calls `useStyles()` and returns JSX. The
+ * first draft was the latter, invoked from `renderTile` as a plain function —
+ * a hook call outside a render, which React permits right up until it does
+ * not and which the strip's own `react-hooks` rules would have caught only
+ * after eslint ran.
  */
-function TilePlaceholder({ tile }: { readonly tile: TileRef }): ReactElement {
-  // A COMPONENT, not a helper that calls `useStyles()` and returns JSX. The
-  // first draft was the latter, invoked from `renderTile` as a plain function
-  // — a hook call outside a render, which React permits right up until it
-  // does not and which the strip's own `react-hooks` rules would have caught
-  // only after eslint ran.
+function TilePlaceholder({
+  tile,
+  detail,
+}: {
+  readonly tile: TileRef;
+  readonly detail: string;
+}): ReactElement {
   const styles = useStyles();
   return (
     <div className={styles.placeholder}>
       <Body1>{tileTitle(tile)}</Body1>
-      <Caption1 className={styles.subtle}>
-        This tab is a placeholder. Tile bodies arrive with the opener.
-      </Caption1>
+      <Caption1 className={styles.subtle}>{detail}</Caption1>
     </div>
   );
 }
 
-function renderTile(tile: TileRef): ReactNode {
-  return <TilePlaceholder tile={tile} />;
+/**
+ * One tile's body — now a switch, and the `never` below is load-bearing.
+ *
+ * It was previously uniform across all six kinds, correctly: nothing could
+ * open a tab, so every kind was equally unrenderable and six branches saying
+ * "not yet" in different words would have been structure standing in for
+ * capability. That is no longer true of `chat`, so the switch arrives with
+ * the commit that gives a branch something to return, exactly as the previous
+ * docblock said it would.
+ *
+ * **The artifact branches are still placeholders and are NOT the same claim
+ * as the old uniform one.** They name a specific, recorded blocker rather
+ * than "not yet": the renderer exists and is good (`artifacts/artifact-markdown.tsx`),
+ * but turning an artifact room's `Y.Doc` into markdown lives only in
+ * `clients/mobile/host/artifact-body/artifact-body-markdown.ts`, which pulls
+ * **seven `@tiptap/*` packages** this bundle does not depend on. That is a
+ * bundle-size decision for a Teams iframe, not a rendering problem — see
+ * `parity-contract` §*Two renderers with no door*. Wiring it here without
+ * taking that decision would be the tail wagging the dog.
+ */
+function renderTile(tile: TileRef, deps: TileDeps): ReactNode {
+  switch (tile.type) {
+    case "chat":
+      return (
+        <ChatTile
+          streamConnection={deps.streamConnection}
+          diffClient={deps.diffClient}
+          epicId={deps.epicId}
+          chatId={tile.id}
+          entry={deps.chatEntry(tile.id)}
+          configuredHostId={deps.hostId}
+          now={deps.now}
+        />
+      );
+
+    case "spec":
+    case "ticket":
+    case "story":
+    case "review":
+      return (
+        <TilePlaceholder
+          tile={tile}
+          detail="Artifact bodies need a Y.Doc-to-markdown step that only the mobile client has; it carries a ProseMirror stack this tab does not. Open it in Traycer for now."
+        />
+      );
+
+    case "blank":
+      return (
+        <TilePlaceholder
+          tile={tile}
+          detail="Pick something to show here. Opening content into a blank tab lands next."
+        />
+      );
+
+    default: {
+      /*
+       * Load-bearing, not decorative. A new member of `TileRef` fails the
+       * BUILD here rather than rendering an empty pane — the same device
+       * `TILE_KIND_LABELS` uses one file over, and the reason `tile-ref.ts`
+       * says deferring a kind "costs nothing and is reversible".
+       */
+      const unreachable: never = tile;
+      return unreachable;
+    }
+  }
 }
 
 export function CanvasScreen({
@@ -166,9 +261,30 @@ export function CanvasScreen({
   onBack,
   hostId,
   ids,
+  streamConnection,
+  diffClient,
+  now,
+  chatEntry,
 }: CanvasScreenProps): ReactElement {
   const styles = useStyles();
   const title = epicName ?? `Epic ${epicId.slice(0, 8)}`;
+
+  /*
+   * NOT memoised, deliberately. `now` ticks, so a `useMemo` keyed on these
+   * deps would rebuild on every tick anyway — the memo would cost a
+   * comparison and buy nothing. `renderTile` is called during render by
+   * `tile-canvas.tsx`, not stored, so identity does not matter here; the
+   * moment it is passed to something memoised, this comment is the thing to
+   * revisit.
+   */
+  const deps: TileDeps = {
+    streamConnection,
+    diffClient,
+    epicId,
+    hostId,
+    now,
+    chatEntry,
+  };
 
   return (
     <div className={styles.screen}>
@@ -191,7 +307,7 @@ export function CanvasScreen({
         <TileCanvas
           state={state}
           onChange={onChange}
-          renderTile={renderTile}
+          renderTile={(tile) => renderTile(tile, deps)}
           ids={ids}
           hostId={hostId}
           // Names WHY it is empty rather than that it is. "Nothing open" is

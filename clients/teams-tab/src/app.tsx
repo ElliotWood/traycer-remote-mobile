@@ -189,7 +189,7 @@ function ChatRoute({
         configuredHostId={CONFIGURED_HOST_ID}
         diffClient={diffClient}
         now={now}
-        onBack={onBack}
+        chrome={{ kind: "screen", onBack }}
       />
     </div>
   );
@@ -730,6 +730,27 @@ function EpicsScreen({
           onChange={canvas.setState}
           hostId={CONFIGURED_HOST_ID}
           ids={uuidIds}
+          streamConnection={streamConnection}
+          diffClient={connection?.hostClient ?? null}
+          now={now}
+          /*
+           * ALWAYS NULL, and the consequence is stated rather than left to be
+           * discovered: a chat in a pane renders its transcript but is NOT
+           * actionable — approve/reject and interview answers are disabled,
+           * exactly as on a deep link.
+           *
+           * The row comes from the epic doc, and this route does not hold that
+           * subscription; `EpicScreen` does. Opening one here would be the
+           * second `epic.subscribe` per epic that `canvas-screen.tsx` warns
+           * against, to serve a screen no user can currently reach a chat from.
+           *
+           * The opener is where this is answered, not here. `onOpenAgent`
+           * already carries the clicked row (`setOpenedChat(entry)`) for the
+           * full-screen route; the canvas opener will carry it the same way,
+           * because the thing that knows which chat was clicked is the list
+           * that was clicked — not the canvas.
+           */
+          chatEntry={() => null}
           onBack={() => {
             navigate({ name: "epic", epicId: route.epicId });
           }}
@@ -1394,7 +1415,7 @@ export function App(): ReactElement {
             // than spinning. The cards themselves are the subject here.
             diffClient={null}
             now={CHAT_FIXTURE_NOW}
-            onBack={() => undefined}
+            chrome={{ kind: "screen", onBack: () => undefined }}
           />
         </div>,
     );
