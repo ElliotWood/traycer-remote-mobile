@@ -35,6 +35,7 @@ import {
   ShellNotificationsProvider,
   type ShellNotifications,
 } from "./shell-notifications";
+import { ShellSettingsProvider } from "./shell-settings";
 import { NotificationBell } from "../notifications/notification-bell";
 
 /**
@@ -61,6 +62,17 @@ declare global {
     __traycerShellMounts?: number;
   }
 }
+
+/**
+ * The fallback when no caller wants the settings handler.
+ *
+ * MODULE-LEVEL so it is referentially stable. Written inline it would be a
+ * fresh function every render, and it is handed straight to a context whose
+ * consumer lists it in an effect's dependency array — so every render would
+ * republish, which is the exact hazard `shell-notifications` documents about
+ * its own handler. A no-op that loops is worse than no no-op.
+ */
+const NO_SETTINGS_SLOT = (): void => undefined;
 
 const useStyles = makeStyles({
   /**
@@ -153,12 +165,27 @@ export interface AppShellProps {
   readonly leading?: ReactNode;
   /** Trailing cluster — identity, connection. Never collapses. */
   readonly trailing?: ReactNode;
+  /**
+   * Receives the screen's "open settings" handler, or `null` when no screen
+   * is publishing one.
+   *
+   * WHY THIS ONE TRAVELS OUT AND THE BELL'S DOES NOT. The bell is rendered by
+   * this component, so its published data can stop here. The account menu is
+   * rendered by `App` into {@link AppShellProps.trailing} — ABOVE this
+   * component — because it needs the auth service, which the shell
+   * deliberately knows nothing about. So the handler has to keep going up.
+   *
+   * Optional: a shell without it simply never offers the row. See
+   * `./shell-settings` for why the row is hidden rather than disabled.
+   */
+  readonly setOpenSettings?: (open: (() => void) | null) => void;
   readonly children: ReactNode;
 }
 
 export function AppShell({
   leading,
   trailing,
+  setOpenSettings,
   children,
 }: AppShellProps): React.JSX.Element {
   const styles = useStyles();
@@ -235,7 +262,11 @@ export function AppShell({
       <div className={styles.body} data-shell-region="body">
         <ShellStatusProvider setStatus={setStatus}>
           <ShellNotificationsProvider setNotifications={setNotifications}>
-            {children}
+            <ShellSettingsProvider
+              setOpenSettings={setOpenSettings ?? NO_SETTINGS_SLOT}
+            >
+              {children}
+            </ShellSettingsProvider>
           </ShellNotificationsProvider>
         </ShellStatusProvider>
       </div>

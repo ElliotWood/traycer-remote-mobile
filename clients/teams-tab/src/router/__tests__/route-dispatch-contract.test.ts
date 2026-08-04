@@ -120,6 +120,12 @@ describe("route dispatch — every member reaches a screen", () => {
       "chat",
       "waiting",
       "notifications",
+      // Added with the App settings screen. Failed on the commit that added
+      // the union member, before the `case` existed — the SECOND time this
+      // assertion has been exercised by real work rather than by a deliberate
+      // mutation, which is the only evidence that a contract test is load
+      // -bearing rather than decorative.
+      "settings",
       // Added with the canvas. This assertion failed on the commit that added
       // it, before the case existed — which is the test working, and is the
       // first time it has been exercised by something other than a deliberate

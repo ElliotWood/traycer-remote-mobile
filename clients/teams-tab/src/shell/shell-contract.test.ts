@@ -72,29 +72,58 @@ describe("shell contract — containment, not growth", () => {
   /**
    * THE WIRING, not the component.
    *
-   * `sign-out-button.test.tsx` proves the button calls `signOut` when
-   * pressed. It passes whether or not anything RENDERS the button — and
-   * "the method exists, shared, and nothing calls it" is the exact defect
-   * the button was built to fix. Repeating it one level up would be the
-   * joke telling itself twice.
+   * `account-menu.test.tsx` proves the menu calls `onSignOut` when pressed.
+   * It passes whether or not anything RENDERS the menu — and "the method
+   * exists, shared, and nothing calls it" is the exact defect this control
+   * was built to fix. Repeating it one level up would be the joke telling
+   * itself twice.
    *
    * Mutation-checked: changing `app.tsx` to pass `userId={null}` reddened
    * nothing before this existed.
+   *
+   * UPDATED when `SignOutButton` was replaced by `AccountMenu`. The assertion
+   * moved from `userId={…}` to `user={status.user}` and that is the POINT of
+   * the change rather than an incidental rename: the old control was handed
+   * the id alone, which is why it could only render `"user-a1b2…"`. Passing
+   * the whole principal is what makes a name, an email and an avatar
+   * reachable. An assertion that had been loosened to "contains SignOut"
+   * would have survived the regression this one is here to catch.
    *
    * Stated limit, same as the rest of this file: a source assertion proves
    * the wiring is WRITTEN, not that it renders. A jsdom render of `App`
    * would prove more and needs the Teams SDK handshake faked; that is a
    * bigger piece of work and this is not a substitute for it.
    */
-  it("CONTRACT: sign-out is wired into the frame with the real identity", () => {
+  it("CONTRACT: the account menu is wired into the frame with the real identity", () => {
     const app = read("app.tsx");
     expect(app).toContain("trailing={");
-    expect(app).toContain("<SignOutButton");
-    // The IDENTITY, from the auth status — not a placeholder, and not null.
-    expect(app).toContain("userId={status.user.user.id}");
+    expect(app).toContain("<AccountMenu");
+    // The whole PRINCIPAL, from the auth status — not an id, not a
+    // placeholder, not null.
+    expect(app).toContain("user={status.user}");
     // Only when signed in: a dead control under preview is the affordance
     // that silently does nothing.
     expect(app).toContain('status.kind === "signed-in" ? (');
+  });
+
+  /**
+   * THE SETTINGS SLOT'S ONE ASYMMETRY, asserted because it is the part a
+   * later tidy-up would "simplify" away.
+   *
+   * `onOpenSettings` travels up from the screen and is `null` once the screen
+   * unmounts — which is precisely what happens when the in-frame boundary
+   * catches a throw. Sign-out must NOT travel the same way, or the control
+   * would vanish in one of the three states it was built for. So the menu
+   * takes `onOpenSettings` from published state and `onSignOut` from `auth`
+   * directly, and those two lines have to differ.
+   */
+  it("CONTRACT: sign-out does not depend on a mounted screen, settings does", () => {
+    const app = read("app.tsx");
+    expect(app).toContain("onOpenSettings={openSettings}");
+    expect(app).toContain("auth.signOut();");
+    // The publisher clears the slot on unmount — the mechanism that makes the
+    // asymmetry real rather than stylistic.
+    expect(read("shell/shell-settings.tsx")).toContain("setOpenSettings(null)");
   });
 
   it("CONTROL: these assertions can fail — a string absent from the shell is absent", () => {
