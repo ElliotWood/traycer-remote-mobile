@@ -8,6 +8,11 @@
  * bytes, not a markdown string handed in directly), through the real
  * `useArtifactBody` hook, into the real `ArtifactMarkdown` renderer — the
  * door, not just the room behind it.
+ *
+ * These two cover the BODY half. `client={null}` puts the comments section in
+ * its no-host state deliberately — the threads have their own door and their
+ * own tests in `comments/__tests__/`, and mixing them here would make a body
+ * assertion depend on an unrelated RPC.
  */
 import { describe, expect, it, afterEach } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -60,7 +65,14 @@ describe("ArtifactViewer — the door, not just the room", () => {
 
     render(
       <FluentProvider theme={webLightTheme}>
-        <ArtifactViewer entry={ENTRY} registry={registry} onBack={() => undefined} />
+        <ArtifactViewer
+          entry={ENTRY}
+          registry={registry}
+          epicId="epic-1"
+          client={null}
+          now={0}
+          onBack={() => undefined}
+        />
       </FluentProvider>,
     );
 
@@ -75,7 +87,14 @@ describe("ArtifactViewer — the door, not just the room", () => {
 
     render(
       <FluentProvider theme={webLightTheme}>
-        <ArtifactViewer entry={ENTRY} registry={registry} onBack={() => undefined} />
+        <ArtifactViewer
+          entry={ENTRY}
+          registry={registry}
+          epicId="epic-1"
+          client={null}
+          now={0}
+          onBack={() => undefined}
+        />
       </FluentProvider>,
     );
 
