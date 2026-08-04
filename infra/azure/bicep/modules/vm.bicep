@@ -278,19 +278,28 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
 // inflates by 4/3, so the operative budget for the raw script under any
 // mechanism that needs base64 is 98,304 bytes - not 131,072.
 //
-//   raw provisionScript   120,701 bytes
-//   base64 of it          160,936 characters
+//   raw provisionScript   122,575 bytes
+//   base64 of it          163,436 characters
 //   ARM's limit           131,072
-//   headroom, plaintext    10,371 characters (7.9%)
+//   headroom, plaintext     8,497 characters (6.5%)
 //
-// 🔴 THOSE FOUR NUMBERS ARE A SNAPSHOT AND THEY MOVE. Measured at
-// `node infra/azure/scripts/measure-provision-payload.mjs`, 2026-08-04. They
-// changed by 2,774 bytes DURING the change that introduced them, because a
-// comment was added to one provisioned script - every byte of every file this
-// template carries lands in this budget, comments included, and this repo
-// comments heavily on purpose. Do not trust the figures above; run the
-// command. It exits non-zero when the payload no longer fits, so it is a gate
-// and not only a report - wire it into anything that gates this directory.
+// 🔴 THOSE FOUR NUMBERS ARE A SNAPSHOT, THEY MOVE, AND THE DIRECTION IS ONE
+// WAY. Measured at `node infra/azure/scripts/measure-provision-payload.mjs`,
+// 2026-08-04. Over a single afternoon's work on this directory they went:
+//
+//   117,927  ->  120,701  ->  122,575     headroom 10.0% -> 7.9% -> 6.5%
+//
+// Nothing in those three steps added a feature. Each was COMMENTS added to
+// provisioned scripts - every byte of every file this template carries lands
+// in the same budget, and this repo comments heavily on purpose. That is a
+// defensible trade, but it is a trade, and at this rate the ceiling binds
+// before any new capability does.
+//
+// So: do not trust the figures above, run the command. It exits non-zero when
+// the payload stops fitting, which makes it a gate and not only a report -
+// wire it into anything that gates this directory. When it does go red, the
+// fix is a SECOND runCommands resource split at a phase boundary, not a
+// comment cull; see the note on why concat() cannot help.
 //
 // It evaluates this template's own `provisionScript` expression rather than
 // summing the loadTextContent sources: `wc -c` over those undercounts, since

@@ -125,9 +125,28 @@ for tenant_id in ${TRAYCER_TENANT_IDS}; do
   # separate step to turn monitoring on for them.
   systemctl enable --now "traycer-health-probe@${tenant_id}.timer"
   # A6: same reasoning as the health probe - enabled for every tenant up front
-  # so A3 onboarding needs no separate "turn monitoring on" step. Structural
-  # mode only; see traycer-agent-probe.sh on why --spawn is not scheduled.
+  # so A3 onboarding needs no separate "turn monitoring on" step. This one is
+  # the STRUCTURAL probe: free, every few minutes.
   systemctl enable --now "traycer-agent-probe@${tenant_id}.timer"
+  # A6: and the SPAWN probe, which costs one real Claude call per run.
+  #
+  # WHY THIS IS NOT A NEW SPEND, since the unit's own header says the cost was
+  # "approved as an explicit spend, not a default". It is already being
+  # incurred: `traycer-agent-spawn-probe@<tenant>.timer` is enabled on the live
+  # VM today, by hand. What was missing was any way to reproduce that - so the
+  # money was being spent AND a rebuild would silently stop spending it,
+  # removing the only check that distinguishes a live credential from a dead
+  # one at exactly the moment you would most want it. Found by the drift check
+  # in verify-iac-parity.sh, which reported the timer as enabled on the VM and
+  # by no template.
+  #
+  # THE COST, stated so it can be argued with rather than rediscovered: 4 runs
+  # per tenant per day (6-hourly, jittered), one `claude` invocation each,
+  # against the ONE Claude Max account this deployment shares across N people.
+  # It scales with tenant count. If that becomes the wrong trade, turn it off
+  # in this one place - which is the point of it being here at all, rather than
+  # being a hand-enabled unit nobody knows is running.
+  systemctl enable --now "traycer-agent-spawn-probe@${tenant_id}.timer"
 done
 
 echo "bootstrap: configuring nginx ingress (HTTP-only, pre-certificate)"

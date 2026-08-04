@@ -19,9 +19,21 @@
 # But the deployment shares ONE Claude Max account across N people (see
 # A7), so a probe that spawns an agent every couple of minutes would eat
 # the quota it is supposed to protect - monitoring that causes the outage
-# it watches for. So `--spawn` exists, is proven to work, and is NOT on a
-# timer by default. Enabling it is a deliberate, documented quota
-# decision, not something this script makes on the operator's behalf.
+# it watches for.
+#
+# THE RESOLUTION, and this paragraph replaces one that said `--spawn` is
+# "NOT on a timer by default". That was written before the timer existed and
+# has been stale since traycer-agent-spawn-probe@.timer landed; bootstrap.sh
+# now enables it, so a file saying "not scheduled" beside a script that
+# schedules it would leave the next reader to work out which one is lying.
+#
+# `--spawn` IS scheduled, at a cadence chosen to answer the objection above
+# rather than to ignore it: 6-hourly and jittered, so 4 runs per tenant per
+# day - not the structural probe's few-minute cadence. The quota decision is
+# real and is recorded in traycer-agent-spawn-probe@.service and at the
+# `systemctl enable` in bootstrap.sh; it is made in the deploy path where it
+# can be reversed in one place, rather than left to whoever remembers to
+# enable a unit by hand.
 #
 # Exit: 0 healthy, 1 alertable, 2 usage error.
 set -uo pipefail
