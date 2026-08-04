@@ -19,13 +19,24 @@
  * fields a correct answer is assembled from survive the projection at all.
  */
 import { describe, expect, it } from "vitest";
-import type { ContentBlock } from "@traycer/protocol/persistence/epic/content-blocks";
+import type {
+  ContentBlock,
+  InterviewBlock,
+} from "@traycer/protocol/persistence/epic/content-blocks";
 import { toTranscriptBlock } from "../transcript";
 
-function interview(
-  questions: readonly Record<string, unknown>[],
-): ContentBlock {
-  return {
+/**
+ * What the projection actually receives: a row read out of a Y.Doc, which has
+ * been through no schema. `questions: unknown[]` is the honest shape — the
+ * projection's whole job is to sanitize them — and it is what lets the cases
+ * below pass the malformed values a real doc can hold.
+ */
+type RawInterviewBlock = Omit<InterviewBlock, "questions"> & {
+  readonly questions: readonly unknown[];
+};
+
+function interview(questions: readonly unknown[]): ContentBlock {
+  const raw: RawInterviewBlock = {
     type: "interview",
     blockId: "iv-1",
     status: "completed",
@@ -38,10 +49,11 @@ function interview(
     answers: [],
     error: null,
     metadata: null,
-  } as unknown as ContentBlock;
+  };
+  return raw as ContentBlock;
 }
 
-function projectQuestions(questions: readonly Record<string, unknown>[]) {
+function projectQuestions(questions: readonly unknown[]) {
   const block = toTranscriptBlock(interview(questions));
   if (block.kind !== "interview") throw new Error("not an interview");
   return block.questions;
