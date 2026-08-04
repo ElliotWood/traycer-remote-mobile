@@ -15,6 +15,25 @@
 //
 // Exit codes: 0 = fits under the mechanism in use, 1 = over.
 //
+// 🔴 DO NOT CROSS-CHECK THIS NUMBER WITH `az` ON WINDOWS. `az ... --query
+// "source.script"` silently DISCARDS every non-ASCII character on a cp1252
+// console, prints only `WARNING: Unable to encode the output with cp1252
+// encoding`, and exits 0. Measured against the deployed runCommands: 122,396
+// characters via raw ARM REST, 122,308 via `az` - 88 characters gone, with no
+// error. The loss is always DOWNWARD, so an over-budget payload reads as
+// fitting, which is the one direction this gate exists to catch. Neither
+// PYTHONIOENCODING=utf-8 nor PYTHONUTF8=1 suppresses it. Use the REST API
+// directly when you need the real bytes:
+//
+//   TOK=$(az account get-access-token --resource https://management.azure.com \
+//           --query accessToken -o tsv)
+//   curl -s -H "Authorization: Bearer $TOK" \
+//     ".../virtualMachines/<vm>/runCommands/traycer-provisioning?api-version=2024-03-01"
+//
+// Same family as `az bicep build --stdout` dying with a cp1252
+// UnicodeEncodeError (use --outfile), but worse: that one fails loudly, this
+// one succeeds with wrong data.
+//
 // Usage: node infra/azure/scripts/measure-provision-payload.mjs
 
 import {

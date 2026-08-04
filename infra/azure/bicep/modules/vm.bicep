@@ -278,16 +278,29 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
 // inflates by 4/3, so the operative budget for the raw script under any
 // mechanism that needs base64 is 98,304 bytes - not 131,072.
 //
-//   raw provisionScript   122,575 bytes
-//   base64 of it          163,436 characters
+//   raw provisionScript   123,421 bytes
+//   base64 of it          164,564 characters
 //   ARM's limit           131,072
-//   headroom, plaintext     8,497 characters (6.5%)
+//   headroom, plaintext     7,651 characters (5.8%)
 //
 // 🔴 THOSE FOUR NUMBERS ARE A SNAPSHOT, THEY MOVE, AND THE DIRECTION IS ONE
 // WAY. Measured at `node infra/azure/scripts/measure-provision-payload.mjs`,
 // 2026-08-04. Over a single afternoon's work on this directory they went:
 //
-//   117,927  ->  120,701  ->  122,575     headroom 10.0% -> 7.9% -> 6.5%
+//   117,927 -> 120,701 -> 122,575 -> 123,421   headroom 10.0% -> 5.8%
+//
+// 🔴 AND IT IS NOT A CONSTANT ACROSS DEPLOYMENTS. That figure is for the
+// measurer's own placeholder parameters. The real payload varies with the
+// LENGTH of `publicHostname`, `acmeContactEmail` and the tenant list, which
+// are interpolated into the script: the A0 scratch deploy's actual payload was
+// 122,569 bytes while the measurer read 122,575 for the same tree. The gate is
+// still a gate; the number is per-parameter-set, so do not treat a figure
+// quoted here as what YOUR deployment will send.
+//
+// 🔴 AND DO NOT VERIFY IT WITH `az` ON WINDOWS - `az --query "source.script"`
+// silently drops non-ASCII characters (88 of them, measured) with a WARNING
+// and exit 0, always UNDER-reporting. See measure-provision-payload.mjs's
+// header for the raw-REST command that returns the real bytes.
 //
 // Nothing in those three steps added a feature. Each was COMMENTS added to
 // provisioned scripts - every byte of every file this template carries lands
@@ -392,15 +405,25 @@ resource provisioning 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01'
     runAsUser: 'root'
   }
   // A content-derived tag, playing the part `forceUpdateTag` played for the
-  // extension. Changing `source.script` should be enough on its own to make
-  // the RP re-execute, since it changes the resource - but that is a belief
-  // about the provider's update semantics, not something observed, and the
-  // whole point of this file is not to rely on those. The tag makes the
-  // resource definitely differ when the script differs. uniqueString() is
-  // deterministic, so an unchanged script does not churn it.
+  // extension. uniqueString() is deterministic, so an unchanged script does
+  // not churn it.
   //
-  // UNVERIFIED until a scratch deploy shows a second run picking up an edited
-  // script. Stated as open rather than assumed.
+  // ✅ VERIFIED on the A0 scratch deploy, 2026-08-04, and the two mechanisms
+  // this template always moves together were separated with direct REST PUTs
+  // so each could be tested alone:
+  //
+  //   nothing changed (identical redeploy)   NOT re-executed  <- the control
+  //   tag changed, script byte-identical     re-executed
+  //   script changed, tag held constant      re-executed
+  //   one byte inside a loadTextContent file re-executed, and the byte landed
+  //
+  // The control row is what makes the others mean anything: re-execution is
+  // NOT unconditional, so the re-runs were caused by the change and not by
+  // deploying. Each mechanism is independently sufficient - so the earlier
+  // belief that a `source.script` change alone suffices is now observed true,
+  // and this tag is genuine belt-and-braces rather than the load-bearing part.
+  // Keep it: it costs nothing and it removes the dependency on provider update
+  // semantics that could change under us without notice.
   tags: {
     'traycer-provision-content': uniqueString(provisionScript)
   }
