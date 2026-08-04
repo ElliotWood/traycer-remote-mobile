@@ -42,6 +42,7 @@ import {
 } from "@fluentui/react-icons";
 import type { EdgeDropPosition, TilePane } from "./tile-tree";
 import { tileTitle, type TileRef } from "./tile-ref";
+import type { SplitAffordance } from "./split-affordance";
 
 const useStyles = makeStyles({
   /*
@@ -141,7 +142,7 @@ export interface TabStripProps {
   /**
    * Whether each split would do anything, asked PER DIRECTION.
    *
-   * Two booleans rather than one, because the answers genuinely differ: a
+   * Two of them rather than one, because the answers genuinely differ: a
    * same-direction split merges into the parent group instead of deepening,
    * so a pane at `MAX_TREE_DEPTH` can often still split one way. One flag
    * would disable a control that works.
@@ -152,9 +153,16 @@ export interface TabStripProps {
    * broken rather than as a limit being reached. A control that vanishes is
    * nearly as bad — the user assumes they mis-saw it. Disabled with the reason
    * in the tooltip is the only one of the three that says what happened.
+   *
+   * ⚠️ CARRIES ITS REASON, and that is the whole point of the type. These were
+   * plain booleans while depth was the only way to be refused, and the tooltip
+   * hardcoded "Nesting limit reached". The moment size became a second reason,
+   * that string was a LIE on the new path — a disabled control explaining
+   * itself with the wrong cause is worse than one that says nothing, because
+   * the user acts on it (closing panes to make room, which does not help).
    */
-  readonly canSplitRight: boolean;
-  readonly canSplitDown: boolean;
+  readonly splitRight: SplitAffordance;
+  readonly splitDown: SplitAffordance;
 }
 
 export function TabStrip(props: TabStripProps) {
@@ -168,8 +176,8 @@ export function TabStrip(props: TabStripProps) {
     onNewTab,
     onSplit,
     onClosePane,
-    canSplitRight,
-    canSplitDown,
+    splitRight,
+    splitDown,
   } = props;
   const styles = useStyles();
 
@@ -284,8 +292,8 @@ export function TabStrip(props: TabStripProps) {
           className={styles.paneButton}
           icon={<SplitVerticalRegular fontSize={14} />}
           aria-label="Split pane right"
-          title={canSplitRight ? "Split right" : "Nesting limit reached"}
-          disabled={!canSplitRight}
+          title={splitRight.allowed ? "Split right" : splitRight.reason}
+          disabled={!splitRight.allowed}
           onClick={() => {
             onSplit("right");
           }}
@@ -297,8 +305,8 @@ export function TabStrip(props: TabStripProps) {
           className={styles.paneButton}
           icon={<SplitHorizontalRegular fontSize={14} />}
           aria-label="Split pane down"
-          title={canSplitDown ? "Split down" : "Nesting limit reached"}
-          disabled={!canSplitDown}
+          title={splitDown.allowed ? "Split down" : splitDown.reason}
+          disabled={!splitDown.allowed}
           onClick={() => {
             onSplit("bottom");
           }}

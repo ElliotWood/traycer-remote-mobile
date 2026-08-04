@@ -22,7 +22,7 @@
  * position); that is a known trade and the reason gui-app has a scroll-anchor
  * store, which is a later problem and not this one.
  */
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
 import { Button, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import { AddRegular } from "@fluentui/react-icons";
 import { SplitContainer, type SplitPaneComponentProps } from "./split-container";
@@ -41,6 +41,8 @@ import {
   type IdSource,
 } from "./canvas-state";
 import { makeBlankTile } from "./opener";
+import { resolveSplitAffordance } from "./split-affordance";
+import { usePaneExtentPx } from "./use-pane-extent";
 import type { TilePane } from "./tile-tree";
 import type { TileRef } from "./tile-ref";
 
@@ -197,6 +199,14 @@ function PaneView(props: PaneViewProps) {
   const styles = useStyles();
   const focused = state.activePaneId === pane.id;
 
+  // Measured on the PANE element, not the canvas or the viewport. Both of
+  // `insertPaneAtEdge`'s branches halve the target pane's own extent, so the
+  // pane's box is the exact quantity the rule divides — a canvas-level or
+  // viewport-level measurement would be right only for a pane that happens to
+  // fill it.
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const paneExtent = usePaneExtentPx(paneRef);
+
   const activeTile =
     pane.activeTabId === null
       ? null
@@ -204,6 +214,7 @@ function PaneView(props: PaneViewProps) {
 
   return (
     <div
+      ref={paneRef}
       className={mergeClasses(styles.pane, focused && styles.focusedPane)}
       data-testid="canvas-pane"
       data-pane-id={pane.id}
@@ -263,8 +274,16 @@ function PaneView(props: PaneViewProps) {
         onClosePane={() => {
           onChange(closePane(state, pane.id));
         }}
-        canSplitRight={canSplitPane(state, pane.id, "right")}
-        canSplitDown={canSplitPane(state, pane.id, "bottom")}
+        splitRight={resolveSplitAffordance(
+          canSplitPane(state, pane.id, "right"),
+          paneExtent,
+          "right",
+        )}
+        splitDown={resolveSplitAffordance(
+          canSplitPane(state, pane.id, "bottom"),
+          paneExtent,
+          "bottom",
+        )}
       />
       <div className={styles.body} data-testid="canvas-pane-body">
         {activeTile === null ? null : renderTile(activeTile)}

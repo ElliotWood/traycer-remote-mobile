@@ -35,11 +35,20 @@ import { makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import { MIN_SPLIT_SIZE, MIN_PANE_PX } from "./tile-tree-constants";
 import { evenSizes, type SplitDirection } from "./tile-tree";
 import { computeResizeHandleSizes, resizeHandleSizesEqual } from "./resize-sizes";
+import { SPLIT_HANDLE_PX } from "./split-affordance";
 
 const KEYBOARD_STEP_RATIO = 0.05;
 
-/** Hit area, in px. Wider than the visible line, which is 1px of divider. */
-const GRAB_PX = 8;
+/**
+ * Hit area, in px. Wider than the visible line, which is 1px of divider.
+ *
+ * Imported rather than declared, because `split-affordance.ts` subtracts this
+ * same thickness before halving a pane. Two copies of the number would agree
+ * today and drift the first time either is tuned — and the failure would be
+ * a split allowed at exactly the width where it produces an under-minimum
+ * pane, which no test asserting round numbers would notice.
+ */
+const GRAB_PX = SPLIT_HANDLE_PX;
 
 const useStyles = makeStyles({
   handle: {
