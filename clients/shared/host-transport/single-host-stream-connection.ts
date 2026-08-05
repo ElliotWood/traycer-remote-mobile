@@ -59,11 +59,14 @@ import {
  * live at) so the phone behaves identically on the wire: ping ~25s (decision
  * #14), pong cutoff 60s, backoff 1s → 30s.
  */
-const OPEN_ACK_TIMEOUT_MS = 10_000;
-const PING_INTERVAL_MS = 25_000;
-const PONG_TIMEOUT_MS = 60_000;
-const INITIAL_BACKOFF_MS = 1_000;
-const MAX_BACKOFF_MS = 30_000;
+// Exported (not just module-local) so HA-4's two-tier connection manager
+// dials a watching-tier client with the SAME timing profile as the driving
+// one, rather than a second copied set of magic numbers.
+export const OPEN_ACK_TIMEOUT_MS = 10_000;
+export const PING_INTERVAL_MS = 25_000;
+export const PONG_TIMEOUT_MS = 60_000;
+export const INITIAL_BACKOFF_MS = 1_000;
+export const MAX_BACKOFF_MS = 30_000;
 
 /**
  * Endpoint identity for the single fixed host the phone dials. Mobile has no
