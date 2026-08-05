@@ -4,6 +4,7 @@ import {
   WorkingVerbContext,
   pickWorkingVerb,
 } from "@/components/chat/working-verb";
+import { isFastModeEnabled } from "@/components/home/data/landing-options";
 import { HarnessIcon } from "@/components/home/pickers/harness-icon";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import type {
@@ -127,7 +128,7 @@ export function AssistantMessageBody({
   const replyText = useMemo(
     () =>
       segments.length === 0 && stopped !== null && stopped.turnHadOutput
-        ? stopped.turnReplyText
+        ? collectAssistantReplyText(stopped.turnReplySegments)
         : collectAssistantReplyText(segments),
     [segments, stopped],
   );
@@ -573,14 +574,6 @@ function AssistantMetaRow({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * Fast mode is on whenever the turn carried a non-default service tier (e.g.
- * Codex `"priority"`); an empty/null tier means the harness default.
- */
-function isFastModeEnabled(serviceTier: string | null): boolean {
-  return serviceTier !== null && serviceTier.trim().length > 0;
-}
-
-/**
  * Past-tense verbs rotated per turn so the footer reads playfully rather than
  * mechanically (Claude Code CLI pattern). Seeded by `messageId` (stable per
  * turn AND distinct between sibling turns sharing one user-send) so the verb
@@ -769,6 +762,7 @@ function ApprovalSegmentCard({
       decision={segment.decision}
       variant="card"
       headerFindUnitId={findUnitId}
+      initiallyOpen={false}
     />
   );
 }
@@ -795,12 +789,19 @@ function AssistantSegment({
         />
       );
     case "reasoning":
+      // Unreachable from the timeline - `isActivitySegment` admits reasoning
+      // unconditionally, so every reasoning block reaches the renderer through
+      // an activity group. Kept so the switch stays exhaustive over the segment
+      // taxonomy, and for direct renders in tests.
       return (
         <ReasoningSegment
           findUnitId={findUnitId}
           markdown={segment.markdown}
           isStreaming={segment.isStreaming}
           durationMs={segment.durationMs}
+          bodyBoundedByParent={false}
+          headerless={false}
+          initiallyExpanded={false}
         />
       );
     case "tool": {
@@ -834,6 +835,7 @@ function AssistantSegment({
           segment={segment}
           variant="card"
           headerFindUnitId={findUnitId}
+          initiallyOpen={false}
         />
       );
     case "file_change_group":
@@ -846,20 +848,27 @@ function AssistantSegment({
           findUnitId={findUnitId}
         />
       );
-    case "command":
+    case "command": {
+      // Same treatment as a promoted tool call: while the host still lists the
+      // command as running background work, the card keeps reading "running"
+      // even though the turn that spawned it already finalized its blocks.
+      const isBackgroundRunning = backgroundToolBlockIds.has(segment.id);
       return (
         <CommandSegment
           command={segment.command}
           cwd={segment.cwd}
           exitCode={segment.exitCode}
-          isStreaming={segment.isStreaming}
-          endState={segment.endState}
+          isStreaming={segment.isStreaming || isBackgroundRunning}
+          endState={isBackgroundRunning ? null : segment.endState}
+          stopped={segment.stopped}
           progress={segment.progress}
           startedAt={segment.startedAt}
           variant="card"
           headerFindUnitId={findUnitId}
+          initiallyOpen={false}
         />
       );
+    }
     case "subagent":
       return (
         <SubagentSegment
@@ -901,6 +910,7 @@ function AssistantSegment({
         <ErrorSegment
           message={segment.message}
           code={segment.code}
+          recoverable={segment.recoverable}
           findUnitId={findUnitId}
         />
       );

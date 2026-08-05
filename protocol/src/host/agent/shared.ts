@@ -66,6 +66,7 @@ export const guiHarnessIdSchema = harnessIdSchema.extract([
   "devin",
   "pi",
   "hermes",
+  "omp",
 ]);
 export type GuiHarnessId = z.infer<typeof guiHarnessIdSchema>;
 
@@ -137,12 +138,10 @@ export type GuiHarnessIdV30 = z.infer<typeof guiHarnessIdSchemaV30>;
 
 /**
  * Frozen harness id set as shipped in protocol v4.0 (with Devin/Pi, before
- * Hermes). Used only by the frozen v4.0 response schema of
+ * Hermes/omp). Used only by the frozen v4.0 response schema of
  * `agent.gui.listHarnesses` so already-shipped v4.0 clients never receive
- * post-v4.0 ids; the v5.0 line adds them and v5→v4 / v5→v3 / v5→v2 / v5→v1
- * bridges filter them for older callers. Do NOT add new harnesses here -
- * extend the latest `guiHarnessIdSchema` and use the existing v5 bridge
- * instead.
+ * post-v4.0 ids. Do NOT add new harnesses here - extend the latest
+ * `guiHarnessIdSchema` and use the existing bridges instead.
  */
 export const guiHarnessIdSchemaV40 = harnessIdSchema.extract([
   "claude",
@@ -163,6 +162,36 @@ export const guiHarnessIdSchemaV40 = harnessIdSchema.extract([
   "pi",
 ]);
 export type GuiHarnessIdV40 = z.infer<typeof guiHarnessIdSchemaV40>;
+
+/**
+ * Frozen harness id set as shipped in protocol v5.0 (with Hermes, before omp).
+ *
+ * This line IS released - `cli-v1.1.8` (tagged 2026-07-25) shipped v5.0, so a
+ * client in the field strict-decodes exactly these 17 ids. omp therefore could
+ * not join v5.0 and opened v6.0 instead, with v6→v5 … v6→v1 bridges that drop
+ * post-v5.0 ids. Do NOT add new harnesses here - extend the latest
+ * `guiHarnessIdSchema` and use the existing v6 bridge instead.
+ */
+export const guiHarnessIdSchemaV50 = harnessIdSchema.extract([
+  "claude",
+  "codex",
+  "opencode",
+  "traycer",
+  "cursor",
+  "grok",
+  "qwen",
+  "kiro",
+  "droid",
+  "kimi",
+  "copilot",
+  "kilocode",
+  "openrouter",
+  "amp",
+  "devin",
+  "pi",
+  "hermes",
+]);
+export type GuiHarnessIdV50 = z.infer<typeof guiHarnessIdSchemaV50>;
 
 export const tuiHarnessIdSchema = harnessIdSchema.extract([
   "claude",
@@ -227,6 +256,7 @@ export const AGENT_FACING_HARNESS_IDS = [
   "devin",
   "pi",
   "hermes",
+  "omp",
 ] as const;
 
 export const AGENT_FACING_HARNESS_ID_LIST = AGENT_FACING_HARNESS_IDS.join(", ");
@@ -409,6 +439,15 @@ export type CreateAgentRequestV20 = z.infer<typeof createAgentRequestSchemaV20>;
  * callers retain their legacy sender-inheritance behavior; current tool/CLI
  * callers always send a concrete mode. Making the field required keeps the
  * released v2.0 wire immutable.
+ */
+/**
+ * `agentMode` is RETAINED here even though Epic Mode was removed from the
+ * product. v3.0 is itself released (it shipped in the v1.1.8 tags), so a
+ * current client and a v1.1.8 host both negotiate 3.0 and NO bridge runs
+ * between them - dropping the key would simply be rejected by that host, which
+ * still requires it. Callers state the one remaining mode; the field goes when
+ * the released client/host floor passes this version, together with the
+ * equally-blocked `prepareTuiLaunch` / `createTuiAgent` request shapes.
  */
 export const createAgentRequestSchemaV30 = createAgentRequestSchemaV20.extend({
   permissionMode: permissionModeSchema.nullable(),
@@ -682,11 +721,11 @@ export const listAgentsResponseSchemaV30 = listAgentsResponseSchema.extend({
 });
 export type ListAgentsResponseV30 = z.infer<typeof listAgentsResponseSchemaV30>;
 
-// ── Frozen protocol-v4.0 agent.list response (with Devin/Pi, before Hermes) ─
-// `agent.list` enumerates every agent in the epic - including Hermes GUI
+// ── Frozen protocol-v4.0 agent.list response (with Devin/Pi, pre-Hermes/omp) ─
+// `agent.list` enumerates every agent in the epic - including Hermes/omp GUI
 // harness chats a newer client created - so an already-shipped v4.0 client
 // would hit a strict enum on those rows. v4.0 is frozen here as actually
-// shipped (with Devin/Pi); the v5.0 line carries Hermes rows and v5→v4 /
+// shipped (with Devin/Pi); the v5.0 line carries Hermes/omp rows and v5→v4 /
 // v5→v3 / v5→v2 / v5→v1 bridges drop them for older callers. Do not add new
 // harnesses here - use the existing v5 bridge.
 export const agentSummarySchemaV40 = agentSummarySchema.extend({
@@ -696,6 +735,22 @@ export const listAgentsResponseSchemaV40 = listAgentsResponseSchema.extend({
   agents: z.array(agentSummarySchemaV40),
 });
 export type ListAgentsResponseV40 = z.infer<typeof listAgentsResponseSchemaV40>;
+
+// ── Frozen protocol-v5.0 agent.list response (with Hermes, before omp) ──────
+// `agent.list` enumerates every agent in the epic - including omp GUI harness
+// chats a newer client created - so an already-shipped v5.0 client would hit a
+// strict enum on those rows. This line IS released (`cli-v1.1.8` /
+// `host-v1.1.8`, both tagged 2026-07-25), so it is frozen here as actually
+// shipped; the v6.0 line carries omp rows and v6→v5 … v6→v1 bridges drop them
+// for older callers. Do not add new harnesses here - use the existing v6
+// bridge.
+export const agentSummarySchemaV50 = agentSummarySchema.extend({
+  harnessId: guiHarnessIdSchemaV50.nullable(),
+});
+export const listAgentsResponseSchemaV50 = listAgentsResponseSchema.extend({
+  agents: z.array(agentSummarySchemaV50),
+});
+export type ListAgentsResponseV50 = z.infer<typeof listAgentsResponseSchemaV50>;
 
 /**
  * `agent.sendMessage@1.0` - fire-and-forget enqueue from one agent to

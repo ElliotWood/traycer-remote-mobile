@@ -3,9 +3,10 @@ import {
   type ChildProcess,
   type SpawnOptions,
 } from "node:child_process";
+import { constants as osConstants } from "node:os";
 import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
-import { dirname } from "node:path";
+import type { Readable } from "node:stream";
 import {
   openBootstrapLogFd,
   writeBootstrapMarker,
@@ -25,7 +26,37 @@ import {
 import type { Environment } from "../runner/environment";
 import { CLI_ERROR_CODES, CliError, cliError } from "../runner/errors";
 import { withHostNodeOptions } from "../service/host-node-options";
+import {
+  CRASH_REPORT_SCAN_TIMEOUT_MS,
+  CRASH_REPORT_SPAWN_SLACK_MS,
+  MAX_KEPT_CRASH_REPORTS,
+  STDERR_END_WAIT_TIMEOUT_MS,
+  STDERR_FLUSH_TIMEOUT_MS,
+  StderrLogTee,
+  type StderrTee,
+  type CrashReportMatch,
+  crashReportsDirFor,
+  describeExitCode,
+  describeFatalSignal,
+  findCrashReportSince,
+  prepareCrashReportsDir,
+} from "../host/crash-diagnostics";
 import { hostHomeDir } from "../store/paths";
+import {
+  attestLaunchdSupervisorPid,
+  readLayer0Frame,
+  readLiveProbeContext,
+  readLiveProbeContextForServiceLabel,
+  writeProbeMarkerAtomically,
+  type Layer0FrameRead,
+  type LiveProbeContext,
+  type LiveProbeContextRead,
+} from "../host/lifecycle-probe";
+import {
+  mapLayer0FrameToProbeOutcome,
+  type ProbeMarker,
+  type ProbeSupervisorAttestation,
+} from "@traycer-clients/shared/host-lifecycle";
 import {
   applyEnvOverrides,
   listEnvOverrides,
@@ -55,10 +86,30 @@ import { createCliLogger, errorFromUnknown, type ILogger } from "../logger";
 //   5. Forward SIGTERM / SIGINT / SIGHUP to the host child.
 //   6. Exit with the host's final status (signal → 128+N, code → code).
 
-export interface RunHostStartOptions {
-  readonly environment: Environment;
-  readonly cwd: string | null;
-}
+export type HostStartProbeOptions = {
+  readonly transitionId: string;
+  readonly probeNonce: string;
+  readonly serviceLabel: string;
+};
+
+/** Existing service invocations stay label-less until their plist is refreshed. */
+export type RunHostStartOptions =
+  | {
+      readonly environment: Environment;
+      readonly cwd: string | null;
+    }
+  | {
+      readonly environment: Environment;
+      readonly cwd: string | null;
+      /** Identity binding for an ordinary service start; no probe authority. */
+      readonly serviceLabel: string;
+    }
+  | {
+      readonly environment: Environment;
+      readonly cwd: string | null;
+      /** Present only for a journal-authorised reclaim spawn probe. */
+      readonly probe: HostStartProbeOptions;
+    };
 
 export interface HostStartTarget {
   readonly executable: string;
@@ -66,6 +117,14 @@ export interface HostStartTarget {
   readonly cwd: string;
   readonly record: HostInstallRecord;
 }
+
+/**
+ * Child descriptor carrying the framed Layer-0 status record, named to the
+ * host by `--layer0-status-fd`. Three is the first descriptor past
+ * stdin/stdout/stderr and is the normal protocol; the flag exists so the host
+ * never has to infer the transport from the descriptor's type.
+ */
+export const LAYER0_STATUS_FD = 3;
 
 export interface ResolveHostStartTargetDeps {
   readonly readInstallRecord: (
@@ -136,10 +195,18 @@ export async function resolveHostStartTarget(
   // publishes pid.json where this environment's desktop watches, instead of
   // self-resolving to its own baked slot. PATH-ONLY: this never selects the
   // host's cloud/auth target, which stays baked into the host binary.
+  // The host home dir, NOT the executable's own directory: on Windows a
+  // process's CWD is an open handle on that directory, and children the
+  // host spawns without an explicit cwd inherit it. With the CWD inside
+  // `install/`, any such child that outlives the pre-update kill blocks
+  // the install-dir swap rename with EBUSY - and the slot scan cannot see
+  // a process whose only tie to the install is its CWD. The host itself
+  // resolves nothing cwd-relative (SEA module loads anchor at
+  // `import.meta.url`; data paths come from `--host-data-dir`).
   return {
     executable: record.executablePath,
     args: ["--host-data-dir", hostHomeDir(opts.environment)],
-    cwd: opts.cwd ?? dirname(record.executablePath),
+    cwd: opts.cwd ?? hostHomeDir(opts.environment),
     record,
   };
 }
@@ -171,6 +238,39 @@ export interface RunHostStartDeps extends ResolveHostStartTargetDeps {
   readonly exit: (code: number) => void;
   readonly onError: (message: string) => void;
   readonly logger: ILogger | null;
+  readonly readLiveProbeContext: (
+    environment: Environment,
+    input: LiveProbeContext,
+    now: string,
+  ) => Promise<LiveProbeContextRead>;
+  readonly readLiveProbeContextForServiceLabel: (
+    environment: Environment,
+    serviceLabel: string,
+    now: string,
+  ) => Promise<LiveProbeContextRead>;
+  readonly now: () => string;
+  readonly readLayer0Frame: (
+    stream: Readable,
+    timeoutMs: number,
+  ) => Promise<Layer0FrameRead>;
+  readonly attestProbeSupervisor: (
+    serviceLabel: string,
+    supervisorPid: number,
+  ) => Promise<ProbeSupervisorAttestation | null>;
+  readonly writeProbeMarker: (
+    environment: Environment,
+    marker: ProbeMarker,
+  ) => Promise<void>;
+  // Crash-diagnostics operations. Injected so tests never touch the real
+  // host data dir: the defaults create/prune/scan real directories and tee
+  // real bytes into host.log.
+  readonly prepareCrashReportsDir: (dir: string) => Promise<readonly string[]>;
+  readonly findCrashReport: (
+    dir: string,
+    sinceMs: number,
+    excludeNames: ReadonlySet<string>,
+  ) => Promise<CrashReportMatch | null>;
+  readonly createStderrTee: (environment: Environment) => StderrTee;
 }
 
 const defaultRunDeps: RunHostStartDeps = {
@@ -189,6 +289,16 @@ const defaultRunDeps: RunHostStartDeps = {
     console.error(message);
   },
   logger: null,
+  readLiveProbeContext,
+  readLiveProbeContextForServiceLabel,
+  now: () => new Date().toISOString(),
+  readLayer0Frame,
+  attestProbeSupervisor: attestLaunchdSupervisorPid,
+  writeProbeMarker: writeProbeMarkerAtomically,
+  prepareCrashReportsDir: (dir) =>
+    prepareCrashReportsDir(dir, MAX_KEPT_CRASH_REPORTS),
+  findCrashReport: findCrashReportSince,
+  createStderrTee: (environment) => new StderrLogTee(environment),
 };
 
 // Long-running entrypoint invoked by the OS service manager. Resolves
@@ -209,13 +319,60 @@ export async function runHostStart(
   // on a pre-action log baseline (Finding F evidence identity).
   const attemptId = randomUUID();
   const supervisorPid = process.pid;
+  const requestedProbe = "probe" in opts ? opts.probe : null;
+  const serviceLabel = "serviceLabel" in opts ? opts.serviceLabel : null;
+  const probeRead: LiveProbeContextRead | null =
+    requestedProbe !== null
+      ? await deps.readLiveProbeContext(
+          opts.environment,
+          requestedProbe,
+          deps.now(),
+        )
+      : serviceLabel === null
+        ? null
+        : await deps.readLiveProbeContextForServiceLabel(
+            opts.environment,
+            serviceLabel,
+            deps.now(),
+          );
+  const probeContext =
+    probeRead !== null && probeRead.kind === "authorised"
+      ? probeRead.context
+      : null;
 
   logger.info("Host supervisor starting", {
     environment: opts.environment,
     hasCwdOverride: opts.cwd !== null,
     attemptId,
     supervisorPid,
+    probe: probeContext !== null,
+    // Carried so a machine that never enters probe mode says WHY. All three
+    // non-authorised arms are equally safe (no incumbent bypass), but a
+    // journal at a schema version this build cannot read is a very different
+    // situation from one whose deadline elapsed, and neither is "no journal".
+    probeAuthority:
+      probeRead === null
+        ? "not-requested"
+        : probeRead.kind === "authorised"
+          ? "authorised"
+          : probeRead.kind === "unauthorised"
+            ? probeRead.reason
+            : `indeterminate: ${probeRead.cause}`,
   });
+
+  // A stale/malformed probe invocation has no authority to bypass the normal
+  // incumbent guard. Exit cleanly without a marker so the reconciler treats it
+  // as ambiguity, never as wedge evidence or permission to evict raw.
+  if (requestedProbe !== null && probeContext === null) {
+    logger.warn("Host probe declined: no matching live transition journal", {
+      environment: opts.environment,
+      transitionId: requestedProbe.transitionId,
+      serviceLabel: requestedProbe.serviceLabel,
+      attemptId,
+      supervisorPid,
+    });
+    return deps.exit(0);
+  }
 
   // Best-effort backstop against stacking a second host on a live one.
   // BE PRECISE ABOUT WHAT THIS DOES AND DOES NOT COVER.
@@ -269,7 +426,10 @@ export async function runHostStart(
   // cleanly-exited job down until the next login instead of relaunching it
   // in a loop. No bootstrap marker is written - declining is not a spawn
   // attempt, and the existing phases all describe one.
-  const incumbent = await deps.findIncumbentHost(opts.environment);
+  const incumbent =
+    probeContext === null
+      ? await deps.findIncumbentHost(opts.environment)
+      : null;
   if (incumbent !== null) {
     logger.warn(
       "Host supervisor declined to start - another host already owns this data dir",
@@ -304,15 +464,28 @@ export async function runHostStart(
       await deps.writeMarker(
         opts.environment,
         "failed-to-spawn",
-        markerFields(attemptId, supervisorPid, {
-          shell: undefined,
-          args: undefined,
-          bundle: undefined,
-          exitCode: undefined,
-          signal: undefined,
-          error: `${err.code}: ${err.message}`,
-        }),
+        markerFields(
+          attemptId,
+          supervisorPid,
+          {
+            shell: undefined,
+            args: undefined,
+            bundle: undefined,
+            exitCode: undefined,
+            signal: undefined,
+            error: `${err.code}: ${err.message}`,
+          },
+          null,
+        ),
       );
+      await writeProbeTerminalIfAttested({
+        context: probeContext,
+        attemptId,
+        supervisorPid,
+        reason: `target-resolution-${err.code}`,
+        deps,
+        environment: opts.environment,
+      });
       deps.onError(`traycer host start: ${err.code}: ${err.message}`);
       deps.onError(detailLine);
       return deps.exit(err.exitCode);
@@ -322,6 +495,14 @@ export async function runHostStart(
       { environment: opts.environment, exitCode: 1 },
       errorFromUnknown(err),
     );
+    await writeProbeTerminalIfAttested({
+      context: probeContext,
+      attemptId,
+      supervisorPid,
+      reason: "target-resolution-unexpected",
+      deps,
+      environment: opts.environment,
+    });
     throw err;
   }
 
@@ -364,20 +545,52 @@ export async function runHostStart(
     rotation,
   });
 
+  // Create + prune the diagnostic-report destination BEFORE the spawn: the
+  // relative `--report-directory=crash-reports` in NODE_OPTIONS resolves
+  // against the child cwd, and a crash before the host's own runtime arming
+  // must still have somewhere to land. Never throws.
+  const crashReportsDirPath = crashReportsDirFor(target.cwd);
+  const preexistingReportNames = new Set(
+    await deps.prepareCrashReportsDir(crashReportsDirPath),
+  );
+
   await deps.writeMarker(
     opts.environment,
     "starting",
-    markerFields(attemptId, supervisorPid, {
-      shell: undefined,
-      args: target.args,
-      bundle: target.executable,
-      exitCode: undefined,
-      signal: undefined,
-      error: undefined,
-    }),
+    markerFields(
+      attemptId,
+      supervisorPid,
+      {
+        shell: undefined,
+        args: target.args,
+        bundle: target.executable,
+        exitCode: undefined,
+        signal: undefined,
+        error: undefined,
+      },
+      null,
+    ),
   );
 
   const logFd = await deps.openLogFd(opts.environment);
+  // `--layer0-status-fd` is the AUTHORIZATION for the framed Layer-0 status
+  // transport, not a hint about it: the host writes a status frame only when
+  // this supervisor names the descriptor, and is a hard no-op otherwise. It
+  // is therefore passed if and only if the `stdio` vector below actually
+  // opens the pipe (probe mode). Passing it speculatively would re-create the
+  // defect it exists to close - the host used to sniff fd 3's type, and
+  // Node's own IPC channel is a Unix-domain socket on fd 3, so unrelated IPC
+  // received raw frames. Version skew is safe both ways: an N-1 host scans
+  // argv and ignores the unknown flag, and a current host that is not given
+  // the flag simply writes nothing.
+  const hostArgs = [
+    ...target.args,
+    "--layer0-attempt-id",
+    attemptId,
+    ...(probeContext === null
+      ? []
+      : ["--layer0-status-fd", String(LAYER0_STATUS_FD)]),
+  ] as const;
 
   // The `make dev-desktop` host runtime is a `.cmd` wrapper that execs
   // `node <bundle>` (production is a real `.exe`). bun/Node launch a `.cmd`
@@ -386,14 +599,27 @@ export async function runHostStart(
   // "'C:\Users\Traycer' is not recognized". Invoke cmd.exe ourselves with a
   // verbatim, fully-quoted command line on Windows; every other case spawns
   // the executable directly.
-  const launch = resolveSpawnInvocation(target.executable, target.args);
+  const launch = resolveSpawnInvocation(target.executable, hostArgs);
 
+  // Captured BEFORE the spawn: a loader-phase crash can write its diagnostic
+  // report before any post-spawn statement runs, and the report scan treats
+  // this as its lower bound (with additional slack for mtime granularity).
+  const childSpawnedAtMs = Date.now();
   let child: ChildProcess;
   try {
     child = deps.spawn(launch.command, launch.args, {
       cwd: target.cwd,
       env,
-      stdio: ["ignore", logFd, logFd],
+      // Index LAYER0_STATUS_FD of this vector IS the descriptor named by
+      // `--layer0-status-fd` above; the two must not drift apart. stdout
+      // stays on the log fd; stderr is piped so the supervisor can tee it -
+      // byte-for-byte into `host.log` BY PATH (a host-side log rotation
+      // strands an fd-bound copy in `host.log.1`) plus a bounded in-memory
+      // tail for the crash marker.
+      stdio:
+        probeContext === null
+          ? ["ignore", logFd, "pipe"]
+          : ["ignore", logFd, "pipe", "pipe"],
       windowsHide: process.platform === "win32",
       ...(launch.windowsVerbatimArguments
         ? { windowsVerbatimArguments: true }
@@ -409,20 +635,140 @@ export async function runHostStart(
     await deps.writeMarker(
       opts.environment,
       "failed-to-spawn",
-      markerFields(attemptId, supervisorPid, {
-        shell: undefined,
-        args: undefined,
-        bundle: target.executable,
-        exitCode: undefined,
-        signal: undefined,
-        error: message,
-      }),
+      markerFields(
+        attemptId,
+        supervisorPid,
+        {
+          shell: undefined,
+          args: undefined,
+          bundle: target.executable,
+          exitCode: undefined,
+          signal: undefined,
+          error: message,
+        },
+        null,
+      ),
     );
+    await writeProbeTerminalIfAttested({
+      context: probeContext,
+      attemptId,
+      supervisorPid,
+      reason: "host-spawn-failed",
+      deps,
+      environment: opts.environment,
+    });
     deps.onError(
       `traycer host start: ${CLI_ERROR_CODES.HOST_SPAWN_FAILED}: ${message}`,
     );
     return deps.exit(66);
   }
+
+  // Stderr tee (see the stdio comment above): bounded path-addressed mirror
+  // into host.log plus the head+tail capture for the crash marker. Failures
+  // are swallowed - a diagnostics write must never take the supervisor down.
+  const stderrTee = deps.createStderrTee(opts.environment);
+  // Resolves when the stderr stream ends (or errors). `exit` fires when the
+  // process dies, NOT when its pipes have drained, so the finalize path waits
+  // on THIS (bounded) before writing the marker - otherwise the fatal text can
+  // still be unread in the pipe and the capture comes out empty in exactly the
+  // abnormal-death case this feature exists for.
+  let resolveStderrEnded: () => void = () => undefined;
+  const stderrEnded = new Promise<void>((resolve) => {
+    resolveStderrEnded = resolve;
+  });
+  if (child.stderr === null || child.stderr === undefined) {
+    resolveStderrEnded();
+  } else {
+    const stderr = child.stderr;
+    stderr.on("data", (chunk: Buffer) => {
+      stderrTee.append(chunk);
+    });
+    // MANDATORY, not defensive: the stream is a live `Readable` this process
+    // owns, and Node rethrows an unhandled stream `error` as an uncaught
+    // exception. A read error on this pipe (EIO, or EPIPE after an abnormal
+    // child death - i.e. precisely the crash case) would kill the supervisor
+    // BEFORE it writes the terminal marker Desktop reads. Swallow it and
+    // settle the wait: whatever bytes arrived are still worth recording, and
+    // `error` may arrive instead of `end`.
+    stderr.on("error", () => {
+      resolveStderrEnded();
+    });
+    stderr.on("end", () => {
+      resolveStderrEnded();
+    });
+    stderr.on("close", () => {
+      resolveStderrEnded();
+    });
+  }
+
+  const probeObservation =
+    probeContext === null
+      ? null
+      : observeProbeStatus({
+          child,
+          context: probeContext,
+          attemptId,
+          supervisorPid,
+          deps,
+          environment: opts.environment,
+        });
+  // `persistChildExit` awaits this inside a try/catch, but ONLY on the `exit`
+  // path. If the child fails asynchronously (`child.once("error", …)`, e.g.
+  // ENOENT) or simply never exits, nothing is ever attached - so a rejected
+  // `writeProbeMarker` (disk full, EACCES on the marker path) surfaces as an
+  // unhandled rejection and can take the supervisor down. Killing the
+  // supervisor because a diagnostic marker could not be written is a strictly
+  // worse outcome than not writing it.
+  //
+  // Marking it handled here rather than replacing the promise: `.catch()`
+  // returns a NEW promise and leaves `probeObservation` itself rejected but
+  // acknowledged, so `persistChildExit` still observes the failure and still
+  // logs it with its own context. Swallowing it into a resolved
+  // `{ marker: null }` would trade the crash for silence.
+  void probeObservation?.catch(() => undefined);
+
+  // `spawn()` may report a failure asynchronously (notably ENOENT on some
+  // platforms).  It is an EventEmitter error, not an exception from spawn,
+  // so it needs the same terminal evidence path as a synchronous failure.
+  // Guard both listeners: some child implementations subsequently emit exit.
+  let childFinalized = false;
+  const finalizeChildExit = (
+    code: number | null,
+    signal: NodeJS.Signals | null,
+  ): void => {
+    if (childFinalized) return;
+    childFinalized = true;
+    void persistChildExit({
+      code,
+      signal,
+      deps,
+      logger,
+      environment: opts.environment,
+      attemptId,
+      supervisorPid,
+      bundle: target.executable,
+      probeObservation,
+      childSpawnedAtMs,
+      stderrTee,
+      stderrEnded,
+      crashReportsDirPath,
+      preexistingReportNames,
+    });
+  };
+  const finalizeChildSpawnError = (cause: Error): void => {
+    if (childFinalized) return;
+    childFinalized = true;
+    void persistAsyncChildSpawnFailure({
+      cause,
+      deps,
+      logger,
+      environment: opts.environment,
+      attemptId,
+      supervisorPid,
+      bundle: target.executable,
+      probeContext,
+    });
+  };
 
   for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
     process.on(sig, () => {
@@ -448,80 +794,394 @@ export async function runHostStart(
     });
   }
 
-  child.on("exit", (code, signal) => {
-    // `process.exit()` is synchronous. Terminal markers are therefore written
-    // synchronously before exit rather than scheduling an append that the
-    // process could abandon. Desktop uses these as fail-now readiness evidence.
-    if (signal !== null) {
-      logger.warn("Host child exited by signal", {
-        environment: opts.environment,
-        signal,
-        exitCode: 128 + signalNumber(signal),
-        attemptId,
-      });
-      return persistTerminalMarkerAndExit({
-        deps,
-        logger,
-        environment: opts.environment,
-        phase: "killed",
-        fields: markerFields(attemptId, supervisorPid, {
-          shell: undefined,
-          args: undefined,
-          bundle: target.executable,
-          exitCode: undefined,
-          signal,
-          error: undefined,
-        }),
-        exitCode: 128 + signalNumber(signal),
-      });
-    }
-    if (code === null || code === 0) {
-      logger.info("Host child exited cleanly", {
-        environment: opts.environment,
-        exitCode: code ?? 0,
-        attemptId,
-      });
-      return persistTerminalMarkerAndExit({
-        deps,
-        logger,
-        environment: opts.environment,
-        phase: "exited",
-        fields: markerFields(attemptId, supervisorPid, {
-          shell: undefined,
-          args: undefined,
-          bundle: target.executable,
-          exitCode: code,
-          signal: undefined,
-          error: undefined,
-        }),
-        exitCode: code ?? 0,
-      });
-    }
-    logger.error(
-      "Host child exited with non-zero status",
+  child.once("error", finalizeChildSpawnError);
+  child.once("exit", finalizeChildExit);
+}
+
+async function persistAsyncChildSpawnFailure(input: {
+  readonly cause: Error;
+  readonly deps: RunHostStartDeps;
+  readonly logger: ILogger;
+  readonly environment: Environment;
+  readonly attemptId: string;
+  readonly supervisorPid: number;
+  readonly bundle: string;
+  readonly probeContext: LiveProbeContext | null;
+}): Promise<void> {
+  const message = input.cause.message;
+  input.logger.error(
+    "Host supervisor asynchronous spawn failed",
+    { environment: input.environment, exitCode: 66 },
+    errorFromUnknown(input.cause),
+  );
+  await input.deps.writeMarker(
+    input.environment,
+    "failed-to-spawn",
+    markerFields(
+      input.attemptId,
+      input.supervisorPid,
       {
-        environment: opts.environment,
-        exitCode: code,
-        attemptId,
+        shell: undefined,
+        args: undefined,
+        bundle: input.bundle,
+        exitCode: undefined,
+        signal: undefined,
+        error: message,
       },
       null,
-    );
+    ),
+  );
+  await writeProbeTerminalIfAttested({
+    context: input.probeContext,
+    attemptId: input.attemptId,
+    supervisorPid: input.supervisorPid,
+    reason: "host-spawn-failed",
+    deps: input.deps,
+    environment: input.environment,
+  });
+  input.deps.onError(
+    `traycer host start: ${CLI_ERROR_CODES.HOST_SPAWN_FAILED}: ${message}`,
+  );
+  input.deps.exit(66);
+}
+
+async function persistChildExit(input: {
+  readonly code: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly deps: RunHostStartDeps;
+  readonly logger: ILogger;
+  readonly environment: Environment;
+  readonly attemptId: string;
+  readonly supervisorPid: number;
+  readonly bundle: string;
+  readonly probeObservation: Promise<ProbeObservation> | null;
+  readonly childSpawnedAtMs: number;
+  readonly stderrTee: StderrTee;
+  readonly stderrEnded: Promise<void>;
+  readonly crashReportsDirPath: string;
+  readonly preexistingReportNames: ReadonlySet<string>;
+}): Promise<void> {
+  if (input.probeObservation !== null) {
+    try {
+      const observation = await input.probeObservation;
+      if (
+        observation.marker !== null &&
+        observation.marker.outcome.kind === "awaiting-readiness"
+      ) {
+        await input.deps.writeProbeMarker(input.environment, {
+          ...observation.marker,
+          outcome: {
+            kind: "terminal",
+            reason:
+              input.signal === null
+                ? `child-exit-${input.code ?? 0}`
+                : `child-signal-${input.signal}`,
+          },
+        });
+      }
+    } catch (error) {
+      input.logger.warn("Host probe marker finalization failed", {
+        environment: input.environment,
+        errorName: errorFromUnknown(error).name,
+        errorMessage: errorFromUnknown(error).message,
+      });
+    }
+  }
+
+  const {
+    code,
+    signal,
+    logger,
+    environment,
+    attemptId,
+    supervisorPid,
+    bundle,
+    deps,
+  } = input;
+  // TWO waits, and they are not interchangeable. First: let the stderr pipe
+  // reach `end` - `exit` does not imply drained pipes, so without this the
+  // capture can be empty precisely when the child died hard. Second: drain
+  // the tee's queued `appendFile` writes, which `process.exit()` below would
+  // otherwise abandon. Both are bounded, because a grandchild holding the
+  // inherited stderr fd can keep the stream open indefinitely and a
+  // diagnostics path must never hang the supervisor's exit.
+  await withDeadline(input.stderrEnded, STDERR_END_WAIT_TIMEOUT_MS);
+  await input.stderrTee.flush(STDERR_FLUSH_TIMEOUT_MS);
+  // `process.exit()` is synchronous. Terminal markers are therefore written
+  // synchronously before exit rather than scheduling an append that the
+  // process could abandon. Desktop uses these as fail-now readiness evidence.
+  if (signal !== null) {
+    // A fatal signal is a CRASH, not a shutdown: a Node fatal abort surfaces
+    // on macOS/Linux as `code=null, signal=SIGABRT`, and routing it through
+    // the bare killed path would discard the report and stderr evidence
+    // exactly where it matters most. Forwarded shutdown signals stay bare.
+    const fatalMeaning = describeFatalSignal(signal);
+    const crashReport =
+      fatalMeaning === null ? null : await boundedCrashReportScan(input);
+    logger.warn("Host child exited by signal", {
+      environment,
+      signal,
+      exitCode: 128 + signalNumber(signal),
+      attemptId,
+    });
+    if (fatalMeaning !== null) {
+      // Same support-log line as the nonzero-exit crash branch: a POSIX
+      // fatal is the same event wearing a signal, and cli.log is where a
+      // support pull reads the OOM-vs-native answer.
+      logger.error(
+        "Host crash diagnostics",
+        {
+          environment,
+          attemptId,
+          exitMeaning: fatalMeaning,
+          report: crashReport?.filename ?? "none",
+          reportSummary: crashReport?.summary ?? "none",
+        },
+        null,
+      );
+    }
     return persistTerminalMarkerAndExit({
       deps,
       logger,
-      environment: opts.environment,
-      phase: "crashed",
-      fields: markerFields(attemptId, supervisorPid, {
+      environment,
+      phase: "killed",
+      fields: markerFields(
+        attemptId,
+        supervisorPid,
+        {
+          shell: undefined,
+          args: undefined,
+          bundle,
+          exitCode: undefined,
+          signal,
+          error: undefined,
+        },
+        fatalMeaning === null
+          ? null
+          : {
+              exitMeaning: fatalMeaning,
+              report: crashReport?.filename,
+              stderrTail: input.stderrTee.capture.isEmpty()
+                ? undefined
+                : input.stderrTee.capture.escapedForMarker(),
+            },
+      ),
+      exitCode: 128 + signalNumber(signal),
+    });
+  }
+  if (code === null || code === 0) {
+    logger.info("Host child exited cleanly", {
+      environment,
+      exitCode: code ?? 0,
+      attemptId,
+    });
+    return persistTerminalMarkerAndExit({
+      deps,
+      logger,
+      environment,
+      phase: "exited",
+      fields: markerFields(
+        attemptId,
+        supervisorPid,
+        {
+          shell: undefined,
+          args: undefined,
+          bundle,
+          exitCode: code,
+          signal: undefined,
+          error: undefined,
+        },
+        null,
+      ),
+      exitCode: code ?? 0,
+    });
+  }
+  logger.error(
+    "Host child exited with non-zero status",
+    {
+      environment,
+      exitCode: code,
+      attemptId,
+    },
+    null,
+  );
+  // Crash enrichment: decode the exit status, reference the diagnostic
+  // report this child wrote (if any), and attach the stderr capture - the
+  // fatal-error text that used to be stranded in a rotated-away log
+  // generation. All best-effort and time-bounded; the marker must be
+  // written regardless.
+  const exitMeaning = describeExitCode(code) ?? undefined;
+  const crashReport = await boundedCrashReportScan(input);
+  if (exitMeaning !== undefined || crashReport !== null) {
+    logger.error(
+      "Host crash diagnostics",
+      {
+        environment,
+        attemptId,
+        exitMeaning: exitMeaning ?? "unknown",
+        report: crashReport?.filename ?? "none",
+        reportSummary: crashReport?.summary ?? "none",
+      },
+      null,
+    );
+  }
+  return persistTerminalMarkerAndExit({
+    deps,
+    logger,
+    environment,
+    phase: "crashed",
+    fields: markerFields(
+      attemptId,
+      supervisorPid,
+      {
         shell: undefined,
         args: undefined,
-        bundle: target.executable,
+        bundle,
         exitCode: code,
         signal: undefined,
         error: undefined,
-      }),
-      exitCode: code,
-    });
+      },
+      {
+        exitMeaning,
+        report: crashReport?.filename,
+        stderrTail: input.stderrTee.capture.isEmpty()
+          ? undefined
+          : input.stderrTee.capture.escapedForMarker(),
+      },
+    ),
+    exitCode: code,
   });
+}
+
+/**
+ * Report scan bounded by {@link CRASH_REPORT_SCAN_TIMEOUT_MS}: the terminal
+ * marker is readiness authority and must not be lost to a slow disk - past
+ * the budget the marker goes out without a `report=` field. The lower bound
+ * gets {@link CRASH_REPORT_SPAWN_SLACK_MS} of slack for loader-phase crashes
+ * and mtime granularity.
+ */
+function boundedCrashReportScan(input: {
+  readonly deps: RunHostStartDeps;
+  readonly crashReportsDirPath: string;
+  readonly childSpawnedAtMs: number;
+  readonly preexistingReportNames: ReadonlySet<string>;
+}): Promise<CrashReportMatch | null> {
+  return Promise.race([
+    // `.catch` is load-bearing, not decoration. `persistChildExit` is invoked
+    // as `void persistChildExit(...)`, so a rejection here would skip the
+    // terminal marker AND `deps.exit` - leaving the supervisor alive with no
+    // evidence written, which is strictly worse than having no `report=`
+    // field. The default implementation swallows its own I/O errors, but the
+    // INJECTED dependency contract makes no such promise.
+    input.deps
+      .findCrashReport(
+        input.crashReportsDirPath,
+        input.childSpawnedAtMs - CRASH_REPORT_SPAWN_SLACK_MS,
+        input.preexistingReportNames,
+      )
+      .catch(() => null),
+    new Promise<null>((resolve) => {
+      const timer = setTimeout(
+        () => resolve(null),
+        CRASH_REPORT_SCAN_TIMEOUT_MS,
+      );
+      timer.unref?.();
+    }),
+  ]);
+}
+
+/**
+ * Resolves when `promise` settles or `timeoutMs` elapses, whichever is first.
+ * Never rejects: every caller here is on the exit path, where the only
+ * acceptable outcome is "continue and write the marker".
+ */
+function withDeadline(
+  promise: Promise<void>,
+  timeoutMs: number,
+): Promise<void> {
+  return Promise.race([
+    promise.then(
+      () => undefined,
+      () => undefined,
+    ),
+    new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      timer.unref?.();
+    }),
+  ]);
+}
+
+/**
+ * Failure markers are meaningful only when the live launchd job can attest
+ * itself.  An unattested failure deliberately remains ambiguity: it may
+ * defer a reclaim, but can never authorise raw-host eviction.
+ */
+async function writeProbeTerminalIfAttested(input: {
+  readonly context: LiveProbeContext | null;
+  readonly attemptId: string;
+  readonly supervisorPid: number;
+  readonly reason: string;
+  readonly deps: RunHostStartDeps;
+  readonly environment: Environment;
+}): Promise<void> {
+  if (input.context === null) return;
+  const attestation = await input.deps.attestProbeSupervisor(
+    input.context.serviceLabel,
+    input.supervisorPid,
+  );
+  if (attestation === null) return;
+  await input.deps.writeProbeMarker(input.environment, {
+    v: 1,
+    transitionId: input.context.transitionId,
+    probeNonce: input.context.probeNonce,
+    serviceLabel: input.context.serviceLabel,
+    supervisorPid: input.supervisorPid,
+    attestation,
+    outcome: { kind: "terminal", reason: input.reason },
+  });
+}
+
+type ProbeObservation = { readonly marker: ProbeMarker | null };
+
+async function observeProbeStatus(input: {
+  readonly child: ChildProcess;
+  readonly context: LiveProbeContext;
+  readonly attemptId: string;
+  readonly supervisorPid: number;
+  readonly deps: RunHostStartDeps;
+  readonly environment: Environment;
+}): Promise<ProbeObservation> {
+  const status = input.child.stdio[LAYER0_STATUS_FD];
+  if (!isReadable(status)) return { marker: null };
+  const read = await input.deps.readLayer0Frame(status, 3_000);
+  if (read.kind !== "frame" || read.frame.attemptId !== input.attemptId) {
+    return { marker: null };
+  }
+  const attestation = await input.deps.attestProbeSupervisor(
+    input.context.serviceLabel,
+    input.supervisorPid,
+  );
+  if (attestation === null) return { marker: null };
+  const marker: ProbeMarker = {
+    v: 1,
+    transitionId: input.context.transitionId,
+    probeNonce: input.context.probeNonce,
+    serviceLabel: input.context.serviceLabel,
+    supervisorPid: input.supervisorPid,
+    attestation,
+    outcome: mapLayer0FrameToProbeOutcome(read.frame),
+  };
+  await input.deps.writeProbeMarker(input.environment, marker);
+  return { marker };
+}
+
+function isReadable(value: unknown): value is Readable {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "on" in value &&
+    typeof value.on === "function"
+  );
 }
 
 function persistTerminalMarkerAndExit(options: {
@@ -569,6 +1229,13 @@ function markerFields(
     readonly signal: string | null | undefined;
     readonly error: string | undefined;
   },
+  // Crash-only enrichment (decoded exit status, diagnostic-report reference,
+  // stderr tail). `null` everywhere except the `phase=crashed` writer.
+  diagnostics: {
+    readonly exitMeaning: string | undefined;
+    readonly report: string | undefined;
+    readonly stderrTail: string | undefined;
+  } | null,
 ): BootstrapMarkerFields {
   return {
     shell: fields.shell,
@@ -577,12 +1244,25 @@ function markerFields(
     exitCode: fields.exitCode,
     signal: fields.signal,
     error: fields.error,
+    exitMeaning: diagnostics?.exitMeaning,
+    report: diagnostics?.report,
+    stderrTail: diagnostics?.stderrTail,
     attemptId,
     supervisorPid,
   };
 }
 
 function signalNumber(signal: NodeJS.Signals): number {
+  // The platform's own table first: the newly crash-classified fatal signals
+  // (SIGABRT, SIGSEGV, ...) must map to their real numbers - reporting
+  // SIGABRT as the generic 15 fallback (exit 143 instead of 134) misfiles
+  // the crash for every consumer of the supervisor's exit code. Some numbers
+  // are platform-dependent (SIGBUS is 7 on Linux, 10 on macOS), which is why
+  // this is a lookup, not a table.
+  const known = osConstants.signals[signal];
+  if (typeof known === "number") {
+    return known;
+  }
   if (signal === "SIGINT") return 2;
   if (signal === "SIGTERM") return 15;
   if (signal === "SIGHUP") return 1;

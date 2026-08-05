@@ -63,6 +63,32 @@ const INNER_SUBPAGE: CommandSubpage = {
       run: () => undefined,
     },
     {
+      id: "open:cat:badged",
+      label: "Badged Leaf",
+      description: null,
+      keywords: ["badged"],
+      group: "open",
+      scope: "actions",
+      shortcut: null,
+      actionId: null,
+      subpage: null,
+      run: () => undefined,
+      hostBadge: "Remote Box",
+    },
+    {
+      id: "open:cat:status",
+      label: "Unavailable Leaf",
+      description: null,
+      keywords: ["unavailable"],
+      group: "open",
+      scope: "actions",
+      shortcut: null,
+      actionId: null,
+      subpage: null,
+      run: () => undefined,
+      statusBadge: "Unavailable: Remote Box",
+    },
+    {
       id: "open:cat:nested",
       label: "Nested",
       description: null,
@@ -251,6 +277,25 @@ describe("PaneOpener", () => {
     });
   });
 
+  it("includes a deep row's status badge in its accessible name", () => {
+    render(
+      <PaneOpener
+        epicId="epic-1"
+        tabId="tab-status"
+        groupId="group-status"
+        active={false}
+      />,
+    );
+
+    fireEvent.change(searchInput(), { target: { value: "unavailable" } });
+
+    expect(
+      screen.getByRole("option", {
+        name: "Category → Unavailable Leaf → Unavailable: Remote Box",
+      }),
+    ).not.toBeNull();
+  });
+
   it("selecting a deep row that bears a sub-page drills into it", () => {
     render(
       <PaneOpener
@@ -299,5 +344,25 @@ describe("PaneOpener", () => {
     expect(within(paneA).getByText("Inner Leaf")).not.toBeNull();
     expect(within(paneB).queryByText("Inner Leaf")).toBeNull();
     expect(within(paneB).getByText("Category")).not.toBeNull();
+  });
+
+  it("renders a host badge only on a sub-page row that carries one", () => {
+    render(
+      <PaneOpener
+        epicId="epic-1"
+        tabId="tab-badge"
+        groupId="group-badge"
+        active={false}
+      />,
+    );
+    fireEvent.click(screen.getByText("Category"));
+
+    expect(screen.getByText("Badged Leaf")).not.toBeNull();
+    expect(screen.getByText("Remote Box")).not.toBeNull();
+    // The unbadged row's own container carries no badge text.
+    const innerLeafRow = screen
+      .getByText("Inner Leaf")
+      .closest('[data-slot="command-item"]');
+    expect(innerLeafRow?.textContent).not.toContain("Remote Box");
   });
 });

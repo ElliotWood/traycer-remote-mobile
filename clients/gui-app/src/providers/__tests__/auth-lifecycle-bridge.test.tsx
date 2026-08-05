@@ -34,6 +34,7 @@ function fakeOpenEpicHandle(id: string): OpenEpicStoreHandle & {
     },
     requestFreshSnapshot: () => undefined,
     isClean: () => true,
+    hotArtifactRoomIdsForTests: () => [],
     disposeCount: 0,
   };
   return h;
@@ -58,6 +59,7 @@ function fakeChatHandle(
       streamFlushCoordinator: IMMEDIATE_STREAM_FLUSH_COORDINATOR,
       streamClientFactory: () => ({
         sendAction: () => undefined,
+        sameTurnSteeringProtocolSupported: () => true,
         close: () => {
           calls.close += 1;
         },
