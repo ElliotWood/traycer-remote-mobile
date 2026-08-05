@@ -181,6 +181,10 @@ export function foldRuntimeEvent(
         command: event.command,
         cwd: event.cwd ?? null,
         exitCode: null,
+        // Not yet known - backgrounding is only decided at the parent turn's
+        // end, mirroring the tool_call block's same-named field.
+        backgroundTask: null,
+        stopped: false,
       };
       return withBlock(state, block);
     }

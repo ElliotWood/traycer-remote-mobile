@@ -81,7 +81,10 @@ export function createHostCredentialsStore(): CredentialsMutationStore {
       metaPath: `${credentialsPath}.meta.json`,
       lockPath: `${credentialsPath}.lock`,
     },
-    refresh: refreshOnceAbortable,
+    // Neither "cli" nor "desktop": a headless bridge process (`remote-bridge`,
+    // `remote-agent` next) has no closer fit in this narrow union, so it omits
+    // the field like any other unclassified client - see `refreshOnceAbortable`.
+    refresh: (args) => refreshOnceAbortable({ ...args, clientKind: null }),
     lockWaitMs: LOCK_WAIT_MS,
     lockPollIntervalMs: LOCK_POLL_INTERVAL_MS,
     continuationRetryMs: CONTINUATION_RETRY_MS,

@@ -45,7 +45,7 @@ export function useProviders(client: MobileHostClient | null): UseProvidersResul
     let cancelled = false;
     const fetchOnce = async (): Promise<void> => {
       try {
-        const response = await client.request("providers.list", {});
+        const response = await client.request("providers.list", { native: null });
         if (!cancelled) {
           setProviders(response.providers);
           setLoading(false);

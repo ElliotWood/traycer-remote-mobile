@@ -202,7 +202,7 @@ export function useProviders(client: SettingsClient | null): ProvidersState {
       return;
     }
     client
-      .request("providers.list", {})
+      .request("providers.list", { native: null })
       .then((response) => {
         setState({ kind: "ready", providers: response.providers });
       })

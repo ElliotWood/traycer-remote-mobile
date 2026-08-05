@@ -110,6 +110,8 @@ describe("mandatory collapsed-by-default (reasoning/tool_call/file_change/subage
         command: "grep -r foo",
         cwd: null,
         exitCode: 0,
+        backgroundTask: false,
+        stopped: false,
       },
     ];
     renderBlocks(blocks, null);

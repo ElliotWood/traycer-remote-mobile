@@ -33,7 +33,10 @@
 import { hostRpcRegistry } from "@traycer/protocol/host/index";
 import type { HostRpcRegistry } from "@traycer/protocol/host/index";
 import { v4 as uuidv4 } from "uuid";
-import { WsRpcClient } from "../host-transport/ws-rpc-client";
+import {
+  WsRpcClient,
+  HOST_POST_OPEN_ATTESTATION_WINDOW_MS,
+} from "../host-transport/ws-rpc-client";
 import { createWhatwgWebSocketFactory } from "../host-transport/whatwg-ws-factory";
 import { createAuthAwareMessenger } from "../host-transport/auth-aware-messenger";
 import {
@@ -91,6 +94,7 @@ const defaultMessengerFactory: MessengerFactory = ({ registry }) =>
     webSocketFactory: createWhatwgWebSocketFactory(),
     dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
     frameTimeoutMs: DEFAULT_WS_FRAME_TIMEOUT_MS,
+    hostAttestationWindowMs: HOST_POST_OPEN_ATTESTATION_WINDOW_MS,
   });
 
 /**

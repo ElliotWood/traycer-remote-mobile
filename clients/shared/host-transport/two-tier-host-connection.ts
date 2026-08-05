@@ -202,6 +202,10 @@ export class WatchingConnection {
       endpoint: endpointFor(entry),
       bearer: () => auth.current()?.credentials ?? null,
       auth: createStreamAuthRevalidator(auth),
+      // No delegated host-credential-provisioning policy for this watching-tier
+      // connection either — see the matching note in
+      // `single-host-stream-connection.ts`.
+      hostCredentialMint: null,
       webSocketFactory,
       dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
       openAckTimeoutMs: OPEN_ACK_TIMEOUT_MS,

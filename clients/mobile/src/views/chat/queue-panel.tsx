@@ -79,8 +79,13 @@ export function QueuePanel({ queue, canMutate, onPause, onResume, onCancel, onSt
 
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {queue.items.map((item) => {
-          const text = userContentToMarkdown(item.message.content);
-          const steerable = item.delivery === "same_turn" && item.status === "pending";
+          // Managed commands (scheduled shell/monitor commands) share this
+          // queue but have no message content and cannot be steered or moved
+          // back to the composer - both are prompt-only concepts.
+          const isPrompt = item.kind === "prompt";
+          const text = isPrompt ? userContentToMarkdown(item.message.content) : item.description;
+          const steerable =
+            isPrompt && item.delivery === "same_turn" && item.status === "pending";
           return (
             <li
               key={item.queueItemId}
@@ -119,15 +124,17 @@ export function QueuePanel({ queue, canMutate, onPause, onResume, onCancel, onSt
                   <SendHorizontal size={13} aria-hidden="true" />
                 </button>
               )}
-              <button
-                type="button"
-                aria-label="Edit queued message"
-                disabled={!canMutate}
-                onClick={() => onEdit(item, text)}
-                style={iconButtonStyle(canMutate)}
-              >
-                <Pencil size={13} aria-hidden="true" />
-              </button>
+              {isPrompt && (
+                <button
+                  type="button"
+                  aria-label="Edit queued message"
+                  disabled={!canMutate}
+                  onClick={() => onEdit(item, text)}
+                  style={iconButtonStyle(canMutate)}
+                >
+                  <Pencil size={13} aria-hidden="true" />
+                </button>
+              )}
               <button
                 type="button"
                 aria-label="Delete queued message"

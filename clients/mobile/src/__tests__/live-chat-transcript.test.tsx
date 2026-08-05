@@ -132,6 +132,7 @@ function fetchSnapshot(): Promise<ChatSnapshot> {
           endpoint: () => ({ hostId: "live-test", websocketUrl: HOST_WS }),
           bearer: () => auth.current()?.credentials ?? null,
           auth: createStreamAuthRevalidator(auth),
+          hostCredentialMint: null,
           webSocketFactory: createWhatwgStreamWebSocketFactory(),
           dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
           // Mirrors `HostStreamConnection`'s constants (`stream-connection.ts`).

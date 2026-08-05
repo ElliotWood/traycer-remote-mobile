@@ -283,6 +283,11 @@ export class HostStreamConnection {
       // R3: read the live credential lease; no MutableBearerLease.
       bearer: () => auth.current()?.credentials ?? null,
       auth: createStreamAuthRevalidator(auth),
+      // This client has no delegated host-credential-provisioning policy (that's
+      // a desktop-app concern — see `HostCredentialMintFlow`); opting out is the
+      // documented, correct choice for a client that isn't gui-app's app-wide
+      // provisioning provider.
+      hostCredentialMint: null,
       webSocketFactory: createWhatwgStreamWebSocketFactory(),
       dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
       openAckTimeoutMs: OPEN_ACK_TIMEOUT_MS,

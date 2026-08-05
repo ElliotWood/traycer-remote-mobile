@@ -228,6 +228,12 @@ function makeEpicDocCallbacks(
     onMigrationNotAllowed: () => {},
     // Connection state is surfaced via the handle's connection store, not here.
     onConnectionStatus: () => {},
+    // Dirty-state tracking (unsaved-changes indicator) has no surface in the
+    // phone's epic detail yet - no-op like the other out-of-scope callbacks
+    // above.
+    onArtifactRoomDirty: () => {},
+    onRootDirty: () => {},
+    onDirtySnapshot: () => {},
   };
 }
 

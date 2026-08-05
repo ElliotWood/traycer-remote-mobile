@@ -609,6 +609,7 @@ export class MobileAuthService {
       authnBaseUrl: this.authnBaseUrl,
       token,
       refreshToken,
+      clientKind: null,
       signal: null,
     });
     if (!this.isCurrent(generation)) {
@@ -662,6 +663,7 @@ export class MobileAuthService {
       authnBaseUrl: this.authnBaseUrl,
       token: stored.token,
       refreshToken: stored.refreshToken,
+      clientKind: null,
       signal: null,
     });
     if (!this.isCurrent(generation)) {

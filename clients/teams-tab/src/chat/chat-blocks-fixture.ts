@@ -133,6 +133,8 @@ const M2_BLOCKS: readonly ContentBlock[] = [
     command: "bun test clients/teams-tab",
     cwd: "/srv/traycer/tenants/acme",
     exitCode: 1,
+    backgroundTask: false,
+    stopped: false,
   },
   {
     type: "todo",
@@ -328,6 +330,8 @@ const M4_BLOCKS: readonly ContentBlock[] = [
         summary: "17 call sites, all under clients/. None outside the workspace.",
         outputFile: null,
         mcp: null,
+        live: false,
+        managedCommand: null,
       },
     ],
   },

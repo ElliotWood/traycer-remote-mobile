@@ -424,6 +424,11 @@ export function useEpicAgents(
       onMigrationProgress: () => undefined,
       onMigrationFailed: () => undefined,
       onMigrationNotAllowed: () => undefined,
+      // Dirty-state tracking has no surface in the tab yet - deliberate no-op
+      // for the same reason as the other out-of-scope callbacks above.
+      onArtifactRoomDirty: () => undefined,
+      onRootDirty: () => undefined,
+      onDirtySnapshot: () => undefined,
     };
 
     const handle = streamConnection.openEpic({ epicId, callbacks });
