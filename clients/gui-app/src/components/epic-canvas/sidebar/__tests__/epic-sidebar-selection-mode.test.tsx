@@ -314,6 +314,7 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   }) => (
     <button
       type="button"
+      role="menuitem"
       data-testid={props["data-testid"]}
       disabled={props.disabled}
       aria-disabled={props["aria-disabled"]}
