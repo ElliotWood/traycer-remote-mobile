@@ -6,8 +6,8 @@ import {
   type HostRequestAuthority,
   type IHostMessenger,
 } from "../host-messenger";
-import { MutableBearerLease } from "@traycer-clients/shared/auth/bearer-source";
-import type { AuthorityBoundAuthRevalidator } from "@traycer-clients/shared/auth/bearer-revalidator";
+import { MutableBearerLease } from "../../auth/bearer-source";
+import type { AuthorityBoundAuthRevalidator } from "../../auth/bearer-revalidator";
 import { hostRpcRegistry } from "@traycer/protocol/host/index";
 
 type Registry = typeof hostRpcRegistry;

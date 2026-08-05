@@ -1,5 +1,13 @@
 <!doctype html>
-<html lang="en">
+<!--
+  `class="dark" data-theme="traycer-green"` — mobile has exactly one theme
+  (no theme switcher, unlike desktop's `theme-applier` + settings store), so
+  these are hardcoded rather than set at runtime. Without BOTH attributes,
+  global.css's `:root`/`.dark` tokens are a neutral GRAYSCALE fallback —
+  the teal/near-black palette only activates under
+  `.dark[data-theme="traycer-green"]` (Evaluator finding).
+-->
+<html lang="en" class="dark" data-theme="traycer-green">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -7,6 +15,16 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Traycer Remote</title>
+    <!-- No dedicated favicon asset exists — point the browser at the same
+         PWA icon `vite.config.ts`'s manifest already ships (`icons/icon-192.png`)
+         rather than leaving `/favicon.ico` to 404 on every load. -->
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <!-- iOS wants 180x180 for the home-screen icon; pointing this at the
+         192 forces Safari to resample it, which softens the artwork. The
+         dedicated asset is the same logo rendered at the exact size. iOS
+         also derives the launch/splash appearance from this icon plus the
+         manifest's `background_color`, so getting it right fixes both. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   </head>
   <body>
     <div id="root"></div>

@@ -1,0 +1,17 @@
+[Unit]
+Description=A6 end-to-end probe for the WebSocket deflate relay
+# NOT instanced per tenant (unlike traycer-health-probe@): the relay is a
+# single shared process fronting the host, so one probe covers it.
+
+[Service]
+Type=oneshot
+Environment=TRAYCER_HOME_ROOT=__TRAYCER_HOME_ROOT__
+# `||` rather than letting a nonzero exit mark the unit failed: this probe
+# is the thing that DETECTS a fault, so its own failure must become an
+# alert, not a second failed unit for someone to notice separately.
+# Lives in /usr/local/lib/traycer, NOT /usr/local/bin: it imports `ws`, and
+# Node resolves bare specifiers by walking up from the SCRIPT's directory.
+# The only node_modules/ws on this box is /usr/local/lib/traycer/node_modules
+# (installed for the relay itself), so a copy in /usr/local/bin fails with
+# ERR_MODULE_NOT_FOUND - found by running it there first, not predicted.
+ExecStart=/bin/bash -c '/usr/bin/node /usr/local/lib/traycer/traycer-relay-probe.mjs || /usr/local/bin/traycer-alert.sh relay relay_unreachable "end-to-end relay probe failed - see journalctl -u traycer-relay-probe"'

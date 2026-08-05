@@ -6,6 +6,7 @@
 **/build/
 **/lib/
 !/clients/gui-app/src/lib/
+!/clients/mobile/src/lib/
 **/@types/
 **/.eslintcache
 **/.env
@@ -23,3 +24,10 @@ coverage*.json
 .claude
 .agents
 *.tsbuildinfo
+# Real deployment parameters (SSH keys, hostnames) - see
+# infra/azure/bicep/main.example.bicepparam for the placeholder shape.
+infra/azure/bicep/main.bicepparam
+# Generated one-off retrofit scripts: infra/azure/scripts/*.assembled.sh are
+# built by inlining the real script/unit sources at run time. The sources are
+# the tracked artifacts; the assembled output is a build product.
+infra/azure/scripts/*.assembled.sh

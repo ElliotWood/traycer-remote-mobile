@@ -1,0 +1,10 @@
+[Unit]
+Description=Resync the nginx upstream from tenant %i's host pid.json
+
+[Service]
+Type=oneshot
+# Oneshot, triggered by the .path unit - not a daemon polling a file. The
+# script is idempotent and refuses to reload when the generated config fails
+# `nginx -t`, so a malformed pid.json degrades to a stale-but-working upstream
+# rather than taking nginx down.
+ExecStart=/usr/local/bin/traycer-nginx-upstream.sh %i

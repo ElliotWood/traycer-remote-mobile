@@ -1,0 +1,35 @@
+{
+  "name": "@traycer-clients/remote-bridge",
+  "version": "0.1.0",
+  "description": "Headless Node client speaking the Traycer host RPC protocol, exposing a channel-agnostic action surface (list agents, read status, approve/reject/answer-interview/send) for a channel adapter to sit on top of.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "traycer-remote-bridge": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "scripts": {
+    "compile": "tsc --noEmit",
+    "lint": "eslint . --cache --max-warnings 0",
+    "lint:fix": "eslint . --cache --fix --max-warnings 0",
+    "format": "bun x prettier --write .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@traycer/protocol": "workspace:*",
+    "@traycer-clients/shared": "workspace:*",
+    "commander": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

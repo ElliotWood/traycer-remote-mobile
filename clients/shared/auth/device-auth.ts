@@ -3,7 +3,9 @@
  * (RFC 8628) endpoints in `authn-v3` (`/api/v3/auth/device/authorize` and
  * `/api/v3/auth/device/token`). Used by both the CLI process (ticket 04) and
  * the Electron main process (ticket 06), so it depends only on the ambient
- * `fetch` and carries no shell, DI, or singleton state.
+ * `fetch` and carries no shell, DI, or singleton state. The mobile web client
+ * (`clients/mobile`, ticket T1) reuses the exact same start + poll helpers with
+ * `clientId: "mobile"`.
  *
  * Why a dedicated client instead of `exchangeCodeForTokens`: the device-token
  * endpoint deliberately diverges from `exchange-code`. `428` and `429` are
@@ -20,7 +22,7 @@
  */
 import { readRotatedTokens } from "./auth-validation";
 
-export type DeviceClientId = "cli" | "desktop";
+export type DeviceClientId = "cli" | "desktop" | "mobile";
 
 /**
  * Per-request cancellation + timeout for the device HTTP calls. `signal` is the

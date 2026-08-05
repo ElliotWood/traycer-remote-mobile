@@ -1,0 +1,12 @@
+# Built Teams app package — assembled from manifest.json + icons at package
+# time, and it carries the real bot/app id once injected. Build artifact:
+# never tracked, regardless of contents.
+appPackage/*.zip
+
+# Local overlay carrying the real app/bot ids. manifest.json ships the
+# all-zeros placeholder; the real ids are substituted at package time and
+# must never be committed.
+appPackage/local-ids.json
+
+# Rendered card screenshots — regenerate with tools/shoot.mjs.
+card-shots/

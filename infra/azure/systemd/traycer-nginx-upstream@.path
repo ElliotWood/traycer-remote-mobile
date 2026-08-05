@@ -1,0 +1,24 @@
+[Unit]
+Description=Watch tenant %i's host pid.json and resync the nginx upstream
+# CAPTURED FROM THE RUNNING VM 2026-08-03, not authored from scratch.
+#
+# traycer-nginx-upstream.sh has been in this repo since A6; the two units that
+# TRIGGER it were live-only. So a rebuilt VM got the script and nothing to run
+# it, and the concrete consequence is specific: nginx's `traycer_host` upstream
+# is generated from the tenant's pid.json, so without this watcher it never
+# refreshes. The first host restart after a rebuild moves the port, the
+# upstream keeps pointing at the old one, and every tab and RPC request 502s
+# with nothing in the deploy output saying why.
+#
+# TEMPLATED (`@`) rather than transcribed. The live pair hard-codes a tenant
+# name in both the watched path and the ExecStart argument, and a tenant name
+# is a username - which does not go in this repo. `%i` is also how
+# traycer-agent-probe@ and traycer-health-probe@ already do it, so this is the
+# established idiom rather than a new one.
+#
+#   systemctl enable --now traycer-nginx-upstream@<tenant>.path
+[Path]
+PathModified=__TRAYCER_HOME_ROOT__/%i/.traycer/host/pid.json
+
+[Install]
+WantedBy=multi-user.target

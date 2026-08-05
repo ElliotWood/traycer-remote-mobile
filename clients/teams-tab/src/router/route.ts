@@ -1,0 +1,138 @@
+/**
+ * URL-backed routing for the tab.
+ *
+ * WHY NOT MOBILE'S `@/router/nav`, given the "extract, don't duplicate" rule:
+ * that module is an in-memory stack whose own docblock says it exists because
+ * "the phone client has exactly one drilldown and NO URL BAR to honour". The
+ * tab's requirement is the opposite one. It needs real URLs because:
+ *
+ *   - the manifest points `contentUrl` at a path, and two entries collapsing
+ *     onto one screen is exactly what happened while there was no router;
+ *   - Teams deep links address a tab by URL;
+ *   - browser back must move within the app rather than leaving it.
+ *
+ * So this is a different mechanism for a different requirement, not a second
+ * copy of the same one. Sharing the reducer would mean sharing a route union
+ * whose first member is called `fleet` and means epics — importing a
+ * vocabulary collision we just finished removing.
+ *
+ * WHY NOT A ROUTER DEPENDENCY: the whole surface is two routes and a
+ * drilldown. `history.pushState` plus a `popstate` listener is the entire
+ * mechanism, and a router would bring a matcher, a nesting model and an
+ * outlet system for a problem that has none of those.
+ */
+
+/** Everything the tab can be looking at. Discriminated for exhaustive rendering. */
+export type Route =
+  | { readonly name: "epics" }
+  | { readonly name: "epic"; readonly epicId: string }
+  | {
+      readonly name: "chat";
+      readonly epicId: string;
+      readonly chatId: string;
+    }
+  /**
+   * "Waiting on you" — the cross-epic ATTENTION slice, per-feed.
+   *
+   * Kept distinct from `notifications` below, and the distinction is the one
+   * the parity contract had to spell out: this screen answers "what is blocked
+   * on me right now", the other is the app-level bell with read state and
+   * recent activity. Related, not the same row, and collapsing them would lose
+   * the short list that is the reason this one exists.
+   */
+  | { readonly name: "waiting" }
+  /** The app-level notifications screen, reached from the frame's bell. */
+  | { readonly name: "notifications" }
+  /**
+   * App settings, reached from the frame's account menu.
+   *
+   * A ROUTE rather than a dialog, for the reason the canvas is one: a Teams
+   * tab reloads more often than a page, and settings is where a user lands
+   * when something is wrong and they want to read the host version back to
+   * someone. A dialog cannot be linked to or reloaded into.
+   */
+  | { readonly name: "settings" }
+  /**
+   * The tile canvas for one epic — panes, tab strips, splits.
+   *
+   * BESIDE the `epic` drill-in, not instead of it. `epic` is a list you read
+   * top to bottom; this is a workspace you arrange. Making the canvas the
+   * epic screen would have replaced a surface that works with one that is
+   * new, on a viewport we have not measured — `MIN_PANE_PX = 240` means a
+   * canvas below 480px cannot split at all, and Teams mobile's width is still
+   * an unread number.
+   *
+   * ITS OWN ROUTE rather than a mode flag on `epic`, because the layout is
+   * per-epic persisted state that a user returns to. A mode held in component
+   * state cannot be deep-linked, cannot be shared into a Teams chat, and is
+   * lost on the reload that an iframe does more often than a page.
+   *
+   * This is the change the router's own docblock anticipates — it argues
+   * against a router dependency on the grounds that "the whole surface is two
+   * routes and a drilldown". That was true and a canvas retires it. Recorded
+   * as a decision rather than left as a quiet contradiction of a written
+   * rationale.
+   */
+  | { readonly name: "canvas"; readonly epicId: string };
+
+/**
+ * The path prefix the tab is served under.
+ *
+ * MUST match the Vite `--base`. They are the same fact in two places, and a
+ * mismatch is invisible in dev (where base is `/`) and fatal in production —
+ * every route would parse as unknown and fall back to the list, so a deep
+ * link would silently land on the wrong screen rather than failing loudly.
+ */
+export const BASE = "/tab";
+
+/**
+ * Parses a pathname into a route.
+ *
+ * Unknown paths resolve to `epics` rather than throwing or rendering a 404:
+ * this is served under an SPA fallback, so an unmatched path is far more
+ * likely to be a stale link than a mistake worth an error page. `/tab/fleet`
+ * is the concrete case — the URL Elliot already has open, from before the
+ * screen was renamed.
+ */
+export function parseRoute(pathname: string): Route {
+  const rest = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
+  const segments = rest.split("/").filter((s) => s.length > 0);
+
+  if (segments[0] === "waiting") return { name: "waiting" };
+  if (segments[0] === "notifications") return { name: "notifications" };
+  if (segments[0] === "settings") return { name: "settings" };
+  if (segments[0] === "epics" && typeof segments[1] === "string") {
+    if (segments[2] === "chats" && typeof segments[3] === "string") {
+      return { name: "chat", epicId: segments[1], chatId: segments[3] };
+    }
+    // Exact match, not a prefix: `/epics/:id/canvassed` is not the canvas, and
+    // a `startsWith` here would silently claim it. The trailing-segment check
+    // matters for the same reason — `/epics/:id/canvas/anything` is a path
+    // this build does not define, and resolving it to the canvas would invent
+    // a meaning for a URL a later version may want.
+    if (segments[2] === "canvas" && segments.length === 3) {
+      return { name: "canvas", epicId: segments[1] };
+    }
+    return { name: "epic", epicId: segments[1] };
+  }
+  return { name: "epics" };
+}
+
+export function routeToPath(route: Route): string {
+  switch (route.name) {
+    case "chat":
+      return `${BASE}/epics/${route.epicId}/chats/${route.chatId}`;
+    case "canvas":
+      return `${BASE}/epics/${route.epicId}/canvas`;
+    case "epic":
+      return `${BASE}/epics/${route.epicId}`;
+    case "waiting":
+      return `${BASE}/waiting`;
+    case "notifications":
+      return `${BASE}/notifications`;
+    case "settings":
+      return `${BASE}/settings`;
+    case "epics":
+      return `${BASE}/epics`;
+  }
+}

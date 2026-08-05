@@ -12,12 +12,12 @@ import {
   MissingBearerTokenForOpenFrameError,
   type HostEndpointProvider,
 } from "./ws-rpc-client";
-import type { BearerSourceProvider } from "@traycer-clients/shared/auth/bearer-source";
-import { readAccessTokenExpiryMs } from "@traycer-clients/shared/auth/jwt-exp";
+import type { BearerSourceProvider } from "../auth/bearer-source";
+import { readAccessTokenExpiryMs } from "../auth/jwt-exp";
 import type {
   RevalidateOutcome,
   StreamAuthRevalidator,
-} from "@traycer-clients/shared/auth/bearer-revalidator";
+} from "../auth/bearer-revalidator";
 import type { FatalErrorDetails } from "@traycer/protocol/framework/ws-protocol";
 import {
   hostStreamOpenAckFrameSchema,
@@ -241,7 +241,19 @@ export class WsStreamClient<Registry extends VersionedStreamRpcRegistry> {
     }
     this.closed = true;
     this.closedReason = reason;
-    console.info(
+    // `console.info`/`console.debug`/`console.log` all write to Node's
+    // stdout (Node's `Console` implementation, unlike browsers, does not
+    // route `info`/`debug` to a separate stream). `console.error` used
+    // here instead: this file is shared with `clients/remote-bridge`,
+    // which reserves stdout for command payloads only (every diagnostic
+    // goes to stderr, so a channel adapter parsing stdout as JSON never
+    // hits a non-JSON line) - `console.info` on this line broke that
+    // contract on every `close()` call, in every command. gui-app and the
+    // CLI have no such stdout contract, so routing to stderr is a
+    // severity/stream change only for them, not a behavior change (this
+    // was already a Console-API log line, not read by anything downstream
+    // of stdout in either).
+    console.error(
       `[stream] WsStreamClient closed (client=${this.instanceId}, reason=${reason}, sessions=${this.ownedSessions.size})`,
     );
     for (const session of Array.from(this.ownedSessions)) {
@@ -348,7 +360,11 @@ export class WsStreamClient<Registry extends VersionedStreamRpcRegistry> {
     }
     // Wake-recovery trace (piped to the desktop log via the renderer-console
     // bridge): proves the wake signal arrived and how many sessions re-dialed.
-    console.debug(
+    // `console.error` not `.debug`/`.info`/`.log`: this file is shared with
+    // `clients/remote-bridge`, whose stdout is reserved for command payloads
+    // only - `console.debug` writes to stdout in Node (unlike a browser),
+    // which broke that contract on every wake-recovery cycle.
+    console.error(
       `[stream] reconnectAll reason=${reason} sessions=${this.ownedSessions.size}`,
     );
     for (const session of Array.from(this.ownedSessions)) {
@@ -554,15 +570,21 @@ class StreamSession<
   }
 
   /**
-   * Proactively drops the current socket and re-dials immediately. Used on a
-   * device-wake / network-online signal: the socket may be half-open (the OS
-   * froze it during sleep) while we still believe we are subscribed, and we
-   * would otherwise wait out the full pong timeout (~60s) before noticing.
-   * `teardownSocket` closes the (possibly half-open) socket with its `onclose`
-   * already detached, so it cannot re-enter the drop path; resetting the attempt
-   * counters makes the redial immediate rather than on the accumulated backoff;
-   * `onTransportDrop` re-arms the reconnect and the dial re-sends the subscribe
-   * frame. No-op once the session is permanently closed.
+   * Proactively drops the current socket and re-dials IMMEDIATELY (0ms, not
+   * merely reset-to-attempt-0). Used on a device-wake / network-online
+   * signal: the socket may be half-open (the OS froze it during sleep)
+   * while we still believe we are subscribed, and we would otherwise wait
+   * out the full pong timeout (~60s) before noticing.
+   *
+   * Deliberately bypasses `onTransportDrop()` (used by every OTHER drop
+   * path) because that always schedules through `backoffFor`, whose
+   * `attempt<=0` case still returns the flat `initialBackoffMs` (not 0) —
+   * fine for an ordinary drop, but a wasted second on a signal that already
+   * knows reconnecting now is worth it. `teardownSocket` closes the
+   * (possibly half-open) socket with its `onclose` already detached, so it
+   * cannot re-enter the drop path; resetting the attempt counters keeps
+   * subsequent-failure backoff escalation starting fresh from this redial,
+   * same as before. No-op once the session is permanently closed.
    */
   forceReconnect(reason: string): void {
     if (this.disposed) {
@@ -571,7 +593,8 @@ class StreamSession<
     this.teardownSocket(1000, reason);
     this.reconnectAttempt = 0;
     this.slowClientReconnectStreak = 0;
-    this.onTransportDrop();
+    this.resetForReconnect();
+    this.scheduleReconnect(true);
   }
 
   /**
@@ -625,7 +648,7 @@ class StreamSession<
     const selected = this.config.endpoint();
     if (selected === null || selected.websocketUrl === null) {
       this.transitionTo("reconnecting", null);
-      this.scheduleReconnect();
+      this.scheduleReconnect(false);
       return;
     }
 
@@ -639,7 +662,7 @@ class StreamSession<
     } catch (cause) {
       if (cause instanceof MissingBearerTokenForOpenFrameError) {
         this.transitionTo("reconnecting", null);
-        this.scheduleReconnect();
+        this.scheduleReconnect(false);
         return;
       }
       throw cause;
@@ -658,7 +681,10 @@ class StreamSession<
     const auth = this.config.auth;
     const expiresAtMs = readAccessTokenExpiryMs(token);
     if (auth !== null && expiresAtMs !== null && expiresAtMs <= Date.now()) {
-      console.debug(
+      // `console.error` not `.debug`: see the `reconnectAll` comment above -
+      // `console.debug` writes to Node's stdout, which the bridge reserves
+      // for command payloads only.
+      console.error(
         `[stream] pre-dial bearer already expired; revalidating before dial method=${String(this.config.method)}`,
       );
       this.transitionTo("reconnecting", null);
@@ -1045,7 +1071,10 @@ class StreamSession<
     }
     // Wake-recovery trace: which way the overnight-expired-bearer revalidation
     // resolved, so an on-device wake shows whether the fresh bearer landed.
-    console.debug(
+    // `console.error` not `.debug`: see the `reconnectAll` comment above -
+    // `console.debug` writes to Node's stdout, which the bridge reserves
+    // for command payloads only.
+    console.error(
       `[stream] UNAUTHORIZED revalidate outcome=${outcome} method=${String(
         this.config.method,
       )}`,
@@ -1063,7 +1092,7 @@ class StreamSession<
       // in reconnect backoff; the next cycle revalidates again once
       // connectivity returns.
       this.noProgressUnauthorizedReconnects = 0;
-      this.scheduleReconnect();
+      this.scheduleReconnect(false);
       return;
     }
     // outcome === "rotated": authn accepts the credential. If the bearer the
@@ -1091,7 +1120,7 @@ class StreamSession<
     } else {
       this.noProgressUnauthorizedReconnects = 0;
     }
-    this.scheduleReconnect();
+    this.scheduleReconnect(false);
   }
 
   /**
@@ -1216,7 +1245,7 @@ class StreamSession<
     }
     this.lastCloseWasSlowClient = false;
     this.resetForReconnect();
-    this.scheduleReconnect();
+    this.scheduleReconnect(false);
   }
 
   /**
@@ -1243,7 +1272,15 @@ class StreamSession<
     this.transitionTo("reconnecting", null);
   }
 
-  private scheduleReconnect(): void {
+  /**
+   * `immediate` (only `forceReconnect` passes `true`) skips straight to a
+   * 0ms delay instead of `backoffFor`'s schedule — a wake/online signal
+   * already knows the drop wasn't a failed attempt to escalate away from.
+   * `reconnectAttempt` still advances either way, so a redial that itself
+   * fails resumes normal exponential escalation from there, same as any
+   * other drop.
+   */
+  private scheduleReconnect(immediate: boolean): void {
     if (this.disposed) {
       return;
     }
@@ -1256,11 +1293,13 @@ class StreamSession<
     // rather than retrying at the initial delay (which resets on every
     // successful subscribe). For all other drops the streak is 0 and this is
     // exactly `backoffFor(reconnectAttempt, ...)`.
-    const delay = backoffFor(
-      Math.max(this.reconnectAttempt, this.slowClientReconnectStreak),
-      this.config.initialBackoffMs,
-      this.config.maxBackoffMs,
-    );
+    const delay = immediate
+      ? 0
+      : backoffFor(
+          Math.max(this.reconnectAttempt, this.slowClientReconnectStreak),
+          this.config.initialBackoffMs,
+          this.config.maxBackoffMs,
+        );
     this.reconnectAttempt += 1;
     this.backoffTimer = setTimeout(() => {
       this.backoffTimer = null;

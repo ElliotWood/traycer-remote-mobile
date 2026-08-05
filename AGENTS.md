@@ -35,6 +35,20 @@ make dev-desktop                # signed host from Releases + HMR desktop
 make dev-desktop VERSION=1.2.3  # pin host release
 ```
 
+**On Git Bash / MSYS, prefix any build that takes a `--base=/` style
+argument with `MSYS_NO_PATHCONV=1`:**
+
+```bash
+MSYS_NO_PATHCONV=1 npx vite build --base=/     # clients/teams-tab
+```
+
+Without it MSYS rewrites the leading-slash argument into a Windows path, and
+the bundle emits `src="/Program Files/Git/assets/…"`. It builds successfully,
+loads nothing, and every screenshot of it is blank — **which reads as a
+product defect rather than a build one.** A 30-view screenshot run produced 69
+blank images before a control (a view known to work, failing identically)
+showed the fault was in the harness. Cost twice, by two agents.
+
 `make dev-desktop` talks to the **production** cloud — no local backends. Details:
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
