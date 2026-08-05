@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,10 +15,12 @@ import {
   registerHostPickerDirectory,
   useHostPickerList,
 } from "@/hooks/host/use-host-picker-list";
+import { useReactiveActiveHostId } from "@/hooks/host/use-reactive-active-host-id";
 import { AgentSpinningDots } from "@/components/ui/agent-spinning-dots";
 import { ReportIssueAction } from "@/components/report-issue/report-issue-action";
 import { createReportIssueContext } from "@/lib/report-issue-context";
 import { useRunnerHost } from "@/providers/use-runner-host";
+import { uiQueryKeys } from "@/lib/query-keys";
 
 /**
  * Generic shell-agnostic host picker.
@@ -98,37 +101,47 @@ interface HostPickerListProps {
 
 function HostPickerList(props: HostPickerListProps) {
   const binding = useHostBinding();
+  const queryClient = useQueryClient();
   const directory = binding === null ? null : binding.directory;
   const hostClient = binding === null ? null : binding.hostClient;
-  const [revision, setRevision] = useState<number>(0);
   const directoryId =
     directory === null ? null : registerHostPickerDirectory(directory);
 
   useEffect(() => {
-    if (directory === null) {
+    if (directory === null || directoryId === null) {
       return;
     }
     const subscription = directory.onChange(() => {
-      setRevision((prev) => prev + 1);
+      void queryClient.invalidateQueries({
+        queryKey: uiQueryKeys.hostPicker(directoryId),
+      });
     });
     return () => {
       subscription.dispose();
     };
-  }, [directory]);
+  }, [directory, directoryId, queryClient]);
 
   useEffect(() => {
-    if (hostClient === null) {
+    if (hostClient === null || directoryId === null) {
       return;
     }
     const unsubscribe = hostClient.onChange(() => {
-      setRevision((prev) => prev + 1);
+      void queryClient.invalidateQueries({
+        queryKey: uiQueryKeys.hostPicker(directoryId),
+      });
     });
     return () => {
       unsubscribe();
     };
-  }, [hostClient]);
+  }, [hostClient, directoryId, queryClient]);
 
-  const query = useHostPickerList(directoryId, revision);
+  const query = useHostPickerList(directoryId);
+  // Subscribed, not read at render time: `getActiveHostId()` lives outside
+  // React, and the list query is no longer a proxy render signal for it - a
+  // host swap leaves the directory contents (and, through structural
+  // sharing, `data`'s identity) untouched, so nothing here would re-render
+  // and the selected row would keep pointing at the previous host.
+  const activeId = useReactiveActiveHostId();
 
   if (directory === null || query.isLoading) {
     return (
@@ -179,7 +192,6 @@ function HostPickerList(props: HostPickerListProps) {
     );
   }
 
-  const activeId = hostClient === null ? null : hostClient.getActiveHostId();
 
   return (
     <div

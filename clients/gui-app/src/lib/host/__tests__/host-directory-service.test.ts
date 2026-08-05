@@ -545,3 +545,113 @@ describe("HostDirectoryService", () => {
     });
   });
 });
+
+describe("HostDirectoryService poll emit suppression", () => {
+  const secondRemoteHostEntry: HostDirectoryEntry = {
+    ...mockRemoteHostEntry,
+    hostId: "remote-host-2",
+    label: "Second Remote Mac",
+  };
+
+  function queuedFetcher(
+    batches: ReadonlyArray<readonly HostDirectoryEntry[]>,
+  ): () => Promise<readonly HostDirectoryEntry[]> {
+    let index = 0;
+    return () => {
+      const batch = batches[Math.min(index, batches.length - 1)];
+      index += 1;
+      return Promise.resolve(batch);
+    };
+  }
+
+  it("does not notify onChange when a poll delivers a field-identical snapshot, and still notifies when one actually changes", async () => {
+    const host = makeHost(null);
+    const fetcher = queuedFetcher([
+      [mockRemoteHostEntry],
+      // Fresh object literals, field-identical to the previous batch - what a
+      // real 15s poll produces when nothing about the registry changed. An
+      // unconditional emit here re-rendered/refetched every `onChange`
+      // consumer app-wide on every tick (terminal tiles unmounted through
+      // the reachability gate and reset to "Starting terminal session…").
+      [{ ...mockRemoteHostEntry }],
+      [{ ...mockRemoteHostEntry, label: "Renamed" }],
+      [mockRemoteHostEntry, secondRemoteHostEntry],
+    ]);
+    const directory = new HostDirectoryService({
+      runnerHost: host,
+      remoteFetcher: fetcher,
+    });
+    await directory.start();
+
+    const observed: Array<readonly HostDirectoryEntry[]> = [];
+    directory.onChange((entries) => {
+      observed.push(entries);
+    });
+
+    await directory.refresh();
+    expect(observed).toEqual([]);
+
+    // A changed FIELD on the same host must still reach every consumer -
+    // without this leg a "never emit" regression would pass the case above.
+    await directory.refresh();
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.[0]?.label).toBe("Renamed");
+
+    // As must a changed set of hosts.
+    await directory.refresh();
+    expect(observed).toHaveLength(2);
+    expect(observed[1]).toHaveLength(2);
+  });
+
+  it("notifies onChange when a poll adds a host even though the previously emitted entries are unchanged", async () => {
+    const host = makeHost(null);
+    const fetcher = queuedFetcher([
+      [mockRemoteHostEntry],
+      [mockRemoteHostEntry, secondRemoteHostEntry],
+    ]);
+    const directory = new HostDirectoryService({
+      runnerHost: host,
+      remoteFetcher: fetcher,
+    });
+    await directory.start();
+
+    const observed: Array<readonly HostDirectoryEntry[]> = [];
+    directory.onChange((entries) => {
+      observed.push(entries);
+    });
+
+    await directory.refresh();
+
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.map((entry) => entry.hostId)).toEqual([
+      mockRemoteHostEntry.hostId,
+      secondRemoteHostEntry.hostId,
+    ]);
+  });
+
+  it("keeps the no-change emit suppression armed against the LAST EMITTED snapshot, not the last poll", async () => {
+    const host = makeHost(null);
+    const fetcher = queuedFetcher([
+      [mockRemoteHostEntry],
+      [{ ...mockRemoteHostEntry, label: "Renamed" }],
+      [{ ...mockRemoteHostEntry, label: "Renamed" }],
+    ]);
+    const directory = new HostDirectoryService({
+      runnerHost: host,
+      remoteFetcher: fetcher,
+    });
+    await directory.start();
+
+    const observed: Array<readonly HostDirectoryEntry[]> = [];
+    directory.onChange((entries) => {
+      observed.push(entries);
+    });
+
+    // Change, then hold. The second poll re-delivers the CHANGED value, which
+    // is now the emitted baseline - it must not emit a second time.
+    await directory.refresh();
+    await directory.refresh();
+
+    expect(observed).toHaveLength(1);
+  });
+});
