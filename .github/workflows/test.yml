@@ -73,9 +73,11 @@ jobs:
           # either side alone. `teams-bot` was missing from BOTH and is added
           # here for the same reason the others were: it owns a `test` script
           # (76 tests) and had never run in CI.
-          - project: traycer-clients-mobile
-            name: "test (traycer-clients-mobile)"
-            test_args: ""
+          #
+          # traycer-clients-mobile and @traycer-clients/teams-tab entries
+          # removed 2026-08-05 when both packages were archived
+          # (archive/clients-mobile, archive/clients-teams-tab) and deleted
+          # from main.
           - project: "@traycer-clients/mobile-push-service"
             name: "test (@traycer-clients/mobile-push-service)"
             test_args: ""
@@ -84,15 +86,6 @@ jobs:
             test_args: ""
           - project: "@traycer-clients/teams-bot"
             name: "test (@traycer-clients/teams-bot)"
-            test_args: ""
-          # `teams-tab` — added for the SAME reason as `teams-bot` above, which
-          # is the point: that entry's own note says it "had never run in CI",
-          # and the package added after it repeated the omission exactly. A
-          # hand-maintained matrix is a list someone has to REMEMBER, and the
-          # failure is silent — the suite passes locally and runs nowhere.
-          # 129 tests, including the shell contract and the create-epic rules.
-          - project: "@traycer-clients/teams-tab"
-            name: "test (@traycer-clients/teams-tab)"
             test_args: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
