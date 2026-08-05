@@ -60,7 +60,11 @@ export function createPushServiceCredentialsStore(): CredentialsMutationStore {
       metaPath: `${credentialsPath}.meta.json`,
       lockPath: `${credentialsPath}.lock`,
     },
-    refresh: (args) => refreshOnceAbortable(args),
+    // `clientKind: null` omits the field from the refresh body entirely, which
+    // is the request this service sent before upstream added it. It reads the
+    // CLI's credentials file but is not the CLI, so claiming `"cli"` would put
+    // a false client identity on the wire. Matches `host-credentials-store.ts`.
+    refresh: (args) => refreshOnceAbortable({ ...args, clientKind: null }),
     lockWaitMs: LOCK_WAIT_MS,
     lockPollIntervalMs: LOCK_POLL_INTERVAL_MS,
     continuationRetryMs: CONTINUATION_RETRY_MS,

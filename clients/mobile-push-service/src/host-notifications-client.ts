@@ -93,6 +93,11 @@ export async function runHostNotificationsSubscription(
     // the CLI monitor's `auth: null` — avoids double-handling the same
     // recovery in both places).
     auth: null,
+    // Opted out: this is a headless notification relay, not a surface the user
+    // is signed in to. It must not mint a device credential on their behalf —
+    // `null` leaves the host on this connection's lease, as before the
+    // capability existed (`WsStreamClientOptions.hostCredentialMint`).
+    hostCredentialMint: null,
     webSocketFactory: createWhatwgStreamWebSocketFactory(),
     dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
     openAckTimeoutMs: OPEN_ACK_TIMEOUT_MS,
