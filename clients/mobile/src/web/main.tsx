@@ -13,6 +13,7 @@ import {
   type BakedHost,
 } from "./host-directory-fetcher";
 import { ManageHostsPanel } from "./manage-hosts-panel";
+import { applyTeamsHostAttributes, initializeTeamsHost } from "./teams-host";
 
 const config = __TRAYCER_GUI_APP_DEV_CONFIG__;
 
@@ -91,6 +92,16 @@ function bootstrap(): void {
       />
     </StrictMode>,
   );
+
+  // AFTER render, and deliberately not awaited. This same bundle is the Teams
+  // client and the PWA; in a plain browser the handshake never even loads the
+  // SDK, and inside a non-Teams frame it can only settle on a 4s timeout. Both
+  // of those are reasons nothing user-visible may wait on it.
+  //
+  // `notifySuccess()` also means "my content is up", which is only true here.
+  void initializeTeamsHost({}).then((state) => {
+    applyTeamsHostAttributes(state, document.documentElement);
+  });
 }
 
 bootstrap();
