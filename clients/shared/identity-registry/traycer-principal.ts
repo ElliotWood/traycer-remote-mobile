@@ -31,7 +31,9 @@ import type { VerifiedPrincipal, VerifiedTraycerUserId } from "./types";
 export type TraycerPrincipalFailure =
   | "rejected"
   | "network_error"
-  | "malformed_response";
+  | "malformed_response"
+  /** Refused without calling authn at all — see {@link DEFAULT_MAX_CONCURRENT_VERIFICATIONS}. */
+  | "capacity_exhausted";
 
 export type TraycerPrincipalResult =
   | { readonly kind: "verified"; readonly principal: VerifiedPrincipal }
@@ -40,6 +42,36 @@ export type TraycerPrincipalResult =
 /** Bounds the outbound call so a hung authn cannot hold a pending connection open indefinitely. */
 export const DEFAULT_TRAYCER_VERIFY_TIMEOUT_MS = 10_000;
 
+/**
+ * Ceiling on simultaneous in-flight verifications, process-wide.
+ *
+ * WHY THIS IS NOT OPTIONAL: this function is reached by UNAUTHENTICATED input.
+ * Anyone who can open a WebSocket to the ingress can cause one outbound call
+ * to Traycer's authn, so without a ceiling the deployment becomes an
+ * amplifier pointed at a third party — inbound connections we do not control
+ * turning into outbound requests someone else has to absorb. The ingress rate
+ * limit bounds this per source address, which is not the same as bounding it
+ * in aggregate: distributed sources multiply straight through a per-IP limit.
+ *
+ * Past the ceiling this fails CLOSED (refuses the connection) rather than
+ * queueing. Queueing would convert an abuse burst into unbounded latency and
+ * memory on our side, and a refused connection is honest — the client can
+ * retry, and a legitimate user is never silently held.
+ */
+export const DEFAULT_MAX_CONCURRENT_VERIFICATIONS = 32;
+
+/**
+ * Module-level because the ceiling must be process-wide: a per-instance
+ * counter would be trivially bypassed by anything that constructs more than
+ * one caller, which defeats the point of a cap.
+ */
+let inFlightVerifications = 0;
+
+/** Test-only: asserts the counter is balanced (never leaks a slot on any path). */
+export function inFlightVerificationsForTests(): number {
+  return inFlightVerifications;
+}
+
 export interface VerifyTraycerPrincipalParams {
   readonly bearer: string;
   /** e.g. `https://authn.traycer.ai` — no default; an unset value is a startup failure, not an implicit endpoint. */
@@ -47,6 +79,8 @@ export interface VerifyTraycerPrincipalParams {
   readonly timeoutMs: number;
   /** Injection seam for tests only — production callers pass the global `fetch`. */
   readonly fetchImpl: typeof fetch;
+  /** Process-wide in-flight ceiling; pass {@link DEFAULT_MAX_CONCURRENT_VERIFICATIONS} in production. */
+  readonly maxConcurrent: number;
 }
 
 /**
@@ -60,11 +94,33 @@ export interface VerifyTraycerPrincipalParams {
 export async function verifyTraycerPrincipal(
   params: VerifyTraycerPrincipalParams,
 ): Promise<TraycerPrincipalResult> {
-  const { bearer, authnBaseUrl, timeoutMs, fetchImpl } = params;
+  const { bearer, authnBaseUrl, timeoutMs, fetchImpl, maxConcurrent } = params;
   if (bearer.length === 0) {
     return { kind: "failed", reason: "rejected" };
   }
 
+  // Checked BEFORE the slot is taken and before any network call, so a burst
+  // is refused rather than absorbed.
+  if (inFlightVerifications >= maxConcurrent) {
+    return { kind: "failed", reason: "capacity_exhausted" };
+  }
+  inFlightVerifications += 1;
+  try {
+    return await verifyAgainstAuthn(bearer, authnBaseUrl, timeoutMs, fetchImpl);
+  } finally {
+    // `finally`, not a decrement at each return: this function has six exit
+    // paths and can also throw, and a slot leaked on any one of them would
+    // wedge the cap permanently closed — turning a DoS guard into a DoS.
+    inFlightVerifications -= 1;
+  }
+}
+
+async function verifyAgainstAuthn(
+  bearer: string,
+  authnBaseUrl: string,
+  timeoutMs: number,
+  fetchImpl: typeof fetch,
+): Promise<TraycerPrincipalResult> {
   let response: Response;
   try {
     response = await fetchImpl(userEndpoint(authnBaseUrl), {

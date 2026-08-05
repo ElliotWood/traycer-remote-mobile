@@ -10,8 +10,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=traycer
-Group=traycer
+User=__TRAYCER_OS_USER__
+Group=__TRAYCER_OS_USER__
 # TRAYCER_AUTHN_BASE_URL has no default in the router - an unset value is a
 # startup failure rather than a silently-assumed identity provider, because
 # "which service vouches for inbound bearers" is exactly the thing that must

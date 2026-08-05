@@ -1,0 +1,102 @@
+name: Infra checks
+
+# WHY THIS WORKFLOW EXISTS. Nothing gated `infra/` at all. The repo already had
+# four `verify-*.sh` scripts under infra/azure/scripts, and every one of them
+# was referenced only from infra/azure/README.md - so they ran when somebody
+# remembered, which is the same as not running. `pre-commit`'s workspace-checks
+# hook covers clients/, protocol/ and scripts/, and stops there.
+#
+# The immediate reason is a budget nobody can see being spent: the Azure
+# provisioning payload has a hard 131,072-character ceiling, and over one
+# afternoon it went 117,927 -> 120,701 -> 122,575 bytes with no feature added -
+# each step was comments in provisioned scripts. Nothing anywhere would have
+# said a word until a deployment failed, and `az deployment validate` returns
+# "error": null on a payload the API refuses, so it would not have said a word
+# either.
+#
+# WHY CI AND NOT pre-commit. measure-provision-payload.mjs evaluates the
+# template's own expression, which needs `az bicep build`. Making a local
+# commit depend on the Azure CLI would fail for every contributor who has not
+# installed it - and a hook that fails for a missing tool teaches people
+# --no-verify, which disarms every OTHER hook too. `az` is preinstalled on
+# GitHub's ubuntu runners, so this costs contributors nothing.
+#
+# 🔴 UNEXERCISED AT THE TIME OF WRITING. Nothing on this branch has been
+# pushed, so this file has never actually run - it is written from the
+# conventions in test.yml, not from a green check. Treat its first run as the
+# thing that verifies it. That caveat is the whole failure class this
+# directory keeps producing, so it is stated rather than assumed away.
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: infra checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # `az bicep` self-installs its Bicep CLI on first use; doing it as its
+      # own step keeps that download out of the check whose failure would then
+      # look like a template error.
+      - name: Install the Bicep CLI
+        run: az bicep install
+
+      # The gate. Exits non-zero when the assembled provisioning script no
+      # longer fits ARM's per-expression limit. When it goes red the fix is a
+      # second runCommands resource split at a phase boundary - NOT a comment
+      # cull, and NOT concat(), which cannot help because the limit applies to
+      # an expression's result. See vm.bicep.
+      - name: Provisioning payload fits ARM's expression limit
+        run: node infra/azure/scripts/measure-provision-payload.mjs
+
+      # The drift check's own mutation suite: 15 cases, acceptance case first,
+      # control is the only green. Needs no Azure subscription and no VM - it
+      # drives the comparison with synthetic documents, which is the whole
+      # reason the comparison is a separate file.
+      - name: Drift check can still go red
+        run: bash infra/azure/scripts/verify-iac-parity.test.sh
+
+      # Fetches ws + zod and runs a real tenant-router process. The case that
+      # matters is the third: a listener that accepts connections and ignores
+      # every frame must FAIL. If it ever passes, the A6 probe has regressed to
+      # a port check, which is what this test exists to prevent.
+      - name: A6 relay probe still refuses a liveness-only listener
+        run: bash infra/azure/scripts/verify-relay-probe.sh
+
+      # DELIBERATELY NOT RUN HERE, having been tried: the other three
+      # verify-*.sh scripts in that directory are LIVE-VM checks wearing the
+      # same name shape, not repo checks.
+      #
+      #   verify-nginx-hygiene.sh    needs nginx installed and inspects
+      #                              sites-enabled/ and conf.d/ on a running box
+      #   verify-authn-allowlist.sh  requires a live origin URL as argv[1]
+      #   verify-tenant-env-parity.sh  needs origin/traycer-azure-identity-registry
+      #                              fetched, which a shallow CI checkout has not got
+      #
+      # All three exit non-zero correctly when they cannot do their job -
+      # checked, not assumed - so adding them would produce a permanently red
+      # gate, and a permanently red gate gets ignored or deleted. They want a
+      # post-deploy job with a VM to talk to, which is the same place
+      # verify-iac-parity.sh belongs. Recorded here so the next person does not
+      # repeat the ten minutes it took to find this out.

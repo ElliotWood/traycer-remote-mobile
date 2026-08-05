@@ -24,6 +24,8 @@
 # and do not provision).
 
 limit_req_zone $binary_remote_addr zone=traycer_ingress:10m rate=10r/s;
+# Tighter, separate budget for the authn proxy — see the /authn block below.
+limit_req_zone $binary_remote_addr zone=traycer_authn:10m rate=5r/s;
 
 server {
     listen 80;
@@ -51,6 +53,42 @@ server {
 
     client_max_body_size 64m;
     limit_req zone=traycer_ingress burst=20 nodelay;
+
+    # Same-origin authn proxy, as an ENDPOINT ALLOWLIST rather than a
+    # pass-through. It exists at all because production authn's CORS allowlist
+    # contains exactly one origin, so a browser on this origin cannot call it
+    # directly — forwarding server-side is the only thing that works.
+    #
+    # It is an allowlist because `^/authn/(.*)$` made the VM an open relay to
+    # any authn path, from our address. These four are exactly what the PWA
+    # calls; `api/v3/auth/exchange-code` is absent on purpose (desktop-only
+    # PKCE callback).
+    #
+    # `$authn_host` is a VARIABLE deliberately: with a literal hostname nginx
+    # resolves at config-load time and refuses to start when DNS is not yet up,
+    # which is normal during boot. That took the whole site down once.
+    location ~ ^/authn/(api/v3/user|api/v3/auth/refresh|api/v3/auth/device/authorize|api/v3/auth/device/token)$ {
+        limit_req zone=traycer_authn burst=10 nodelay;
+        limit_req_status 429;
+        set $authn_host "authn.traycer.ai";
+        proxy_pass https://$authn_host/$1$is_args$args;
+        proxy_set_header Host $authn_host;
+        proxy_set_header Origin "";
+        proxy_set_header Referer "";
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Credentials;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+        proxy_hide_header Access-Control-Expose-Headers;
+        proxy_hide_header Access-Control-Max-Age;
+    }
+
+    # A PLAIN PREFIX, not `^~`: nginx checks regexes before a plain prefix, but
+    # `^~` suppresses regex checking entirely — so `^~ /authn/` here would win
+    # over the allowlist above and 404 every legitimate sign-in.
+    location /authn/ {
+        return 404;
+    }
 
     location / {
         # Placeholder upstream - A0 terminates TLS and enforces the body

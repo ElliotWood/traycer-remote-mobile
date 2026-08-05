@@ -280,6 +280,28 @@
         "vitest": "catalog:",
       },
     },
+    "clients/remote": {
+      "name": "@traycer-clients/remote",
+      "version": "0.1.0",
+      "bin": {
+        "traycer-remote": "./src/index.ts",
+      },
+      "dependencies": {
+        "commander": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@traycer-clients/shared": "workspace:*",
+        "@traycer/protocol": "workspace:*",
+        "@types/node": "catalog:",
+        "@typescript-eslint/eslint-plugin": "catalog:",
+        "@typescript-eslint/parser": "catalog:",
+        "eslint": "catalog:",
+        "prettier": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "clients/remote-bridge": {
       "name": "@traycer-clients/remote-bridge",
       "version": "0.1.0",
@@ -1897,6 +1919,8 @@
     "@traycer-clients/mobile": ["@traycer-clients/mobile@workspace:clients/mobile"],
 
     "@traycer-clients/mobile-push-service": ["@traycer-clients/mobile-push-service@workspace:clients/mobile-push-service"],
+
+    "@traycer-clients/remote": ["@traycer-clients/remote@workspace:clients/remote"],
 
     "@traycer-clients/remote-bridge": ["@traycer-clients/remote-bridge@workspace:clients/remote-bridge"],
 

@@ -350,8 +350,8 @@ is the design:
 
 | Mode | Cost | Catches |
 |---|---|---|
-| structural (on the timer) | free | missing/broken binary, **credential with no auth material**, repo unreadable by the owning user |
-| `--spawn` (**not** scheduled) | one real Claude call | a credential that is present and well-formed but **dead** — expired, revoked, or quota-exhausted |
+| structural (on the timer) | free | missing/broken binary, token not configured, **token configured but not reaching the running host**, repo unreadable by the owning user |
+| `--spawn` (**not** scheduled) | one real Claude call | a token that is present and delivered but **dead** — expired, revoked, or quota-exhausted |
 
 `--spawn` is deliberately not on a timer. The deployment shares one Claude
 Max account across N people (A7), so a probe that spawned an agent every
@@ -359,24 +359,73 @@ few minutes would consume the quota it exists to protect — monitoring that
 causes the outage it watches for. Enabling it is an explicit, costed
 decision, not one this repo makes for the operator.
 
-**This probe found a live defect on its first run, and then found a defect
-in itself.** `--spawn` against the real tenant returned `Not logged in ·
-Please run /login`. Investigating (keys only, never values) showed
-`.claude.json` contained *nothing but* telemetry and migration fields —
-`machineID`, `userID`, `cachedExperimentData`, `migrationVersion` — with no
-token of any kind, and no `.claude/.credentials.json` at all. Claude Code
-writes that file on first run whether or not anyone has authenticated.
+### How the harness is actually authenticated (and two wrong checks)
 
-So the structural check as first written (`[ -s ~/.claude.json ]`) was
-itself a false-green for the one condition that matters: file present,
-0600, 389 bytes, valid JSON, zero credentials. It now requires an
-auth-bearing key and **fails on the real box**, at zero quota cost.
-Verified both directions — fails against the live unauthenticated state,
-passes against a synthetic credential carrying `oauthAccount`.
+`claude setup-token` prints a long-lived OAuth token and **persists
+nothing**. There is no credentials file to find, by design. The token
+lives in `/etc/traycer/claude.env` (0600 root:root) as
+`CLAUDE_CODE_OAUTH_TOKEN` and reaches the harness through
+`traycer-host@.service.d/10-claude-auth.conf`'s `EnvironmentFile=-`.
 
-This check is coupled to Claude Code's on-disk layout, which is an
-internal detail. If it starts failing on a box that genuinely works,
-check the layout before trusting the alert.
+**Two drafts of this check were wrong in opposite directions**, and the
+pair is more instructive than either alone:
+
+1. `[ -s ~/.claude.json ]` — a false **green**. That file is first-run
+   scaffolding Claude Code writes whether or not anyone authenticated: on
+   this box 0600, 389 bytes, valid JSON, and containing *only* telemetry
+   and migration keys (`machineID`, `userID`, `cachedExperimentData`,
+   `migrationVersion`). Zero credentials, check passes.
+2. Then requiring an auth-bearing key *in that file* — a false **red**.
+   Under `setup-token` it never gains one, and a bare `claude -p` from any
+   shell lacking the env var always reports `Not logged in`. The probe
+   reported the agent surface broken while it was working.
+
+The second is the mirror of the first: **strictness aimed at the wrong
+mechanism is not rigour.** Fixing a false-green by tightening the same
+wrong measurement just relocates the error.
+
+What it checks now, verified against the live box:
+
+- **Configured** — `/etc/traycer/claude.env` defines a non-empty
+  `CLAUDE_CODE_OAUTH_TOKEN` (presence and value *length* only; the value
+  is never read, printed, or logged, so it cannot leak into the journal or
+  Log Analytics).
+- **Delivered** — the variable is actually present in the running host's
+  `/proc/<pid>/environ`. This is the half a config check cannot give you: a
+  correct env file plus a host that started *before* the drop-in landed is
+  a running harness with no credential — config green, capability absent.
+- Unreadable env file is treated as **inconclusive and alerted**, named
+  distinctly, because the file is 0600 root:root and that means "probe ran
+  as the wrong user", not "credential missing".
+
+Verified in all three directions: passes on the real working config, fails
+when the env file is absent, fails when it defines an empty token.
+
+### Onboarding a tenant by hand? Enable its timers, or it is unmonitored
+
+**This has already happened once.** The only real tenant on the box
+(`elliot`) had **no functional health probe at all** — `traycer-health-probe@elliot.timer`
+was `disabled` — while the timer for a throwaway test canary was active.
+Monitoring that looked deployed and covered nothing that mattered.
+
+**Root cause, which will recur:** `bootstrap.sh` enables the per-tenant
+timers inside its `for tenant_id in ${TRAYCER_TENANT_IDS}` loop, and
+`tenantIds` is still `[]` in the live parameter file. `elliot` was created
+by hand, outside that loop, so nothing ever enabled its timers. Nothing
+failed; the tenant simply had no monitoring, and the only visible signal
+was a canary's timer sitting in the list looking reassuring.
+
+So: **any tenant added outside `bootstrap.sh` must have its timers enabled
+explicitly**, or A3 must go through the loop.
+
+```sh
+systemctl enable --now traycer-health-probe@<tenant>.timer
+systemctl enable --now traycer-agent-probe@<tenant>.timer
+```
+
+Verify with `systemctl list-timers 'traycer*'` and confirm a line exists
+**per tenant** — the check is that the list matches the tenants you expect,
+not merely that it is non-empty.
 
 ### A note on `az vm run-command` and probe provenance
 
@@ -406,6 +455,17 @@ agent's state gets read as another's.
   root cause makes the stream noisier, not more informative.
 - Ingestion lag between `logger` and a queryable Log Analytics row is
   minutes. The alert rule's floor is `PT5M`. A6 is not a real-time pager.
+- **The agent probe's structural mode proves the token is PRESENT and
+  DELIVERED, never that it is VALID.** A revoked, expired, or
+  quota-exhausted token is still a non-empty string in
+  `/etc/traycer/claude.env` and still appears in the host's environ, so it
+  sails through every structural check while no agent can actually run.
+  Only `--spawn` — a real Claude call asserting on a sentinel in the reply —
+  distinguishes a live credential from a dead one. Until `--spawn` is on a
+  timer, **treat a green agent probe as "wired correctly", not "working"**.
+  This is the same present-vs-functional distinction the rest of A6 exists
+  to close, left deliberately open here because closing it costs quota on
+  a shared account (see the mode table above).
 
 ## Agent execution — the thing the VM exists for
 
@@ -434,7 +494,34 @@ standalone (so an existing box recovers without one).
 | Harness on the **host process's** PATH | yes — `/usr/local/bin` is in it |
 | Node 22 (see below) | yes — `bootstrap.sh` |
 | Per-tenant agent work root (`$HOME/work`) | yes |
-| **Claude subscription credential** | **no — a human must approve an OAuth grant** |
+| Systemd drop-in that delivers the credential to the harness | yes — `10-claude-auth.conf` |
+| **The credential itself (`/etc/traycer/claude.env`)** | **no — a human must approve an OAuth grant** |
+
+**Proven end to end, on the shared-account credential, not asserted:** agent
+`b12a40fc-…` on the VM host ran to `status=completed type=turn.completed` and
+wrote a real file on the box:
+
+```
+altra-vm-traycer-host-aue
+traycer
+Linux 6.17.0-1020-azure
+Wed Jul 29 23:35:31 UTC 2026
+```
+
+That is the harness executing shell commands on the VM under the intended
+credential — a hostname, an OS user and a fresh timestamp, none of which a
+version check or a model catalogue could have produced.
+
+**One trap on the way there, worth knowing before it costs you an hour:** the
+first chat that attempted a turn *before* the credential existed had a failed
+provider session anchored to it (`session=16787191-…`). Every retry after
+authentication re-resumed that dead session and came back
+`status=interrupted` with no work done — indistinguishable from an auth
+failure, on a box whose credential was already correct. A **fresh** agent on
+the same host with the same credential completed first time. So a red turn on
+a long-lived chat is not evidence about the credential; test with a new chat
+before suspecting the token (and see A6's probe, which spawns fresh for this
+reason).
 
 The credential is the one thing that cannot be captured here, and it is not
 an oversight: it is an OAuth grant against a Claude subscription. **No token,
@@ -491,19 +578,62 @@ There is no SSH to this VM and no browser on it, so the flow is driven
 through a tmux pty that survives between `az vm run-command` invocations:
 
 ```sh
-tmux new-session -d -s claudeauth \
+tmux new-session -d -s claudeauth -x 400 -y 50 \
   "sudo -u traycer env HOME=/srv/traycer/tenants/elliot TERM=xterm-256color \
      /usr/local/bin/claude setup-token; sleep 3600"
 tmux capture-pane -p -J -t claudeauth     # read the sign-in URL out of the pane
-# a human opens that URL, signs in as the account whose capacity this box
-# should consume, approves, and reads back the code:
-tmux send-keys -t claudeauth '<code>' Enter
-tmux capture-pane -p -J -t claudeauth     # confirm it took
+# a human opens that URL (see the account warning below), approves, and
+# reads back the code:
+tmux send-keys -t claudeauth '<code>'     # the code, on its own
+tmux send-keys -t claudeauth Enter        # Enter SEPARATELY — see below
+tmux capture-pane -p -J -t claudeauth     # read the PRINTED TOKEN
 ```
 
-Whichever account authorises here becomes the VM's capacity — this is a
-deliberate choice, not a detail. Re-run `provision-agent-runtime.sh`
-afterwards to verify.
+Three things here are non-obvious and each cost a round trip:
+
+**`setup-token` prints a token and persists nothing.** It reports
+`✓ Long-lived authentication token created successfully!` and writes no
+`~/.claude/.credentials.json` at all — `claude -p` still answers
+`Not logged in · Please run /login` immediately afterwards. A success
+message with no effect; the same family as everything else in this file.
+The token is the output, and installing it is a separate manual step:
+
+```sh
+umask 077 && install -d -m 700 /etc/traycer
+printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' '<token>' > /etc/traycer/claude.env
+chmod 600 /etc/traycer/claude.env && chown root:root /etc/traycer/claude.env
+systemctl restart traycer-host@elliot     # REQUIRED — see below
+```
+
+`CLAUDE_CODE_OAUTH_TOKEN` is the **only** mechanism. The harness inherits it
+from the host process, via the drop-in
+`traycer-host@.service.d/10-claude-auth.conf` (`EnvironmentFile=-`, so an
+absent file cannot stop the host). Corollary worth stating plainly: **a
+correct env file plus a host that started before it landed is a running
+harness with no credential** — editing the file without restarting the unit
+changes nothing. `traycer-agent-probe.sh` (A6) asserts that *delivered* half
+continuously by reading `/proc/<host-pid>/environ`; it reads the path from an
+overridable `TRAYCER_CLAUDE_ENV`, so **moving this file breaks that probe** —
+change both together.
+
+**Enter must be sent as its own `send-keys`.** Batched with the code text it
+is swallowed: all 92 characters land in the field and sit there looking
+submitted, and the flow reads exactly like a rejected code.
+
+**The account is the part that goes wrong silently, and Claude Code will not
+tell you which one you got.** Whichever account approves becomes the VM's
+capacity. An already-signed-in browser approves against *that* session
+without ever showing a chooser — which is how this VM was first authorised
+against the wrong account entirely, with every check green. So: open the URL
+in a **private window**, sign in deliberately, and read the account off the
+page *before* approving. There is no way to verify it afterwards from the VM:
+no credentials file exists to inspect, the token is opaque
+(`sk-ant-oat01-…`, scope `user:inference`), and starting the TUI with the
+token in the environment does **not** count as a logged-in session — it drops
+you at the login-method chooser, so `/status` is unreachable. Confirm the
+account at approval time or not at all.
+
+Re-run `provision-agent-runtime.sh` afterwards to verify.
 
 ### What the verification actually proves
 
@@ -514,16 +644,55 @@ the real per-tenant HOME:
 
 ```sh
 sudo -u traycer env HOME=/srv/traycer/tenants/elliot \
+  CLAUDE_CODE_OAUTH_TOKEN="$(sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p' /etc/traycer/claude.env)" \
   /usr/local/bin/claude -p 'Reply with the single word: ready'
 ```
 
 `sudo -u` is not decoration: root can run the binary while the `traycer`
 user may not, and root is not who runs agents.
 
-**The negative case was run first.** With the harness installed but not yet
-authenticated, the check fails and prints the recovery procedure — confirmed
-live before the credential existed, so the passing case is worth something.
-That ordering is the point: a gate never observed failing is not evidence.
+An earlier revision of this script ran that check **without** the token and
+reported `NOT AUTHENTICATED` against a perfectly healthy box — a false red of
+exactly the shape A6's probe hit independently (it looked for
+`.credentials.json`, which this mechanism never creates). Both are recorded
+here because the deceptive artifact is real: the `.claude.json` on this box
+carries `firstStartTime`, `userID` and `migrationVersion`, so it *looks* like
+a configured install and has never held a credential.
+
+**Verified to discriminate, both states in one run** — same script, same
+binary, same OS user, same HOME, differing only in the credential:
+
+```
+$ TRAYCER_CLAUDE_ENV=/etc/traycer/claude.env         ./provision-agent-runtime.sh
+agent-runtime: elliot - harness authenticated, completed a real call
+$ TRAYCER_CLAUDE_ENV=/etc/traycer/does-not-exist.env ./provision-agent-runtime.sh
+agent-runtime: elliot - harness installed but NOT AUTHENTICATED.
+```
+
+A verifier that passes in both states measures nothing, so this was checked
+both ways rather than inferred from a single green — and checked against the
+*current* script, not remembered from an earlier session.
+
+### The tenant loop covers hand-onboarded tenants
+
+`provision-agent-runtime.sh` takes the **union** of `TRAYCER_TENANT_IDS` and
+the HOMEs that actually exist under `TRAYCER_HOME_ROOT`, rather than trusting
+the variable. A tenant onboarded outside `bootstrap.sh`'s loop is invisible to
+that list, so a list-only loop skips the one tenant the box is really running.
+Not hypothetical: `traycer-health-probe@elliot.timer` was found **disabled**
+for precisely this reason — `elliot` was onboarded by hand, so nothing had
+ever enabled its probe. Proven by running with `TRAYCER_TENANT_IDS` empty:
+
+```
+agent-runtime: covering tenants: elliot
+```
+
+### The harness self-updates — treat the installed version as a floor
+
+`provision-agent-runtime.sh` installed **2.1.197**; **2.1.220** was running
+within the hour, with no re-provisioning. So a version mismatch against that
+line is not evidence that provisioning failed to run, and the version cannot
+be pinned by this script alone.
 
 ## What's not done yet
 
@@ -720,3 +889,27 @@ One note for whoever edits it: the `try/catch` around the `localStorage` seed is
 load-bearing. Init scripts run in *every* frame, and this app renders wireframe
 previews in sandboxed iframes where `localStorage` access throws — without the
 guard the harness manufactures the page errors it exists to detect.
+
+### nginx hygiene guard (run before any nginx change)
+
+`verify-nginx-hygiene.sh` asserts `sites-enabled/` and `conf.d/` contain **only**
+expected files, then runs `nginx -t`. Both directories are globbed, so a backup
+left beside a real file is *loaded as config* — which has already cost one repair
+cycle via a duplicate `server_name` reported as
+`server_names_hash_bucket_size`, a message naming neither the duplicate nor the
+backup. `--quarantine` moves offenders to `/root/nginx-backups/`. Back up
+**there**, never into a globbed directory.
+
+`apply-authn-allowlist.sh` applies the `/authn` allowlist to an already-running
+VM **in place**, rewriting one `location` block by brace-matching rather than
+regenerating the file — because certbot and other agents also edit it (the Teams
+bot's `/api/messages` lives there and must survive). Hygiene check first, backup
+outside the globbed dirs, idempotent, `nginx -t` before reload, auto-rollback if
+the test fails.
+
+`verify-signin-cold.mjs` drives a **cold** browser (no seeded credentials) and
+proves the tightened allowlist still carries a real sign-in: `device/authorize`
+returns 200 *through the proxy*, a real user code reaches the DOM, and
+`device/token` polling begins. The RFC 8628 human-approval step is not
+automatable and is explicitly **not** claimed as proven — everything nginx could
+have broken sits before it.

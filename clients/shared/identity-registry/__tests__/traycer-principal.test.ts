@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
-import { verifyTraycerPrincipal } from "../traycer-principal";
+import {
+  verifyTraycerPrincipal,
+  inFlightVerificationsForTests,
+  DEFAULT_MAX_CONCURRENT_VERIFICATIONS,
+} from "../traycer-principal";
 import { IdentityRegistry } from "../registry";
 
 /**
@@ -76,6 +80,7 @@ function verifyAt(bearer: string, baseUrl: string) {
     authnBaseUrl: baseUrl,
     timeoutMs: 5000,
     fetchImpl: fetch,
+    maxConcurrent: DEFAULT_MAX_CONCURRENT_VERIFICATIONS,
   });
 }
 
@@ -239,5 +244,111 @@ describe("verifyTraycerPrincipal + IdentityRegistry — the full browser routing
       kind: "refused",
       reason: "unmapped_principal",
     });
+  });
+});
+
+describe("verifyTraycerPrincipal — the concurrency ceiling (amplification guard)", () => {
+  /**
+   * An authn that blocks until released, so real verifications can be held
+   * in flight simultaneously rather than simulated with a counter.
+   */
+  async function startBlockingAuthn(): Promise<{
+    baseUrl: string;
+    release: () => void;
+    close: () => Promise<void>;
+  }> {
+    const waiting: Array<() => void> = [];
+    let holding = true;
+    const respond = (res: import("node:http").ServerResponse): void => {
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ user: { id: "traycer-user-alice" } }));
+    };
+    const server = createServer((_req, res) => {
+      // Once released, stop holding — otherwise the post-release recovery
+      // call blocks too and the test measures the harness, not the cap.
+      if (!holding) {
+        respond(res);
+        return;
+      }
+      waiting.push(() => respond(res));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const addr = server.address();
+    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
+    return {
+      baseUrl: `http://127.0.0.1:${port}`,
+      release: () => {
+        holding = false;
+        for (const w of waiting.splice(0)) w();
+      },
+      close: () =>
+        new Promise<void>((resolve) => {
+          holding = false;
+          for (const w of waiting.splice(0)) w();
+          server.close(() => resolve());
+        }),
+    };
+  }
+
+  it("refuses past the ceiling WITHOUT calling authn, then recovers once slots free", async () => {
+    const blocking = await startBlockingAuthn();
+    try {
+      const cap = 3;
+      const held = Array.from({ length: cap }, () =>
+        verifyTraycerPrincipal({
+          bearer: "t",
+          authnBaseUrl: blocking.baseUrl,
+          timeoutMs: 5000,
+          fetchImpl: fetch,
+          maxConcurrent: cap,
+        }),
+      );
+      // Let the three in-flight requests actually reach the server.
+      await new Promise((r) => setTimeout(r, 300));
+
+      // The (cap+1)th must be refused immediately, without a network call.
+      const overflow = await verifyTraycerPrincipal({
+        bearer: "t",
+        authnBaseUrl: blocking.baseUrl,
+        timeoutMs: 5000,
+        fetchImpl: fetch,
+        maxConcurrent: cap,
+      });
+      expect(overflow).toEqual({ kind: "failed", reason: "capacity_exhausted" });
+
+      blocking.release();
+      const settled = await Promise.all(held);
+      expect(settled.every((r) => r.kind === "verified")).toBe(true);
+
+      // Slots freed: a fresh call succeeds again rather than staying wedged.
+      const after = await verifyAt("t", blocking.baseUrl);
+      expect(after.kind).toBe("verified");
+    } finally {
+      await blocking.close();
+    }
+  }, 20_000);
+
+  it("leaks no slot on ANY exit path — the cap must not wedge itself closed", async () => {
+    // Every failure mode in turn. A decrement missed on one of these would
+    // permanently shrink the ceiling, turning the DoS guard into a DoS.
+    authn.setResponse(401, {});
+    await verify("t");
+    authn.setResponse(500, {});
+    await verify("t");
+    authn.setResponse(200, { user: {} });
+    await verify("t");
+    authn.setResponse(200, "not json{{{");
+    await verify("t");
+    await verifyAt("t", "http://127.0.0.1:1"); // unreachable
+    authn.setResponse(200, { user: { id: "traycer-user-alice" } });
+    await verify("t"); // success path too
+    expect(inFlightVerificationsForTests()).toBe(0);
+  });
+
+  it("the shipped default ceiling is a real bound, not unlimited", () => {
+    expect(Number.isInteger(DEFAULT_MAX_CONCURRENT_VERIFICATIONS)).toBe(true);
+    expect(DEFAULT_MAX_CONCURRENT_VERIFICATIONS).toBeGreaterThan(0);
+    expect(DEFAULT_MAX_CONCURRENT_VERIFICATIONS).toBeLessThan(1000);
   });
 });

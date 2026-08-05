@@ -46,6 +46,7 @@ import { IdentityRegistry } from "../../../clients/shared/identity-registry/regi
 import {
   verifyTraycerPrincipal,
   DEFAULT_TRAYCER_VERIFY_TIMEOUT_MS,
+  DEFAULT_MAX_CONCURRENT_VERIFICATIONS,
 } from "../../../clients/shared/identity-registry/traycer-principal";
 import type { TenantMapping } from "../../../clients/shared/identity-registry/types";
 
@@ -223,6 +224,10 @@ wss.on("connection", (client, req) => {
       authnBaseUrl: config.authnBaseUrl,
       timeoutMs: DEFAULT_TRAYCER_VERIFY_TIMEOUT_MS,
       fetchImpl: fetch,
+      // Unauthenticated input reaches this call, so it must not be able to
+      // turn inbound connections into unbounded outbound load on Traycer's
+      // authn. Past the ceiling the connection is refused, not queued.
+      maxConcurrent: DEFAULT_MAX_CONCURRENT_VERIFICATIONS,
     });
     if (verification.kind !== "verified") {
       // Includes authn being unreachable: refuse rather than route on a guess.
