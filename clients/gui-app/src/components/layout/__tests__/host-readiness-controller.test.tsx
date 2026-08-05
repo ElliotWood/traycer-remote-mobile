@@ -700,14 +700,22 @@ describe("<SurfaceReadinessBoundary /> restored default-host detail (MED7)", () 
     });
   });
 
-  // traycer#860 / #4747: a host that answered host.status as busy-serving
-  // turns must not read like one that never started. The pre-filled report
-  // health line carries the host's own busy session count.
-  it("names the host's busy sessions in the provisioning-error report health line", () => {
+  // traycer#860 / #4747: a host that is busy serving turns must not read like
+  // one that never started, so the pre-filled report health line names it.
+  //
+  // Release note (v1.1.10): upstream states this as a session *count* read off
+  // `host.status`'s busy payload. `busy` / `busySessionCount` are remote-host
+  // protocol fields, and this line ships without remote host, so
+  // `HostStatusSnapshot` carries only `hostVersion` and the health line says a
+  // bare "busy". The signal itself is unaffected - `hostBusy` comes from the
+  // local-host gate's busy-keep flow, not from the probe payload - so upstream's
+  // two count tests (3 sessions / singularized 1 session) collapse into this one.
+  it("names a busy host in the provisioning-error report health line", () => {
     useDesktopDialogStore.setState({ reportIssueAvailable: true });
     const presentation: DefaultHostReadinessPresentation = {
       ...DEFAULT_HOST_PRESENTATION,
       provisioningError: new Error("ensure failed"),
+      hostBusy: true,
       compatibility: {
         ...DEFAULT_HOST_PRESENTATION.compatibility,
         hostStatus: {
@@ -732,42 +740,7 @@ describe("<SurfaceReadinessBoundary /> restored default-host detail (MED7)", () 
     expect(useDesktopDialogStore.getState().reportIssueContext).toEqual({
       title: "Could not start Traycer Host",
       message:
-        "Traycer Host could not start. Host health: host unknown, compat compatible, busy 3 sessions.",
-      code: "HOST_PROVISIONING_FAILED",
-      source: "Host startup",
-    });
-  });
-
-  it("singularizes the busy session count in the report health line", () => {
-    useDesktopDialogStore.setState({ reportIssueAvailable: true });
-    const presentation: DefaultHostReadinessPresentation = {
-      ...DEFAULT_HOST_PRESENTATION,
-      provisioningError: new Error("ensure failed"),
-      compatibility: {
-        ...DEFAULT_HOST_PRESENTATION.compatibility,
-        hostStatus: {
-          hostVersion: "x",
-        },
-      },
-    };
-    const controller: HostReadinessController = {
-      readinessFor: () => ({ kind: "provisioning-error" }),
-      defaultHostPresentation: presentation,
-    };
-
-    renderWithProviders(
-      controller,
-      <SurfaceReadinessBoundary scope="default-host" tabHostId={null}>
-        <Member id="epic" />
-      </SurfaceReadinessBoundary>,
-      buildRunnerHost(),
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /Report issue/i }));
-    expect(useDesktopDialogStore.getState().reportIssueContext).toEqual({
-      title: "Could not start Traycer Host",
-      message:
-        "Traycer Host could not start. Host health: host unknown, compat compatible, busy 1 session.",
+        "Traycer Host could not start. Host health: host unknown, compat compatible, busy.",
       code: "HOST_PROVISIONING_FAILED",
       source: "Host startup",
     });

@@ -822,8 +822,30 @@ function queryButtonByAriaLabel(label: string): HTMLButtonElement | null {
   return button;
 }
 
+/**
+ * Resolves the inline editor the same way the button helpers above resolve
+ * theirs - by attribute, not by accessible name.
+ *
+ * Release note (v1.1.10): upstream drives the transcript through LegendList,
+ * whose test environment feeds real viewport metrics. This line ships Virtuoso,
+ * which parks its list container at `visibility: hidden` until it has measured,
+ * and jsdom never lays out, so it stays there. Accessible-name computation
+ * returns "" for anything inside a hidden subtree no matter what `aria-label`
+ * says, so `getByRole("textbox", { name: "Edit message" })` cannot match here -
+ * not even with `hidden: true`, which finds the element but still reads its
+ * name as empty. That is also why every sibling helper in this file reaches for
+ * `document.querySelector`. The label is still what identifies the element, and
+ * `chat-message-user-body.test.tsx` asserts the a11y contract on the same
+ * editor outside the virtualized list.
+ */
 function pasteInlineEditText(text: string): void {
-  fireEvent.paste(screen.getByRole("textbox", { name: "Edit message" }), {
+  const editor = document.querySelector(
+    '[data-composer-editor][aria-label="Edit message"]',
+  );
+  if (editor === null) {
+    throw new Error("Expected the inline message editor to be open");
+  }
+  fireEvent.paste(editor, {
     clipboardData: {
       files: [],
       items: [],
