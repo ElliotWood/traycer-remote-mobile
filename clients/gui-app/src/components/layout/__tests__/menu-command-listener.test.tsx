@@ -289,6 +289,7 @@ function buildDirtyHandle(epicId: string): OpenEpicStoreHandle {
     dispose: () => undefined,
     requestFreshSnapshot: () => undefined,
     isClean: () => false,
+    hotArtifactRoomIdsForTests: () => [],
   };
 }
 
