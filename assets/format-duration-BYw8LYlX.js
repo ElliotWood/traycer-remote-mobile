@@ -1,0 +1,1 @@
+function e(e){if(e<60)return`${e}s`;let t=Math.floor(e/60),n=e%60;return t<60?`${t}m ${n}s`:`${Math.floor(t/60)}h ${t%60}m ${n}s`}export{e as t};

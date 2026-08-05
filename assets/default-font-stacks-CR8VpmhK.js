@@ -1,0 +1,1 @@
+var e=`"Figtree Variable", "Figtree", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`,t=`"SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", ui-monospace, monospace`;function n(e){return`"${e.replace(/\\/g,`\\\\`).replace(/"/g,`\\"`)}"`}function r(e,t){return e===null?t:`${n(e)}, ${t}`}export{n as i,e as n,r,t};
