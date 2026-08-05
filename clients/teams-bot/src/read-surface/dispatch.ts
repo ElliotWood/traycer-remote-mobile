@@ -62,8 +62,30 @@ export interface DispatchDeps extends HostAccessDeps {
     readonly conversationReference: unknown;
     /** The requester's own words, carried through the button. */
     readonly spokenText?: string;
-    readonly attachmentCount?: number;
+    /**
+     * Handle to the documents fetched on the MESSAGE turn — never the
+     * download URL itself. See `intake-store.ts` and `start-assessment.ts`.
+     */
+    readonly intakeId?: string;
   }) => Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }>;
+  /**
+   * Fetches and stores any documents on the current message turn.
+   *
+   * Lives on the MESSAGE turn, not the card press, and that is forced rather
+   * than chosen: Teams delivers the pre-authorised download URL exactly once,
+   * with the message. By the time someone presses "Yes, go ahead" it is gone
+   * from our reach and may well have expired. Returns `null` when the turn
+   * carried no files at all.
+   *
+   * OPTIONAL: a deployment with no intake directory configured still runs,
+   * and simply never has documents to pass on.
+   */
+  readonly ingestAttachments?: (
+    attachments: readonly unknown[] | undefined,
+  ) => Promise<{
+    readonly intakeId: string;
+    readonly fileCount: number;
+  } | null>;
   /** Injected so "requested 2m ago" labels are deterministic in tests. */
   readonly now: () => number;
 }

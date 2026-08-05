@@ -18,6 +18,7 @@ import {
   DEFAULT_REFRESH_MIN_DELAY_MS,
 } from "@traycer-clients/shared/auth/token-refresh-scheduler";
 import type { InterviewAnswer } from "@traycer/protocol/persistence/epic/content-blocks";
+import type { ChatRunSettings } from "@traycer/protocol/host/agent/gui/subscribe";
 import type { Transcript } from "./transcript-projection";
 import { ChatSession } from "./chat-session";
 import { HostEndpointPoller } from "./host-endpoint";
@@ -45,6 +46,17 @@ const FIND_APPROVAL_TIMEOUT_MS = 8_000;
 const FIND_APPROVAL_POLL_MS = 250;
 /** Delay before the one bounded retry of a host-classified-transient unary RPC failure (see `requestWithTransientRetry`). */
 const TRANSIENT_RETRY_DELAY_MS = 1_000;
+/**
+ * Default harness for a chat this bridge starts with no settings of its own
+ * yet (`create-chat` mints a chat with `settings: null`). Mirrors the mobile
+ * client's `AUTHOR_HARNESS_ID` (`clients/mobile/src/host/use-create-chat.ts`)
+ * — same reasoning: a member of both `guiHarnessIdSchema` (what a chat's
+ * settings accept) and `agentFacingHarnessIdSchema` (what
+ * `agent.listHarnessModels` accepts).
+ */
+const DEFAULT_HARNESS = "claude";
+/** `supervised` routes tool/file-edit approvals back to a human — the mode every adapter on top of this bridge (Teams, D3 CLI) expects by default. */
+const DEFAULT_PERMISSION_MODE = "supervised";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -403,10 +415,55 @@ export class BridgeClient implements RemoteBridgeActions {
         wsStreamClient: this.streamClient,
         auth: this.auth,
         onDiagnostic: (message) => this.logger.debug(message, null),
+        resolveDefaultSettings: () => this.resolveDefaultSettings(),
       });
       this.chatSessions.set(chatId, session);
     }
     return session;
+  }
+
+  /**
+   * A concrete run-settings tuple for a chat that has none yet — see
+   * `ChatSession`'s constructor docblock for why forwarding `null` onto the
+   * wire silently drops the message instead of failing.
+   *
+   * Same shape as `listAgents`/`createChat`: one unary RPC through the
+   * shared `rpcClient`, same endpoint poll, same bearer lease. `null` on any
+   * failure to resolve (no endpoint, the RPC failing, or the harness listing
+   * no models) — the caller refuses to send rather than guessing a slug.
+   */
+  private async resolveDefaultSettings(): Promise<ChatRunSettings | null> {
+    const endpoint = this.endpointPoller.get();
+    if (endpoint === null) return null;
+    let response;
+    try {
+      response = await this.rpcClient.request(
+        "agent.listHarnessModels",
+        {
+          epicId: this.epicId,
+          senderAgentId: this.senderAgentId,
+          harnessId: DEFAULT_HARNESS,
+        },
+        {
+          endpoint,
+          bearer: this.auth.lease,
+          abortSignal: new AbortController().signal,
+        },
+      );
+    } catch {
+      return null;
+    }
+    const model = response.models[0]?.id;
+    if (model === undefined || model.length === 0) return null;
+    return {
+      harnessId: DEFAULT_HARNESS,
+      model,
+      permissionMode: DEFAULT_PERMISSION_MODE,
+      reasoningEffort: null,
+      serviceTier: null,
+      agentMode: "regular",
+      profileId: null,
+    };
   }
 
   /**

@@ -4,6 +4,7 @@ import {
   type ChatApprovalState,
   type ChatFileEditApprovalState,
   type ChatPendingInterviewState,
+  type ChatRunSettings,
   type ChatRunStatus,
   type ChatSnapshot,
 } from "@traycer/protocol/host/agent/gui/subscribe";
@@ -54,6 +55,7 @@ export class ChatSession {
   private session: IStreamSession;
   private readonly tracker: ActionTracker;
   private readonly onDiagnostic: (message: string) => void;
+  private readonly resolveDefaultSettings: () => Promise<ChatRunSettings | null>;
   private disposed = false;
 
   private snapshot: ChatSnapshot | null = null;
@@ -83,6 +85,25 @@ export class ChatSession {
     readonly wsStreamClient: WsStreamClient<HostStreamRpcRegistry>;
     readonly auth: HostAuth;
     readonly onDiagnostic?: (message: string) => void;
+    /**
+     * A chat `create-chat` just minted has `chat.settings: null` — nothing
+     * has ever configured a harness/model for it. `sendMessage` used to
+     * forward that `null` straight onto the wire's `send` frame, whose own
+     * schema (`chatRunSettingsSchema` on `subscribe.ts`) requires a REAL,
+     * non-nullable tuple. The host accepted the malformed frame, acked it,
+     * and silently never ran or persisted it — measured live: `actionAck`
+     * "accepted", then `chat.subscribe`'s own snapshot showing
+     * `messages: []` / `runStatus: "idle"` / `turnInProgress: false`,
+     * unchanged across three reads over 8+ seconds. Filed as a host-side
+     * protocol gap separately; this is the client-side half.
+     *
+     * Required (not optional / defaulted) so a caller cannot forget to wire
+     * it and land back on the silent-drop — same reasoning as
+     * `use-create-chat.ts`'s `resolveAuthorModel` on the mobile client,
+     * which this mirrors: derive a real settings tuple, never pass a null
+     * one through.
+     */
+    readonly resolveDefaultSettings: () => Promise<ChatRunSettings | null>;
   }) {
     this.chatId = opts.chatId;
     this.epicId = opts.epicId;
@@ -90,6 +111,7 @@ export class ChatSession {
     this.wsStreamClient = opts.wsStreamClient;
     this.auth = opts.auth;
     this.onDiagnostic = opts.onDiagnostic ?? (() => {});
+    this.resolveDefaultSettings = opts.resolveDefaultSettings;
     this.tracker = new ActionTracker({
       send: (frame, binaryPayload) =>
         this.session.sendClientFrame(frame, binaryPayload),
@@ -443,9 +465,22 @@ export class ChatSession {
         reason: "not connected yet - no snapshot observed",
       };
     }
+    // A chat with no settings yet (just minted by `create-chat`, never had a
+    // harness/model chosen) cannot forward `null` — the wire's `send` frame
+    // requires a real `chatRunSettingsSchema` tuple. Resolve one rather than
+    // pass the null through; see the constructor docblock for why forwarding
+    // it silently drops the message instead of failing.
+    const settings = this.snapshot.chat.settings ?? (await this.resolveDefaultSettings());
+    if (settings === null) {
+      return {
+        kind: "failed",
+        reason:
+          "this chat has no run settings and none could be resolved (no models available for the default harness) — refusing to send a frame the host would silently drop",
+      };
+    }
+
     const clientActionId = randomUUID();
     const messageId = clientActionId;
-    const settings = this.snapshot.chat.settings;
     return this.tracker.issue({
       clientActionId,
       frame: {

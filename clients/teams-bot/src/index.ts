@@ -20,6 +20,8 @@ import {
 } from "./read-surface/epic-binding-store";
 import { createReadSurfaceHandler } from "./read-surface/read-surface-handler";
 import { createStartAssessment } from "./intake/start-assessment";
+import { ingestAttachments } from "./intake/attachment-fetch";
+import { FileIntakeStore } from "./intake/intake-store";
 import { DurableConversationReferenceStore } from "./state/conversation-reference-store";
 import { resolveTenantEnv } from "./read-surface/host-access";
 import type { ResolvePrincipal } from "./read-surface/principal-source";
@@ -112,6 +114,25 @@ async function main(): Promise<void> {
   const resolvePrincipal = selectPrincipalSource(process.env);
 
   /*
+   * WHERE A CUSTOMER'S DOCUMENT SITS ON DISK.
+   *
+   * Under the bot's own private state directory — the same place the
+   * conversation references live — and NOT under any path nginx has a root
+   * in. That is the enforcement of "the document must never become publicly
+   * reachable": there is no route to it, the directory is `0700` and the
+   * files `0600`, and both the bot and the Traycer host run as `traycer`, so
+   * the skill's agent can read them and nothing else on the box can.
+   *
+   * The directory is deliberately derived from the same env var the
+   * reference store uses, so a deployment cannot end up with one of them in
+   * a private directory and the other somewhere a web server serves.
+   */
+  const stateDir =
+    process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ??
+    "/srv/traycer/teams-bot/state";
+  const intake = new FileIntakeStore(`${stateDir}/intake`);
+
+  /*
    * `startAssessment` — the last wire, and OPTIONAL by construction.
    *
    * Composed only when a host id and an epic are configured. Without them the
@@ -130,13 +151,12 @@ async function main(): Promise<void> {
     defaultEpicId.length > 0
       ? createStartAssessment({
           references: new DurableConversationReferenceStore(
-            process.env.TRAYCER_TEAMS_STATE_DIR !== undefined
-              ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/conversation-refs.json`
-              : "/srv/traycer/teams-bot/state/conversation-refs.json",
+            `${stateDir}/conversation-refs.json`,
             (message: string, detail: string) => {
               logWarn(message, { detail });
             },
           ),
+          intake,
           hostId: assessmentHostId,
           epicId: defaultEpicId,
           tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
@@ -172,6 +192,32 @@ async function main(): Promise<void> {
     parentEnv: process.env,
     resolvePrincipal,
     startAssessment,
+    /*
+     * The message-turn fetch. Returns `null` when nothing was retrievable, so
+     * the card carries no handle rather than one that resolves to an empty
+     * set — a button promising a document we do not have is the failure this
+     * whole path exists to remove.
+     *
+     * A record IS still written when files arrived and could not be fetched:
+     * the instruction names them as unavailable so the skill says so, rather
+     * than answering as though the request had no attachment.
+     */
+    ingestAttachments: async (attachments) => {
+      const result = await ingestAttachments(attachments, {});
+      if (result.fetched.length === 0 && result.unavailable.length === 0) {
+        return null;
+      }
+      const record = intake.put({
+        fetched: result.fetched,
+        unavailable: result.unavailable,
+        now: Date.now(),
+      });
+      logInfo("documents stored for assessment", {
+        files: record.files.length,
+        unavailable: record.unavailable.length,
+      });
+      return { intakeId: record.intakeId, fileCount: record.files.length };
+    },
     now: Date.now,
   });
 

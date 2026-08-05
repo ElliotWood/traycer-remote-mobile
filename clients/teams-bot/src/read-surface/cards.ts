@@ -1961,11 +1961,30 @@ export function buildClarifyCard(options: {
    * field is an unbounded payload.
    */
   readonly spokenText?: string;
+  /**
+   * Handle to the documents already fetched and stored on this turn.
+   *
+   * A UUID, and deliberately nothing more. The obvious alternative — carrying
+   * the Teams `downloadUrl` through the button — puts a pre-authorised
+   * capability for a customer's document into a payload that Bot Service
+   * relays out and back. It would also be dead by the time a card sat unread
+   * for twenty minutes. This names a directory on our own disk instead.
+   */
+  readonly intakeId?: string;
+  /**
+   * How many documents that handle resolves to, for the card's own wording.
+   *
+   * NOT the value the skill is told. The instruction reads the manifest, so
+   * this number can only make the card say something slightly wrong; it can
+   * never make the assessment claim a document it does not have.
+   */
+  readonly attachmentCount?: number;
 }): Attachment {
   const canSuggest =
     options.suggestionLabel !== null &&
     options.product !== null &&
     options.intent !== null;
+  const count = options.attachmentCount ?? 0;
 
   return card([
     text("Before I start", { weight: "bolder", size: "medium" }),
@@ -1975,6 +1994,17 @@ export function buildClarifyCard(options: {
         : "I'm not sure what you'd like me to do with that.",
       { spacing: "none" },
     ),
+    // Shown only when there IS one. Telling someone their file arrived is the
+    // cheapest possible answer to "did it get my attachment?", and until now
+    // there was no answer at all.
+    ...(count > 0
+      ? [
+          text(
+            `I've got ${String(count)} document${count === 1 ? "" : "s"} from your message and will pass ${count === 1 ? "it" : "them"} to the assessment.`,
+            { spacing: "small", isSubtle: true, wrap: true },
+          ),
+        ]
+      : []),
     actionSet([
       ...(canSuggest
         ? [
@@ -1987,6 +2017,7 @@ export function buildClarifyCard(options: {
                 intent: options.intent ?? "",
                 skill: options.skill ?? "",
                 text: (options.spokenText ?? "").slice(0, 900),
+                intakeId: options.intakeId ?? "",
               },
               { associateInputs: false },
             ),

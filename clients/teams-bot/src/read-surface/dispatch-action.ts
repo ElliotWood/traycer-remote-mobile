@@ -436,6 +436,15 @@ async function dispatchConfirmedRoute(
     intent: readString(request.data, "intent") ?? "",
     conversationReference: request.conversationReference,
     spokenText: readString(request.data, "text") ?? "",
+    // The documents, by reference. `readString` returns null for an empty
+    // string, so a card built before intake existed — or one for a message
+    // with no files — arrives here as `undefined` and starts an assessment
+    // that correctly says nothing was attached. It is NOT validated here:
+    // the store refuses anything that is not a UUID before it goes near a
+    // path, which is where that check belongs.
+    ...(readString(request.data, "intakeId") !== null
+      ? { intakeId: readString(request.data, "intakeId") as string }
+      : {}),
   });
 
   return outcome.kind === "started"

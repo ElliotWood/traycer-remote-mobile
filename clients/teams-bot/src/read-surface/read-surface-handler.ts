@@ -19,6 +19,7 @@ import {
   captureRawAttachments,
   RAW_ATTACHMENT_LOG_FLAG,
 } from "../intake/attachment-capture";
+import { classifyAttachment } from "../intake/attachment-fetch";
 
 /**
  * The activity handler — messages and card actions.
@@ -51,6 +52,42 @@ class ReadSurfaceHandler extends ActivityHandler {
       conversationType: context.activity.conversation?.conversationType,
       enabled: process.env[RAW_ATTACHMENT_LOG_FLAG] === "1",
     });
+
+    /*
+     * FETCH THE DOCUMENTS NOW, ON THIS TURN.
+     *
+     * Not on the card press, and the reason is not preference. Teams hands
+     * the pre-authorised `downloadUrl` to the bot exactly once, attached to
+     * the message. It is short-lived, and it is the only thing that can
+     * retrieve the file without a Graph permission this bot does not have.
+     * Deferring the fetch to the confirm button means fetching a URL that
+     * has to survive a relay out to Bot Service and back, and a user who
+     * might press twenty minutes later. Both are avoidable by doing it here.
+     *
+     * The bytes land on disk and everything downstream carries an opaque
+     * intake id — see `intake-store.ts` for why a path rather than a link.
+     *
+     * Runs BEFORE parsing so a message that is nothing but a file is still
+     * ingested, and awaited so the card that follows can say the file
+     * arrived.
+     */
+    const fileAttachments = (context.activity.attachments ?? []).filter(
+      (attachment) => classifyAttachment(attachment).kind !== "not_a_file",
+    );
+    let intake: { readonly intakeId: string; readonly fileCount: number } | null =
+      null;
+    if (fileAttachments.length > 0 && this.deps.ingestAttachments !== undefined) {
+      try {
+        intake = await this.deps.ingestAttachments(context.activity.attachments);
+      } catch (error) {
+        // A download failure must not swallow the message. The user still
+        // asked a question; the card that follows simply will not offer to
+        // pass a document it does not have.
+        logWarn("attachment ingest threw", {
+          detail: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    }
 
     // A CARD BUTTON ARRIVES HERE, NOT AT `onAdaptiveCardInvoke`.
     //
@@ -125,7 +162,17 @@ class ReadSurfaceHandler extends ActivityHandler {
     if (command.kind === "help" && spoken.text.trim().length > 0) {
       const classified = classify({
         text: spoken.text,
-        hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
+        // FILE attachments, not `attachments.length`.
+        //
+        // Teams attaches a `text/html` block to every formatted message, so
+        // the old length check was true for messages carrying no document at
+        // all. Measured on the live bot, not inferred: the only attachment
+        // shape ever captured in production was
+        // `{"contentType":"text/html","content":"string(11)"}` — on a plain
+        // text message that routed to the help card. Every "attachments
+        // received, count: 1" line in that journal was this, and the
+        // classifier was being told a document existed on all of them.
+        hasAttachments: fileAttachments.length > 0,
       });
       if (classified.kind === "uncertain" && classified.suggestion !== null) {
         // The BUTTON carries the route. The handler must not re-derive it
@@ -138,6 +185,15 @@ class ReadSurfaceHandler extends ActivityHandler {
               intent: classified.suggestion.intent,
               skill: classified.suggestion.skill,
               spokenText: spoken.text,
+              // The whole point of ingesting above: the button now carries a
+              // handle to the documents, so the confirmed dispatch has
+              // something to give the skill.
+              ...(intake !== null
+                ? {
+                    intakeId: intake.intakeId,
+                    attachmentCount: intake.fileCount,
+                  }
+                : {}),
             }),
           ),
         );

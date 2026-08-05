@@ -9,6 +9,14 @@ import {
   dispatchAssessment,
 } from "../dispatch-assessment";
 import type { SkillRoute } from "../classify";
+import type { IntakeFile } from "../intake-store";
+
+/** A stored document, as the intake store hands it over. */
+const FILE: IntakeFile = {
+  name: "Retail Presentation.pptx",
+  path: "/srv/traycer/teams-bot/state/intake/abc/files/Retail Presentation.pptx",
+  bytes: 2048,
+};
 
 const ROUTE: SkillRoute = {
   product: "sensormine",
@@ -46,7 +54,7 @@ describe("dispatchAssessment", () => {
       {
         route: ROUTE,
         spokenText: "does this fit SensorMine?",
-        attachmentCount: 1,
+        attachments: { files: [FILE] },
         conversationReference: REFERENCE,
       },
     );
@@ -71,7 +79,7 @@ describe("dispatchAssessment", () => {
       {
         route: ROUTE,
         spokenText: "does this fit SensorMine?",
-        attachmentCount: 1,
+        attachments: { files: [FILE] },
         conversationReference: REFERENCE,
       },
     );
@@ -94,7 +102,7 @@ describe("dispatchAssessment", () => {
       {
         route: ROUTE,
         spokenText: "does this fit SensorMine?",
-        attachmentCount: 1,
+        attachments: { files: [FILE] },
         // No serviceUrl — cannot be replied to later.
         conversationReference: { channelId: "msteams", conversation: {} },
       },
@@ -118,7 +126,7 @@ describe("dispatchAssessment", () => {
     const input = {
       route: ROUTE,
       spokenText: "does this fit SensorMine?",
-      attachmentCount: 1,
+      attachments: { files: [FILE] },
       conversationReference: REFERENCE,
     };
     const first = await dispatchAssessment(deps, input);
@@ -144,7 +152,7 @@ describe("dispatchAssessment", () => {
       {
         route: ROUTE,
         spokenText: "x",
-        attachmentCount: 0,
+        attachments: { files: [] },
         conversationReference: REFERENCE,
       },
     );
@@ -154,20 +162,60 @@ describe("dispatchAssessment", () => {
 
 describe("buildInstruction", () => {
   it("names the skill and quotes the requester verbatim", () => {
-    const text = buildInstruction(ROUTE, "does this fit SensorMine?", 2);
+    const text = buildInstruction(ROUTE, "does this fit SensorMine?", {
+      files: [FILE],
+    });
     expect(text).toContain("smv4-new-opportunity");
     expect(text).toContain("does this fit SensorMine?");
-    expect(text).toContain("2 documents");
+  });
+
+  it("CONTRACT: gives the skill the PATH, not a count it cannot act on", () => {
+    // This is the defect the whole intake path exists to fix. The old
+    // instruction said "1 document attached to the request." and named
+    // nothing, so the agent's best available move was to answer from the
+    // request text — which reads, in the transcript, exactly like an
+    // assessment that read the document.
+    const text = buildInstruction(ROUTE, "assess this", { files: [FILE] });
+    expect(text).toContain(FILE.path);
+    expect(text).toContain(FILE.name);
+    expect(text).toMatch(/read it before answering/i);
+  });
+
+  it("names every file when there are several", () => {
+    const second: IntakeFile = { ...FILE, name: "Pricing.xlsx", path: "/tmp/p.xlsx" };
+    const text = buildInstruction(ROUTE, "assess these", {
+      files: [FILE, second],
+    });
+    expect(text).toContain(FILE.path);
+    expect(text).toContain(second.path);
+    expect(text).toContain("2 documents were attached");
+  });
+
+  it("CONTRACT: names files that could not be fetched, rather than hiding them", () => {
+    // Silence here is the same class of bug as the count: the agent answers
+    // as though nothing was attached, and nobody downstream can tell that
+    // from a request that genuinely had no document.
+    const text = buildInstruction(ROUTE, "assess this", {
+      files: [],
+      unavailable: [{ name: "Deck.pptx", reason: "channel files need Graph" }],
+    });
+    expect(text).toContain("Deck.pptx");
+    expect(text).toContain("channel files need Graph");
+    expect(text).toMatch(/could not be retrieved/i);
   });
 
   it("says so plainly when no skill is configured, rather than inventing one", () => {
-    const text = buildInstruction({ ...ROUTE, skill: null }, "hello", 0);
+    const text = buildInstruction({ ...ROUTE, skill: null }, "hello", {
+      files: [],
+    });
     expect(text).toContain("no skill configured");
     expect(text).not.toContain("smv4");
   });
 
   it("says no documents were attached rather than staying silent", () => {
-    expect(buildInstruction(ROUTE, "hello", 0)).toContain("No documents");
+    expect(buildInstruction(ROUTE, "hello", { files: [] })).toContain(
+      "No documents",
+    );
   });
 });
 

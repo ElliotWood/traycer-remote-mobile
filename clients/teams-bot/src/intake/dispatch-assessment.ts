@@ -27,6 +27,7 @@ import {
   type ConversationReferenceStore,
 } from "../state/conversation-reference-store";
 import type { SkillRoute } from "./classify";
+import type { IntakeFile } from "./intake-store";
 
 export interface DispatchDeps {
   /** Bridge `create-chat`. Idempotent on `chatId`. */
@@ -53,17 +54,67 @@ export type DispatchOutcome =
    */
   | { readonly kind: "unconfirmed"; readonly reason: string };
 
-/** The first message, which is what actually invokes the skill. */
+/**
+ * The first message, which is what actually invokes the skill.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * IT NAMES PATHS, NOT A COUNT.
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * This took `attachmentCount: number` and rendered "2 documents attached to
+ * the request." An agent reading that has been told a document exists and
+ * given no way whatsoever to open it, so the best it can do is answer from
+ * the request text and hope — which is indistinguishable, in the transcript,
+ * from an assessment that read the document and disagreed with it.
+ *
+ * Two defects met there. The count was also always `0`, because the confirm
+ * card's payload never carried one, so `?? 0` in `start-assessment.ts` won
+ * every time and the skill was told "No documents were attached" about
+ * documents that had arrived. Fixing only the drop would have produced a
+ * correct number attached to nothing openable.
+ *
+ * So the instruction carries ABSOLUTE PATHS. The bot and the host run on the
+ * same box as the same user (`deploy/vm-deploy.sh`, `User=traycer`), so a
+ * path here is a path the agent can open — see `intake-store.ts` for why
+ * that, rather than any kind of URL, is the transport.
+ */
 export function buildInstruction(
   route: SkillRoute,
   spokenText: string,
-  attachmentCount: number,
+  attachments: {
+    readonly files: readonly IntakeFile[];
+    /** Files that arrived and could not be fetched. Named, never hidden. */
+    readonly unavailable?: readonly { readonly name: string; readonly reason: string }[];
+  },
 ): string {
   const skill = route.skill ?? "(no skill configured for this route)";
-  const files =
-    attachmentCount === 0
-      ? "No documents were attached."
-      : `${String(attachmentCount)} document${attachmentCount === 1 ? "" : "s"} attached to the request.`;
+  const unavailable = attachments.unavailable ?? [];
+
+  const documents: string[] = [];
+  if (attachments.files.length === 0) {
+    documents.push("No documents were attached.");
+  } else {
+    documents.push(
+      `${String(attachments.files.length)} document${attachments.files.length === 1 ? " was" : "s were"} attached. Read ${attachments.files.length === 1 ? "it" : "them"} before answering:`,
+    );
+    for (const file of attachments.files) {
+      documents.push(`- ${file.name} — ${file.path}`);
+    }
+  }
+  if (unavailable.length > 0) {
+    // TOLD, not omitted. An agent that knows a document exists and cannot be
+    // read can say so; one that was never told will answer as though the
+    // request had no attachment, and nobody downstream can tell the
+    // difference.
+    documents.push("");
+    documents.push(
+      "These were attached but could not be retrieved — say so rather than answering as if they did not exist:",
+    );
+    for (const file of unavailable) {
+      documents.push(`- ${file.name} (${file.reason})`);
+    }
+  }
+
   // The user's own words are included VERBATIM and marked as theirs. The
   // classifier decided the route; it did not decide what they meant, and the
   // skill should read the question rather than our summary of it.
@@ -73,7 +124,7 @@ export function buildInstruction(
     "The request, in the requester's own words:",
     spokenText,
     "",
-    files,
+    ...documents,
   ].join("\n");
 }
 
@@ -92,7 +143,14 @@ export async function dispatchAssessment(
   input: {
     readonly route: SkillRoute;
     readonly spokenText: string;
-    readonly attachmentCount: number;
+    /** Documents already fetched and on disk. See {@link buildInstruction}. */
+    readonly attachments: {
+      readonly files: readonly IntakeFile[];
+      readonly unavailable?: readonly {
+        readonly name: string;
+        readonly reason: string;
+      }[];
+    };
     /** Raw Bot Framework conversation reference for this turn. */
     readonly conversationReference: unknown;
   },
@@ -117,7 +175,7 @@ export async function dispatchAssessment(
     });
     await deps.sendMessage(
       created.chatId,
-      buildInstruction(input.route, input.spokenText, input.attachmentCount),
+      buildInstruction(input.route, input.spokenText, input.attachments),
     );
     return { kind: "started", chatId: created.chatId };
   } catch (error) {
