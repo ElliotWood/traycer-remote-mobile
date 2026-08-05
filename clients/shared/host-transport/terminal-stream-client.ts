@@ -99,7 +99,6 @@ export class TerminalStreamClient {
   private closed: boolean;
 
   constructor(options: TerminalStreamClientOptions) {
-    this.wsStreamClient = options.wsStreamClient;
     this.callbacks = options.callbacks;
     this.closed = false;
     this.session = options.wsStreamClient.subscribe("terminal.subscribe", {
@@ -130,8 +129,12 @@ export class TerminalStreamClient {
     envelope: StreamFrameEnvelope,
     binaryPayload: Uint8Array | null,
   ): void {
-    const version =
-      this.wsStreamClient.getMethodSchemaVersion("terminal.subscribe");
+    // THIS session's negotiated version: each terminal tab is its own
+    // `terminal.subscribe` session, and the client-wide accessor answers for
+    // whichever one reconciliation reached first. Parsing a frame at a sibling
+    // tab's minor either strips fields this host did send or demands fields it
+    // cannot.
+    const version = this.session.getNegotiatedSchemaVersion();
     const parsed =
       version !== null && version.major === 1 && version.minor >= 5
         ? terminalSubscribeServerFrameSchemaV15.safeParse(envelope)
