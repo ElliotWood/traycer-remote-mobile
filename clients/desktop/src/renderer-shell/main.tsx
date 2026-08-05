@@ -9,6 +9,7 @@ import {
   type DesktopPreloadBridge,
 } from "./desktop-runner-host";
 import { composeDesktopSignInUrl, DESKTOP_REDIRECT_URI } from "./sign-in-url";
+import { createExtraHostsFetcher } from "./extra-hosts";
 import { config } from "../config";
 
 declare global {
@@ -16,6 +17,12 @@ declare global {
     readonly runnerHost: DesktopPreloadBridge;
   }
 }
+
+// Extra hosts supplied at launch, not in source - see `extra-hosts.ts` for why
+// these are `kind: "local"` and what that does and does not assert.
+const extraHostsFetcher = createExtraHostsFetcher(
+  import.meta.env.VITE_DESKTOP_EXTRA_HOSTS,
+);
 
 function bootstrap(): void {
   const bridge = window.runnerHost;
@@ -62,7 +69,7 @@ function bootstrap(): void {
       <TraycerApp
         runnerHost={host}
         registry={hostRpcRegistry}
-        remoteFetcher={null}
+        remoteFetcher={extraHostsFetcher}
         initialRoute={bridge.initialRoute}
       />
     </StrictMode>,
