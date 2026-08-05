@@ -21,7 +21,7 @@
  *      already lied.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { HostNotificationsConfigResponse } from "@traycer/protocol/host/notifications/host-notifications";
 import { SettingsScreen } from "../settings-screen";
 import type {
@@ -29,6 +29,7 @@ import type {
   NotificationConfigResult,
   ProviderSummary,
   ProvidersState,
+  SettingsClient,
 } from "../use-settings";
 
 /**
@@ -63,9 +64,27 @@ function provider(over: Partial<ProviderSummary>): ProviderSummary {
     providerId: "claude-code",
     enabled: true,
     auth: { status: "authenticated" },
+    // Defaults to NO profiles — the pre-profile host shape. The usage rows
+    // still read once with a `null` profile in that case, which is why every
+    // render below needs a client even when the test is about something else.
+    profiles: [],
     ...over,
   };
 }
+
+/**
+ * A client whose usage read never settles, for the tests that are not about
+ * usage.
+ *
+ * A never-resolving promise rather than `null`: `null` is the "no host
+ * configured" state and renders its own error copy, which would then appear in
+ * every provider assertion below and make a matcher for real usage text pass
+ * for the wrong reason. A pending read renders "Loading usage…" and nothing
+ * else, which is inert with respect to what these tests assert.
+ */
+const PENDING_CLIENT: SettingsClient = {
+  request: () => new Promise(() => undefined),
+};
 
 /**
  * Every severity, off on both channels.
@@ -124,6 +143,7 @@ describe("settings — providers", () => {
         notifications={notifications({ kind: "loading" }, NOOP_SET)}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     expect(screen.getByText(/No providers reported by this host/)).toBeTruthy();
@@ -137,6 +157,7 @@ describe("settings — providers", () => {
         notifications={notifications({ kind: "loading" }, NOOP_SET)}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     expect(screen.getByText(/Couldn't read providers/)).toBeTruthy();
@@ -164,11 +185,58 @@ describe("settings — providers", () => {
         notifications={notifications({ kind: "loading" }, NOOP_SET)}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     expect(screen.getByText("Connected")).toBeTruthy();
     // The host's own token for the bad case, rather than an invented word.
     expect(screen.getByText("unauthenticated")).toBeTruthy();
+  });
+
+  it("reads usage for the ENABLED provider only", async () => {
+    /*
+     * `host.getRateLimitUsage` makes the host reach out to the provider, so a
+     * usage read for a switched-off account spends a live call to report limits
+     * nobody asked for. The filter is invisible on screen — a disabled row
+     * looks the same with and without it — so this is asserted on the requests.
+     *
+     * Both providers carry a profile, so a broken filter produces TWO calls and
+     * the length check alone would catch it; the identity check is here because
+     * "two calls" and "the wrong one of two" are different defects.
+     */
+    const calls: Array<{ readonly providerId?: string }> = [];
+    // Asserted onto the member type, matching `use-settings.test.tsx`'s
+    // `fakeClient`. `as any` is banned in this package.
+    const request = ((_method: string, params: { providerId?: string }) => {
+      calls.push(params);
+      return new Promise(() => undefined);
+    }) as SettingsClient["request"];
+    const client: SettingsClient = { request };
+    const ready: ProvidersState = {
+      kind: "ready",
+      providers: [
+        provider({
+          profiles: [{ profileId: "p1", kind: "managed", label: "A" }],
+        }),
+        provider({
+          providerId: "codex",
+          enabled: false,
+          profiles: [{ profileId: "p2", kind: "managed", label: "B" }],
+        }),
+      ],
+    };
+    render(
+      <SettingsScreen
+        providers={ready}
+        notifications={notifications({ kind: "loading" }, NOOP_SET)}
+        hostStatus={LOADED_STATUS}
+        onSignOut={NOOP_SET}
+        client={client}
+      />,
+    );
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.providerId).toBe("claude-code");
   });
 });
 
@@ -183,6 +251,7 @@ describe("settings — notifications", () => {
         )}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     expect(
@@ -217,6 +286,7 @@ describe("settings — notifications", () => {
         )}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     const info = screen.getByRole("switch", { name: "Informational" });
@@ -254,6 +324,7 @@ describe("settings — notifications", () => {
         )}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     expect(
@@ -282,6 +353,7 @@ describe("settings — notifications", () => {
         )}
         hostStatus={LOADED_STATUS}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     expect(
@@ -303,6 +375,7 @@ describe("settings — about", () => {
         notifications={notifications({ kind: "loading" }, NOOP_SET)}
         hostStatus={LOADED_STATUS}
         onSignOut={onSignOut}
+        client={PENDING_CLIENT}
       />,
     );
     expect(screen.getByText(/Host v1\.4\.2/)).toBeTruthy();
@@ -318,6 +391,7 @@ describe("settings — about", () => {
         notifications={notifications({ kind: "loading" }, NOOP_SET)}
         hostStatus={{ kind: "error", detail: "timed out" }}
         onSignOut={NOOP_SET}
+        client={PENDING_CLIENT}
       />,
     );
     // The POINT of three independent states: only two of the four methods are

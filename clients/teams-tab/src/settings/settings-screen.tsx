@@ -13,29 +13,44 @@
  *
  * | Mobile section | Here | Why |
  * | --- | --- | --- |
- * | Providers → expandable USAGE WINDOWS | provider + auth status only | See below. Not a shortcut — a collision avoided |
+ * | Providers → USAGE WINDOWS | ✅ built — see `./provider-usage` | Was deferred; the deferral's premise was checkable and wrong. See below |
  * | Display → screen wake lock | absent | `isWakeLockSupported()` is false in a Teams tab and the control is hidden on mobile too when unsupported. A row that cannot do anything is worse than its absence |
  * | Account → "Clear cached data" | absent | Mobile clears a service worker, the Cache Storage API and IndexedDB. This client is not a PWA and registers none of them. Recorded in `account/account-menu.tsx` |
  *
- * ⚠️ **THE USAGE WINDOWS ARE NOT MINE TO BUILD, and this is the reason.**
- * Mobile normalises each provider arm's own field names through
- * `extractUsageWindows` (`clients/mobile/src/host/use-provider-usage.ts`).
- * That logic has ALREADY been generalised into `clients/shared/rate-limits/`
- * — `projectProfileUsage`, `provider-rate-limit-envelope`, `window-severity`
- * — on `traycer/mobile-v2-desktop-companion`, which is not merged here:
+ * ## The usage row's deferral, and why it is worth recording rather than deleting
+ *
+ * This docblock previously said the usage windows were "NOT MINE TO BUILD",
+ * because the arm normalisation "has ALREADY been generalised into
+ * `clients/shared/rate-limits/`" and only needed
+ * `traycer/mobile-v2-desktop-companion` to merge. That branch has now merged.
+ * **It does not contain the function this section needed**, so the stated
+ * unblock would not have unblocked anything:
  *
  * ```sh
- * git log --oneline -2 -- clients/shared/rate-limits   # on that branch
- * #   5b7e1f54  M2 fix: the banner named a family when the limit was profile-wide
- * #   65921e93  M2 item 5: the rate-limit severity rules move to shared
+ * grep -rn 'extractUsageWindows' clients/shared/   # before this change
+ * #   (nothing) — it had never left clients/mobile
  * ```
  *
- * Vendoring a third copy of the arm-normalisation here would be a guaranteed
- * conflict with work already done, against the tab plan's decision 6 ("extract
- * on demand, NEVER duplicate"). The correct sequence is: that branch lands,
- * then this section grows an expandable usage row against the shared module.
- * `providers.list` needs none of it, so the section is built now and the row
- * it is missing is named rather than implied.
+ * What had moved to shared was gui-app's ENVELOPE projection
+ * (`projectProfileUsage`), which takes a `ProviderRateLimitEnvelope` — and
+ * nothing in `clients/shared` can build one, because
+ * `buildProviderRateLimitEnvelope` stayed in `clients/gui-app` with the
+ * react-query cache it converges. `provider-rate-limit-envelope.ts` says so in
+ * its own docblock. Two modules named for rate limits, one directory, different
+ * questions.
+ *
+ * The reasoning was otherwise sound, which is exactly why nobody re-checked it:
+ * decision 6 ("extract on demand, NEVER duplicate") is right, vendoring a third
+ * copy would have been wrong, and "wait for the branch" is what that rule
+ * implies IF the branch carries the function. The unchecked premise was the
+ * last one. **A blocker that expires silently is worse than an open one** —
+ * nothing would have told the next reader the wait was over, or that it had
+ * been the wrong wait.
+ *
+ * Done properly now: `extractUsageWindows` MOVED to
+ * `@traycer-clients/shared/rate-limits/usage-windows`, mobile re-exports it
+ * from its original path, and it gained the tests it had never had in either
+ * client.
  */
 import type { ReactElement } from "react";
 import {
@@ -60,7 +75,9 @@ import {
   type NotificationConfigResult,
   type ProviderSummary,
   type ProvidersState,
+  type SettingsClient,
 } from "./use-settings";
+import { ProviderUsage } from "./provider-usage";
 
 /**
  * The four severities, in mobile's order, with mobile's exact copy.
@@ -139,6 +156,16 @@ export interface SettingsScreenProps {
   readonly notifications: NotificationConfigResult;
   readonly hostStatus: HostStatusState;
   readonly onSignOut: () => void;
+  /**
+   * Threaded through to the usage rows, which each own a `host.getRateLimitUsage`
+   * read of their own.
+   *
+   * A PROP rather than a context lookup, matching every other load on this
+   * screen: the three states above arrive as props from the route, and a
+   * component reaching past them for its own client would make this screen
+   * untestable in exactly the half that talks to a host.
+   */
+  readonly client: SettingsClient | null;
 }
 
 export function SettingsScreen({
@@ -146,12 +173,13 @@ export function SettingsScreen({
   notifications,
   hostStatus,
   onSignOut,
+  client,
 }: SettingsScreenProps): ReactElement {
   const styles = useStyles();
   return (
     <main className={styles.screen}>
       <Subtitle2 as="h1">Settings</Subtitle2>
-      <ProvidersSection state={providers} />
+      <ProvidersSection state={providers} client={client} />
       <Divider />
       <NotificationsSection result={notifications} />
       <Divider />
@@ -174,8 +202,10 @@ function SectionHeading({
 
 function ProvidersSection({
   state,
+  client,
 }: {
   readonly state: ProvidersState;
+  readonly client: SettingsClient | null;
 }): ReactElement {
   const styles = useStyles();
   return (
@@ -199,7 +229,11 @@ function ProvidersSection({
         <Body1 className={styles.muted}>No providers reported by this host.</Body1>
       ) : (
         state.providers.map((provider) => (
-          <ProviderRow key={provider.providerId} provider={provider} />
+          <ProviderRow
+            key={provider.providerId}
+            provider={provider}
+            client={client}
+          />
         ))
       )}
     </section>
@@ -208,29 +242,46 @@ function ProvidersSection({
 
 function ProviderRow({
   provider,
+  client,
 }: {
   readonly provider: ProviderSummary;
+  readonly client: SettingsClient | null;
 }): ReactElement {
   const styles = useStyles();
   const authenticated = provider.auth.status === "authenticated";
   return (
-    <div className={styles.providerRow}>
-      <span
-        aria-hidden="true"
-        className={`${styles.dot} ${provider.enabled ? styles.dotOn : styles.dotOff}`}
-      />
-      <Body1 className={styles.providerName}>
-        {PROVIDER_DISPLAY_NAMES[provider.providerId] ?? provider.providerId}
-      </Body1>
+    <div>
+      <div className={styles.providerRow}>
+        <span
+          aria-hidden="true"
+          className={`${styles.dot} ${provider.enabled ? styles.dotOn : styles.dotOff}`}
+        />
+        <Body1 className={styles.providerName}>
+          {PROVIDER_DISPLAY_NAMES[provider.providerId] ?? provider.providerId}
+        </Body1>
+        {/*
+          The host's own word for the state, except for the one case where it
+          has a plain-English equivalent. `status` is a machine token
+          ("unauthenticated", "expired"); showing it raw is honest and showing
+          "Connected" for the good case is what mobile does, so both hold.
+        */}
+        <Caption1 className={styles.muted}>
+          {authenticated ? "Connected" : provider.auth.status}
+        </Caption1>
+      </div>
       {/*
-        The host's own word for the state, except for the one case where it
-        has a plain-English equivalent. `status` is a machine token
-        ("unauthenticated", "expired"); showing it raw is honest and showing
-        "Connected" for the good case is what mobile does, so both hold.
+        USAGE IS READ ONLY FOR ENABLED PROVIDERS, and this is a real decision
+        rather than a filter for tidiness. `host.getRateLimitUsage` makes the
+        host reach out to the provider, so a row for a disabled provider spends
+        a live call — and one per profile — to report limits on an account this
+        user has switched off. Mobile filters the same way, one level up
+        (`providers.filter((p) => p.enabled)`), so this matches it; the row
+        itself stays visible either way, which is why the filter sits here and
+        not around the whole row.
       */}
-      <Caption1 className={styles.muted}>
-        {authenticated ? "Connected" : provider.auth.status}
-      </Caption1>
+      {provider.enabled ? (
+        <ProviderUsage client={client} provider={provider} />
+      ) : null}
     </div>
   );
 }
