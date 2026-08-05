@@ -4,7 +4,10 @@ import {
   hostStreamRpcRegistry,
 } from "@traycer/protocol/host/registry";
 import { hostNotificationsSubscribeServerFrameSchema } from "@traycer/protocol/host/notifications/host-notifications";
-import { WsRpcClient } from "@traycer-clients/shared/host-transport/ws-rpc-client";
+import {
+  WsRpcClient,
+  HOST_POST_OPEN_ATTESTATION_WINDOW_MS,
+} from "@traycer-clients/shared/host-transport/ws-rpc-client";
 import { WsStreamClient } from "@traycer-clients/shared/host-transport/ws-stream-client";
 import type { IStreamSession } from "@traycer-clients/shared/host-transport/i-stream-session";
 import type { ProactiveRefreshScheduler } from "@traycer-clients/shared/auth/token-refresh-scheduler";
@@ -96,6 +99,7 @@ export class BridgeClient implements RemoteBridgeActions {
       webSocketFactory: createNodeWebSocketFactory(),
       dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
       frameTimeoutMs: RPC_FRAME_TIMEOUT_MS,
+      hostAttestationWindowMs: HOST_POST_OPEN_ATTESTATION_WINDOW_MS,
     });
 
     this.streamClient = new WsStreamClient({
@@ -106,6 +110,9 @@ export class BridgeClient implements RemoteBridgeActions {
       // `recoverFromUnauthorized` and the notifications-feed handling
       // below) — the same reason `traycer monitor` passes `auth: null`.
       auth: null,
+      // No delegated host-credential-provisioning policy - see the matching
+      // note in clients/shared/host-transport/single-host-stream-connection.ts.
+      hostCredentialMint: null,
       webSocketFactory: createNodeStreamWebSocketFactory(),
       dialTimeoutMs: DEFAULT_DIAL_TIMEOUT_MS,
       openAckTimeoutMs: OPEN_ACK_TIMEOUT_MS,
