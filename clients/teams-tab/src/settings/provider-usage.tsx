@@ -41,7 +41,7 @@
  * lives: same labels, same severity threshold, same reset phrasing, same
  * distinction between "no window concept" and "no live windows".
  */
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   Caption1,
   ProgressBar,
@@ -227,8 +227,17 @@ function UsageWindowMeter({
   readonly row: UsageWindowRow;
 }): ReactElement {
   const styles = useStyles();
+  /*
+   * The clock is read ONCE per mount, in a lazy initialiser, not during
+   * render — `react-hooks/purity` correctly flags `Date.now()` called
+   * directly in the render body, since a "Resets in 42m" label recomputed on
+   * every incidental re-render is unstable output. Mirrors mobile's
+   * `UsageWindowMeter` (`views/toolbar/usage-sheet.tsx`), which hit the same
+   * rule for the same reason.
+   */
+  const [now] = useState(() => Date.now());
   const percent = Math.max(0, Math.min(100, Math.round(row.window.usedPercent)));
-  const reset = formatResetLine(row.window.resetsAt, Date.now());
+  const reset = formatResetLine(row.window.resetsAt, now);
   return (
     <div className={styles.meter}>
       <div className={styles.meterHead}>
