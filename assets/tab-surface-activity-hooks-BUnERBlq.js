@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-B0Z9INg1.js";import{n as t}from"./jsx-runtime-Ciaf_P-h.js";import{t as n}from"./tab-surface-activity-context-DFMjkalZ.js";var r=e(t(),1);function i(){return(0,r.use)(n)}export{i as t};
