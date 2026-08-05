@@ -62,7 +62,7 @@ Verified in both directions: `C:\repo\traycer-remote-mobile ↔ /srv/traycer/rep
 | A running turn | The fork boundary is a *completed* assistant message. `plan` refuses a non-idle source. |
 | Anything after that boundary | `forkSource` cuts at an assistant message id. Trailing user messages are dropped, and named as such. |
 | Host-local agents | `agent list` is per host. Child agents and open reply threads die with the binding. |
-| Provider profile | `profileId` is host-local; the clone lands on the target's ambient login unless it holds the same account. |
+| Provider profile | `profileId` is a managed config directory on one machine. The target does not ignore an unknown one — it **rejects the whole `epic.createChat`**. The tool maps by the provider's `accountUuid`, which is stable across machines, and falls back to the target's ambient login when no match exists, naming the reason in the plan. |
 | Uncommitted work | The target is a different clone. Only pushed commits cross. |
 | Terminals, TUI agents, pending approvals | Host-local runtime. |
 
@@ -108,7 +108,8 @@ PASS  carries N message(s)
 PASS  records its source                   (a chat.forked event naming the source chat)
 PASS  workspace bound on the target        (a binding row on THAT machine owning the new chat)
 PASS  the bound folder exists on the target (realpath, via workspace.prepareFolders)
-PASS  source chat still intact             (same message count, same host)
+PASS  the requested worktree was created    (only when --branch asked for one)
+PASS  source chat still intact, read from X (named host, not the target's replica)
 ```
 
 The folder check earned its place: a `--workspace` typo — or a POSIX path an MSYS shell rewrote into `C:/Program Files/Git/srv/...` — produced a binding row that passed every other verdict and a chat that could not run. `plan` now refuses such a path before anything is created; the verdict re-checks what the host actually chose, which need not be what was asked for.
@@ -126,6 +127,25 @@ Both quirks below cost time if rediscovered:
 
 Requires Node 22+ for the built-in `WebSocket`. No dependencies.
 
-## Scope
+## Known limitations
 
-Not covered, deliberately: batch moves, moving a chat's descendants as a tree, recreating agent processes on the target, and moving a chat with a turn in flight. The first two are additive; the last two are not possible.
+Honest list, kept because someone picking this up later needs it. This is a utility, not a workflow — chats live where they are created and clients pick which host they drive, so these are not on a path to being fixed.
+
+- **`--branch` has never succeeded against a live host.** Pointed at a branch that does not exist on the target, the host silently falls back to a plain `local` binding and returns success. That is now caught by its own verdict ("the requested worktree was actually created") rather than reported as a clean move — but the *working* path, a real pushed branch, is still unexercised. Treat the first real use as the test.
+- **When the source host is unreachable, the source-intact verdict falls back to the target's replica** and relabels itself to say so. It cannot then see anything host-local. The guarantee still holds structurally — `epic.createChat` is only ever called on the target, and nothing in this tool writes to the source — but the check is weaker than its name in that one case.
+- **`chats` needs a chat id to bootstrap** (`--from`). `agent.list` requires a `senderAgentId` that exists. An **agent id IS a chat id**, so any id you already have unlocks the full list.
+- **The installed skill is a copy.** `~/.traycer/*/skills/` is Traycer-managed with a sha256 manifest; a host update reconciling it may drop an entry it does not recognise. The repo copy is canonical — re-run `install-skill.mjs`.
+- Not covered, deliberately: batch moves, moving a chat's descendants as a tree, recreating agent processes on the target, and moving a chat with a turn in flight. The first two are additive; the last two are not possible.
+
+## One finding worth stealing
+
+**An MSYS shell rewrites a leading POSIX path into a Git-install prefix, and a verifier that only checks structure will not notice.** `--workspace /srv/traycer/repo/...` reached the code as `C:/Program Files/Git/srv/traycer/repo/...`. A binding row was created, it was owned by the right chat on the right host, and **all seven verdicts passed** — on a folder that does not exist and a chat that could not run.
+
+The generalisable part is the instrument:
+
+| Probe | Absent directory | Empty directory | Usable as an existence check |
+| --- | --- | --- | --- |
+| `workspace.listDirectory` | `entries: []` | `entries: []` | **No** — the two answers are identical |
+| `workspace.prepareFolders` | throws `ENOENT` on realpath | succeeds | **Yes** |
+
+Any check that asks "did the structure come out right" will pass a path that is well-formed and wrong. Ask something that has to touch the filesystem.

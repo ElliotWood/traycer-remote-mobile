@@ -9,7 +9,9 @@
 // host would only re-test our own fake. No network, no host: `node
 // test-move-chat.mjs`.
 import assert from "node:assert/strict";
-import { collectChecks, forkBoundary, repoFromMeta, translateWorkspaces } from "./move-chat.mjs";
+import {
+  collectChecks, findProfile, forkBoundary, repoFromMeta, resolveProfileForTarget, translateWorkspaces,
+} from "./move-chat.mjs";
 import { floorMethods } from "./rpc.mjs";
 
 const tests = [];
@@ -154,6 +156,7 @@ const failures = (checks) => checks.filter(([, passed]) => !passed).map(([label]
 test("a clean move passes every verdict", () => {
   const checks = collectChecks({
     plan: PLAN, newChatId: "new", created: CREATED, bindingRows: ROWS, sourceAfter: SOURCE_AFTER,
+    sourceReadFrom: "source",
   });
   assert.deepEqual(failures(checks), []);
   assert.equal(checks.length, 7);
@@ -201,6 +204,35 @@ test("a binding row owned by a DIFFERENT host fails, even though a row exists", 
   assert.deepEqual(failures(checks), ["binding owned by the expected host"]);
 });
 
+test("a worktree the host quietly declined to create is a FAILURE, not a pass", () => {
+  const worktreePlan = {
+    ...PLAN,
+    workspace: { intentEntries: [{ kind: "worktree", isPrimary: true, branch: { type: "existing", name: "feature/x" } }] },
+  };
+  // The host answers a branch it cannot check out with a plain local binding
+  // and reports success - measured against a live host.
+  const declined = collectChecks({
+    plan: worktreePlan, newChatId: "new", created: CREATED, bindingRows: ROWS,
+    sourceAfter: SOURCE_AFTER, sourceReadFrom: "source",
+  });
+  assert.deepEqual(failures(declined), ["the requested worktree was actually created"]);
+
+  const honoured = collectChecks({
+    plan: worktreePlan, newChatId: "new", created: CREATED,
+    bindingRows: [{ ...ROWS[0], mode: "worktree", worktreePath: "/srv/wt", branch: "feature/x" }],
+    sourceAfter: SOURCE_AFTER, sourceReadFrom: "source",
+  });
+  assert.deepEqual(failures(honoured), []);
+});
+
+test("a plain local move gets no worktree verdict at all", () => {
+  const checks = collectChecks({
+    plan: { ...PLAN, workspace: { intentEntries: [{ kind: "local", isPrimary: true }] } },
+    newChatId: "new", created: CREATED, bindingRows: ROWS, sourceAfter: SOURCE_AFTER, sourceReadFrom: "source",
+  });
+  assert.ok(!checks.some(([label]) => label.includes("worktree")));
+});
+
 test("a row owned by a different CHAT does not count as ours", () => {
   const checks = collectChecks({
     plan: PLAN, newChatId: "new", created: CREATED,
@@ -223,14 +255,95 @@ test("a damaged source fails the move — the promise this tool makes", () => {
   const truncated = collectChecks({
     plan: PLAN, newChatId: "new", created: CREATED, bindingRows: ROWS,
     sourceAfter: { ...SOURCE_AFTER, messages: [msg("user", "u1")] },
+    sourceReadFrom: "source",
   });
-  assert.deepEqual(failures(truncated), ["source chat still intact"]);
+  assert.equal(failures(truncated).length, 1);
 
   const rebound = collectChecks({
     plan: PLAN, newChatId: "new", created: CREATED, bindingRows: ROWS,
     sourceAfter: { ...SOURCE_AFTER, hostId: "target-host" },
+    sourceReadFrom: "source",
   });
-  assert.deepEqual(failures(rebound), ["source chat still intact"]);
+  assert.equal(failures(rebound).length, 1);
+});
+
+test("the source verdict says WHICH host it read, and admits when it only read the replica", () => {
+  const [label] = collectChecks({
+    plan: PLAN, newChatId: "new", created: CREATED, bindingRows: ROWS,
+    sourceAfter: SOURCE_AFTER, sourceReadFrom: "tonberry",
+  }).at(-1);
+  assert.match(label, /read from tonberry/);
+
+  // The dangerous case: reading the source out of the TARGET's replica would
+  // pass with the source machine switched off, so it must never claim more.
+  const [replicaLabel] = collectChecks({
+    plan: PLAN, newChatId: "new", created: CREATED, bindingRows: ROWS,
+    sourceAfter: SOURCE_AFTER, sourceReadFrom: null,
+  }).at(-1);
+  assert.match(replicaLabel, /replica/);
+  assert.match(replicaLabel, /NOT read/);
+  assert.doesNotMatch(replicaLabel, /still intact/);
+});
+
+// ─── provider profile (P0: the target REJECTS a foreign profileId) ───────────
+
+const providersWith = (profiles) => ({ providers: [{ providerId: "claude-code", profiles }] });
+const AMBIENT = { profileId: "ambient", kind: "ambient", label: "Terminal account", identity: { accountUuid: null } };
+const MANAGED = { profileId: "p-source", kind: "managed", label: "Work", identity: { accountUuid: "acct-1" } };
+const SETTINGS = { harnessId: "claude", model: "sonnet", profileId: "p-source" };
+const host = (alias) => ({ alias, origin: "ws://x", hostId: alias });
+
+test("findProfile never matches the ambient row, whose wire id is the literal \"ambient\"", () => {
+  assert.equal(findProfile(providersWith([AMBIENT, MANAGED]), "ambient"), null);
+  assert.equal(findProfile(providersWith([AMBIENT, MANAGED]), "p-source").accountUuid, "acct-1");
+});
+
+test("a host-local profileId is NEVER passed through — the target rejects the whole call", async () => {
+  const r = await resolveProfileForTarget(host("src"), host("tgt"), SETTINGS,
+    async (h) => providersWith(h.alias === "src" ? [AMBIENT, MANAGED] : [AMBIENT]));
+  assert.equal(r.settings.profileId, null);
+  assert.equal(r.disposition, "ambient");
+  assert.match(r.reason, /same account/);
+});
+
+test("a matching account on the target maps to ITS profileId, not the source's", async () => {
+  const r = await resolveProfileForTarget(host("src"), host("tgt"), SETTINGS,
+    async (h) => providersWith(h.alias === "src"
+      ? [MANAGED]
+      : [{ profileId: "p-target", kind: "managed", label: "Work", identity: { accountUuid: "acct-1" } }]));
+  assert.equal(r.settings.profileId, "p-target");
+  assert.equal(r.disposition, "mapped");
+});
+
+test("two unknown identities are not a match", async () => {
+  const nullIdentity = { ...MANAGED, identity: { accountUuid: null } };
+  const r = await resolveProfileForTarget(host("src"), host("tgt"), SETTINGS,
+    async () => providersWith([nullIdentity]));
+  assert.equal(r.settings.profileId, null);
+  assert.equal(r.disposition, "ambient");
+});
+
+test("an unreachable source falls back to ambient rather than failing the move", async () => {
+  const unreadable = await resolveProfileForTarget(null, host("tgt"), SETTINGS, async () => providersWith([]));
+  assert.equal(unreadable.settings.profileId, null);
+
+  const throwing = await resolveProfileForTarget(host("src"), host("tgt"), SETTINGS, async () => {
+    throw new Error("could not reach src");
+  });
+  assert.equal(throwing.settings.profileId, null);
+  assert.match(throwing.reason, /could not be read/);
+});
+
+test("a chat with no profile is left exactly alone", async () => {
+  const plain = { harnessId: "claude", model: "sonnet", profileId: null };
+  const r = await resolveProfileForTarget(host("src"), host("tgt"), plain, async () => {
+    throw new Error("must not be called");
+  });
+  assert.equal(r.settings, plain);
+  assert.equal(r.disposition, "none");
+  assert.equal((await resolveProfileForTarget(host("src"), host("tgt"), null, async () => {
+    throw new Error("must not be called");
+  })).settings, null);
 });
 
 // ─── run ─────────────────────────────────────────────────────────────────────

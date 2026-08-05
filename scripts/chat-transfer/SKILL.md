@@ -26,7 +26,7 @@ Do not re-derive this; it is measured.
 | `worktreeBinding` (which folder a chat runs in) | | ✅ SQLite, per host |
 | Harness session (`activeSessionChain`) | | ✅ |
 | Agent processes, terminals, TUI agents | | ✅ |
-| Provider credentials / profiles | | ✅ |
+| Provider credentials / profiles | | ✅ (an unknown `profileId` makes the target **reject the create**, not ignore it — the tool maps by `accountUuid` or falls back to ambient) |
 
 Two consequences that drive the whole flow:
 
@@ -71,7 +71,7 @@ Present `plan`'s output, then add the judgement it cannot make:
 - **Name the workspace translation explicitly**, both sides. `C:\repo\x → /srv/traycer/repo/Owner/x` is the step most likely to be wrong, and it is the one the user can check at a glance.
 - **If the source host was not read**, say so plainly. The plan will show `source host not read` — that means a turn could be running there unseen, and the workspaces came from the harness session snapshot rather than the real binding.
 - **If nothing translated**, the chat lands folderless. Offer `--workspace <path>` rather than letting it land empty by default. `plan` refuses a `--workspace` that does not exist on the target — including a POSIX path an MSYS shell rewrote into `C:/Program Files/Git/srv/...`, which is easy to produce from Git Bash and looks correct in every other check.
-- **A `worktree`-mode source is the common trap.** The source runs in a worktree on a branch; the target gets the plain checkout unless the branch is pushed and `--branch <name>` is passed. Uncommitted work in that worktree does not exist on the target at all. Say this in the user's own terms — "the changes you have not committed stay on the old machine".
+- **A `worktree`-mode source is the common trap.** The source runs in a worktree on a branch; the target gets the plain checkout unless the branch is pushed and `--branch <name>` is passed. Uncommitted work in that worktree does not exist on the target at all. Say this in the user's own terms — "the changes you have not committed stay on the old machine". **`--branch` has never succeeded against a live host** — when the branch is absent the host silently returns a plain `local` binding, which `move` now catches as a failed verdict. Warn before using it.
 
 Then ask. The move creates a chat in a shared epic; it is visible to the user immediately.
 
