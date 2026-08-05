@@ -10,7 +10,7 @@
  * below it comes from the Teams theme, so light / dark / high-contrast are
  * correct without a single colour being chosen here.
  */
-import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useChatScrollContainer } from "./shell/chat-scroll-container";
 import { useAutoScrollToBottom } from "./chat/use-auto-scroll-to-bottom";
 import { ScrollToBottomChip } from "./chat/scroll-to-bottom-chip";
@@ -51,6 +51,10 @@ import type { EpicListClient } from "@traycer-clients/shared/epic/epic-list";
 import type { EpicChatEntry } from "@traycer-clients/shared/epic/epic-doc-chats";
 import { ApprovalsPreview } from "./chat/approvals-preview";
 import { ArtifactMarkdown } from "./artifacts/artifact-markdown";
+import {
+  ArtifactLinkProvider,
+  type ArtifactLinkValue,
+} from "./artifacts/artifact-link-context";
 import { CommentsPanel } from "./comments/comments-panel";
 import { AuthorAgent } from "./authoring/author-agent";
 import { CreateArtifact } from "./authoring/create-artifact";
@@ -344,6 +348,59 @@ function EpicScreen({
     setOpenedArtifact(null);
   }
   /*
+   * Lets an artifact link inside RENDERED PROSE open the artifact, instead of
+   * navigating the tab's iframe to its on-disk path. See
+   * `artifacts/artifact-link-context.tsx` for why this is a context and not a
+   * prop, and `artifact-markdown.tsx` for the four-branch link policy.
+   *
+   * SCOPED TO THIS SCREEN, and that is a real limit rather than an oversight.
+   * The artifact viewer is component state here, so this is the only route
+   * that has somewhere to open into — a link in the CHAT transcript is a
+   * sibling route, reads the inert default, and reports "couldn't open that
+   * artifact" rather than doing nothing. Lifting it needs the artifact to
+   * become a route, which is mobile's U1 fix (`router/nav.ts:31` — "a
+   * top-level route, NOT EpicView-local state") and is deliberately not done
+   * here: `EpicSession` on the queued canvas branch is where the shared
+   * subscription both epic-scoped routes need already lands, so building it
+   * first would conflict with that branch for no gain.
+   *
+   * The FOREIGN-EPIC refusal is the part worth reading. An agent-authored link
+   * carries its own epic id, which need not be this one. Looking a foreign
+   * artifact up in this epic's tree finds nothing — and "not found" and "not
+   * from this epic" would then render identically, as an artifact that does
+   * not exist. Refused explicitly instead, so the two stay distinguishable.
+   */
+  const artifactLink = useMemo<ArtifactLinkValue>(
+    () => ({
+      resolveArtifact: async (linkEpicId, filePath) => {
+        if (hostClient === null) return null;
+        const response = await hostClient.request("epic.resolveArtifactByPath", {
+          epicId: linkEpicId,
+          filePath,
+        });
+        return response.artifact?.artifactId ?? null;
+      },
+      openArtifact: (linkEpicId, artifactId) => {
+        if (linkEpicId !== epicId) return false;
+        // The snapshot that carries the artifact tree costs ~47s, so a link
+        // clicked early in that window genuinely has no tree to look in yet.
+        // Reported as a failure to open, which surfaces as "couldn't open that
+        // artifact" — the alternative, treating loading as empty, would tell
+        // the reader the artifact does not exist while it is still arriving.
+        if (agents.kind !== "ready") return false;
+        // `byId` is a Record and this package does not set
+        // `noUncheckedIndexedAccess`, so a missing key TYPES as an entry and
+        // arrives `undefined`. Without `?? null` that undefined would be
+        // stored as the open artifact and read for fields it does not have.
+        const entry = agents.artifacts.byId[artifactId] ?? null;
+        if (entry === null) return false;
+        setOpenedArtifact(entry);
+        return true;
+      },
+    }),
+    [agents, epicId, hostClient],
+  );
+  /*
    * THE FIRST SCREEN IN THE SHELL, and deliberately the only one for now.
    *
    * This is the surface with the ~40s wait, so it is the only one where the
@@ -387,6 +444,13 @@ function EpicScreen({
      * that debt bought.
      */
     <div className={styles.screen}>
+      {/*
+        WRAPS THE VIEWER TOO, not just the tree. An artifact body is the most
+        likely place of all to contain a link to another artifact, so scoping
+        this to the non-viewer branch would switch the policy off exactly where
+        agents cross-reference the most.
+      */}
+      <ArtifactLinkProvider value={artifactLink}>
       {openedArtifact !== null ? (
         <ArtifactViewer
           entry={openedArtifact}
@@ -438,6 +502,7 @@ function EpicScreen({
           />
         </>
       )}
+      </ArtifactLinkProvider>
     </div>
   );
 }
