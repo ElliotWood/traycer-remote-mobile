@@ -1,4 +1,5 @@
 import {
+  createHashHistory,
   createMemoryHistory,
   createRouter,
   type Router,
@@ -32,6 +33,14 @@ export function createAppRouter(
   const history = createAppHistory(initialRoute, windowId);
   const router = createRouter({
     routeTree,
+    // BROWSER-PROOF SCAFFOLDING: the route tree is root-relative, so a build
+    // served from anything but `/` matches nothing and every URL renders
+    // "Not Found". Vite always defines BASE_URL ("/" unless `base` is set),
+    // so this is a no-op for the desktop renderer and the dev server.
+    // No `basepath`: a root deploy does not need one, and a subpath deploy
+    // uses hash history (see `createAppHistory`), where the route lives in the
+    // fragment and always starts at "/". Setting one here would make the
+    // router demand the prefix inside the hash.
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
     // Show a neutral loading screen once a navigation has pended past this
@@ -97,7 +106,16 @@ function createAppHistory(
   // work natively, and reload survives via the browser. A shell-injected
   // `initialRoute` still overrides via memory history below.
   if (!isElectronContext()) {
-    if (initialRoute === null) return undefined;
+    if (initialRoute === null) {
+      // Served from a SUBPATH (vite `base` other than "/"): browser history
+      // plus a router `basepath` puts router-core's `load` and
+      // @tanstack/history's subscriber set into a feedback loop that never
+      // converges - thousands of stack overflows a second, measured at 0 on
+      // "/" and ~1300/15s on "/next/". Hash history keeps the route in the
+      // fragment, so the basepath never participates in path normalisation
+      // and the loop cannot form. Root deploys are untouched.
+      return isSubpathDeploy() ? createHashHistory() : undefined;
+    }
     return createMemoryHistory({
       initialEntries: [normalizeInitialRoute(initialRoute)],
     });
@@ -106,6 +124,11 @@ function createAppHistory(
   // Use a memory history seeded from `localStorage` so the router boots at
   // the last visited route synchronously, with no async gate.
   return createPersistentMemoryHistory(initialRoute, windowId);
+}
+
+/** Vite always defines BASE_URL; anything but "/" means a subpath deploy. */
+function isSubpathDeploy(): boolean {
+  return import.meta.env.BASE_URL.replace(/\/+$/, "") !== "";
 }
 
 function normalizeInitialRoute(initialRoute: string | null): string {
