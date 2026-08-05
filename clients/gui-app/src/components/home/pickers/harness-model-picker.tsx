@@ -89,6 +89,11 @@ import {
   sortGuiHarnessesByProviderOrder,
 } from "@/lib/provider-ordering";
 import { isProviderAmbientSignedOut } from "@/lib/providers/provider-ambient-auth";
+import {
+  paneActivationDeferProps,
+  runAfterPaneActivationFocusIntent,
+  usePaneActivationFocusIntent,
+} from "@/components/epic-canvas/pane-activation";
 
 export type { ReasoningFooterConfig, ServiceTierFooterConfig };
 
@@ -156,6 +161,7 @@ function HarnessModelPickerImpl(props: HarnessModelPickerProps) {
     runTargetHostId,
   } = props;
   const activityEnabled = useSurfaceActivity();
+  const paneActivationFocusIntent = usePaneActivationFocusIntent();
   const selection = useStore(store, (s) => s.selection);
   const selectedModel = useStore(store, (s) => s.selectedModel);
   const reasoning = useStore(store, (s) => s.reasoning);
@@ -228,8 +234,11 @@ function HarnessModelPickerImpl(props: HarnessModelPickerProps) {
 
   useEffect(() => {
     if (activityEnabled || !visibleOpen) return;
-    closeOnly();
-  }, [activityEnabled, closeOnly, visibleOpen]);
+    return runAfterPaneActivationFocusIntent(
+      paneActivationFocusIntent,
+      closeOnly,
+    );
+  }, [activityEnabled, closeOnly, paneActivationFocusIntent, visibleOpen]);
 
   const harnessesQuery = useGuiHarnessesQuery({
     enabled: activityEnabled,
@@ -799,6 +808,7 @@ function HarnessModelPickerImpl(props: HarnessModelPickerProps) {
           align={undefined}
         >
           <HarnessModelTrigger
+            {...paneActivationDeferProps}
             selection={selection}
             label={presentation.label}
             reasoningLabel={presentation.reasoningLabel}
