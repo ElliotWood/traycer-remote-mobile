@@ -16,6 +16,11 @@ export function SwitcherListRow(props: {
   readonly onSelect: () => void;
   readonly actions: ReactNode;
   readonly selectTestId: string;
+  /**
+   * Optional trailing annotation, before the active check. Used to name the
+   * host a row is bound to when that is not the selected one.
+   */
+  readonly badge?: ReactNode;
 }) {
   const { icon, label, active, onSelect, actions, selectTestId } = props;
   return (
@@ -34,6 +39,7 @@ export function SwitcherListRow(props: {
         <span className="min-w-0 flex-1 truncate text-ui-sm text-foreground">
           {label}
         </span>
+        {props.badge}
         {active ? (
           <Check
             className="size-4 shrink-0 text-primary"

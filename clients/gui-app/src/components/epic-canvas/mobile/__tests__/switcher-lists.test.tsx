@@ -20,7 +20,11 @@ interface FixtureSession {
 }
 interface ActivateCall {
   readonly id: string;
-  readonly ref: { readonly type: string };
+  readonly ref: { readonly type: string; readonly hostId?: string };
+}
+interface FixtureHostEntry {
+  readonly hostId: string;
+  readonly label: string;
 }
 interface Holder {
   records: ReadonlyArray<FixtureRecord>;
@@ -28,6 +32,8 @@ interface Holder {
   activeId: string | null;
   role: "owner" | "viewer";
   activateCalls: ActivateCall[];
+  activeHostId: string | null;
+  hostDirectory: ReadonlyArray<FixtureHostEntry> | undefined;
 }
 
 const holder = vi.hoisted(
@@ -37,11 +43,29 @@ const holder = vi.hoisted(
     activeId: null,
     role: "owner",
     activateCalls: [],
+    activeHostId: "host-A",
+    hostDirectory: [
+      { hostId: "host-A", label: "Altra" },
+      { hostId: "host-B", label: "Tonberry" },
+    ],
   }),
 );
 
 vi.mock("@/lib/epic-selectors", () => ({
-  useEpicArtifactRecords: () => holder.records,
+  // Faithful to `recordForChat`: a CHAT row's `hostId` is stamped with the
+  // app's ACTIVE host, not the chat's own binding. Reproducing that here is
+  // what makes the open-path test discriminating - with the fixture's real
+  // hostId passed straight through, binding to `record.hostId` and binding
+  // to the true host are indistinguishable and the test proves nothing.
+  useEpicArtifactRecords: () =>
+    holder.records.map((record) =>
+      record.type === "chat"
+        ? { ...record, hostId: holder.activeHostId ?? "unknown-host" }
+        : record,
+    ),
+  // The chat's REAL binding, read per-id straight off the projection.
+  useEpicNodeHostId: (nodeId: string) =>
+    holder.records.find((record) => record.id === nodeId)?.hostId ?? null,
   useEpicActiveAgentIds: () => new Set<string>(),
   useEpicChatHarnessId: () => null,
   useMaybeEpicTuiAgentHarnessId: () => null,
@@ -79,7 +103,10 @@ vi.mock("@/hooks/terminal/use-terminal-list-query", () => ({
 }));
 vi.mock("@/lib/host", () => ({ useHostClient: () => null }));
 vi.mock("@/hooks/host/use-reactive-active-host-id", () => ({
-  useReactiveActiveHostId: () => "host-A",
+  useReactiveActiveHostId: () => holder.activeHostId,
+}));
+vi.mock("@/hooks/host/use-host-directory-list-query", () => ({
+  useHostDirectoryList: () => ({ data: holder.hostDirectory }),
 }));
 vi.mock("@/lib/terminals/terminal-session-filters", () => ({
   isVisibleEpicTerminalSession: () => true,
@@ -131,6 +158,11 @@ beforeEach(() => {
   holder.activeId = null;
   holder.role = "owner";
   holder.activateCalls = [];
+  holder.activeHostId = "host-A";
+  holder.hostDirectory = [
+    { hostId: "host-A", label: "Altra" },
+    { hostId: "host-B", label: "Tonberry" },
+  ];
 });
 afterEach(cleanup);
 
@@ -248,5 +280,84 @@ describe("switcher create affordances (editor-gated)", () => {
     holder.role = "viewer";
     render(<SwitcherArtifactsList {...PROPS} />);
     expect(screen.queryByTestId("new-artifact-action")).toBeNull();
+  });
+});
+
+/**
+ * `chat.hostId` is a for-life binding, and the record is cloud-replicated -
+ * so a chat bound elsewhere is VISIBLE here and simply cannot run here. The
+ * row has to say which host owns it, and must not say anything when the row
+ * runs on the selected host (a badge on every row would be noise, and would
+ * make the real signal invisible).
+ */
+describe("switcher agent rows name a foreign owning host", () => {
+  beforeEach(() => {
+    holder.records = [
+      { id: "chat-1", parentId: null, name: "Alpha", type: "chat", status: null, hostId: "host-A" },
+      { id: "chat-2", parentId: null, name: "Bravo", type: "chat", status: null, hostId: "host-B" },
+    ];
+  });
+
+  it("badges only the row bound to another host, and names that host", () => {
+    render(<SwitcherAgentsList {...PROPS} />);
+    // Bound here: no badge at all.
+    expect(screen.queryByTestId("switcher-agent-host-chat-1")).toBeNull();
+    // Bound elsewhere: named, using the label from the host directory.
+    expect(
+      screen.getByTestId("switcher-agent-host-chat-2").textContent,
+    ).toBe("Tonberry");
+  });
+
+  it("moves the badge when the selected host changes", () => {
+    const first = render(<SwitcherAgentsList {...PROPS} />);
+    expect(screen.getByTestId("switcher-agent-host-chat-2").textContent).toBe(
+      "Tonberry",
+    );
+    first.unmount();
+
+    holder.activeHostId = "host-B";
+    render(<SwitcherAgentsList {...PROPS} />);
+    // The binding did not move - the selection did. Now Alpha is the one
+    // that cannot run here.
+    expect(screen.queryByTestId("switcher-agent-host-chat-2")).toBeNull();
+    expect(screen.getByTestId("switcher-agent-host-chat-1").textContent).toBe(
+      "Altra",
+    );
+  });
+
+  it("falls back to a neutral name for a host this client has never listed", () => {
+    // Knowing a chat is foreign is a fact from the record; knowing what that
+    // host is CALLED is not. Never fabricate the name.
+    holder.hostDirectory = [{ hostId: "host-A", label: "Altra" }];
+    render(<SwitcherAgentsList {...PROPS} />);
+    expect(screen.getByTestId("switcher-agent-host-chat-2").textContent).toBe(
+      "another host",
+    );
+  });
+
+  it("opens a foreign chat bound to ITS host, not the selected one", () => {
+    // The tile's hostId becomes `useTabHostId()`, which the chat composer
+    // sends with. Binding it to the active host would run the turn on the
+    // wrong machine - the hazard `use-comm-graph-jump.ts` refuses by name.
+    render(<SwitcherAgentsList {...PROPS} />);
+    fireEvent.click(screen.getByTestId("switcher-agent-row-chat-2"));
+    const call = holder.activateCalls.find((entry) => entry.id === "chat-2");
+    expect(call?.ref).toMatchObject({ hostId: "host-B" });
+  });
+
+  it("opens a chat bound here against its own host too", () => {
+    render(<SwitcherAgentsList {...PROPS} />);
+    fireEvent.click(screen.getByTestId("switcher-agent-row-chat-1"));
+    const call = holder.activateCalls.find((entry) => entry.id === "chat-1");
+    expect(call?.ref).toMatchObject({ hostId: "host-A" });
+  });
+
+  it("badges nothing before the directory resolves the selected host", () => {
+    // On first paint the active host is not known yet. Flagging every row as
+    // foreign for one frame would be a visible lie.
+    holder.activeHostId = null;
+    render(<SwitcherAgentsList {...PROPS} />);
+    expect(screen.queryByTestId("switcher-agent-host-chat-1")).toBeNull();
+    expect(screen.queryByTestId("switcher-agent-host-chat-2")).toBeNull();
   });
 });

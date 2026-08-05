@@ -457,11 +457,19 @@ export function epicNodeRefForNodeId(
 
 export function useEpicArtifactRecords(): ReadonlyArray<EpicTreeRecord> {
   const handle = useOpenEpicHandle();
-  // Chat / artifact projections do not yet carry a hostId (only
-  // tui-agents do). The renderer's currently-active host is the
-  // host hosting the open-epic projection, so it is the correct
-  // binding source for those rows. Tui-agent rows override with their
-  // projected hostId.
+  // ARTIFACT projections carry no hostId, so they take the renderer's
+  // currently-active host - the host hosting the open-epic projection.
+  //
+  // CHAT projections DO carry one (`ChatProjection.hostId`, "Real
+  // projections carry the persisted `Chat.hostId`"), and it is deliberately
+  // NOT used here: `EpicTreeRecord.hostId` means "the host this row was
+  // projected through", which for a chat row is the active host. It is
+  // therefore NOT the chat's for-life binding, and must never be used to
+  // open a tile - that would bind the tile, and its composer, to whichever
+  // host happened to be selected. Read `useEpicNodeHostId(id)` for the real
+  // binding; `use-comm-graph-jump.ts` refuses that same guess by name.
+  //
+  // Tui-agent rows override with their own projected hostId.
   const fallbackHostId = useReactiveActiveHostId() ?? UNKNOWN_HOST_PLACEHOLDER;
   return useStore(
     handle.store,

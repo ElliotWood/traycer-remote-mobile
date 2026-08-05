@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { getHostPickerExtra } from "@/components/layout/header/host-picker-extra";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -81,6 +83,7 @@ export function HostPicker() {
             runnerHost.hostPicker.requestClose();
           }}
         />
+        {getHostPickerExtra()}
         <DialogFooter>
           <Button
             type="button"
@@ -249,6 +252,7 @@ interface HostPickerOptionProps {
     readonly hostId: string;
     readonly label: string;
     readonly kind: string;
+    readonly status: string;
   };
   readonly selected: boolean;
   readonly planRestricted: boolean;
@@ -258,6 +262,7 @@ interface HostPickerOptionProps {
 function HostPickerOption(props: HostPickerOptionProps) {
   const { entry, selected } = props;
   const restricted = props.planRestricted && entry.kind === "remote";
+  const unavailable = entry.status === "unavailable";
   return (
     <Button
       type="button"
@@ -267,15 +272,34 @@ function HostPickerOption(props: HostPickerOptionProps) {
       data-testid={`host-picker-option-${entry.hostId}`}
       data-selected={selected}
       data-plan-restricted={restricted}
+      data-unavailable={unavailable}
       variant={selected ? "secondary" : "outline"}
       onClick={() => {
         props.onSelect(entry.hostId);
       }}
       className="h-auto min-h-12 w-full justify-start gap-3 whitespace-normal px-4 py-3 text-left"
     >
-      <span className="min-w-0 flex-1 truncate text-ui font-medium">
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-ui font-medium",
+          unavailable && "text-muted-foreground",
+        )}
+      >
         {entry.label}
       </span>
+      {/* `status` had a renderer nowhere and a producer nowhere, so a host
+          that was switched off was indistinguishable from a live one. The
+          option stays SELECTABLE - blocking it would replace an honest
+          "Unreachable" with a dead control and hide the real dial error. */}
+      {unavailable ? (
+        <Badge
+          variant="outline"
+          className="shrink-0 border-destructive/50 bg-destructive/10 text-destructive"
+          data-testid={`host-picker-unavailable-${entry.hostId}`}
+        >
+          Unreachable
+        </Badge>
+      ) : null}
       {restricted ? (
         <Badge
           variant="outline"

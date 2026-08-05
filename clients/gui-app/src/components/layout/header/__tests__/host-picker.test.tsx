@@ -10,11 +10,34 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
  * driven directly.
  */
 
+interface PickerEntry {
+  readonly hostId: string;
+  readonly label: string;
+  readonly kind: string;
+  readonly status: string;
+}
+
+const DEFAULT_ENTRIES: readonly PickerEntry[] = [
+  { hostId: "local-1", label: "This Mac", kind: "local", status: "available" },
+  {
+    hostId: "remote-1",
+    label: "Office workstation",
+    kind: "remote",
+    status: "available",
+  },
+];
+
 const mocks = vi.hoisted(() => ({
   planRestricted: vi.fn<() => boolean>(() => false),
   selectById: vi.fn(),
   openExternalLink: vi.fn(() => Promise.resolve()),
   requestClose: vi.fn(),
+  entries: [] as ReadonlyArray<{
+    readonly hostId: string;
+    readonly label: string;
+    readonly kind: string;
+    readonly status: string;
+  }>,
 }));
 
 vi.mock("@/hooks/host/use-remote-hosts-plan-gate", () => ({
@@ -56,20 +79,7 @@ vi.mock("@/hooks/host/use-host-picker-list", () => ({
   useHostPickerList: () => ({
     isLoading: false,
     isError: false,
-    data: [
-      {
-        hostId: "local-1",
-        label: "This Mac",
-        kind: "local",
-        status: "available",
-      },
-      {
-        hostId: "remote-1",
-        label: "Office workstation",
-        kind: "remote",
-        status: "available",
-      },
-    ],
+    data: mocks.entries,
   }),
 }));
 
@@ -77,6 +87,7 @@ import { HostPicker } from "@/components/layout/header/host-picker";
 
 beforeEach(() => {
   mocks.planRestricted.mockReturnValue(false);
+  mocks.entries = DEFAULT_ENTRIES;
 });
 
 afterEach(() => {
@@ -120,5 +131,55 @@ describe("HostPicker paid-plan gating", () => {
     fireEvent.click(remote);
     expect(mocks.selectById).toHaveBeenCalledWith("remote-1");
     expect(mocks.requestClose).toHaveBeenCalled();
+  });
+});
+
+/**
+ * `status` previously had a renderer nowhere: an entry marked `unavailable`
+ * drew exactly like a live one, so a host that was switched off was
+ * indistinguishable from one that was running. These pin the distinction.
+ */
+describe("HostPicker reachability", () => {
+  it("marks an unreachable host and leaves a reachable one unmarked", () => {
+    mocks.entries = [
+      { hostId: "local-1", label: "Altra", kind: "local", status: "available" },
+      {
+        hostId: "local-2",
+        label: "Tonberry",
+        kind: "local",
+        status: "unavailable",
+      },
+    ];
+    render(<HostPicker />);
+
+    const reachable = screen.getByTestId("host-picker-option-local-1");
+    expect(reachable.getAttribute("data-unavailable")).toBe("false");
+    expect(screen.queryByTestId("host-picker-unavailable-local-1")).toBeNull();
+
+    const unreachable = screen.getByTestId("host-picker-option-local-2");
+    expect(unreachable.getAttribute("data-unavailable")).toBe("true");
+    expect(
+      screen.getByTestId("host-picker-unavailable-local-2").textContent,
+    ).toBe("Unreachable");
+  });
+
+  it("keeps an unreachable host selectable", () => {
+    // Disabling it would swap an honest "Unreachable" for a dead control and
+    // hide the real dial error behind a button that does nothing. The user is
+    // allowed to try; the badge tells them what to expect.
+    mocks.entries = [
+      {
+        hostId: "local-2",
+        label: "Tonberry",
+        kind: "local",
+        status: "unavailable",
+      },
+    ];
+    render(<HostPicker />);
+
+    const unreachable = screen.getByTestId("host-picker-option-local-2");
+    expect((unreachable as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(unreachable);
+    expect(mocks.selectById).toHaveBeenCalledWith("local-2");
   });
 });

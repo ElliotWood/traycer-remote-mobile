@@ -1,6 +1,12 @@
 import { type ReactNode, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Plus, Settings, SquareArrowOutUpRight } from "lucide-react";
+import {
+  LogOut,
+  Plus,
+  Server,
+  Settings,
+  SquareArrowOutUpRight,
+} from "lucide-react";
 import { SignOutConfirmDialog } from "@/components/auth/sign-out-confirm-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -62,6 +68,14 @@ export function MobileNavDrawer(): ReactNode {
   const handleNewTask = () => {
     close();
     activateTabIntent(navigate, openNewEpicIntent(), undefined);
+  };
+  // `<HostPicker />` is already mounted inside `<TraycerApp />` and is opened
+  // through `runnerHost.hostPicker.requestOpen()`. On desktop an Electron menu
+  // item calls that; on a phone shell nothing did, so the picker shipped with
+  // no way to reach it. This is that way.
+  const handleSwitchHost = () => {
+    close();
+    runnerHost.hostPicker.requestOpen();
   };
   const handleSettings = () => {
     close();
@@ -185,6 +199,16 @@ export function MobileNavDrawer(): ReactNode {
             </div>
           </nav>
           <div className="flex shrink-0 flex-col gap-1 border-t border-border/60 p-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className={ROW_CLASS}
+              data-testid="mobile-nav-switch-host"
+              onClick={handleSwitchHost}
+            >
+              <Server className="size-4" />
+              <span className="flex-1 text-left">Switch host</span>
+            </Button>
             <Button
               type="button"
               variant="ghost"

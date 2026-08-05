@@ -3,33 +3,35 @@ import { createRoot } from "react-dom/client";
 import {
   TraycerApp,
   hostRpcRegistry,
+  registerHostPickerExtra,
   setMobileApp,
 } from "@traycer-clients/gui-app";
-import type {
-  RemoteHostFetcher,
-  RemoteHostFetchOutcome,
-} from "@traycer-clients/shared/host-client/remote-fetcher";
 import "./index.css";
 import { MobileRunnerHost } from "../mobile-runner-host";
+import {
+  createWebHostFetcher,
+  type BakedHost,
+} from "./host-directory-fetcher";
+import { ManageHostsPanel } from "./manage-hosts-panel";
 
 const config = __TRAYCER_GUI_APP_DEV_CONFIG__;
 
-// The baked `config.host` captures the port as of Vite startup, which goes
-// stale whenever the dev host restarts; the dev-server endpoint re-reads the
-// host's pid.json per request, so each directory refresh gets the live port.
-// BROWSER-TESTING SCAFFOLDING (dev web entry only): superseded by real
-// remote-host discovery in the shipped mobile client.
-const bakedHost: RemoteHostFetchOutcome = {
-  kind: "hosts",
-  entries: [config.host],
-};
-
-const remoteFetcher: RemoteHostFetcher = async () => {
+/**
+ * The baked `config.host` captures the port as of Vite startup, which goes
+ * stale whenever the dev host restarts; the dev-server endpoint re-reads
+ * the host's pid.json per request, so each directory refresh gets the live
+ * port. In a static build that endpoint does not exist, the fetch fails,
+ * and the baked entry is the answer we want anyway.
+ *
+ * This resolves the ENDPOINT only. Whether the host is actually up is a
+ * separate question, answered by a real probe in `host-directory-fetcher`.
+ */
+async function resolveBakedHost(): Promise<BakedHost> {
   try {
     const response = await fetch(config.devHostPath);
-    if (!response.ok) return bakedHost;
+    if (!response.ok) return config.host;
     const parsed: unknown = await response.json();
-    if (parsed === null || typeof parsed !== "object") return bakedHost;
+    if (parsed === null || typeof parsed !== "object") return config.host;
     const record = parsed as Record<string, unknown>;
     const { hostId, version, websocketUrl } = record;
     if (
@@ -37,18 +39,13 @@ const remoteFetcher: RemoteHostFetcher = async () => {
       typeof version !== "string" ||
       typeof websocketUrl !== "string"
     ) {
-      return bakedHost;
+      return config.host;
     }
-    return {
-      kind: "hosts",
-      entries: [{ ...config.host, hostId, version, websocketUrl }],
-    };
+    return { ...config.host, hostId, version, websocketUrl };
   } catch {
-    // The baked entry, not `failed`: this scaffolding's whole point is that the
-    // dev host is reachable at a known port even when the pid re-read misses.
-    return bakedHost;
+    return config.host;
   }
-};
+}
 
 function bootstrap(): void {
   document.documentElement.classList.add("traycer-mobile-client");
@@ -62,6 +59,25 @@ function bootstrap(): void {
     hostLabel: config.host.label,
     relayBaseUrl: config.relayBaseUrl,
   });
+
+  // The directory is the baked host plus every host the user added, each
+  // with a MEASURED status. What this replaces returned a single entry with
+  // a hardcoded `status: "available"`, so a host that was switched off
+  // looked exactly like a live one.
+  const remoteFetcher = createWebHostFetcher({
+    resolveBakedHost,
+    getBearerToken: async () => {
+      const credentials = await host.tokenStore.get();
+      return credentials?.token ?? null;
+    },
+  });
+
+  // Registered before the first render, which is the contract
+  // `registerHostPickerExtra` documents.
+  registerHostPickerExtra(
+    <ManageHostsPanel bakedHostId={config.host.hostId} />,
+  );
+
   const container = document.getElementById("root");
   if (container === null) {
     throw new Error("#root element not found in index.html");
