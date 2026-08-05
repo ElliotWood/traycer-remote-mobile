@@ -71,6 +71,7 @@ import {
 } from "./artifacts/artifact-fixture";
 import type { EpicArtifactEntry } from "@traycer-clients/shared/epic/epic-doc-artifacts";
 import { ArtifactViewer } from "./artifacts/artifact-viewer";
+import type { CommentThreadsClient } from "./comments/use-comment-threads";
 import { ChatScreen } from "./chat/chat-screen";
 import {
   CHAT_FIXTURE,
@@ -308,12 +309,15 @@ function EpicScreen({
   /** `preview ?? live.agents`, resolved once by `EpicSession`. */
   readonly agents: EpicAgentsState;
   /**
-   * The unary requester, feeding BOTH creates. Named as both rather than as
-   * one: the two client types are structurally identical, so declaring only
-   * `CreateChatClient` compiles perfectly while telling the next reader this
-   * screen creates chats and nothing else.
+   * The unary requester, feeding BOTH creates AND the artifact's comment
+   * threads. Named as all three rather than as one: the client types are
+   * structurally identical, so declaring only `CreateChatClient` compiles
+   * perfectly while telling the next reader this screen creates chats and
+   * nothing else.
    */
-  readonly hostClient: (CreateChatClient & CreateArtifactClient) | null;
+  readonly hostClient:
+    | (CreateChatClient & CreateArtifactClient & CommentThreadsClient)
+    | null;
   readonly epicId: string;
   readonly epic: FleetEpic | null;
   readonly now: number;
@@ -387,6 +391,12 @@ function EpicScreen({
         <ArtifactViewer
           entry={openedArtifact}
           registry={live.artifactRooms}
+          epicId={epicId}
+          // Same requester as the two creates. Null under preview, which is
+          // what makes `?preview=artifact` reach no host — the comments panel
+          // inherits that property rather than needing its own gate.
+          client={hostClient}
+          now={preview === null ? now : AGENTS_FIXTURE_NOW}
           onBack={() => {
             setOpenedArtifact(null);
           }}
