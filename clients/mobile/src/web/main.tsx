@@ -7,6 +7,7 @@ import {
   setMobileApp,
 } from "@traycer-clients/gui-app";
 import "./index.css";
+import { lastSelectedHostKey } from "@/lib/persist";
 import { MobileRunnerHost } from "../mobile-runner-host";
 import {
   createWebHostFetcher,
@@ -47,8 +48,37 @@ async function resolveBakedHost(): Promise<BakedHost> {
   }
 }
 
+/**
+ * Selects the host that served this page, the first time this browser runs
+ * the app.
+ *
+ * `HostDirectoryService.getDefaultEntry()` auto-binds only when the
+ * directory holds exactly ONE entry - "the zero/many mobile paths require an
+ * explicit user gesture before binding". The moment the origin offers a
+ * second host by default, that gesture has never happened, so the app sits
+ * on the readiness gate forever: `<HostPicker/>` is mounted above the gate,
+ * but the only thing that opens it (the nav drawer) is inside it.
+ *
+ * Writing the persisted selection is exactly the gesture, made on the user's
+ * behalf with the only defensible default - the host that served the page.
+ * It is a SELECTION, not a claim about reachability: the picker still shows
+ * the measured status, and a first-run user can change it immediately.
+ * Never overwrites an existing choice.
+ */
+function seedInitialHostSelection(): void {
+  try {
+    const key = lastSelectedHostKey();
+    if (localStorage.getItem(key) === null) {
+      localStorage.setItem(key, config.host.hostId);
+    }
+  } catch {
+    // Private mode / quota: the app still runs, it just shows the picker.
+  }
+}
+
 function bootstrap(): void {
   document.documentElement.classList.add("traycer-mobile-client");
+  seedInitialHostSelection();
   // PRODUCT flag, not layout: unlocks mobile-app-only UX policy such as the
   // single-composer draft model. See gui-app's `src/lib/mobile-app.ts` for
   // how this differs from the viewport signal.
@@ -66,6 +96,7 @@ function bootstrap(): void {
   // looked exactly like a live one.
   const remoteFetcher = createWebHostFetcher({
     resolveBakedHost,
+    defaultHostsPath: "/__traycer/hosts",
     getBearerToken: async () => {
       const credentials = await host.tokenStore.get();
       return credentials?.token ?? null;

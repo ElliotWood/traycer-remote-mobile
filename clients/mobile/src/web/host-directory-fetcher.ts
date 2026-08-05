@@ -17,7 +17,7 @@ import type {
   RemoteHostFetchOutcome,
 } from "@traycer-clients/shared/host-client/remote-fetcher";
 import { probeHost, type HostProbeResult } from "./probe-host";
-import { readStoredHosts } from "./host-store";
+import { readStoredHosts, type StoredHost } from "./host-store";
 
 /** The baked entry, as `vite.config.web.ts` defines it. */
 export interface BakedHost {
@@ -82,11 +82,32 @@ function toDirectoryEntry(
 let inFlight: Promise<RemoteHostFetchOutcome> | null = null;
 
 /**
- * Builds the fetcher the app hands to `TraycerApp`. Refreshes are
- * single-flighted: the directory refreshes on picker-open and on several
- * other events, and without this a burst would open several sockets per
- * host at once.
+ * Hosts the serving origin offers by default, so a working two-host setup
+ * needs no typing. Absent (a static deploy, where this 404s) means "just the
+ * baked entry plus whatever the user added" - never an error, and never a
+ * fabricated entry.
  */
+async function fetchDefaultHosts(
+  path: string,
+): Promise<readonly StoredHost[]> {
+  try {
+    const response = await fetch(path);
+    if (!response.ok) return [];
+    const parsed: unknown = await response.json();
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is StoredHost =>
+        entry !== null &&
+        typeof entry === "object" &&
+        typeof (entry as StoredHost).hostId === "string" &&
+        typeof (entry as StoredHost).label === "string" &&
+        typeof (entry as StoredHost).websocketUrl === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
 export interface WebHostFetcherDeps {
   /**
    * Resolves the baked entry per refresh rather than closing over it once.
@@ -96,8 +117,16 @@ export interface WebHostFetcherDeps {
    */
   readonly resolveBakedHost: () => Promise<BakedHost>;
   readonly getBearerToken: () => Promise<string | null>;
+  /** Origin-supplied default hosts endpoint. */
+  readonly defaultHostsPath: string;
 }
 
+/**
+ * Builds the fetcher the app hands to `TraycerApp`. Refreshes are
+ * single-flighted: the directory refreshes on picker-open and on several
+ * other events, and without this a burst would open several sockets per
+ * host at once.
+ */
 export function createWebHostFetcher(
   deps: WebHostFetcherDeps,
 ): RemoteHostFetcher {
@@ -113,15 +142,25 @@ export function createWebHostFetcher(
 async function refresh(
   deps: WebHostFetcherDeps,
 ): Promise<RemoteHostFetchOutcome> {
-  const bakedHost = await deps.resolveBakedHost();
-  const hosts = [
-    {
-      hostId: bakedHost.hostId,
-      label: bakedHost.label,
-      websocketUrl: bakedHost.websocketUrl,
-    },
-    ...readStoredHosts(),
-  ];
+  const [bakedHost, defaults] = await Promise.all([
+    deps.resolveBakedHost(),
+    fetchDefaultHosts(deps.defaultHostsPath),
+  ]);
+  // Baked entry first, then origin-supplied defaults, then anything the user
+  // added. Deduped by hostId: two entries with one id would make
+  // `selectById` ambiguous, and a user-added entry should win over a default
+  // it deliberately overrides.
+  const byId = new Map<string, StoredHost>();
+  byId.set(bakedHost.hostId, {
+    hostId: bakedHost.hostId,
+    label: bakedHost.label,
+    websocketUrl: bakedHost.websocketUrl,
+  });
+  for (const host of defaults) {
+    if (!byId.has(host.hostId)) byId.set(host.hostId, host);
+  }
+  for (const host of readStoredHosts()) byId.set(host.hostId, host);
+  const hosts = [...byId.values()];
 
   const token = await deps.getBearerToken();
 
