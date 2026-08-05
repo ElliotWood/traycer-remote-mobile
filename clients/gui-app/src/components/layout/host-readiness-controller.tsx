@@ -691,13 +691,7 @@ function describeCompatHealth(
 ): string {
   const compatibility = presentation.compatibility;
   const verdict = compatVerdict(compatibility);
-  // The host's own last answer, not the desktop's converge outcome (that is
-  // the separate `hostBusy` part): a host that reported itself busy serving
-  // turns was up and working, whatever else this report says (traycer#860).
-  const hostStatus = compatibility.hostStatus;
-  if (hostStatus === null || !hostStatus.busy) return verdict;
-  const sessions = hostStatus.busySessionCount === 1 ? "session" : "sessions";
-  return `${verdict}, busy ${hostStatus.busySessionCount} ${sessions}`;
+  return verdict;
 }
 
 function compatVerdict(

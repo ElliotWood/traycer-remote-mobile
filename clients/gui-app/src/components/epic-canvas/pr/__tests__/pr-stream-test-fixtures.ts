@@ -97,7 +97,6 @@ export class MockWsStreamClient<
       endpoint: () => null,
       bearer: () => null,
       auth: null,
-      hostCredentialMint: null,
       webSocketFactory: {
         create: () => {
           throw new Error("MockWsStreamClient should not open a websocket");

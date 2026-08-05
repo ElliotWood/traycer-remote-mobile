@@ -527,6 +527,7 @@ class StreamSession<
   private readonly config: StreamSessionOptions<Registry>;
 
   private status: StreamConnectionStatus = "connecting";
+  private negotiatedSchemaVersion: SchemaVersion | null = null;
   private serverFrameHandler: ServerFrameHandler | null = null;
   private statusHandler: StatusChangeHandler | null = null;
   private reconnectAttempt = 0;
@@ -623,6 +624,10 @@ class StreamSession<
 
   onServerFrame(handler: ServerFrameHandler): void {
     this.serverFrameHandler = handler;
+  }
+
+  getNegotiatedSchemaVersion(): SchemaVersion | null {
+    return this.negotiatedSchemaVersion;
   }
 
   onStatusChange(handler: StatusChangeHandler): void {
@@ -1042,6 +1047,7 @@ class StreamSession<
       this.onSendFailure(socket);
       return;
     }
+    this.negotiatedSchemaVersion = prepared.onWireVersion;
     this.config.onMethodSupport(
       this.config.method,
       "supported",
@@ -1409,6 +1415,7 @@ class StreamSession<
    * that decides whether to reconnect or go terminal.
    */
   private resetForReconnect(): void {
+    this.negotiatedSchemaVersion = null;
     this.clearHeartbeat();
     if (this.openAckTimer !== null) {
       clearTimeout(this.openAckTimer);

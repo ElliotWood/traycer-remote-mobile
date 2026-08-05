@@ -9,7 +9,6 @@
  */
 import { useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { WorktreeBindingSelectorRow } from "@traycer/protocol/host";
 import type { WorktreeBindingSelectorRowV12 } from "@traycer/protocol/host";
 import type { HostClient } from "@traycer-clients/shared/host-client/host-client";
 import { buildTerminalTileRef } from "@/components/epic-canvas/sidebar/new-terminal-tile-ref";
@@ -29,14 +28,11 @@ import {
 } from "@/lib/host";
 import { UNKNOWN_HOST_PLACEHOLDER } from "@/lib/host/constants";
 import { openTileIntoTargetGroup } from "@/lib/commands/actions";
-import { formatGitWorktreeLabel } from "@/lib/git/worktree-label";
-import { openTileIntoTargetGroup } from "@/lib/commands/actions";
 import { isVisibleEpicTerminalSession } from "@/lib/terminals/terminal-session-filters";
 import { isWorkspaceResolvePending } from "@/lib/worktree/worktree-row-resolve-pending";
 import { withoutResolvedMissingRows } from "@/lib/worktree/worktree-row-resolved-missing";
 import { formatWorktreeFolderDisabledReason } from "@/lib/worktree/worktree-folder-disabled-reason";
 import {
-  DEFAULT_TERMINAL_TITLE,
   deriveTitleSourceFromSessionTitle,
   terminalSessionTitle,
 } from "@/lib/terminals/terminal-title";
@@ -387,14 +383,6 @@ export function useTerminalsOpenerItems(
       subpage: NEW_TERMINAL_WORKSPACE_SUBPAGE,
     });
     const existing = sessions.map((session) => {
-      // A host-created sign-in terminal must carry its origin here too, or the
-      // eviction-recreate below - correct for an ordinary shell - spawns a bare
-      // prompt under the sign-in session's id and label. `terminal.list` cannot
-      // tell us; the renderer's record of host-created sign-in terminals can.
-      const signInProviderId = providerLoginTerminalProviderId(
-        defaultHostId,
-        session.sessionId,
-      );
       return openerExistingLeaf(
         "terminals",
         ctx,
@@ -412,38 +400,9 @@ export function useTerminalsOpenerItems(
           // Recorded so an eviction-recreate lands back in the session's
           // directory - same as the sidebar's open-existing path.
           cwd: session.cwd,
-          ...(signInProviderId === null
-            ? {}
-            : {
-                origin: "provider-login" as const,
-                originProviderId: signInProviderId,
-              }),
         },
-        // `terminal.list` is always issued against the active host's client
-        // (`useHostClient()` above) - there is no cross-host terminal listing
-        // today, so every session here IS already on `defaultHostId`. A badge
-        // can never legitimately apply until that plumbing exists (flagged
-        // back per T22's scope - inventing it is a separate, larger change).
-        null,
       );
     });
-    const existing = sessions.map((session) =>
-      openerExistingLeaf("terminals", ctx, {
-        id: session.sessionId,
-        instanceId: uuidv4(),
-        type: "terminal",
-        name: terminalSessionTitle({
-          title: session.title,
-          activeProcessName: session.activeProcessName,
-          currentCwd: session.currentCwd,
-        }),
-        titleSource: deriveTitleSourceFromSessionTitle(session.title),
-        hostId: defaultHostId,
-        // Recorded so an eviction-recreate lands back in the session's
-        // directory - same as the sidebar's open-existing path.
-        cwd: session.cwd,
-      }),
-    );
     return [newTerminal, ...existing];
   }, [ctx, defaultHostId, scope.epicId, sessionsData]);
 }

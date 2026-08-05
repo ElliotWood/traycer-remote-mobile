@@ -94,7 +94,6 @@ export interface TerminalStreamClientOptions {
  */
 export class TerminalStreamClient {
   private readonly session: IStreamSession;
-  private readonly wsStreamClient: WsStreamClient<HostStreamRpcRegistry>;
   private readonly callbacks: TerminalStreamCallbacks;
   private closed: boolean;
 

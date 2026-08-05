@@ -83,6 +83,7 @@ function buildEpicHandle(awareness: unknown): OpenEpicStoreHandle {
     store: storeBase as OpenEpicStoreHandle["store"],
     dispose: () => undefined,
     requestFreshSnapshot: () => undefined,
+    hotArtifactRoomIdsForTests: () => [],
     isClean: () => true,
   };
 }

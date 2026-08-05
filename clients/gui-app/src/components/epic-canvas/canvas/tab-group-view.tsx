@@ -38,9 +38,12 @@ import type {
   TilePane,
 } from "@/stores/epics/canvas/types";
 import { WORKSPACE_FILE_TAB_KIND } from "@/stores/epics/canvas/types";
-import { isBlankTileRef, isDiffTileRef } from "@/stores/epics/canvas/types";
+import {
+  isBlankTileRef,
+  isDiffTileRef,
   isPrDetailTileRef,
   isPrDiffTileRef,
+} from "@/stores/epics/canvas/types";
 import {
   TILE_KIND_GIT_DIFF,
   TILE_KIND_PR_DETAIL,

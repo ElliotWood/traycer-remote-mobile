@@ -309,14 +309,6 @@ function TerminalAgentForkDialogBody(props: TerminalAgentForkDialogProps) {
                 createProfileHostId={hostId}
                 runTargetHostId={hostId}
               />
-              <div className="shrink-0">
-                <AgentModeToggle
-                  value={agentMode}
-                  disabled={busy}
-                  showTooltip={false}
-                  onChange={setAgentMode}
-                />
-              </div>
             </div>
           </section>
           <label htmlFor={argsInputId} className="flex min-w-0 flex-col gap-2">

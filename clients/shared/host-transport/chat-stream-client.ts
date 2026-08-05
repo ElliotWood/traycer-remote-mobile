@@ -139,7 +139,6 @@ export interface ChatStreamClientOptions {
 export class ChatStreamClient {
   private readonly session: IStreamSession;
   private readonly callbacks: ChatStreamCallbacks;
-  private readonly wsStreamClient: WsStreamClient<HostStreamRpcRegistry>;
   private closed: boolean;
 
   constructor(options: ChatStreamClientOptions) {

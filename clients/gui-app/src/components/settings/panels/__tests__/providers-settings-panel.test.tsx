@@ -766,6 +766,12 @@ function createRunnerHost(): MockRunnerHost {
   });
 }
 
+function openProfilesTab(): void {
+  // The released panel is untabbed - profiles render directly. Kept as a
+  // seam so these tests read the same as on main, where this selects the
+  // "Profiles & Limits" tab.
+}
+
 describe("<ProvidersSettingsPanel />", () => {
   beforeEach(() => {
     providerMocks.listResult.data = {

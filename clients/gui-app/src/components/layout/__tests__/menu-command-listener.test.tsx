@@ -154,6 +154,7 @@ function createRunnerHost(menu: FakeDesktopMenu): FakeRunnerHost {
       signInUrl: "https://auth.example.invalid/sign-in",
       authnBaseUrl: "https://auth.example.invalid",
       hasLocalHost: true,
+    getLastKnownLocalHostId: () => Promise.resolve(null),
       validateAuthTokenIdentity: () =>
         Promise.resolve({ kind: "rejected" as const }),
       openExternalLink: () => Promise.resolve(),

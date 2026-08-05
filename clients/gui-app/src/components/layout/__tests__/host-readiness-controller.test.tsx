@@ -711,8 +711,6 @@ describe("<SurfaceReadinessBoundary /> restored default-host detail (MED7)", () 
       compatibility: {
         ...DEFAULT_HOST_PRESENTATION.compatibility,
         hostStatus: {
-          busy: true,
-          busySessionCount: 3,
           hostVersion: "x",
         },
       },
@@ -748,8 +746,6 @@ describe("<SurfaceReadinessBoundary /> restored default-host detail (MED7)", () 
       compatibility: {
         ...DEFAULT_HOST_PRESENTATION.compatibility,
         hostStatus: {
-          busy: true,
-          busySessionCount: 1,
           hostVersion: "x",
         },
       },

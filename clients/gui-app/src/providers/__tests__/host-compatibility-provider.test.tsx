@@ -254,12 +254,12 @@ function compatibilityDetail(compatibility: HostCompatibility): string {
 
 /**
  * Surfaces the host.status payload fields carried on a `compatible` verdict
- * (busy / busySessionCount / hostVersion). Non-compatible arms never hold one.
+ * (hostVersion). Non-compatible arms never hold one.
  */
 function hostStatusDetail(compatibility: HostCompatibility): string {
   if (compatibility.status !== "compatible") return "none";
   const snapshot = compatibility.hostStatus;
-  return `busy=${String(snapshot.busy)};count=${String(snapshot.busySessionCount)};version=${snapshot.hostVersion}`;
+  return `version=${snapshot.hostVersion}`;
 }
 
 function getCompatibilityStatusText(): string | null {
@@ -640,8 +640,6 @@ describe("HostCompatibilityProvider startup consumers", () => {
     }));
     const busyStatus: HostStatusResponse = {
       ...compatibleHostStatus,
-      busy: true,
-      busySessionCount: 2,
       hostVersion: "9.9.9",
     };
     const { queryClient } = mountStartupConsumers({
@@ -655,7 +653,7 @@ describe("HostCompatibilityProvider startup consumers", () => {
       expect(getCompatibilityStatusText()).toBe("compatible");
     });
     expect(getCompatibilityDetailText()).toBe("live");
-    expect(getHostStatusSnapshotText()).toBe("busy=true;count=2;version=9.9.9");
+    expect(getHostStatusSnapshotText()).toBe("version=9.9.9");
     queryClient.clear();
   });
 
@@ -670,8 +668,6 @@ describe("HostCompatibilityProvider startup consumers", () => {
     }));
     const firstAnswer: HostStatusResponse = {
       ...compatibleHostStatus,
-      busy: true,
-      busySessionCount: 4,
       hostVersion: "held-version",
     };
     const { queryClient } = mountStartupConsumers({
@@ -695,7 +691,7 @@ describe("HostCompatibilityProvider startup consumers", () => {
       expect(getCompatibilityStatusText()).toBe("compatible");
     });
     expect(getHostStatusSnapshotText()).toBe(
-      "busy=true;count=4;version=held-version",
+      "version=held-version",
     );
 
     await act(async () => {
@@ -708,7 +704,7 @@ describe("HostCompatibilityProvider startup consumers", () => {
     expect(getCompatibilityStatusText()).toBe("compatible");
     // The held snapshot is the first successful answer, not a blank one.
     expect(getHostStatusSnapshotText()).toBe(
-      "busy=true;count=4;version=held-version",
+      "version=held-version",
     );
     expect(probes).toBeGreaterThan(1);
     queryClient.clear();

@@ -17,8 +17,6 @@ const HOST_STATUS_PROBE = {};
  * because the probe read only success/failure and discarded this payload.
  */
 export interface HostStatusSnapshot {
-  readonly busy: boolean;
-  readonly busySessionCount: number;
   readonly hostVersion: string;
 }
 
@@ -132,8 +130,6 @@ export function useHostCompatibilityProbe(): HostCompatibility {
       retry: () => void probe.refetch(),
       degraded: probe.isError,
       hostStatus: {
-        busy: probe.data.busy,
-        busySessionCount: probe.data.busySessionCount,
         hostVersion: probe.data.hostVersion,
       },
     };

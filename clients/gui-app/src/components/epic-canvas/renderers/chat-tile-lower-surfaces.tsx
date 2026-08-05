@@ -165,6 +165,12 @@ export interface ChatLowerComposerState {
 }
 
 interface ComposerSurfaceModel {
+  /**
+   * The epic-canvas view tab hosting this composer, so a drop or banner can
+   * open its tile in ITS OWN view - in a split view each pane renders its
+   * own composer surface.
+   */
+  readonly viewTabId: string;
   readonly runtime: ChatLowerRuntimeState;
   readonly access: ChatLowerAccessState;
   readonly turn: ChatLowerTurnState;
@@ -302,6 +308,7 @@ export function ChatLowerInteractionSurfaces(
 
   const composerModel = useMemo(
     () => ({
+      viewTabId: props.viewTabId,
       runtime: props.runtime,
       access: props.access,
       turn: turnWithCascade,
@@ -513,6 +520,7 @@ function LiveChatComposer(props: {
     <ChatComposer
       key={model.queue.editingItem?.queueItemId}
       taskId={model.composer.nodeId}
+      viewTabId={model.viewTabId}
       isActive={model.composer.isActive}
       sendDisabled={!model.access.canAct}
       sendDisabledHint={chatSendDisabledHint(model.access)}

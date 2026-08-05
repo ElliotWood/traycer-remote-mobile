@@ -313,9 +313,12 @@ export interface PrDiffTileRef {
 }
 
 export type EpicCanvasTileRef =
-  EpicNodeRef | GitDiffTileRef | SnapshotDiffTileRef | BlankTileRef;
+  | EpicNodeRef
+  | GitDiffTileRef
+  | SnapshotDiffTileRef
+  | BlankTileRef
   | PrDetailTileRef
-  | PrDiffTileRef
+  | PrDiffTileRef;
 
 export function isBlankTileRef(
   value: EpicCanvasTileRef,

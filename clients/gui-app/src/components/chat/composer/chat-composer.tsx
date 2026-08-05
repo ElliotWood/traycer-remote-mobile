@@ -108,6 +108,12 @@ interface ChatComposerProps {
   readonly mentionRoots: ReadonlyArray<string> | null;
   readonly fallbackToGlobalMentionRoots: boolean;
   readonly currentEpicId: string | null;
+  /**
+   * The epic-canvas view tab hosting this composer, so a drop can open the
+   * attachment's tile in ITS OWN view. `null` where the composer is not
+   * inside an epic view (the home composer).
+   */
+  readonly viewTabId: string | null;
   readonly settingsSeed: ChatRunSettings | null;
   readonly fallbackSettingsSeed: ChatRunSettings | null;
   readonly onSubmitMessage:
@@ -200,6 +206,7 @@ function ChatComposerImpl(props: ChatComposerProps) {
     mentionRoots,
     fallbackToGlobalMentionRoots,
     currentEpicId,
+    viewTabId,
     settingsSeed,
     fallbackSettingsSeed,
     onSubmitMessage,

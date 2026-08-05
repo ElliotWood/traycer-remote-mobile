@@ -33,8 +33,6 @@ describe("<HostConnectionDegradedBanner />", () => {
       degraded: true,
       retry,
       hostStatus: {
-        busy: false,
-        busySessionCount: 0,
         hostVersion: "1.0.0",
       },
     });
@@ -50,8 +48,6 @@ describe("<HostConnectionDegradedBanner />", () => {
       degraded: false,
       retry: () => undefined,
       hostStatus: {
-        busy: false,
-        busySessionCount: 0,
         hostVersion: "1.0.0",
       },
     });

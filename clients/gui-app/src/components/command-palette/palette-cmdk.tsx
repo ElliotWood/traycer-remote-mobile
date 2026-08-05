@@ -6,6 +6,7 @@
  * live in `palette-cmdk-controller.ts`.
  */
 import { Fragment } from "react";
+import { Badge } from "@/components/ui/badge";
 import { CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { PaletteItemRow } from "@/components/command-palette/palette-item-row";
 import { buildCmdkValue } from "@/components/command-palette/palette-cmdk-controller";
