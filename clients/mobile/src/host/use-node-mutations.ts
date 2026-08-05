@@ -204,4 +204,3 @@ export function useCreateArtifact({
 
   return { phase, error, create };
 }
-

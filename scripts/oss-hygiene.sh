@@ -54,12 +54,51 @@ PATTERNS=(
   # disabled — see the header — so this false positive is a correctness bug in
   # the gate, not cosmetics. `\s|$` and not `\b`, because `\b` would fail for
   # the `...` placeholder, whose last character is not a word character.
+  #
+  # No `/.traycer` suffix requirement on the POSIX pattern - that narrowing
+  # existed for noise reduction against upstream fixtures, but scope is
+  # already limited to OWNED below, so it only made this pattern miss a real
+  # leak that isn't inside .traycer (ported from scripts/azure's own gate,
+  # ticket A5 - ownership consolidated here so there is one gate instead of
+  # two that could flag each other).
   "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)(\\\\|\\s|$))[A-Za-z0-9._-]+"
-  "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+/\.traycer"
+  "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+"
 
   # Any RFC-4122 GUID. Narrowed by the synthetic-fixture filter below, and
   # scoped to shipping source only — see the scope note.
   "GUID that is not a house fixture|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b"
+
+  # A real-looking email address identifies a person. Excludes RFC 2606
+  # reserved test domains (example.com/.org/.net/.test) - the standard, safe
+  # placeholder this repo's own git fixtures use - and this project's own
+  # published role accounts at traycer.ai (mobile-push-service's VAPID
+  # subject, `mailto:push@traycer.ai`, is a role account the Web Push spec
+  # requires, not a person). Ported from scripts/azure's gate (ticket A5) -
+  # was a straight omission here before.
+  #
+  # Allow-lists the ROLE ACCOUNT, not the whole traycer.ai domain (Evaluator
+  # eval-round-01 finding): an earlier version excluded any @traycer.ai
+  # address, which would have silently passed a real person's address at
+  # that domain (elliot.wood@traycer.ai) alongside the one legitimate role
+  # account - broader than its own justification.
+  #
+  # The exclusion is a whole-match negative lookahead anchored at a word
+  # boundary BEFORE the local part, not a lookahead placed after `@` - a
+  # first attempt placed after `@` (matching only the domain half) cannot
+  # see the local part at all, so it excluded nothing; the correct fix is
+  # excluding the full "role@domain" shape from the start of the match.
+  # `\b` before the lookahead matters too: without it, a regex engine can
+  # still find a match by starting mid-word (e.g. treating "ush@traycer.ai"
+  # inside "push@traycer.ai" as its own address, which the lookahead
+  # wouldn't recognize as excluded) - verified this failure mode happens by
+  # testing the un-anchored version first, then fixing it, rather than
+  # assuming the anchor was unnecessary.
+  #
+  # Verified with git grep -P against planted cases: push@/support@ at
+  # traycer.ai pass; a real personal address at the same domain
+  # (elliot.wood@traycer.ai) and a generic personal address elsewhere are
+  # both still flagged.
+  "email address|\b(?!(push|support|release|noreply)@traycer\.ai\b)[A-Za-z0-9._%+-]+@(?!([A-Za-z0-9.-]*\.)?(example)\.(com|org|net|test)\b)[A-Za-z0-9.-]+\.[a-z]{2,}"
 )
 
 # A GUID that is not one of our fixtures.
@@ -95,7 +134,10 @@ fail=0
 for entry in "${PATTERNS[@]}"; do
   desc="${entry%%|*}"
   rx="${entry#*|}"
-  # Infrastructure identifiers are always wrong; home paths only in owned code.
+  # Infrastructure identifiers are always wrong; personal identifiers (home
+  # paths, email addresses) only in owned code - upstream packages carry
+  # their own maintainers' identifiers in fixtures, inherited, not ours to
+  # rewrite.
   #
   # GUIDs are checked in SHIPPING SOURCE ONLY, and that limit is deliberate
   # rather than convenient. Test files carry ~20 hand-authored GUIDs that are
@@ -105,9 +147,9 @@ for entry in "${PATTERNS[@]}"; do
   # wolf gets disabled. So the covered set is stated below instead of quietly
   # widened, and tests remain a reviewer's job.
   case "$desc" in
-    *"home path"*) scope=("${OWNED[@]}") ;;
-    *GUID*)        scope=("${OWNED[@]}" 'clients/teams-tab' 'clients/shared') ;;
-    *)             scope=(.) ;;
+    *"home path"*|*"email address"*) scope=("${OWNED[@]}") ;;
+    *GUID*)                          scope=("${OWNED[@]}" 'clients/teams-tab' 'clients/shared') ;;
+    *)                                scope=(.) ;;
   esac
   extra=(':!**/__tests__/**' ':!**/*.test.*')
   case "$desc" in
@@ -140,6 +182,7 @@ files_scanned=$(git grep -lI '' -- . "${EXCLUDES[@]}" 2>/dev/null | wc -l | tr -
 printf '\noss-hygiene: scanned %s tracked files\n' "$files_scanned"
 printf '  infrastructure patterns  repo-wide\n'
 printf '  home-path patterns       %s\n' "${OWNED[*]}"
+printf '  email-address patterns   %s\n' "${OWNED[*]}"
 printf '  GUID patterns            shipping source only, NOT tests\n'
 printf '  NOT covered              internal work titles — no distinguishing\n'
 printf '                           shape exists; see the fixture docblocks\n'
