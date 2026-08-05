@@ -971,6 +971,13 @@ function ChatMessagesInner(props: ChatMessagesProps) {
           <div
             {...chatMinimapClipRegionProps}
             ref={transcriptContainerRef}
+            // Ctrl/Cmd+A selects the transcript, not the whole window (#592).
+            // Marked on the element `transcriptContainerRef` points at rather
+            // than on the chat tile's transcript wrapper: that wrapper also
+            // holds the absolutely-positioned lower-surfaces dock (composer,
+            // approvals, todo), which must stay out of the selection. The
+            // timeline is virtualized, so this covers the mounted rows.
+            data-selection-root=""
             className="relative flex-1 overflow-hidden"
           >
             <VirtuosoMessageListLicense
