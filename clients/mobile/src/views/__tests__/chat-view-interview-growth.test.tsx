@@ -22,8 +22,14 @@
 import { describe, expect, it } from "vitest";
 import type { ChatSubscribeClientFrame } from "@traycer/protocol/host/agent/gui/subscribe";
 import { ChatView } from "@/views/chat-view";
+import { HostClientProvider } from "@/host/host-client-context";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
-import { createFakeStreamConnection, type FakeChatSession, type FakeStreamConnection } from "@/test-utils/fakes";
+import {
+  createFakeHostClient,
+  createFakeStreamConnection,
+  type FakeChatSession,
+  type FakeStreamConnection,
+} from "@/test-utils/fakes";
 import { chatCacheStorageKey } from "@/host/use-chat";
 import { act, fireEvent, render, screen } from "@/test-utils/dom";
 
@@ -142,10 +148,17 @@ function snapshotFrame(questionCount: number): unknown {
 }
 
 function renderChat(fake: FakeStreamConnection, epicId: string, chatId: string): void {
+  // A host client is required for `canMutate`/the stale-approve-hazard gate
+  // to ever read `true` — see chat-view.test.tsx's `renderChatView` for why.
+  const host = createFakeHostClient(() => {
+    throw new Error("no request expected in this suite");
+  });
   render(
-    <StreamConnectionProvider connection={fake.connection}>
-      <ChatView epicId={epicId} chatId={chatId} initialTitle={null} onTitleChange={() => {}} />
-    </StreamConnectionProvider>,
+    <HostClientProvider client={host.client}>
+      <StreamConnectionProvider connection={fake.connection}>
+        <ChatView epicId={epicId} chatId={chatId} initialTitle={null} onTitleChange={() => {}} />
+      </StreamConnectionProvider>
+    </HostClientProvider>,
   );
 }
 
@@ -257,7 +270,11 @@ describe("interview block growing after InterviewForm has mounted", () => {
     renderChat(fake, "e1", "c-late-options");
     const session = fake.chatSessions[0];
 
+    // Submit answer is gated on a LIVE connection (the stale-approve-hazard
+    // fix) — established here or the final `disabled` assertion below is
+    // trivially true for the wrong reason.
     act(() => {
+      session.connection.applyStatus("open", null);
       session.callbacks.onSnapshot(
         snapshotFrameCustom([{ questionId: "q1", question: "Freeform?", options: [] }]) as never,
       );
@@ -309,7 +326,11 @@ describe("interview block growing after InterviewForm has mounted", () => {
       { label: "Option 2 for question 2", description: null, preview: null },
     ] };
 
+    // Submit answer is gated on a LIVE connection (the stale-approve-hazard
+    // fix), established here or the final submit later in this test sends
+    // nothing and the frame assertion measures an empty array.
     act(() => {
+      session.connection.applyStatus("open", null);
       session.callbacks.onSnapshot(snapshotFrameCustom([q1, q2]) as never);
     });
     fireEvent.click(await screen.findByRole("button", { name: "Option 1 for question 1" }));

@@ -20,6 +20,7 @@ import type { ListHarnessModelsResponse } from "@traycer/protocol/host/agent/sha
 import type { ReactNode } from "react";
 import { StreamConnectionProvider } from "@/host/stream-connection-context";
 import { NewEpicView } from "@/views/new-epic-view";
+import { FOLDERLESS_TARGET } from "@/host/workspace-selection";
 import { buildCreateEpicRequest, useCreateEpic } from "@/host/use-create-epic";
 import {
   createFakeHostClient,
@@ -66,19 +67,56 @@ const MODELS_RESPONSE: ListHarnessModelsResponse = {
   ],
 };
 
-/** A `request` fake routed by method: models list, then a create echo. */
+/**
+ * `epic.create`'s reply, parameterized on whether the host started the
+ * folded turn. No test may get this value by accident — see `requestImpl`.
+ */
+function createEpicReply(
+  initialTurnStarted: boolean,
+): () => Promise<{ roomInfo: null; task: null; initialTurnStarted: boolean }> {
+  return () => Promise.resolve({ roomInfo: null, task: null, initialTurnStarted });
+}
+
+/**
+ * A `request` fake routed by method: models list, then a create echo.
+ *
+ * `createEpic` has NO default. It used to fall back to
+ * `initialTurnStarted: true` — the branch the real host does not take
+ * (same measured evidence as `author-view.test.tsx`'s sibling fixture: a
+ * real chatId from a live host, see
+ * phone-authored-chat-lands-with-no-turn-running's Evidence section) — so
+ * every call site that omitted it was silently exercising the rare path.
+ * As in that file, the fix is NOT flipping the default: a `false` reply
+ * arms the same `startFoldedFirstTurn` / `FIRST_TURN_ACK_TIMEOUT_MS` (20s)
+ * fallback `use-create-epic.ts` reuses from `use-create-chat.ts`, and a
+ * test that doesn't drive it to completion would be left with a real timer
+ * running unobserved. Stating it at every call site is the fix.
+ */
 function requestImpl(opts: {
   readonly models?: ListHarnessModelsResponse;
-  readonly createEpic?: () => Promise<unknown>;
+  readonly createEpic: () => Promise<unknown>;
+  readonly worktrees?: readonly unknown[];
+  readonly mappings?: readonly unknown[];
 }): (method: string, params: unknown) => Promise<unknown> {
   return (method) => {
     if (method === "agent.listHarnessModels") {
       return Promise.resolve(opts.models ?? MODELS_RESPONSE);
     }
     if (method === "epic.create") {
-      return opts.createEpic !== undefined
-        ? opts.createEpic()
-        : Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: true });
+      return opts.createEpic();
+    }
+    // M5: the workspace picker's two RPCs. Absent by default, so the existing
+    // folderless tests exercise the honest-degrade path (picker unavailable,
+    // creation still works) rather than silently gaining a repo.
+    if (method === "worktree.listAllForHost") {
+      return opts.worktrees === undefined
+        ? Promise.reject(new Error("no worktrees in this test"))
+        : Promise.resolve({ worktrees: opts.worktrees, nextCursor: null });
+    }
+    if (method === "workspace.resolvePathsByRepoIdentifiers") {
+      return opts.mappings === undefined
+        ? Promise.reject(new Error("no mappings in this test"))
+        : Promise.resolve({ mappings: opts.mappings });
     }
     throw new Error(`unexpected method ${method}`);
   };
@@ -125,7 +163,10 @@ async function typeAndSubmit(instruction: string): Promise<void> {
 
 describe("NewEpicView", () => {
   it("resolves a host-scoped model then dispatches epic.create as a folderless epic", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only inspects the dispatched request body, never the
+    // create's outcome — `true` resolves the flow synchronously so nothing is
+    // left running after the assertions.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
     await typeAndSubmit("Plan the billing migration");
@@ -177,7 +218,10 @@ describe("NewEpicView", () => {
   });
 
   it("navigates into the minted epic on a successful create", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: exercises the (rare) case where the host already started the
+    // folded turn, so navigation is immediate with no fallback session. The
+    // common case — `false` — gets its own dedicated coverage below.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, createFakeStreamConnection());
 
@@ -206,8 +250,13 @@ describe("NewEpicView", () => {
   });
 
   it("shows an inline error and never creates when no model can be resolved", async () => {
+    // `createEpic` is never invoked — the flow dead-ends at model resolution
+    // — but the field is required so every call site says so.
     const fake = createFakeHostClient(
-      requestImpl({ models: { harnessId: "claude", models: [] } }),
+      requestImpl({
+        models: { harnessId: "claude", models: [] },
+        createEpic: createEpicReply(true),
+      }),
     );
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, createFakeStreamConnection());
@@ -228,7 +277,9 @@ describe("NewEpicView", () => {
 
   it("refuses to create at all when the host's real id is not configured", async () => {
     configMock.hostId = null;
-    const fake = createFakeHostClient(requestImpl({}));
+    // `createEpic` is never invoked — the flow refuses before the host id
+    // check even reaches a request — but the field is required regardless.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, createFakeStreamConnection());
 
@@ -253,6 +304,8 @@ describe("NewEpicView", () => {
       userId: "user-1",
       model: "test-model",
       instruction: "Anything",
+      target: FOLDERLESS_TARGET,
+      settings: null,
       hostId: CONFIGURED_HOST_ID,
       now: 1,
     });
@@ -263,12 +316,18 @@ describe("NewEpicView", () => {
   // ── The turn-less first run ─────────────────────────────────────────────
   // Measured on a real host: `initialTurnStarted` comes back FALSE, so without
   // a fallback "Create epic" yields a persisted message nothing is acting on.
+  //
+  // `requestImpl` has no default for `initialTurnStarted` any more — every
+  // call site above states it explicitly, all choosing `true` because none of
+  // them observe this outcome and `false` would leave the 20s ack-wait
+  // fallback armed and unobserved for the rest of that test. These two are
+  // where `false` — the branch the host actually takes — gets its own
+  // dedicated, mutation-verified coverage.
 
   it("re-sends the folded message over the chat stream when the host didn't start the turn", async () => {
     const fake = createFakeHostClient(
       requestImpl({
-        createEpic: () =>
-          Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: false }),
+        createEpic: createEpicReply(false),
       }),
     );
     const streams = createFakeStreamConnection();
@@ -322,7 +381,9 @@ describe("NewEpicView", () => {
   });
 
   it("does not re-send when the host reports the folded turn already started", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true` is load-bearing here: this is the contrast that stops the test
+    // above from passing against a hook that re-sends unconditionally.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const streams = createFakeStreamConnection();
     const onCreated = vi.fn();
     renderNewEpic(fake, onCreated, streams);
@@ -337,8 +398,7 @@ describe("NewEpicView", () => {
   it("reports honestly instead of navigating when the first turn cannot be started", async () => {
     const fake = createFakeHostClient(
       requestImpl({
-        createEpic: () =>
-          Promise.resolve({ roomInfo: null, task: null, initialTurnStarted: false }),
+        createEpic: createEpicReply(false),
       }),
     );
     const onCreated = vi.fn();
@@ -361,7 +421,9 @@ describe("NewEpicView", () => {
     // even if that guard is broken. Driving the hook directly is the only way
     // to measure it: two synchronous calls share one closure, so a guard that
     // reads `phase` from state sees a stale "idle" both times.
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only counts `epic.create` invocations, never awaits
+    // the outcome — `true` resolves synchronously so nothing is left running.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     const streams = createFakeStreamConnection();
     const { result } = renderHook(() =>
       useCreateEpic({
@@ -372,8 +434,8 @@ describe("NewEpicView", () => {
     );
 
     act(() => {
-      result.current.submit("Twice in one tick");
-      result.current.submit("Twice in one tick");
+      result.current.submit("Twice in one tick", FOLDERLESS_TARGET);
+      result.current.submit("Twice in one tick", FOLDERLESS_TARGET);
     });
 
     await waitFor(() => {
@@ -383,7 +445,9 @@ describe("NewEpicView", () => {
   });
 
   it("creates exactly one epic when the button is double-tapped", async () => {
-    const fake = createFakeHostClient(requestImpl({}));
+    // `true`: this test only counts `epic.create` invocations, never awaits
+    // the outcome — `true` resolves synchronously so nothing is left running.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
     renderNewEpic(fake, () => {}, createFakeStreamConnection());
 
     const user = userEvent.setup();
@@ -414,6 +478,8 @@ describe("NewEpicView", () => {
       userId: "user-1",
       model: "test-model",
       instruction: "First line of the instruction\nsecond line",
+      target: FOLDERLESS_TARGET,
+      settings: null,
       hostId: CONFIGURED_HOST_ID,
       now: 1_700_000_000_000,
     });
@@ -430,5 +496,122 @@ describe("NewEpicView", () => {
     );
     expect(request.epic.createdAt).toBe(1_700_000_000_000);
     expect(request.epic.updatedAt).toBe(1_700_000_000_000);
+  });
+});
+
+/**
+ * M5 item 3/4 — the picker is the whole point of the ticket: before it, every
+ * epic started from a phone was folderless, i.e. one that could not touch code.
+ *
+ * These assert the REQUEST, not the sheet: a picker that renders rows but
+ * still sends `repoIdentifiers: []` would look correct and change nothing.
+ */
+describe("NewEpicView — workspace picker (M5)", () => {
+  const WORKTREE = {
+    worktreePath: "/src/wt/feature-a",
+    repoLabel: "acme-web",
+    repoIdentifier: { owner: "acme", repo: "acme-web" },
+    branch: "feature-a",
+    inUse: false,
+    uncommittedCount: 0,
+    gitRemovable: true,
+    scripts: null,
+  };
+  const MAPPING = {
+    repoIdentifier: { owner: "acme", repo: "acme-web" },
+    workspacePath: "/src/acme-web",
+  };
+
+  it("still defaults to folderless, and says so", async () => {
+    // `createEpic` is unexercised beyond request construction in this block —
+    // `true` keeps each test fast and side-effect-free.
+    const fake = createFakeHostClient(
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING], createEpic: createEpicReply(true) }),
+    );
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Workspace" }).textContent).toContain(
+        "No repo (folderless)",
+      );
+    });
+    await typeAndSubmit("Plan something");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+    const body = createEpicBody(fake);
+    expect(body.repoIdentifiers).toEqual([]);
+    expect(body.workspaces).toEqual([]);
+  });
+
+  it("binds the epic to a picked REPO — the capability the phone did not have", async () => {
+    const fake = createFakeHostClient(
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING], createEpic: createEpicReply(true) }),
+    );
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Workspace" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    await waitFor(() => {
+      expect(screen.getByText("Repositories")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Runs against the checked-out repository/ }));
+
+    await typeAndSubmit("Fix the billing bug");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+
+    const body = createEpicBody(fake);
+    expect(body.repoIdentifiers).toEqual([{ owner: "acme", repo: "acme-web" }]);
+    expect(body.workspaces).toEqual([{ workspacePath: "/src/acme-web" }]);
+    // Parsed against the REAL schema so a shape the host rejects fails here.
+    const parsed = createEpicRequestSchema.parse(body);
+    expect(parsed.chat?.workspaceMode).toBe("inherit");
+    expect(parsed.chat?.worktreeIntent?.entries[0].kind).toBe("local");
+  });
+
+  it("binds to a picked WORKTREE as an `import` intent, never a `worktree` one", async () => {
+    // `import` adopts an existing worktree; `worktree` would CREATE one, which
+    // this ticket forbids from a phone.
+    const fake = createFakeHostClient(
+      requestImpl({ worktrees: [WORKTREE], mappings: [MAPPING], createEpic: createEpicReply(true) }),
+    );
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Workspace" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
+    await waitFor(() => {
+      expect(screen.getByText("Existing worktrees")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /acme-web · feature-a/ }));
+
+    await typeAndSubmit("Work on feature a");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+
+    const parsed = createEpicRequestSchema.parse(createEpicBody(fake));
+    const entry = parsed.chat?.worktreeIntent?.entries[0];
+    expect(entry?.kind).toBe("import");
+    if (entry?.kind !== "import") throw new Error("expected an import arm");
+    expect(entry.worktreePath).toBe("/src/wt/feature-a");
+  });
+
+  it("still creates folderless when the host's worktree list is unreachable", async () => {
+    // Honest degrade: a phone that cannot read the repo list must still be
+    // able to do the thing it could always do.
+    const fake = createFakeHostClient(requestImpl({ createEpic: createEpicReply(true) }));
+    renderNewEpic(fake, () => {}, createFakeStreamConnection());
+
+    await typeAndSubmit("Plan something anyway");
+    await waitFor(() => {
+      expect(fake.request.mock.calls.some((c) => c[0] === "epic.create")).toBe(true);
+    });
+    expect(createEpicBody(fake).workspaces).toEqual([]);
   });
 });
