@@ -1,4 +1,5 @@
 import type { HostDirectoryEntry } from "@traycer-clients/shared/host-client/host-directory";
+import type { RemoteHostFetcher } from "@traycer-clients/shared/host-client/remote-fetcher";
 
 /**
  * Extra hosts supplied at launch rather than in source, so an endpoint never
@@ -121,8 +122,11 @@ export function parseExtraHosts(raw: unknown): readonly HostDirectoryEntry[] {
  * call so a refresh picks up nothing new - the value is baked in at build
  * time by Vite, which is the point: it is configuration, not discovery.
  */
-export function createExtraHostsFetcher(
-  raw: unknown,
-): () => Promise<readonly HostDirectoryEntry[]> {
-  return () => Promise.resolve(parseExtraHosts(raw));
+export function createExtraHostsFetcher(raw: unknown): RemoteHostFetcher {
+  // ALWAYS `hosts`, and the union's own docblock is why that is right rather
+  // than lazy: the other two members mean "no bearer" and "transport failed",
+  // and neither can happen to a value Vite baked in at build time. An empty
+  // parse here is a genuine empty registry, not a sign-out to be recovered
+  // from and not a failure whose last-known entries must be retained.
+  return () => Promise.resolve({ kind: "hosts", entries: parseExtraHosts(raw) });
 }

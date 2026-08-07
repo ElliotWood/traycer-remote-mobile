@@ -162,23 +162,36 @@ describe("createExtraHostsFetcher", () => {
     const fetcher = createExtraHostsFetcher(
       json([{ hostId: "a", websocketUrl: REMOTE }]),
     );
-    await expect(fetcher()).resolves.toEqual([
-      {
-        hostId: "a",
-        label: "a",
-        kind: "local",
-        websocketUrl: REMOTE,
-        version: null,
-        status: "available",
-      },
-    ]);
+    // The WHOLE outcome, not just its entries: `kind` is what
+    // `HostDirectoryService` branches on to tell an empty registry from a
+    // sign-out from a transient failure, so asserting only the array would
+    // pass on a fetcher that reported the wrong one of the three.
+    await expect(fetcher()).resolves.toEqual({
+      kind: "hosts",
+      entries: [
+        {
+          hostId: "a",
+          label: "a",
+          kind: "local",
+          websocketUrl: REMOTE,
+          version: null,
+          status: "available",
+        },
+      ],
+    });
   });
 
   it("resolves to an empty list when nothing is configured", async () => {
-    await expect(createExtraHostsFetcher(undefined)()).resolves.toEqual([]);
+    await expect(createExtraHostsFetcher(undefined)()).resolves.toEqual({
+      kind: "hosts",
+      entries: [],
+    });
   });
 
   it("rejects nothing, so a bad value cannot abort the initial refresh", async () => {
-    await expect(createExtraHostsFetcher("{not json")()).resolves.toEqual([]);
+    await expect(createExtraHostsFetcher("{not json")()).resolves.toEqual({
+      kind: "hosts",
+      entries: [],
+    });
   });
 });
