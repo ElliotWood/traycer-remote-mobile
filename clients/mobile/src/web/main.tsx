@@ -14,6 +14,7 @@ import {
   type BakedHost,
 } from "./host-directory-fetcher";
 import { ManageHostsPanel } from "./manage-hosts-panel";
+import { isStorageDurable, safeStorage } from "./capacitor-web-shim";
 import { applyTeamsHostAttributes, initializeTeamsHost } from "./teams-host";
 
 const config = __TRAYCER_GUI_APP_DEV_CONFIG__;
@@ -67,14 +68,45 @@ async function resolveBakedHost(): Promise<BakedHost> {
  * Never overwrites an existing choice.
  */
 function seedInitialHostSelection(): void {
-  try {
-    const key = lastSelectedHostKey();
-    if (localStorage.getItem(key) === null) {
-      localStorage.setItem(key, config.host.hostId);
-    }
-  } catch {
-    // Private mode / quota: the app still runs, it just shows the picker.
+  // Through `safeStorage()` rather than raw `localStorage`: under denial the
+  // old try/catch swallowed the throw and the gesture was simply never made,
+  // so the app sat on the picker. In memory it at least holds for the session.
+  const key = lastSelectedHostKey();
+  if (safeStorage().getItem(key) === null) {
+    safeStorage().setItem(key, config.host.hostId);
   }
+}
+
+/**
+ * Says so when the session will not survive a reload.
+ *
+ * MEASURED, and this is why it exists rather than being a nicety. Before the
+ * storage port, denying storage produced *"Could not read saved credentials.*
+ * *Please try again. store-unavailable"* - an ACCIDENT, the SecurityError
+ * escaping into an error state. The port removes the throw, so that message
+ * goes with it and the user gets an ordinary sign-in screen that will keep
+ * reappearing on every load with nothing to explain it.
+ *
+ * Removing an incidental disclosure and calling the result an improvement is
+ * how a fix makes a product quieter and worse. So the accidental message is
+ * replaced with a deliberate one, which is what the retired mobile PWA did
+ * (`sign-in-view.tsx` rendered off `isStorageDurable()`).
+ *
+ * Rendered outside React, in OUR shell, so it costs upstream's UI nothing.
+ */
+function announceNonDurableStorage(container: HTMLElement): void {
+  document.documentElement.dataset.storageDurable = String(isStorageDurable());
+  if (isStorageDurable()) return;
+
+  const banner = document.createElement("div");
+  banner.setAttribute("role", "status");
+  banner.dataset.testid = "storage-not-durable";
+  banner.textContent =
+    "This browser is blocking storage for Traycer, so you will have to sign in again each time you open it.";
+  banner.style.cssText =
+    "padding:10px 14px;font:13px/1.45 system-ui,sans-serif;text-align:center;" +
+    "background:#4a2c00;color:#ffd9a0;border-bottom:1px solid #7a4a00";
+  container.before(banner);
 }
 
 function bootstrap(): void {
@@ -114,6 +146,7 @@ function bootstrap(): void {
   if (container === null) {
     throw new Error("#root element not found in index.html");
   }
+  announceNonDurableStorage(container);
   createRoot(container).render(
     <StrictMode>
       <TraycerApp
