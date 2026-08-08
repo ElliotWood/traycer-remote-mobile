@@ -18,6 +18,8 @@ import { isStorageDurable, safeStorage } from "./capacitor-web-shim";
 import { registerServiceWorker } from "./pwa-shell";
 import { startScreenWakeLock } from "./screen-wake-lock";
 import { applyTeamsHostAttributes, initializeTeamsHost } from "./teams-host";
+import { createWebNotificationHost } from "./web-notification-host";
+import { offerNotificationPermission } from "./notification-permission";
 
 const config = __TRAYCER_GUI_APP_DEV_CONFIG__;
 
@@ -123,6 +125,13 @@ function bootstrap(): void {
     authnBaseUrl: config.authnBaseUrl,
     hostLabel: config.host.label,
     relayBaseUrl: config.relayBaseUrl,
+    // What this replaces did nothing at all: `show()` voided its arguments and
+    // `onClick()` returned a disposable that never fired. Upstream has been
+    // calling that `show()` on every notifiable row - `notification-display.ts`
+    // has no shell gate - so the client was discarding a pipeline it already
+    // had. Constructed here rather than inside the host because the service
+    // worker is the web shell's, not every consumer's.
+    notifications: createWebNotificationHost({}),
   });
 
   // The directory is the baked host plus every host the user added, each
@@ -192,6 +201,13 @@ function bootstrap(): void {
   // a screen that dims during the first few seconds is the case it exists to
   // prevent.
   startScreenWakeLock({});
+
+  // The permission a browser will only grant behind a real tap, which upstream
+  // has nothing to ask for because its settings panel configures WHICH events
+  // notify, not whether the origin may display any. Renders an offer, never a
+  // prompt: an unprompted `requestPermission()` does not merely fail on Chrome,
+  // it burns the grant for the origin.
+  offerNotificationPermission({ container });
 }
 
 bootstrap();

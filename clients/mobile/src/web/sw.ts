@@ -104,10 +104,208 @@ sw.addEventListener("activate", (event) => {
   // into one pointless reload for every user on first install.
 });
 
+const NOTIFICATION_CLICK = "traycer:notification-click";
+const NOTIFICATION_CLIENT_READY = "traycer:notification-client-ready";
+const NOTIFICATION_CLICK_ACK = "traycer:notification-click-ack";
+
 sw.addEventListener("message", (event) => {
   const data = event.data as { readonly type?: string } | undefined;
   if (data?.type === "SKIP_WAITING") void sw.skipWaiting();
+  if (data?.type === NOTIFICATION_CLIENT_READY) {
+    // A page has just mounted its click listener. Hand it anything still
+    // unacknowledged - this is what makes a tap survive a cold open. Delivered
+    // to the announcing page alone, via `event.source`, rather than broadcast:
+    // a second open tab would otherwise route the same click and navigate
+    // itself somewhere the user never asked it to go.
+    if (event.source !== null) flushPendingClicksTo(event.source);
+  }
+  if (data?.type === NOTIFICATION_CLICK_ACK) {
+    const id = (event.data as { readonly id?: unknown }).id;
+    if (typeof id === "string") acknowledgeClick(id);
+  }
 });
+
+/**
+ * Notifications: display and click routing.
+ *
+ * THE CLICK PAYLOAD IS NEVER PARSED HERE, and that is the design rather than a
+ * shortcut. gui-app's `NotificationFocusBridge` already resolves a payload to a
+ * destination - the epic's live tab, a closed chat tile to reopen, an origin
+ * host that may no longer be the active one. None of that is expressible as a
+ * URL, so a worker that built one would be reimplementing a router it cannot
+ * see. The payload goes out through `INotificationHost.show()` and comes back
+ * through `onClick()` byte-identical; `web-notification-host.ts` says the same
+ * from the other side.
+ *
+ * The cold-open path therefore opens `registration.scope` - the app's own base
+ * URL, no route invented - and delivers the payload by message once the page
+ * says its listener is mounted.
+ *
+ * The three message-type constants are declared beside the `message` handler
+ * that reads them, above.
+ */
+
+/**
+ * Clicks awaiting an ack from a page.
+ *
+ * REMOVED ON ACK, NOT ON SEND. A `postMessage` to a window that has not yet
+ * mounted its listener is dropped with no error anywhere - which is precisely
+ * the cold-open case, since the window in question was opened microseconds
+ * earlier by this handler. Clearing on send would lose exactly the taps this
+ * feature exists to deliver.
+ *
+ * Worker memory is not durable: the browser may terminate an idle worker and
+ * this queue dies with it. `notificationclick` therefore holds the worker alive
+ * with `waitUntil` until the queue drains or the wait times out, which covers
+ * the boot it just triggered. A tap that outlives that is lost, and the honest
+ * consequence is that the app opens on its normal landing view.
+ */
+const pendingClicks: Array<{ id: string; payload: unknown }> = [];
+
+/** Ids are per-click and only ever compared for equality, so a counter is enough - and, unlike a random id, it makes a test's expectations legible. */
+let nextClickId = 0;
+
+/** How long `notificationclick` keeps the worker alive waiting for a cold-opened page to boot and acknowledge. */
+const CLICK_DELIVERY_TIMEOUT_MS = 10_000;
+const CLICK_DELIVERY_POLL_MS = 100;
+
+function acknowledgeClick(id: string): void {
+  const index = pendingClicks.findIndex((entry) => entry.id === id);
+  if (index !== -1) pendingClicks.splice(index, 1);
+}
+
+/**
+ * Sends every unacknowledged click to ONE recipient.
+ *
+ * Targeted rather than broadcast. Two tabs are an ordinary state - the app is a
+ * web page - and handing the same click to both makes both navigate, so the
+ * background one silently jumps to a chat the user opened in the foreground.
+ * The recipient is either the window this handler just focused or opened, or the
+ * page that announced its own listener.
+ */
+function flushPendingClicksTo(target: {
+  postMessage(message: unknown): void;
+}): void {
+  for (const entry of pendingClicks) {
+    target.postMessage({
+      type: NOTIFICATION_CLICK,
+      id: entry.id,
+      payload: entry.payload,
+    });
+  }
+}
+
+sw.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const payload: unknown = event.notification.data;
+  const id = `click-${(nextClickId += 1)}`;
+  pendingClicks.push({ id, payload });
+
+  event.waitUntil(
+    (async () => {
+      const windows = await sw.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      // Prefer the window the user is actually looking at. `matchAll` order is
+      // unspecified, so taking `[0]` can focus and message a lingering
+      // background tab while the visible one sits there - a real bug the
+      // retired worker also carried a guard against.
+      const existing = windows.find((client) => client.focused) ?? windows[0];
+      let target: WindowClient | null;
+      if (existing === undefined) {
+        // `registration.scope` is the deployment base (`/next/`), which is both
+        // the correct URL and the only one this worker can know without
+        // assuming a route shape.
+        target = await sw.clients.openWindow(sw.registration.scope);
+      } else {
+        target = await existing.focus();
+      }
+      // `openWindow` is specified to resolve `null` when it cannot hand back a
+      // handle. The click stays queued rather than being dropped: the page it
+      // opened will announce itself, and that path does not need this handle.
+      if (target === null) return;
+      await waitForAck(id, target);
+    })(),
+  );
+});
+
+/**
+ * Resolves when `id` has been acknowledged, or on timeout.
+ *
+ * Polling rather than a stored resolver because the ack arrives in a SEPARATE
+ * event handler, and a promise captured across two service-worker events is
+ * exactly the reference the runtime is entitled to discard when it decides the
+ * worker is idle. Re-flushing on each tick also covers the page that mounts its
+ * listener after the first send but before it thinks to announce itself.
+ */
+async function waitForAck(id: string, target: WindowClient): Promise<void> {
+  const deadline = Date.now() + CLICK_DELIVERY_TIMEOUT_MS;
+  for (;;) {
+    if (!pendingClicks.some((entry) => entry.id === id)) return;
+    flushPendingClicksTo(target);
+    if (Date.now() >= deadline) return;
+    await new Promise((resolve) => setTimeout(resolve, CLICK_DELIVERY_POLL_MS));
+  }
+}
+
+/**
+ * Background delivery. The payload shape is the same one
+ * `INotificationHost.show()` receives, so a push and a foreground notification
+ * produce an identical notification with identical click behaviour - one code
+ * path from tap to route, rather than two that drift.
+ *
+ * A malformed push shows nothing rather than throwing. The browser may then
+ * substitute its own "this site was updated in the background" notice, which is
+ * the platform being honest about a `userVisibleOnly` subscription that
+ * displayed nothing; inventing a placeholder to dodge it would hide a broken
+ * sender.
+ */
+sw.addEventListener("push", (event) => {
+  const parsed = parsePush(event.data);
+  if (parsed === null) return;
+  event.waitUntil(
+    sw.registration.showNotification(parsed.title, {
+      body: parsed.body,
+      data: parsed.payload,
+      tag: parsed.replaceKey ?? undefined,
+    }),
+  );
+});
+
+interface ParsedPush {
+  readonly title: string;
+  readonly body: string;
+  readonly payload: unknown;
+  readonly replaceKey: string | null;
+}
+
+function parsePush(data: PushMessageData | null): ParsedPush | null {
+  if (data === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = data.json();
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object") return null;
+  const record: Record<string, unknown> = { ...parsed };
+  if (typeof record.title !== "string" || typeof record.body !== "string") {
+    return null;
+  }
+  return {
+    title: record.title,
+    body: record.body,
+    // Passed through unvalidated on purpose: see this section's docblock. A
+    // sender that gets it wrong produces an unroutable click, which upstream
+    // handles by opening the notification center - a visible, recoverable
+    // outcome. Validating it here would produce a notification that is silently
+    // never shown, which is neither.
+    payload: record.payload ?? null,
+    replaceKey:
+      typeof record.replaceKey === "string" ? record.replaceKey : null,
+  };
+}
 
 sw.addEventListener("fetch", (event) => {
   const request = event.request;

@@ -73,6 +73,16 @@ export interface MobileRunnerHostOptions {
   readonly hostLabel: string;
   /** The relay's fixed WS attach endpoint (`IRunnerHost.relayBaseUrl`). */
   readonly relayBaseUrl: string;
+  /**
+   * The shell's notification surface. Defaults to the no-op below.
+   *
+   * INJECTED RATHER THAN BUILT HERE because this class is the shell-agnostic
+   * half: the web shell backs notifications with a service worker, and a
+   * service worker is not available to every consumer of this class (its own
+   * tests, and any embedding without a registration). The default keeps the
+   * previous behaviour exactly, so passing nothing is not a regression.
+   */
+  readonly notifications?: INotificationHost | undefined;
 }
 
 const STEP_UP_EXPIRY_SKEW_MS = 5_000;
@@ -98,7 +108,7 @@ export class MobileRunnerHost implements IRunnerHost {
   readonly hasLocalHost = false;
   readonly secureStorage: ISecureStorage = buildSecureStorage();
   readonly tokenStore: ITokenStore;
-  readonly notifications: INotificationHost = buildNotifications();
+  readonly notifications: INotificationHost;
   readonly tray: ITrayState = new MobileNoopTrayState();
   readonly hostPicker: IHostPicker = new MobileHostPicker();
   readonly workspaceFolders: IWorkspaceFoldersHost = {
@@ -129,6 +139,7 @@ export class MobileRunnerHost implements IRunnerHost {
   private retainedStepUpCredential: RetainedStepUpCredential | null = null;
 
   constructor(options: MobileRunnerHostOptions) {
+    this.notifications = options.notifications ?? buildNotifications();
     this.signInUrl = options.signInUrl;
     this.authnBaseUrl = options.authnBaseUrl;
     this.relayBaseUrl = options.relayBaseUrl;
