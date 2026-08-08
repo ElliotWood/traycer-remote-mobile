@@ -24,7 +24,80 @@ import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import { defineConfig, type UserConfig } from "vite";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
+
+/**
+ * Emits `manifest.webmanifest` and links it from the document.
+ *
+ * IN THE CONFIG BECAUSE ONLY THE CONFIG KNOWS `base`. `start_url` and `scope`
+ * have to be the deployment path - a manifest claiming `/` at a build served
+ * from `/next/` installs an app whose icon opens the wrong page, and the two
+ * other surfaces on this origin (`/` and `/tab/`) make that a live collision
+ * rather than a theoretical one. A static file in `public/` cannot express it.
+ *
+ * The `<link>` tags are injected rather than written into `index.html` so the
+ * source document does not reference a file that exists only after a build.
+ */
+function webManifestPlugin(base: string): Plugin {
+  const manifest = {
+    name: "Traycer Remote",
+    short_name: "Traycer",
+    description: "Watch your fleet and answer blocked agents from your phone.",
+    start_url: base,
+    scope: base,
+    display: "standalone",
+    background_color: "#111111",
+    theme_color: "#111111",
+    icons: [
+      { src: `${base}icons/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: `${base}icons/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
+      // `any` AND `maskable` are both required. Android applies its own
+      // adaptive-icon mask and, given only `any` icons, crops the artwork to
+      // fit - clipping the logo's edges. The maskable variant is the same
+      // artwork inset into a 14% safe zone. Keep the `any` entries too:
+      // maskable alone renders padded and undersized wherever nothing masks.
+      {
+        src: `${base}icons/icon-maskable-512.png`,
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+    ],
+  };
+
+  return {
+    name: "traycer-web-manifest",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "manifest.webmanifest",
+        source: JSON.stringify(manifest, null, 2),
+      });
+    },
+    transformIndexHtml: {
+      order: "post",
+      handler() {
+        return [
+          {
+            tag: "link",
+            attrs: { rel: "manifest", href: `${base}manifest.webmanifest` },
+            injectTo: "head" as const,
+          },
+          {
+            tag: "link",
+            attrs: { rel: "apple-touch-icon", href: `${base}icons/apple-touch-icon.png` },
+            injectTo: "head" as const,
+          },
+          {
+            tag: "meta",
+            attrs: { name: "theme-color", content: manifest.theme_color },
+            injectTo: "head" as const,
+          },
+        ];
+      },
+    },
+  };
+}
 
 const mobileRoot = __dirname;
 const clientsRoot = resolve(mobileRoot, "..");
@@ -43,7 +116,13 @@ function requiredEnv(name: string): string {
 
 export default defineConfig((): UserConfig => {
   const origin = requiredEnv("TRAYCER_WEB_ORIGIN");
-  const base = requiredEnv("TRAYCER_WEB_BASE");
+  // Trailing slash guaranteed here, once, because everything downstream
+  // concatenates onto it: the manifest's `scope`/`start_url`/icon paths and
+  // the service worker's precache list. `/next` without it silently yields
+  // `/nexticons/icon-192.png` - a 404 that takes the whole atomic precache
+  // down with it, reported as "the worker did not install".
+  const rawBase = requiredEnv("TRAYCER_WEB_BASE");
+  const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
   const devConfig = {
     authnBaseUrl: `${origin}/authn`,
     signInUrl: "https://traycer.ai/sign-in",
@@ -85,6 +164,7 @@ export default defineConfig((): UserConfig => {
         ...plugin,
         enforce: "post" as const,
       })),
+      webManifestPlugin(base),
     ],
     resolve: {
       alias: {

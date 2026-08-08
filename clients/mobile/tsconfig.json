@@ -26,5 +26,9 @@
     }
   },
   "include": ["src", "scripts", "capacitor.config.ts", "__tests__"],
-  "exclude": ["node_modules", "dist", "android", "ios", "web"]
+  // `src/web/sw.ts` is checked by `tsconfig.sw.json` instead, against the
+  // WebWorker lib. Checking it here too is not merely redundant, it is wrong:
+  // under this config's DOM lib `self` is a `Window`, so the worker's globals
+  // resolve to the wrong types entirely and the file cannot compile.
+  "exclude": ["node_modules", "dist", "android", "ios", "web", "src/web/sw.ts"]
 }

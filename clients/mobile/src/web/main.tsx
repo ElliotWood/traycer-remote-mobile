@@ -15,6 +15,8 @@ import {
 } from "./host-directory-fetcher";
 import { ManageHostsPanel } from "./manage-hosts-panel";
 import { isStorageDurable, safeStorage } from "./capacitor-web-shim";
+import { registerServiceWorker } from "./pwa-shell";
+import { startScreenWakeLock } from "./screen-wake-lock";
 import { applyTeamsHostAttributes, initializeTeamsHost } from "./teams-host";
 
 const config = __TRAYCER_GUI_APP_DEV_CONFIG__;
@@ -166,6 +168,30 @@ function bootstrap(): void {
   void initializeTeamsHost({}).then((state) => {
     applyTeamsHostAttributes(state, document.documentElement);
   });
+
+  // The PWA layer, also after render and also ours rather than upstream's.
+  //
+  // Registration waits for `load`, and that is a real deferral rather than a
+  // stylistic one: installing the worker re-fetches the entire app shell, and
+  // doing that while the first paint is still competing for the same
+  // connections makes the FIRST visit slower in order to buy the SECOND one an
+  // offline start. On a page that has already fired `load` (a route this can
+  // reach, since bootstrap is not guaranteed to run before it) the listener
+  // would never fire, so that case registers immediately.
+  if (document.readyState === "complete") {
+    registerServiceWorker({ container });
+  } else {
+    window.addEventListener(
+      "load",
+      () => registerServiceWorker({ container }),
+      { once: true },
+    );
+  }
+
+  // Not deferred: the wake lock reads storage and calls one navigator API, and
+  // a screen that dims during the first few seconds is the case it exists to
+  // prevent.
+  startScreenWakeLock({});
 }
 
 bootstrap();
