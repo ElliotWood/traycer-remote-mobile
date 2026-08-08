@@ -2,8 +2,25 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createPushSender, type SendNotificationFn } from "../push-sender";
+import {
+  createPushSender,
+  type PushPayload,
+  type SendNotificationFn,
+} from "../push-sender";
 import { SubscriptionStore } from "../subscription-store";
+
+/**
+ * These cases are about delivery and pruning, not about content — one shared
+ * payload keeps them from drifting apart, and keeps a payload-shape change
+ * from having to be applied five times. `payload: null` is the routeless
+ * summary shape, which is a real thing this sender sends.
+ */
+const PAYLOAD: PushPayload = {
+  title: "t",
+  body: "b",
+  payload: null,
+  replaceKey: "host:id:t",
+};
 
 const VAPID_KEYS = {
   publicKey: "test-public-key",
@@ -56,7 +73,7 @@ describe("push sender — prune on error", () => {
     };
     const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
 
-    await sender.sendToAll({ title: "t", body: "b", data: {} });
+    await sender.sendToAll(PAYLOAD);
 
     expect(store.list()).toHaveLength(0);
   });
@@ -68,7 +85,7 @@ describe("push sender — prune on error", () => {
     };
     const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
 
-    await sender.sendToAll({ title: "t", body: "b", data: {} });
+    await sender.sendToAll(PAYLOAD);
 
     expect(store.list()).toHaveLength(0);
   });
@@ -80,7 +97,7 @@ describe("push sender — prune on error", () => {
     };
     const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
 
-    await sender.sendToAll({ title: "t", body: "b", data: {} });
+    await sender.sendToAll(PAYLOAD);
 
     expect(store.list()).toHaveLength(1);
   });
@@ -94,7 +111,7 @@ describe("push sender — prune on error", () => {
     };
     const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
 
-    await sender.sendToAll({ title: "t", body: "b", data: {} });
+    await sender.sendToAll(PAYLOAD);
 
     const remaining = store.list();
     expect(remaining).toHaveLength(1);
@@ -109,7 +126,7 @@ describe("push sender — prune on error", () => {
     };
     const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
 
-    await sender.sendToAll({ title: "t", body: "b", data: {} });
+    await sender.sendToAll(PAYLOAD);
 
     expect(seenVapid).toEqual(VAPID_KEYS);
   });

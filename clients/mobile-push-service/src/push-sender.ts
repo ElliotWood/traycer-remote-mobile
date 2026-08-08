@@ -1,13 +1,27 @@
 import webPush, { WebPushError } from "web-push";
+import type { NotificationActivationEnvelopeV1 } from "./notification-activation-envelope";
 import type { VapidKeys } from "./vapid-keys";
 import type { PushSubscriptionKeys, SubscriptionStore } from "./subscription-store";
 import { logWarn } from "./logger";
 
-/** The exact payload shape delivered to `sw.ts`'s `push` listener. */
+/**
+ * The exact payload shape delivered to `sw.ts`'s `push` listener.
+ *
+ * Field-for-field what `parsePush` in `clients/mobile/src/web/sw.ts` reads:
+ * `title` and `body` are required (a push missing either shows nothing at
+ * all), `payload` is passed through to `Notification.data` unvalidated, and
+ * `replaceKey` becomes the notification `tag`.
+ *
+ * `payload` is typed as the envelope rather than `unknown` because THIS side
+ * is the producer — the worker's `unknown` is the right type for a receiver
+ * that must survive a malformed sender, and would be the wrong type for the
+ * sender whose job is to not be one.
+ */
 export interface PushPayload {
   readonly title: string;
   readonly body: string;
-  readonly data: { readonly epicId: string; readonly chatId: string } | Record<string, never>;
+  readonly payload: NotificationActivationEnvelopeV1 | null;
+  readonly replaceKey: string;
 }
 
 interface RawSubscription {

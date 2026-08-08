@@ -2,6 +2,7 @@ import { ActionableDetector } from "./actionable-detector";
 import { createHttpApiServer } from "./http-api";
 import { runHostNotificationsSubscription } from "./host-notifications-client";
 import { logError, logInfo } from "./logger";
+import { readHostPidMetadata } from "./pid-metadata";
 import { buildPushPayload } from "./push-payload";
 import { createPushSender } from "./push-sender";
 import { PushedStateStore } from "./pushed-state-store";
@@ -28,7 +29,13 @@ async function main(): Promise<void> {
     pushedStateStore,
     onBatch: async (transitions) => {
       if (transitions.length === 0) return;
-      const payload = buildPushPayload(transitions);
+      // Read per batch, not once at startup. The envelope's `originHostId` is
+      // what stops a click landing on a same-id chat replicated onto another
+      // host, so it has to describe the host this batch actually came from —
+      // and `pid.json` is rewritten when the host restarts on a new port,
+      // which is the same reason the subscription re-polls it.
+      const hostId = (await readHostPidMetadata())?.hostId ?? null;
+      const payload = buildPushPayload(transitions, hostId);
       await pushSender.sendToAll(payload);
     },
   });

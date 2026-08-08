@@ -1,0 +1,107 @@
+{
+  "$comment": "GOLDEN WIRE FIXTURE — the exact JSON `mobile-push-service` puts on the wire, asserted from BOTH sides. `push-payload.test.ts` (the producer) asserts `buildPushPayload` still emits these bytes; `clients/gui-app/src/lib/notifications/__tests__/push-service-envelope-contract.test.ts` (the consumer) asserts its real parser still understands them. Neither side can drift without the other going red, which is the only reason this file is checked in rather than generated at test time. Regenerate with `bun run tools/print-wire-fixture.ts` in this package.",
+  "hostId": "host-8f2c1d40",
+  "approval": {
+    "title": "Ship the refactor",
+    "body": "Refactor auth • Approval requested",
+    "payload": {
+      "kind": "notificationActivation",
+      "version": 1,
+      "route": {
+        "kind": "approval",
+        "epicId": "epic-1",
+        "chatId": "chat-1",
+        "approvalId": "appr-1"
+      },
+      "feed": {
+        "source": "host",
+        "id": "approval.requested:chat-1"
+      },
+      "originHostId": "host-8f2c1d40"
+    },
+    "replaceKey": "host:chat:chat-1"
+  },
+  "interview": {
+    "title": "Pick an approach",
+    "body": "Design review • Question waiting",
+    "payload": {
+      "kind": "notificationActivation",
+      "version": 1,
+      "route": {
+        "kind": "interview",
+        "epicId": "epic-1",
+        "chatId": "chat-2",
+        "interviewBlockId": "iv-1"
+      },
+      "feed": {
+        "source": "host",
+        "id": "interview.requested:chat-2"
+      },
+      "originHostId": "host-8f2c1d40"
+    },
+    "replaceKey": "host:chat:chat-2"
+  },
+  "stalled": {
+    "title": "Migrate the schema",
+    "body": "Agent X • Provider is taking longer than expected",
+    "payload": {
+      "kind": "notificationActivation",
+      "version": 1,
+      "route": {
+        "kind": "chat",
+        "epicId": "epic-1",
+        "chatId": "chat-3"
+      },
+      "feed": {
+        "source": "host",
+        "id": "stall-1"
+      },
+      "originHostId": "host-8f2c1d40"
+    },
+    "replaceKey": "host:chat:chat-3"
+  },
+  "stopped": {
+    "title": "Fix the bug",
+    "body": "Agent X • Provider is signed out. Reconnect to continue.",
+    "payload": {
+      "kind": "notificationActivation",
+      "version": 1,
+      "route": {
+        "kind": "chat",
+        "epicId": "epic-1",
+        "chatId": "chat-4"
+      },
+      "feed": {
+        "source": "host",
+        "id": "stop-1"
+      },
+      "originHostId": "host-8f2c1d40"
+    },
+    "replaceKey": "host:chat:chat-4"
+  },
+  "workspaceFailed": {
+    "title": "Provision worktree",
+    "body": "Worktree setup • Worktree creation failed",
+    "payload": {
+      "kind": "notificationActivation",
+      "version": 1,
+      "route": {
+        "kind": "chat",
+        "epicId": "epic-1",
+        "chatId": "chat-5"
+      },
+      "feed": {
+        "source": "host",
+        "id": "workspace-1"
+      },
+      "originHostId": "host-8f2c1d40"
+    },
+    "replaceKey": "host:chat:chat-5"
+  },
+  "summary": {
+    "title": "2 chats need your attention",
+    "body": "Ship the refactor, Pick an approach",
+    "payload": null,
+    "replaceKey": "notification-batch"
+  }
+}
