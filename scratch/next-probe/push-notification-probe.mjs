@@ -44,7 +44,7 @@ const [docrootArg, label = "unlabelled", grantArg = "grant"] = process.argv.slic
 if (docrootArg === undefined) {
   throw new Error("usage: push-notification-probe.mjs <docroot> <label>");
 }
-const DOCROOT = resolve(docrootArg);
+const DOCROOT = docrootArg.startsWith("http") ? docrootArg : resolve(docrootArg);
 const BASE = "/next/";
 const CHROME =
   process.env.TRAYCER_PROBE_CHROME ??
@@ -117,8 +117,12 @@ const PUSH = JSON.stringify({
 });
 
 async function main() {
-  const { server, port } = await serve();
-  const origin = `http://127.0.0.1:${port}`;
+  // A docroot that looks like a URL is served ALREADY - the live deployment.
+  // Same probe, same instrumentation; only where the bytes come from differs,
+  // which is what makes a local green and a deployed green comparable claims.
+  const live = docrootArg.startsWith("http");
+  const { server, port } = live ? { server: null, port: 0 } : await serve();
+  const origin = live ? new URL(docrootArg).origin : `http://127.0.0.1:${port}`;
   const result = { label, docroot: DOCROOT, origin };
 
   // 127.0.0.1 is a secure context, so service workers and the Notification API
@@ -144,13 +148,26 @@ async function main() {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(String(error)));
 
-  await page.goto(`${origin}${BASE}`, { waitUntil: "load" });
+  await page.goto(live ? docrootArg : `${origin}${BASE}`, { waitUntil: "load" });
 
   // The worker registers after `load`, so wait for the attribute the shell
   // stamps rather than a fixed sleep.
   await page
     .waitForFunction(
       () => document.documentElement.dataset.pwa !== undefined,
+      undefined,
+      { timeout: 20_000 },
+    )
+    .catch(() => undefined);
+
+  // Waits for a MOUNTED app before reading the size. Without this the read
+  // races React: on the live origin the worker registers earlier relative to
+  // the first render than it does against a local docroot, and the same bundle
+  // reported `root` 1136 there and 4482 here - a number that moves with
+  // network latency is not a number two runs can be compared on.
+  await page
+    .waitForFunction(
+      () => (document.getElementById("root")?.innerHTML.length ?? 0) > 2_000,
       undefined,
       { timeout: 20_000 },
     )
@@ -238,7 +255,7 @@ async function main() {
   result.pageErrors = pageErrors;
 
   await browser.close();
-  server.close();
+  server?.close();
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
