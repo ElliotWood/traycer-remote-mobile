@@ -20,6 +20,7 @@ import { startScreenWakeLock } from "./screen-wake-lock";
 import { applyTeamsHostAttributes, initializeTeamsHost } from "./teams-host";
 import { createWebNotificationHost } from "./web-notification-host";
 import { offerNotificationPermission } from "./notification-permission";
+import { ensurePushSubscription } from "./push-subscription";
 
 const config = __TRAYCER_GUI_APP_DEV_CONFIG__;
 
@@ -138,13 +139,15 @@ function bootstrap(): void {
   // with a MEASURED status. What this replaces returned a single entry with
   // a hardcoded `status: "available"`, so a host that was switched off
   // looked exactly like a live one.
+  const getBearerToken = async (): Promise<string | null> => {
+    const credentials = await host.tokenStore.get();
+    return credentials?.token ?? null;
+  };
+
   const remoteFetcher = createWebHostFetcher({
     resolveBakedHost,
     defaultHostsPath: "/__traycer/hosts",
-    getBearerToken: async () => {
-      const credentials = await host.tokenStore.get();
-      return credentials?.token ?? null;
-    },
+    getBearerToken,
   });
 
   // Registered before the first render, which is the contract
@@ -207,7 +210,25 @@ function bootstrap(): void {
   // notify, not whether the origin may display any. Renders an offer, never a
   // prompt: an unprompted `requestPermission()` does not merely fail on Chrome,
   // it burns the grant for the origin.
-  offerNotificationPermission({ container });
+  //
+  // The `report` hook is the seam that also drives PUSH registration, and it is
+  // the right one for a reason worth stating: it fires with `granted` both when
+  // the permission was already held at load AND the moment the user taps
+  // Enable. Hanging the subscription off the tap alone would leave every
+  // returning user unsubscribed; hanging it off load alone would leave a new
+  // user unsubscribed until their second visit.
+  offerNotificationPermission({
+    container,
+    report: (outcome) => {
+      document.documentElement.dataset.notifications = outcome;
+      if (outcome !== "granted") return;
+      // Not awaited and never throws. Without it nothing in this client has
+      // ever called `PushManager.subscribe`, so the service worker's `push`
+      // handler, the service's sender and its VAPID identity were all built
+      // against a subscriber list that was permanently empty.
+      void ensurePushSubscription({ getBearer: getBearerToken });
+    },
+  });
 }
 
 bootstrap();
