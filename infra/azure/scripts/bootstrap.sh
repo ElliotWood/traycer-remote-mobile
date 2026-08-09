@@ -288,7 +288,15 @@ server {
     listen 443 ssl;
     server_name __TRAYCER_PUBLIC_HOSTNAME__;
     client_max_body_size 64m;
-    limit_req zone=traycer_ingress burst=20 nodelay;
+    # burst=100, NOT the 20 this line carried until 2026-08-09. The served
+    # /next/sw.js precaches 66 entries and `cache.addAll` fires them as one
+    # burst; a single client was measured at 283 req/s against /next/ on the
+    # live origin. Against burst=20 at 10r/s, ~46 of those 66 would 429, the
+    # install would reject, and the PWA would silently have no offline mode
+    # while still working online. Size this for a precache burst, not for a
+    # page view. (The live box has never carried this line at all - see
+    # clients/mobile-push-service/deploy/vm-nginx-push-ratelimit.sh.)
+    limit_req zone=traycer_ingress burst=100 nodelay;
 
     ssl_certificate /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/privkey.pem;

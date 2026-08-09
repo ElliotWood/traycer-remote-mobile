@@ -52,7 +52,10 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/__TRAYCER_PUBLIC_HOSTNAME__/privkey.pem;
 
     client_max_body_size 64m;
-    limit_req zone=traycer_ingress burst=20 nodelay;
+    # burst=100, not 20 — the /next/ service worker precaches 66 entries in one
+    # `cache.addAll` burst and would lose ~46 of them to 429s at burst=20,
+    # failing the install silently. See bootstrap.sh's copy of this line.
+    limit_req zone=traycer_ingress burst=100 nodelay;
 
     # Same-origin authn proxy, as an ENDPOINT ALLOWLIST rather than a
     # pass-through. It exists at all because production authn's CORS allowlist
