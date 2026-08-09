@@ -177,6 +177,36 @@ describe("intake — confirming a route OPENS A FORM and starts nothing", () => 
     expect(body(preset.card)).toContain("Australia/Perth");
   });
 
+  it("CONTRACT: jurisdiction is a picker over the tool's four values, unselected", async () => {
+    // Free text would let a typo through the form and fail at scaffold time.
+    // And nothing is preselected: a compact-looking first-option-chosen would
+    // put `commonwealth` on a bid nobody chose it for, and `new-bid.mjs`'s own
+    // default of `state` is deliberately not copied here.
+    const result = await dispatchActionInvoke(
+      { verb: CONFIRM_ROUTE_VERB, conversationId: "c1", data: ROUTE_DATA },
+      deps(),
+    );
+    const parsed = JSON.parse(body(result.card)) as {
+      body: {
+        id?: string;
+        type?: string;
+        style?: string;
+        value?: string;
+        choices?: { value: string }[];
+      }[];
+    };
+    const input = parsed.body.find((e) => e.id === JURISDICTION_INPUT_ID);
+    expect(input?.type).toBe("Input.ChoiceSet");
+    expect(input?.style).toBe("expanded");
+    expect(input?.value).toBeUndefined();
+    expect(input?.choices?.map((c) => c.value)).toEqual([
+      "commonwealth",
+      "state",
+      "local",
+      "enterprise",
+    ]);
+  });
+
   it("lists the staged documents by name, so the wrong one can be spotted", async () => {
     // The contract calls intake "the natural place to catch the case where
     // the user attached the wrong document". A count cannot do that.

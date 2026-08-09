@@ -86,15 +86,34 @@ const SLUG_MIN = 3;
 const SLUG_MAX = 48;
 
 /**
- * Same shape as the slug, and for a weaker reason: `jurisdiction` is a token
- * the pipeline stores rather than one it executes. The contract's only worked
- * example is `local`.
+ * `jurisdiction` is a FIXED ENUM, and these are the tool's own four values.
  *
- * UNVERIFIED: nothing here has read `new-bid.mjs`'s accepted values, so this
- * accepts any short token rather than inventing an enum. If the tool has a
- * fixed list, this should become that list and this comment should go.
+ * Read from the real thing — `new-bid.mjs:36` and `bid.config.schema.json`
+ * both carry exactly this list, in this order. An earlier version of this file
+ * accepted any short lowercase token because nothing here had read the tool,
+ * and that was the worse of the two failure modes: a typo passes the form, the
+ * person believes the bid is registered, and `new-bid.mjs` dies at scaffold
+ * time — after they have already supplied a deadline, a buyer and an owner.
+ *
+ * VALIDATING WHAT THE DOWNSTREAM TOOL VALIDATES IS THE POINT OF THE FORM.
+ *
+ * The order is the tool's, deliberately unreordered: `new-bid.mjs` defaults to
+ * `state`, and moving it to the front would make it a default by position.
+ * Nothing here defaults it — see below.
  */
-const JURISDICTION_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
+export const JURISDICTIONS: readonly {
+  readonly id: string;
+  readonly label: string;
+}[] = [
+  { id: "commonwealth", label: "Commonwealth" },
+  { id: "state", label: "State" },
+  { id: "local", label: "Local" },
+  { id: "enterprise", label: "Enterprise" },
+];
+
+export function isKnownJurisdiction(id: string): boolean {
+  return JURISDICTIONS.some((entry) => entry.id === id);
+}
 
 /** A buyer and an owner are free text, but a card is not a document. */
 const NAME_MAX = 120;
@@ -191,16 +210,22 @@ export function parseIntakeForm(
     });
   }
 
+  /*
+   * NOT DEFAULTED TO `state`, even though `new-bid.mjs` does.
+   *
+   * A jurisdiction is a fact about the buyer, and the person filling this in
+   * knows it. An unselected required field costs one tap; a wrong default is
+   * invisible — it looks like an answer, so nobody checks it, and it reaches
+   * the bid config as if someone had chosen it.
+   */
   const jurisdiction = values.jurisdiction.toLowerCase();
-  if (jurisdiction.length === 0) {
+  if (!isKnownJurisdiction(jurisdiction)) {
     errors.push({
       field: "jurisdiction",
-      message: "Which jurisdiction does this tender sit in?",
-    });
-  } else if (!JURISDICTION_PATTERN.test(jurisdiction)) {
-    errors.push({
-      field: "jurisdiction",
-      message: "Lowercase letters, numbers and hyphens only — e.g. local.",
+      message:
+        jurisdiction.length === 0
+          ? "Which jurisdiction does this tender sit in?"
+          : "Pick one of the four the bid tool accepts.",
     });
   }
 

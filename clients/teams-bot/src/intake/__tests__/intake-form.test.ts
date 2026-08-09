@@ -7,6 +7,7 @@ import {
   OWNER_INPUT_ID,
   SLUG_INPUT_ID,
   TIME_ZONE_INPUT_ID,
+  JURISDICTIONS,
   parseIntakeForm,
   readIntakeFormValues,
   type IntakeFormValues,
@@ -139,13 +140,61 @@ describe("intake form — the deadline and the owner", () => {
     expect(fieldsWithErrors({ ...GOOD, owner: "   " })).toContain("owner");
   });
 
-  it("refuses a jurisdiction that is not a plain token", () => {
-    expect(fieldsWithErrors({ ...GOOD, jurisdiction: "" })).toContain(
-      "jurisdiction",
-    );
-    expect(fieldsWithErrors({ ...GOOD, jurisdiction: "New South Wales" })).toContain(
-      "jurisdiction",
-    );
+  it("CONTRACT: jurisdiction accepts exactly the four values new-bid.mjs accepts", () => {
+    // Read from the tool, not inferred: `new-bid.mjs:36` and
+    // `bid.config.schema.json` both carry this list. The form's job is to
+    // validate what the downstream tool validates.
+    expect(JURISDICTIONS.map((entry) => entry.id)).toEqual([
+      "commonwealth",
+      "state",
+      "local",
+      "enterprise",
+    ]);
+    for (const entry of JURISDICTIONS) {
+      expect(
+        fieldsWithErrors({ ...GOOD, jurisdiction: entry.id }),
+        entry.id,
+      ).toEqual([]);
+    }
+  });
+
+  it("CONTRACT: a value the tool would reject fails HERE, not at scaffold time", () => {
+    // The failure being closed: a typo passes the form, the person believes
+    // the bid is registered, and `new-bid.mjs` dies after they have already
+    // supplied a deadline, a buyer and an owner.
+    for (const jurisdiction of [
+      "",
+      "New South Wales",
+      "council",
+      "loca",
+      "federal",
+      "state,local",
+    ]) {
+      expect(
+        fieldsWithErrors({ ...GOOD, jurisdiction }),
+        JSON.stringify(jurisdiction),
+      ).toContain("jurisdiction");
+    }
+  });
+
+  it("normalises case and whitespace before checking, rather than refusing on them", () => {
+    // The ChoiceSet emits the exact value, so this only matters for a relayed
+    // payload — but "State " failing as an unknown jurisdiction would be a
+    // confusing refusal of a right answer.
+    const result = parseIntakeForm({ ...GOOD, jurisdiction: " State " }, NOW);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.details.jurisdiction).toBe("state");
+  });
+
+  it("CONTRACT: jurisdiction is NOT defaulted to `state` the way the tool defaults it", () => {
+    // A jurisdiction is a fact about the buyer and the person knows it. An
+    // unselected required field costs one tap; a wrong default is invisible —
+    // it looks like an answer, so nobody checks it.
+    const result = parseIntakeForm({ ...GOOD, jurisdiction: "" }, NOW);
+    expect(result.kind).toBe("invalid");
+    if (result.kind !== "invalid") return;
+    expect(result.values.jurisdiction).toBe("");
   });
 });
 

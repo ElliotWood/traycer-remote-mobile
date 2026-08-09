@@ -19,6 +19,7 @@ import {
   DEADLINE_DATE_INPUT_ID,
   DEADLINE_TIME_INPUT_ID,
   JURISDICTION_INPUT_ID,
+  JURISDICTIONS,
   OWNER_INPUT_ID,
   SLUG_INPUT_ID,
   TIME_ZONE_INPUT_ID,
@@ -2266,12 +2267,32 @@ export function buildIntakeFormCard(
     ...fieldError(errors, "timeZone"),
 
     fieldLabel("Jurisdiction"),
+    /*
+     * A CHOICESET OVER THE TOOL'S OWN FOUR VALUES, not free text.
+     *
+     * `new-bid.mjs` and `bid.config.schema.json` both fix this to
+     * commonwealth / state / local / enterprise. A free-text field would let a
+     * typo through the form, tell the person their bid was registered, and
+     * fail at scaffold time — after they had already supplied a deadline, a
+     * buyer and an owner. The form's job is to validate what the tool
+     * validates.
+     *
+     * `expanded` and unselected by default, for the same reason as the time
+     * zone above: a compact ChoiceSet renders its first option as if chosen,
+     * which would put `commonwealth` on a bid nobody chose it for. The tool's
+     * own default of `state` is deliberately NOT copied here — a jurisdiction
+     * is a fact about the buyer and the person knows it.
+     */
     {
-      type: "Input.Text",
+      type: "Input.ChoiceSet",
       id: JURISDICTION_INPUT_ID,
-      placeholder: "local",
-      value: values.jurisdiction,
-      maxLength: 31,
+      style: "expanded",
+      isMultiSelect: false,
+      ...(values.jurisdiction.length > 0 ? { value: values.jurisdiction } : {}),
+      choices: JURISDICTIONS.map((entry) => ({
+        title: entry.label,
+        value: entry.id,
+      })),
     },
     ...fieldError(errors, "jurisdiction"),
 

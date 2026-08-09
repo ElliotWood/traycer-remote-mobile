@@ -1096,6 +1096,55 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     for (const verb of emitted) expect(HANDLED.has(verb)).toBe(true);
   });
 
+  it("the intake form emits nothing above Adaptive Cards 1.2", () => {
+    /*
+     * The form is the biggest card in the file and the one most tempted by
+     * 1.3: `label`, `isRequired` and `errorMessage` are exactly what an input
+     * form wants, and our local renderer honours all three. Teams rendered
+     * 1.5 as "cards.unsupported" on DESKTOP, so a permissive local render is
+     * a true measurement of the wrong specimen.
+     *
+     * Field names are `TextBlock`s above their inputs and validation is
+     * server-side, so none of the three is needed. This pins that.
+     */
+    const json = JSON.stringify(
+      buildIntakeFormCard({
+        product: "sensormine",
+        intent: "new-opportunity",
+        skill: "smv4-new-opportunity",
+        routeLabel: "a SensorMine opportunity",
+        spokenText: "does this fit?",
+        stagingId: "1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607",
+        stagedNames: ["Tender.pdf"],
+        values: {
+          slug: "acme",
+          buyer: "Acme",
+          deadlineDate: "2026-09-15",
+          deadlineTime: "17:00",
+          timeZone: "Australia/Perth",
+          jurisdiction: "local",
+          owner: "Elliot Wood",
+        },
+        // WITH errors, because the error path is where `errorMessage` would
+        // be reached for.
+        errors: [{ field: "slug", message: "Give the bid a short name." }],
+        timeZones: DEADLINE_TIME_ZONES,
+      }).content,
+    );
+    expect((JSON.parse(json) as { version: string }).version).toBe("1.2");
+    for (const above of [
+      '"label"',
+      "isRequired",
+      "errorMessage",
+      "targetWidth",
+      "Action.Execute",
+      '"Table"',
+      "RichTextBlock",
+    ]) {
+      expect(json, above).not.toContain(above);
+    }
+  });
+
   it("CONTROL: the check can fail — an invented verb is not in the handled set", () => {
     // Without this, a walker that silently found nothing would pass both
     // assertions above and prove the checker works when it doesn't.
