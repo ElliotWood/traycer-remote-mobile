@@ -102,6 +102,22 @@ you reply to an agent*, which this page teaches.
 Replicas are divs rather than screenshots partly for this reason — a stale
 string is greppable, where a stale screenshot rots silently.
 
+**Both prerequisites landed in `main` on 2026-08-09** (autobuild check-in), so
+the deploy gate above is satisfied — and the grep that sentence promises is now
+run rather than available:
+
+```sh
+# every mock-eyebrow / mock-subtitle / mock-btn on the page must appear
+# verbatim under clients/teams-bot/src
+cd clients/teams-bot && npx vitest run src/read-surface/__tests__/help-page-copy.test.ts
+```
+
+It is **opt-out**: a replica added to the page is checked without anyone
+opting it in, and example content — placeholder epic and opportunity names —
+is exempted by marking that element `data-sample` in `site/index.html`. The
+page rotted three claims within hours of the intake merge; this is what makes
+the next one a red build instead of a reader noticing.
+
 ## Checking it
 
 ```sh
