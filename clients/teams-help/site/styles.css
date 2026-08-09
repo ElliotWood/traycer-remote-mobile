@@ -1,0 +1,1242 @@
+/*
+ * Page styles. Tokens live in theme.css; nothing here may name a colour.
+ *
+ * The one rule that shapes everything else: this page has NO BUILD STEP and
+ * NO DEPENDENCIES. It is hand-written HTML, CSS and SVG served as files.
+ * That is not minimalism for its own sake — this repo has two recorded
+ * failures from putting a bundled SPA behind a subpath (a Git-Bash path
+ * mangling that silently blanked the deployed tab, and a router with no
+ * basepath support that spun the CPU), and neither can happen to a document
+ * that is already its own artifact.
+ */
+
+/* ---------------------------------------------------------------- reset */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /*
+   * Teams' own scroll container is the iframe. `scroll-behavior: smooth`
+   * here is what makes the section nav glide rather than jump, but it is
+   * scoped off under reduced motion further down — for a vestibular
+   * trigger, a smooth scroll is worse than an instant one.
+   */
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-canvas);
+  color: var(--fg);
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+    "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+ul,
+ol {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--accent-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+code,
+kbd,
+.mono {
+  font-family: "Cascadia Code", "Consolas", ui-monospace, "SF Mono", monospace;
+  font-size: 0.9em;
+}
+
+/*
+ * One focus style for everything, and it is never removed. A help page is
+ * disproportionately likely to be read by keyboard and screen-reader users,
+ * because it is where you land when something else did not work.
+ */
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------- typography */
+
+.h-hero {
+  font-size: clamp(1.9rem, 1.2rem + 2.6vw, 3rem);
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+  font-weight: 700;
+  color: var(--fg-strong);
+  text-wrap: balance;
+}
+
+.h-section {
+  font-size: clamp(1.4rem, 1.1rem + 1.1vw, 1.95rem);
+  line-height: 1.2;
+  letter-spacing: -0.016em;
+  font-weight: 650;
+  color: var(--fg-strong);
+  text-wrap: balance;
+}
+
+.h-card {
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  font-weight: 650;
+  color: var(--fg-strong);
+}
+
+.lede {
+  font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.1875rem);
+  line-height: 1.55;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  max-width: 60ch;
+}
+
+.prose {
+  text-wrap: pretty;
+  max-width: 68ch;
+}
+
+.small {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+/* Screen-reader-only, for the labels that a diagram carries visually but
+   an assistive technology cannot infer from an SVG path. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ----------------------------------------------------------------- layout */
+
+.shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 0.4rem + 2.4vw, 2.5rem);
+}
+
+.section {
+  padding-block: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+  border-top: 1px solid var(--stroke);
+}
+
+.section:first-of-type {
+  border-top: 0;
+}
+
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: clamp(1.5rem, 1rem + 1.8vw, 2.5rem);
+}
+
+.grid {
+  display: grid;
+  gap: clamp(0.85rem, 0.5rem + 1.2vw, 1.35rem);
+}
+
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
+}
+
+/* ------------------------------------------------------------- components */
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: clamp(1rem, 0.8rem + 0.7vw, 1.4rem);
+  box-shadow: var(--shadow-card);
+}
+
+.panel {
+  background: var(--bg-sunken);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: clamp(1rem, 0.8rem + 0.9vw, 1.6rem);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.7;
+  background: var(--accent-weak);
+  color: var(--accent-text);
+  border: 1px solid var(--accent-line);
+  white-space: nowrap;
+}
+
+.pill-warn {
+  background: var(--warn-weak);
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+/* A literal command, as the user types it. */
+.cmd {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 5px;
+  background: var(--bg-inset);
+  border: 1px solid var(--stroke);
+  color: var(--fg-strong);
+  font-family: "Cascadia Code", "Consolas", ui-monospace, monospace;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.note {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 8px;
+  background: var(--accent-weak);
+  border-left: 3px solid var(--accent);
+  color: var(--fg);
+}
+
+.note-warn {
+  background: var(--warn-weak);
+  border-left-color: var(--warn);
+}
+
+/* --------------------------------------------------------- theme switcher */
+
+.theme-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-inset);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+}
+
+.theme-switch button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.theme-switch button[aria-pressed="true"] {
+  background: var(--bg-surface);
+  color: var(--fg-strong);
+  box-shadow: var(--shadow-card);
+}
+
+@media (forced-colors: active) {
+  .theme-switch button[aria-pressed="true"] {
+    outline: 2px solid CanvasText;
+  }
+}
+
+/* ------------------------------------------------------- Teams card mocks */
+
+/*
+ * Replicas of the Adaptive Cards the bot sends, built from divs rather than
+ * screenshots.
+ *
+ * Screenshots were the obvious choice and are the wrong one: they are
+ * raster, so they blur on the high-DPI displays most of Teams runs on; they
+ * bake in ONE theme, so a dark-mode reader gets a white rectangle; and they
+ * go stale silently the moment a card's wording changes, with nothing in
+ * CI able to notice. A div replica inherits the theme, stays sharp, and is
+ * greppable when a string changes.
+ *
+ * They are marked `aria-hidden` and paired with a real text description,
+ * because a screen-reader user should get the card's CONTENT, not a tour of
+ * its layout.
+ */
+.mock {
+  background: var(--bg-surface);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  font-size: 0.875rem;
+}
+
+.mock-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.mock-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--teams-brand);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  flex: none;
+}
+
+.mock-who {
+  font-weight: 650;
+  color: var(--fg-strong);
+  font-size: 0.8125rem;
+}
+
+.mock-when {
+  color: var(--fg-faint);
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
+.mock-body {
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mock-title {
+  font-weight: 650;
+  color: var(--fg-strong);
+  font-size: 0.9375rem;
+}
+
+.mock-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.mock-facts dt {
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+
+.mock-facts dd {
+  margin: 0;
+  color: var(--fg-strong);
+}
+
+.mock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.15rem;
+}
+
+.mock-btn {
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid var(--stroke-strong);
+  background: var(--bg-raised);
+  color: var(--fg-strong);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.mock-btn-primary {
+  background: var(--teams-brand);
+  border-color: var(--teams-brand);
+  color: #ffffff;
+}
+
+@media (forced-colors: active) {
+  .mock-btn-primary {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonText;
+  }
+}
+
+/* An annotation tethered to a point on a mock. */
+.annot {
+  position: relative;
+  padding-left: 1.6rem;
+  font-size: 0.8125rem;
+  color: var(--fg-muted);
+}
+
+.annot::before {
+  content: "";
+  position: absolute;
+  left: 0.45rem;
+  top: 0.6em;
+  width: 0.7rem;
+  height: 1px;
+  background: var(--accent);
+}
+
+/* ------------------------------------------------------------ page chrome */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--stroke);
+}
+
+/* `glass` has a transparent canvas, so a sticky bar would smear the content
+   scrolling under it. Give it back just enough of a backdrop to separate. */
+:root[data-theme="glass"] .topbar {
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.25rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 650;
+  color: var(--fg-strong);
+  font-size: 0.9375rem;
+}
+
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.nav a {
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav a:hover {
+  color: var(--fg-strong);
+  background: var(--bg-inset);
+}
+
+.nav a[aria-current="true"] {
+  color: var(--accent-text);
+  background: var(--accent-weak);
+}
+
+.hero {
+  padding-block: clamp(2.25rem, 1.4rem + 3.4vw, 4rem) clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  display: grid;
+  gap: clamp(1.25rem, 0.8rem + 1.8vw, 2rem);
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.copy-btn {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 5px;
+  border: 1px solid var(--stroke-strong);
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.copy-btn:hover {
+  color: var(--fg-strong);
+}
+
+.replay {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--stroke-strong);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.replay:hover {
+  color: var(--fg-strong);
+}
+
+/* --------------------------------------------------------------- the gate */
+
+/*
+ * The boundary between "the bot replied with documents" and "these are ready
+ * to send to a customer".
+ *
+ * This is the highest-value element on the page and it is styled to be
+ * impossible to skim past: a hard vertical rule down the middle, the two
+ * sides visually unlike each other, and the human side carrying the weight.
+ * The stated reason it exists is that the gap is where money is lost — a
+ * salesperson forwarding an unauthorised evidence pack to a buyer.
+ *
+ * It uses --warn rather than the accent so it never reads as decoration in
+ * the same visual key as the rest of the page.
+ */
+.gate {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: clamp(0.85rem, 0.4rem + 1.6vw, 1.75rem);
+  align-items: stretch;
+  padding: clamp(1rem, 0.7rem + 1.2vw, 1.75rem);
+  border: 2px solid var(--warn);
+  border-radius: 14px;
+  background: var(--warn-weak);
+}
+
+.gate-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.gate-rule {
+  width: 2px;
+  background: var(--warn);
+  border-radius: 1px;
+}
+
+.gate-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+/* Below ~640px the two columns would each be ~140px and the divider would
+   read as an underline rather than a boundary, so it becomes a horizontal
+   rule and the sides stack. */
+@media (max-width: 640px) {
+  .gate {
+    grid-template-columns: 1fr;
+  }
+
+  .gate-rule {
+    width: 100%;
+    height: 2px;
+  }
+}
+
+/* ---------------------------------------------------- outcome comparison */
+
+/*
+ * bid vs no-bid, side by side and given EQUAL visual weight.
+ *
+ * Deliberate: a no-bid produces no documents, and if that outcome is drawn
+ * as the lesser or greyed-out branch, the first real no-bid gets read as a
+ * broken bot. Same border, same size, same treatment — only the content
+ * differs.
+ */
+.outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: clamp(0.9rem, 0.7rem + 0.7vw, 1.3rem);
+  border: 1px solid var(--stroke-strong);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.outcome-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* --------------------------------------------------------- mock thread */
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.msg {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.msg-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--teams-brand);
+}
+
+.msg-avatar-person {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.msg-bubble {
+  background: var(--bg-surface);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.875rem;
+  color: var(--fg);
+}
+
+.mention {
+  color: var(--teams-brand);
+  background: var(--teams-brand-weak);
+  border-radius: 3px;
+  padding: 0 0.2rem;
+  font-weight: 600;
+}
+
+.attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--stroke);
+  border-radius: 5px;
+  background: var(--bg-sunken);
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+/* ------------------------------------------------------- status badging */
+
+/*
+ * `Live` vs `Not wired yet`.
+ *
+ * This page documents a journey that is only PARTLY built. The two states
+ * therefore have to be legible at a glance and impossible to confuse — a
+ * help page that quietly describes unshipped behaviour sends its reader to
+ * try something that answers with a help card, and they conclude the bot is
+ * broken rather than unfinished.
+ *
+ * `Not wired yet` uses --warn, the same colour as the authorisation gate,
+ * because both mean "stop, a human needs to know this".
+ */
+.pill-live {
+  background: var(--accent-weak);
+  color: var(--accent-text);
+  border-color: var(--accent-line);
+}
+
+/* Steps that are not built are dimmed as a block, so the eye can pick out
+   the working path by scanning rather than by reading every badge. */
+.step-todo .step-num {
+  background: transparent;
+  color: var(--warn);
+  border: 2px dashed var(--warn);
+}
+
+.step-todo .mock {
+  opacity: 0.82;
+}
+
+@media (forced-colors: active) {
+  .step-todo .mock {
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------- command table */
+
+.cmd-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.cmd-row {
+  display: grid;
+  grid-template-columns: minmax(11rem, 15rem) 1fr;
+  gap: 0.35rem 1.25rem;
+  padding: 0.8rem clamp(0.75rem, 0.5rem + 0.8vw, 1.1rem);
+  border-top: 1px solid var(--stroke);
+  align-items: baseline;
+}
+
+.cmd-row:first-child {
+  border-top: 0;
+}
+
+.cmd-row > div:first-child {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+@media (max-width: 560px) {
+  .cmd-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------------------- sequence */
+
+/*
+ * The diagram SCROLLS on narrow screens rather than scaling down.
+ *
+ * An SVG at `width: 100%` shrinks its text with everything else: this one's
+ * 11px labels land at roughly 5px on a 360px phone, which is not small — it
+ * is unreadable. A six-stage horizontal flow has no honest way to fit that
+ * width, and the alternatives are worse (a second stacked SVG to maintain,
+ * or dropping stages on mobile so the phone reader gets a different and
+ * quietly wrong story).
+ *
+ * So it keeps a legible minimum and the reader swipes. The <ol> beneath it
+ * carries the same sequence in words for anyone who would rather not.
+ */
+.seq-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.35rem;
+
+  /*
+   * `min-width: 0` is what actually makes the scrolling work.
+   *
+   * MEASURED: without it, at a 380px viewport, EVERY element on the page
+   * overflowed — the hero heading, the intro copy, the nav. A grid and flex
+   * item's `min-width` defaults to `auto`, meaning "do not shrink below my
+   * content", so the 40rem minimum on the SVG below propagated up through
+   * this box and its ancestors and laid the whole document out 640px wide.
+   * The scroll container was never containing anything.
+   *
+   * The failure is deceptive because it does not look like an SVG problem:
+   * the reported overflow is on the <h1>, four levels away and with nothing
+   * wrong with it.
+   */
+  min-width: 0;
+}
+
+/* Same reason, one level up: the figure is a grid item of `.hero`. */
+.hero > * {
+  min-width: 0;
+}
+
+.seq {
+  width: 100%;
+  min-width: 40rem;
+  height: auto;
+  overflow: visible;
+}
+
+.seq text {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  fill: var(--fg-muted);
+  font-size: 11px;
+}
+
+.seq .seq-label {
+  fill: var(--fg-strong);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.seq .seq-node {
+  fill: var(--bg-surface);
+  stroke: var(--stroke-strong);
+  stroke-width: 1.5;
+}
+
+.seq .seq-node-accent {
+  fill: var(--accent-weak);
+  stroke: var(--accent);
+}
+
+.seq .seq-node-gate {
+  fill: var(--warn-weak);
+  stroke: var(--warn);
+  stroke-width: 2;
+}
+
+.seq .seq-line {
+  fill: none;
+  stroke: var(--accent-line);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/*
+ * The connector has THREE states, and the difference between the last two
+ * is the whole honesty of the diagram:
+ *
+ *   solid teal    — works today
+ *   dashed amber  — designed, not connected yet
+ *   solid grey    — happens outside Teams, on purpose, and always will
+ *
+ * Collapsing the last two into one "not the happy path" style was the first
+ * draft and it was wrong: it implies the human authorisation step is an
+ * unfinished feature waiting to be automated. It is not — it is the point.
+ */
+.seq .seq-line-todo {
+  stroke: var(--warn);
+
+  /*
+   * `stroke-dasharray` here CANNOT coexist with the `.draw` line-drawing
+   * animation, which works by setting `stroke-dasharray: 1` on a
+   * `pathLength="1"` path and animating the offset. Whichever is declared
+   * later wins, and `.draw` is — so the first version of this rendered a
+   * solid amber line and the dashes silently never appeared.
+   *
+   * So a dashed connector fades in instead of drawing. Two properties, one
+   * attribute, no way to have both.
+   */
+  stroke-dasharray: 5 4;
+}
+
+.seq .seq-line-outside {
+  stroke: var(--stroke-strong);
+}
+
+/* Fade, for the elements that cannot use the draw animation. */
+.fade {
+  opacity: 0;
+}
+
+.is-in .fade {
+  animation: fade-in 520ms ease forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.seq-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin-top: 0.9rem;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+.seq-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.seq-legend i {
+  width: 1.4rem;
+  height: 0;
+  border-top: 2px solid var(--accent-line);
+}
+
+.seq-legend .k-todo {
+  border-top-style: dashed;
+  border-top-color: var(--warn);
+}
+
+.seq-legend .k-outside {
+  border-top-color: var(--stroke-strong);
+}
+
+@media (forced-colors: active) {
+  .seq-legend i {
+    border-top-color: CanvasText;
+  }
+}
+
+.seq .seq-dot {
+  fill: var(--accent);
+}
+
+.seq .seq-glyph {
+  fill: var(--accent-text);
+}
+
+.seq .seq-glyph-warn {
+  fill: var(--warn);
+}
+
+@media (forced-colors: active) {
+  .seq .seq-node,
+  .seq .seq-node-accent,
+  .seq .seq-node-gate {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+
+  .seq .seq-line,
+  .seq .seq-line-todo {
+    stroke: CanvasText;
+  }
+
+  .seq text,
+  .seq .seq-label {
+    fill: CanvasText;
+  }
+
+  .seq .seq-dot,
+  .seq .seq-glyph,
+  .seq .seq-glyph-warn {
+    fill: CanvasText;
+  }
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.footer {
+  padding-block: 2rem 3rem;
+  border-top: 1px solid var(--stroke);
+  color: var(--fg-faint);
+  font-size: 0.8125rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+}
+
+/* --------------------------------------------------------------- journey */
+
+.journey {
+  display: grid;
+  gap: clamp(1rem, 0.6rem + 1.4vw, 1.75rem);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 0 1rem;
+  align-items: start;
+}
+
+.step-num {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  flex: none;
+}
+
+@media (forced-colors: active) {
+  .step-num {
+    border: 1px solid CanvasText;
+  }
+}
+
+/*
+ * The rail that visually chains the steps together.
+ *
+ * A sibling of `.step` rather than a child, so a step can be added or
+ * reordered without its neighbour's connector coming with it. It is nudged
+ * to sit under the CENTRE of the 2.25rem number column — `1.125rem` is half
+ * that column, less half the rail's own 2px width.
+ */
+.journey > .step-rail {
+  width: 2px;
+  height: 1.35rem;
+  margin-left: calc(1.125rem - 1px);
+  background: var(--accent-line);
+  border-radius: 1px;
+}
+
+@media (forced-colors: active) {
+  .journey > .step-rail {
+    background: CanvasText;
+  }
+}
+
+.step-body {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-bottom: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- motion */
+
+/*
+ * Every animation on this page is one of three primitives, and each is
+ * gated the same way: it runs only once `.is-in` is added by the
+ * IntersectionObserver in help.js, and the whole file is neutralised under
+ * `prefers-reduced-motion`.
+ *
+ * The gate matters for correctness, not just taste. Without it the hero's
+ * sequence animation finishes while the reader is still four screens above
+ * it, and they scroll down to the final frame of an explainer that already
+ * played — which is the same as having no explainer.
+ *
+ * EVERY hiding rule below is scoped under `[data-js="on"]`, an attribute the
+ * inline <head> script sets before first paint. Unscoped, `opacity: 0`
+ * waiting on an observer is a page that renders BLANK whenever the script
+ * does not run — a blocked CDN, a CSP the tenant tightened, an old mobile
+ * WebView, JS off. The content is plain HTML and must survive all of that;
+ * animation is the enhancement, not the carrier.
+ */
+
+:where([data-js="on"]) .reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 520ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:where([data-js="on"]) .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Stagger children, so a grid resolves as a sequence rather than a flash. */
+:where([data-js="on"]) .reveal-group > * {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 460ms ease, transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+
+:where([data-js="on"]) .reveal-group.is-in > * {
+  opacity: 1;
+  transform: none;
+}
+
+/*
+ * SVG line drawing. The dash offset is set to the path's own length in the
+ * markup (`pathLength="1"` normalises every path to 1 unit, so one rule
+ * works for paths of any real length — otherwise each would need its own
+ * measured dasharray).
+ */
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.is-in .draw {
+  animation: draw-in 1100ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes draw-in {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A node on a diagram popping in after the line reaches it. */
+.pop {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.86);
+}
+
+.is-in .pop {
+  animation: pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes pop-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * A packet travelling along a path — the document moving through the flow.
+ *
+ * Hidden until the animation runs, which also covers the browsers without
+ * `offset-path`: there the animation cannot move it, and a dot parked over
+ * the first node reads as a rendering bug rather than as motion.
+ */
+.travel {
+  opacity: 0;
+}
+
+.is-in .travel {
+  animation: travel 2600ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  8%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* The "working" pulse, for the long-running assessment. */
+.is-in .pulse {
+  animation: pulse 2000ms ease-in-out infinite;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    r: 4;
+  }
+  50% {
+    opacity: 0.9;
+    r: 7;
+  }
+}
+
+/*
+ * The reduced-motion contract.
+ *
+ * NOT `animation: none` alone — that would leave every `.reveal` stuck at
+ * `opacity: 0`, hiding most of the page from exactly the users who asked
+ * for less movement. This is the classic way a reduced-motion block turns
+ * into a blank screen, so each animated primitive is explicitly returned to
+ * its FINISHED state rather than merely stopped.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  .reveal,
+  .reveal-group > * {
+    opacity: 1;
+    transform: none;
+  }
+
+  .draw {
+    stroke-dashoffset: 0;
+  }
+
+  .pop,
+  .fade {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* The travelling packet has no meaningful still frame — it exists only as
+     movement — so it is removed rather than parked at one end, where it
+     would read as a stray dot. */
+  .travel {
+    display: none;
+  }
+
+  .pulse {
+    opacity: 0.9;
+  }
+}
