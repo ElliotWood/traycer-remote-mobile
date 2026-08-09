@@ -940,11 +940,14 @@ export function buildChatCard(
    * move with it — a Reply button on a chat that cannot receive one is the
    * exact "button that lies" the fleet card's own docblock refused to ship.
    *
-   * Defaults to `false`: a caller that has not established the capability
-   * must not be able to produce a composer button by omission. `dispatch.ts`
-   * reads it from the same `fetchChatCapabilities` it already called.
+   * REQUIRED, with no default — and the repo's `no-restricted-syntax` rule
+   * banning default parameters is stating the same thing I wrote here first
+   * and then undercut. A `canSend = false` default means a caller who has not
+   * established the capability produces a card by omission; the whole point
+   * is that establishing it is not optional. `dispatch.ts` reads it from the
+   * same `fetchChatCapabilities` it already calls.
    */
-  canSend = false,
+  canSend: boolean,
 ): Attachment {
   if (!status.connected) {
     // The WHOLE subject of this card is the degraded state, so the whole card
@@ -2073,7 +2076,8 @@ function outcomeCard(
   tone: ContainerStyle & SemanticColor,
   title: string,
   body: string,
-  extras: readonly unknown[] = [],
+  /** Extra blocks below the toned header. Pass `[]` — see `canSend`. */
+  extras: readonly unknown[],
 ): Attachment {
   return card([
     cardHeader({
@@ -2102,6 +2106,7 @@ export function buildActionOutcomeCard(
         "good",
         verb,
         "The agent has been told and should continue.",
+        [],
       );
     case "rejected":
       return outcomeCard(
@@ -2138,6 +2143,7 @@ export function buildMessageOutcomeCard(
         "good",
         "Message sent",
         `Delivered to ${chatLabel(chat)}.`,
+        [],
       );
     case "rejected":
       return outcomeCard(
@@ -2172,7 +2178,12 @@ export function buildInterviewOutcomeCard(
 ): Attachment {
   switch (outcome.kind) {
     case "applied":
-      return outcomeCard("good", "Answers sent", `${chatLabel(chat)} can continue.`);
+      return outcomeCard(
+        "good",
+        "Answers sent",
+        `${chatLabel(chat)} can continue.`,
+        [],
+      );
     case "rejected":
       return outcomeCard(
         "warning",

@@ -94,7 +94,7 @@ describe("read-surface/cards", () => {
       connected: false,
     };
 
-    const body = cardBody(buildChatCard(disconnectedButPopulated, "epic-1"));
+    const body = cardBody(buildChatCard(disconnectedButPopulated, "epic-1", false));
 
     expect(body).toContain("Host unreachable");
     // The stale approval/interview text must NOT leak into the disconnected card —
@@ -120,7 +120,7 @@ describe("read-surface/cards", () => {
       connected: true,
     };
 
-    const body = cardBody(buildChatCard(connected, "epic-1"));
+    const body = cardBody(buildChatCard(connected, "epic-1", false));
 
     expect(body).toContain("edit_file");
     expect(body).toContain("do the thing");
@@ -268,7 +268,7 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
   it("REGRESSION: names the pending tool, not just a count", () => {
     // A FactSet refactor once replaced "edit_file" with "Pending approvals: 1",
     // which tells the user nothing about what they'd be approving.
-    const body = cardBody(buildChatCard(withApproval, "epic-1"));
+    const body = cardBody(buildChatCard(withApproval, "epic-1", false));
     expect(body).toContain("edit_file");
     expect(body).toContain("do the thing");
   });
@@ -289,6 +289,7 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
           ],
         },
         "epic-1",
+        false,
       ),
     );
     expect(body).toContain("edit_file");
@@ -308,6 +309,7 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
           ],
         },
         "epic-1",
+        false,
       ).content,
     );
     expect(visible).toContain("Rewrite the parser.");
@@ -316,7 +318,7 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
 
   it("says so plainly when nothing is waiting", () => {
     const body = cardBody(
-      buildChatCard({ ...withApproval, pendingApprovals: [] }, "epic-1"),
+      buildChatCard({ ...withApproval, pendingApprovals: [] }, "epic-1", false),
     );
     expect(body).toContain("Nothing waiting on you");
   });
@@ -324,7 +326,7 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
   it("shows which epic the decision belongs to — ambiguous with several epics in play", () => {
     const visible = JSON.stringify(
       collectTextBlocks(
-        buildChatCard(withApproval, "e0000000-0000-4000-8000-0000000000e1")
+        buildChatCard(withApproval, "e0000000-0000-4000-8000-0000000000e1", false)
           .content,
       ),
     );
@@ -336,14 +338,14 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
     const longChat = "a1000000-0000-4000-8000-000000000004";
     const visible = JSON.stringify(
       collectTextBlocks(
-        buildChatCard({ ...withApproval, chatId: longChat }, "epic-1").content,
+        buildChatCard({ ...withApproval, chatId: longChat }, "epic-1", false).content,
       ),
     );
     expect(visible).not.toContain(longChat);
   });
 
   it("the header is never attention-styled — a red container around a green Running badge is contradictory", () => {
-    const content = buildChatCard(withApproval, "epic-1").content;
+    const content = buildChatCard(withApproval, "epic-1", false).content;
     const header = (content as { body: { style?: string }[] }).body[0];
     expect(header.style).toBe("emphasis");
   });
