@@ -71,14 +71,14 @@ async function handleRequestHead(
   const path = requestLine?.path ?? "";
   if (requestLine === null || !ALLOWED_PATHS.has(path)) {
     options.onEvent?.({ kind: "rejected", reason: "bad-path", path });
-    writeRawResponse(client, 404, "Not Found");
+    writeRawResponse(client, 404, "Not Found", null);
     return;
   }
 
   const token = extractHeader(head, AGENT_TUNNEL_TOKEN_HEADER);
   if (token === null || !timingSafeTokenEquals(token, options.token)) {
     options.onEvent?.({ kind: "rejected", reason: "bad-auth", path });
-    writeRawResponse(client, 401, "Unauthorized");
+    writeRawResponse(client, 401, "Unauthorized", null);
     return;
   }
 
@@ -87,7 +87,7 @@ async function handleRequestHead(
   const metadata = await readHostPidMetadata(options.pidJsonPath());
   if (metadata === null || !isValidLocalHostWebsocketUrl(metadata.websocketUrl)) {
     options.onEvent?.({ kind: "rejected", reason: "host-not-running", path });
-    writeRawResponse(client, 503, "Service Unavailable");
+    writeRawResponse(client, 503, "Service Unavailable", null);
     return;
   }
   const loopbackPort = Number.parseInt(new URL(metadata.websocketUrl).port, 10);

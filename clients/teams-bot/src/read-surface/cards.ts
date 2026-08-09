@@ -2133,16 +2133,48 @@ function outcomeCard(
   body: string,
   /** Extra blocks below the toned header. Pass `[]` — see `canSend`. */
   extras: readonly unknown[],
+  /**
+   * Actions. Pass `[]` unless the copy TELLS the reader to go somewhere.
+   *
+   * This parameter exists because of a defect I introduced myself, and it is
+   * worth naming rather than quietly repairing. The three `failed` branches
+   * used to say *check with "chat &lt;id&gt;"*. I rewrote that to *open the
+   * chat and check* while removing the CLI from every other card — and these
+   * cards have no Open button. The old copy named a working command; the new
+   * copy named a gesture with no affordance on the card saying it.
+   *
+   * That is the same shape as the ack card promising a reply nothing sends,
+   * one step smaller: an instruction whose subject does not exist on screen.
+   * I had been auditing other people's cards for exactly this.
+   *
+   * So the rule the parameter enforces: if the copy says go somewhere, the
+   * card carries the way there.
+   */
+  actions: readonly unknown[],
 ): Attachment {
-  return card([
-    cardHeader({
-      eyebrow: null,
-      title,
-      subtitle: body,
-      tone,
-    }),
-    ...extras,
-  ]);
+  return buildCard(
+    [
+      cardHeader({
+        eyebrow: null,
+        title,
+        subtitle: body,
+        tone,
+      }),
+      ...extras,
+    ],
+    actions,
+  );
+}
+
+/** "Open the chat" as a button, for the outcome cards whose copy says to. */
+function openChatAction(chatId: string): readonly unknown[] {
+  return chatId.length === 0
+    ? []
+    : [
+        submitAction("Open the chat", OPEN_CHAT_VERB, { chatId }, {
+          associateInputs: false,
+        }),
+      ];
 }
 
 /** The machine-readable code, when the host gave one. See `buildPrincipalRefusedCard`. */
@@ -2153,6 +2185,12 @@ function codeFacts(code: string | null): readonly unknown[] {
 export function buildActionOutcomeCard(
   outcome: ActionOutcome,
   decision: "approve" | "reject",
+  /**
+   * The chat this decision belonged to. NEW, and only so the `failed` branch
+   * can offer the Open button its own copy tells the reader to press — see
+   * {@link outcomeCard}. The other two branches ignore it.
+   */
+  chat: ChatRef,
 ): Attachment {
   const verb = decision === "approve" ? "Approved" : "Rejected";
   switch (outcome.kind) {
@@ -2162,6 +2200,7 @@ export function buildActionOutcomeCard(
         verb,
         "The agent has been told and should continue.",
         [],
+        [],
       );
     case "rejected":
       return outcomeCard(
@@ -2169,6 +2208,7 @@ export function buildActionOutcomeCard(
         "The host declined this decision",
         outcome.reason ?? "No reason given.",
         codeFacts(outcome.code),
+        [],
       );
     case "failed":
       return outcomeCard("attention", "Couldn't confirm this decision", outcome.reason, [
@@ -2176,7 +2216,7 @@ export function buildActionOutcomeCard(
           "It may or may not have been applied. Open the chat and check before deciding again rather than pressing again.",
           { isSubtle: true, size: "small", spacing: "medium" },
         ),
-      ]);
+      ], openChatAction(chat.chatId));
   }
 }
 
@@ -2199,6 +2239,7 @@ export function buildMessageOutcomeCard(
         "Message sent",
         `Delivered to ${chatLabel(chat)}.`,
         [],
+        [],
       );
     case "rejected":
       return outcomeCard(
@@ -2206,6 +2247,7 @@ export function buildMessageOutcomeCard(
         "The host declined this message",
         outcome.reason ?? "No reason given.",
         codeFacts(outcome.code),
+        [],
       );
     case "failed":
       return outcomeCard("attention", "Couldn't confirm this message", outcome.reason, [
@@ -2213,7 +2255,7 @@ export function buildMessageOutcomeCard(
           "It may already have reached the agent. Open the chat and check before sending again — a duplicate is a second message the agent will act on, not a no-op.",
           { isSubtle: true, size: "small", spacing: "medium" },
         ),
-      ]);
+      ], openChatAction(chat.chatId));
   }
 }
 
@@ -2238,6 +2280,7 @@ export function buildInterviewOutcomeCard(
         "Answers sent",
         `${chatLabel(chat)} can continue.`,
         [],
+        [],
       );
     case "rejected":
       return outcomeCard(
@@ -2245,6 +2288,7 @@ export function buildInterviewOutcomeCard(
         "The host declined these answers",
         outcome.reason ?? "No reason given.",
         codeFacts(outcome.code),
+        [],
       );
     case "failed":
       return outcomeCard("attention", "Couldn't confirm these answers", outcome.reason, [
@@ -2252,7 +2296,7 @@ export function buildInterviewOutcomeCard(
           "They may already have reached the agent. Open the chat first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.",
           { isSubtle: true, size: "small", spacing: "medium", wrap: true },
         ),
-      ]);
+      ], openChatAction(chat.chatId));
   }
 }
 

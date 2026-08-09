@@ -7,8 +7,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Same harness seams the sibling store.test.ts uses: redirect the config file
 // to a per-test temp home via os.homedir, and pin the passwd login shell so
 // defaultShellPath() is deterministic (the mirror's args-only-auto branch reads
-// it). os.platform() stays real: on the macOS/Linux CI runner isWindows === false,
-// so path comparison is case-sensitive throughout.
+// it). os.platform() is pinned too, and that pin is what makes the reference
+// model below a model of anything: the store compares shell paths
+// case-insensitively on win32 and exactly elsewhere, while the model's
+// entryFor/upsert/remove use `===` throughout. With a real os.platform() the
+// two agree on POSIX and disagree on Windows, so the suite reported the
+// runner's OS rather than the store's behaviour. It used to say so in a
+// comment - "os.platform() stays real: on the macOS/Linux CI runner
+// isWindows === false" - which is an assumption written where a mock was
+// needed. win32's case-insensitive dedupe is covered by
+// adversarial-detect-shells.test.ts, which drives both platforms through its
+// own pinned platform mock; this file owns the POSIX contract.
 //
 // The home is BOUND per test via AsyncLocalStorage, not just read from the
 // shared mutable: when vitest times a test out, its async body keeps running
@@ -29,6 +38,7 @@ vi.mock("node:os", async (importActual) => {
   h.homeCtx = new hooks.AsyncLocalStorage<{ readonly home: string }>();
   return {
     ...actual,
+    platform: () => "linux" as NodeJS.Platform,
     homedir: () => h.homeCtx?.getStore()?.home ?? h.home,
     userInfo: (...args: Parameters<typeof actual.userInfo>) => {
       const base = actual.userInfo(...args);

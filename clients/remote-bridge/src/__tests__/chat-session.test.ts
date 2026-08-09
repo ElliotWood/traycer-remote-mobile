@@ -14,6 +14,7 @@ import type {
   StreamWebSocketLike,
   StreamWebSocketMessageEvent,
 } from "@traycer-clients/shared/host-transport/ws-stream-factory";
+import type { ChatRunSettings } from "@traycer/protocol/host/agent/gui/subscribe";
 import { ChatSession } from "../chat-session";
 import type { HostAuth } from "../host-auth";
 
@@ -173,6 +174,7 @@ function snapshotFrame(overrides: {
   readonly pendingFileEditApprovals?: readonly unknown[];
   readonly pendingInterviews?: readonly unknown[];
   readonly messages?: readonly unknown[];
+  readonly settings?: unknown;
 }) {
   return {
     kind: "snapshot",
@@ -180,7 +182,11 @@ function snapshotFrame(overrides: {
     epicId: "epic-1",
     chatId: "chat-1",
     snapshot: {
-      chat: { ...chatFixture, messages: overrides.messages ?? [] },
+      chat: {
+        ...chatFixture,
+        messages: overrides.messages ?? [],
+        settings: "settings" in overrides ? overrides.settings : chatFixture.settings,
+      },
       access: { role: "owner", ownerUserId: "user-1", canAct: true },
       queue: { status: "idle", items: [] },
       activeTurn: null,
@@ -195,7 +201,15 @@ function snapshotFrame(overrides: {
   };
 }
 
-function makeSession(factory: IStreamWebSocketFactory): {
+/** Fails loudly if a test that has no opinion on settings resolution ends up needing it — see the dedicated describe block below for the tests that do. */
+function unusedResolveDefaultSettings(): Promise<ChatRunSettings | null> {
+  throw new Error("resolveDefaultSettings should not be called by this test");
+}
+
+function makeSession(
+  factory: IStreamWebSocketFactory,
+  resolveDefaultSettings: () => Promise<ChatRunSettings | null>,
+): {
   readonly session: ChatSession;
   readonly client: WsStreamClient<typeof hostStreamRpcRegistry>;
 } {
@@ -219,6 +233,7 @@ function makeSession(factory: IStreamWebSocketFactory): {
     userId: "user-1",
     wsStreamClient: client,
     auth: makeHostAuth(),
+    resolveDefaultSettings,
   });
   return { session, client };
 }
@@ -230,7 +245,7 @@ async function flush(): Promise<void> {
 describe("ChatSession.getStatus", () => {
   it("does not answer 'not connected' before the first snapshot - it waits and then reports the real state", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
 
     // getStatus() is called BEFORE any snapshot has arrived - it must not
     // resolve to a stale/false "connected: false" answer immediately. It
@@ -279,7 +294,7 @@ describe("ChatSession.getStatus", () => {
 
   it("surfaces both approval kinds - tool-call and file-edit - in the same pendingApprovals list", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
     await flush();
     completeHandshake(sockets[0]);
 
@@ -319,7 +334,7 @@ describe("ChatSession.getStatus", () => {
 
   it("fails with a clear reason rather than guessing when acting on an approval id that isn't currently pending", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
     await flush();
     completeHandshake(sockets[0]);
     sockets[0].fireText(snapshotFrame({}));
@@ -336,7 +351,7 @@ describe("ChatSession.getStatus", () => {
 
   it("fails fast on a non-UNAUTHORIZED fatal close instead of waiting out a timeout for a session that will never recover", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
     await flush();
     completeHandshake(sockets[0]);
     sockets[0].fireText(
@@ -401,7 +416,7 @@ describe("ChatSession.getStatus", () => {
 describe("ChatSession.getStatus - interview questions", () => {
   it("resolves a pending interview's title, description and questions from the snapshot's own messages", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
 
     const statusPromise = session.getStatus();
     await flush();
@@ -448,7 +463,7 @@ describe("ChatSession.getStatus - interview questions", () => {
 
   it("reports questions as NULL - not [] - when the pending interview's block is absent from the snapshot", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
 
     const statusPromise = session.getStatus();
     await flush();
@@ -485,7 +500,7 @@ describe("ChatSession.getStatus - interview questions", () => {
 
   it("reports questions as [] when the block IS present and genuinely asks nothing", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
 
     const statusPromise = session.getStatus();
     await flush();
@@ -516,7 +531,7 @@ describe("ChatSession.getStatus - interview questions", () => {
 
   it("does not read questions off a NON-interview block that happens to carry the same id", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory);
+    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
 
     const statusPromise = session.getStatus();
     await flush();
@@ -549,6 +564,136 @@ describe("ChatSession.getStatus - interview questions", () => {
 
     expect(status.pendingInterviews[0]?.questions).toBeNull();
     expect(status.pendingInterviews[0]?.title).toBeNull();
+
+    client.close("test-done");
+  });
+});
+
+/**
+ * Regression coverage for the live-verified defect: `create-chat` mints a
+ * chat with `settings: null`, and `sendMessage` used to forward that `null`
+ * straight onto the wire's `send` frame. The host accepted it, acked it, and
+ * silently never ran or persisted it — measured against a real host via
+ * `chat.subscribe`'s own snapshot (`messages: []`, `runStatus: "idle"`,
+ * unchanged across three reads over 8+ seconds). These tests pin the fix at
+ * the unit level: settings are resolved rather than forwarded null, and a
+ * chat that resolves to nothing REFUSES rather than sending a malformed
+ * frame the host would silently drop.
+ */
+describe("ChatSession.sendMessage - settings resolution", () => {
+  const resolvedSettings: ChatRunSettings = {
+    harnessId: "claude",
+    model: "claude-sonnet-5",
+    permissionMode: "supervised",
+    reasoningEffort: null,
+    serviceTier: null,
+    agentMode: "regular",
+    profileId: null,
+  };
+
+  function ackFor(
+    socket: StubStreamWebSocket,
+    clientActionId: string,
+  ): void {
+    socket.fireText({
+      kind: "actionAck",
+      hasBinaryPayload: false,
+      epicId: "epic-1",
+      chatId: "chat-1",
+      clientActionId,
+      action: "send",
+      status: "accepted",
+      reason: null,
+      code: null,
+    });
+  }
+
+  function lastSentFrameOfKind(
+    socket: StubStreamWebSocket,
+    kind: string,
+  ): Record<string, unknown> | undefined {
+    for (let i = socket.textSent.length - 1; i >= 0; i -= 1) {
+      const parsed = JSON.parse(socket.textSent[i]) as Record<string, unknown>;
+      if (parsed["kind"] === kind) return parsed;
+    }
+    return undefined;
+  }
+
+  it("resolves and sends REAL settings for a fresh chat, instead of forwarding the null the host silently drops", async () => {
+    const { factory, sockets } = makeFactory();
+    let resolveCalls = 0;
+    const { session, client } = makeSession(factory, () => {
+      resolveCalls += 1;
+      return Promise.resolve(resolvedSettings);
+    });
+    await flush();
+    completeHandshake(sockets[0]);
+    sockets[0].fireText(snapshotFrame({ settings: null }));
+    await session.getStatus();
+
+    const outcomePromise = session.sendMessage("does this fit SensorMine?");
+    await flush();
+
+    const sent = lastSentFrameOfKind(sockets[0], "send");
+    expect(sent).toBeDefined();
+    // THE CONTROL: this must never be null on the wire - that is the exact
+    // frame shape the host accepted, acked, and discarded.
+    expect(sent?.["settings"]).toEqual(resolvedSettings);
+    expect(resolveCalls).toBe(1);
+
+    ackFor(sockets[0], sent?.["clientActionId"] as string);
+    const outcome = await outcomePromise;
+    expect(outcome.kind).toBe("applied");
+
+    client.close("test-done");
+  });
+
+  it("refuses to send - rather than forwarding null - when no settings can be resolved for a fresh chat", async () => {
+    const { factory, sockets } = makeFactory();
+    const { session, client } = makeSession(factory, () =>
+      Promise.resolve(null),
+    );
+    await flush();
+    completeHandshake(sockets[0]);
+    sockets[0].fireText(snapshotFrame({ settings: null }));
+    await session.getStatus();
+
+    const before = sockets[0].textSent.length;
+    const outcome = await session.sendMessage("does this fit SensorMine?");
+
+    expect(outcome).toEqual({
+      kind: "failed",
+      reason:
+        "this chat has no run settings and none could be resolved (no models available for the default harness) — refusing to send a frame the host would silently drop",
+    });
+    // Nothing new went out on the wire at all - refusing beats sending a
+    // frame the host would silently drop.
+    expect(sockets[0].textSent.length).toBe(before);
+
+    client.close("test-done");
+  });
+
+  it("never calls the resolver when the chat already has real settings, and sends them unchanged", async () => {
+    const { factory, sockets } = makeFactory();
+    const { session, client } = makeSession(factory, () => {
+      throw new Error(
+        "resolveDefaultSettings must not be called when settings already exist",
+      );
+    });
+    await flush();
+    completeHandshake(sockets[0]);
+    sockets[0].fireText(snapshotFrame({})); // chatFixture's own real settings
+    await session.getStatus();
+
+    const outcomePromise = session.sendMessage("hello");
+    await flush();
+
+    const sent = lastSentFrameOfKind(sockets[0], "send");
+    expect(sent?.["settings"]).toEqual(chatFixture.settings);
+
+    ackFor(sockets[0], sent?.["clientActionId"] as string);
+    const outcome = await outcomePromise;
+    expect(outcome.kind).toBe("applied");
 
     client.close("test-done");
   });

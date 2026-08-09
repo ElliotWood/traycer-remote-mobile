@@ -4,13 +4,23 @@ import { dirname, join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Same seams as store.test.ts: temp home for the config file, pinned passwd
-// login shell so defaultShellPath() is deterministic. os.platform() stays real
-// (non-win32 on the runner).
+// login shell so defaultShellPath() is deterministic, and a pinned
+// os.platform().
+//
+// The platform pin is load-bearing, not tidiness. Every fixture below is a
+// POSIX path and the assertions read the store's POSIX branch: on win32 the
+// store compares shell paths case-insensitively and parses them with
+// nodePath.win32, so a real os.platform() makes this suite pass or fail by
+// where it is run. It used to say so in a comment - "os.platform() stays real
+// (non-win32 on the runner)" - which is an assumption written where a mock was
+// needed. The sibling adversarial-detect-shells.test.ts already mocks
+// platform; this is that pattern, applied to the file that needed it.
 const h = vi.hoisted(() => ({ home: "", passwdShell: "/bin/zsh" }));
 vi.mock("node:os", async (importActual) => {
   const actual = await importActual<typeof import("node:os")>();
   return {
     ...actual,
+    platform: () => "linux" as NodeJS.Platform,
     homedir: () => h.home,
     userInfo: (...args: Parameters<typeof actual.userInfo>) => {
       const base = actual.userInfo(...args);

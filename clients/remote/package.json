@@ -20,7 +20,7 @@
     "traycer-remote": "bun run src/index.ts",
     "compile": "tsc --noEmit",
     "format": "bun x prettier --write .",
-    "lint": "eslint . --cache --fix --max-warnings 0",
+    "lint": "eslint . --cache --max-warnings 0",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {

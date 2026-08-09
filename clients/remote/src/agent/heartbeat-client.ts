@@ -43,7 +43,9 @@ async function postJson(
  */
 export class HeartbeatClient {
   private readonly options: HeartbeatClientOptions;
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  // `NodeJS.Timeout` rather than shared's `TimerHandle`: that type exists to
+  // straddle a DOM-only renderer build, and this package is Node-only.
+  private timer: NodeJS.Timeout | null = null;
   private backoffMs = INITIAL_BACKOFF_MS;
   private stopped = false;
 

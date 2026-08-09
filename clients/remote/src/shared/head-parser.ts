@@ -25,9 +25,9 @@ export function writeRawResponse(
   socket: net.Socket,
   status: number,
   statusText: string,
-  body?: { readonly json: unknown },
+  body: { readonly json: unknown } | null,
 ): void {
-  if (body === undefined) {
+  if (body === null) {
     socket.end(
       `HTTP/1.1 ${status} ${statusText}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`,
     );
@@ -73,7 +73,7 @@ export function bufferHttpHead(
     if (idx === -1) {
       if (buf.length > HEAD_MAX_BYTES) {
         handled = true;
-        writeRawResponse(client, 400, "Bad Request");
+        writeRawResponse(client, 400, "Bad Request", null);
       }
       return;
     }

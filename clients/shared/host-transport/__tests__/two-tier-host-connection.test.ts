@@ -22,6 +22,7 @@
  * since `@ts-expect-error` below is checked by `tsc`, not by vitest).
  */
 import { describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 import { buildStreamManifest } from "@traycer/protocol/framework/stream-compat";
 import {
   createRequestContext,
@@ -196,7 +197,7 @@ class FakeSession implements IStreamSession {
   close(): void {}
   emitStatus(
     status: StreamConnectionStatus,
-    reason: StreamCloseReason | null = null,
+    reason: StreamCloseReason | null,
   ): void {
     this.statusHandler?.(status, reason);
   }
@@ -205,8 +206,17 @@ class FakeSession implements IStreamSession {
 interface FakeDrivingHandle {
   readonly connection: HostStreamConnection;
   readonly session: FakeSession;
-  readonly closeSpy: ReturnType<typeof vi.fn>;
+  readonly closeSpy: Mock;
 }
+
+// The two fakes below stand in for classes with private state, so a direct
+// object literal is not assignable to either. Naming the members each fake
+// actually provides, and asserting from that, keeps the assertion a widening
+// of a real type rather than an `as unknown` that would accept anything at
+// all — including a fake that has stopped matching the class it replaces.
+type FakeDrivingClient = Pick<HostStreamConnection["client"], "subscribe">;
+type FakeDrivingConnection = Pick<HostStreamConnection, "client" | "close">;
+type FakeWatchingConnection = Pick<WatchingConnection, "hostId" | "close">;
 
 function fakeDrivingFactory(): {
   readonly createDriving: (
@@ -222,10 +232,12 @@ function fakeDrivingFactory(): {
   ): HostStreamConnection => {
     const session = new FakeSession();
     const closeSpy = vi.fn();
-    const client = {
-      subscribe: vi.fn(() => session),
-    } as unknown as HostStreamConnection["client"];
-    const connection = { client, close: closeSpy } as unknown as HostStreamConnection;
+    const clientLike: FakeDrivingClient = {
+      subscribe: vi.fn(() => session) as FakeDrivingClient["subscribe"],
+    };
+    const client = clientLike as HostStreamConnection["client"];
+    const connectionLike: FakeDrivingConnection = { client, close: closeSpy };
+    const connection = connectionLike as HostStreamConnection;
     byHostId.set(entry.hostId, { connection, session, closeSpy });
     return connection;
   };
@@ -234,7 +246,7 @@ function fakeDrivingFactory(): {
 
 interface FakeWatchingHandle {
   readonly connection: WatchingConnection;
-  readonly closeSpy: ReturnType<typeof vi.fn>;
+  readonly closeSpy: Mock;
 }
 
 function fakeWatchingFactory(): {
@@ -250,7 +262,11 @@ function fakeWatchingFactory(): {
     entry: MachineEndpoint,
   ): WatchingConnection => {
     const closeSpy = vi.fn();
-    const connection = { hostId: entry.hostId, close: closeSpy } as unknown as WatchingConnection;
+    const connectionLike: FakeWatchingConnection = {
+      hostId: entry.hostId,
+      close: closeSpy,
+    };
+    const connection = connectionLike as WatchingConnection;
     byHostId.set(entry.hostId, { connection, closeSpy });
     return connection;
   };

@@ -6,7 +6,7 @@ import type { GatewayConfig } from "../config";
 
 const AGENT_ID = "44444444-4444-4444-4444-444444444444";
 
-function baseConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
+function baseConfig(overrides: Partial<GatewayConfig>): GatewayConfig {
   return {
     publicListen: { host: "127.0.0.1", port: 0 },
     internalListen: { host: "127.0.0.1", port: 0 },
@@ -38,7 +38,7 @@ describe("public request handler: internal routes must not leak onto the public 
 
   it("[R3] GET /hosts with zero agents registered: 200, application/json, []", async () => {
     const registry = new Registry(60_000);
-    const port = await startServer(baseConfig(), registry);
+    const port = await startServer(baseConfig({}), registry);
     const res = await fetch(`http://127.0.0.1:${port}/hosts`, {
       headers: { Authorization: "Bearer irrelevant-not-reached" },
     });
@@ -67,7 +67,7 @@ describe("public request handler: internal routes must not leak onto the public 
 
   it("regression: /agents/heartbeat and /agents/unregister are equally rejected on the public listener", async () => {
     const registry = new Registry(60_000);
-    const port = await startServer(baseConfig(), registry);
+    const port = await startServer(baseConfig({}), registry);
     for (const path of ["/agents/heartbeat", "/agents/unregister"]) {
       const res = await fetch(`http://127.0.0.1:${port}${path}`, { method: "POST" });
       expect(res.status).toBe(404);

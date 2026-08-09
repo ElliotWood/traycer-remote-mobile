@@ -19,7 +19,8 @@
         "{projectRoot}/**/*.js",
         "{projectRoot}/**/*.jsx",
         "{projectRoot}/.eslintrc*",
-        "{projectRoot}/eslint.config.*"
+        "{projectRoot}/eslint.config.*",
+        "sharedLintRules"
       ]
     },
     "test": {
@@ -49,7 +50,8 @@
       "!{projectRoot}/**/*.spec.ts",
       "!{projectRoot}/**/*.test.ts"
     ],
-    "sharedGlobals": []
+    "sharedGlobals": [],
+    "sharedLintRules": ["{workspaceRoot}/eslint/**/*"]
   },
   "analytics": false
 }
