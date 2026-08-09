@@ -35,6 +35,25 @@ file support.
 Enabling it does not, on its own, make the bot send files: upload needs a
 `FileConsentCard`, which nothing here builds.
 
+### Merging the fix is NOT enough — the app must be repackaged and re-uploaded
+
+`manifest.json` here is a **template**. What Teams actually installed is the
+manifest inside `traycer-remote.zip`, built by `make-package.mjs` — and both
+`appPackage/build/` and `*.zip` are untracked, so nothing in a merge touches
+them. The installed app keeps whatever it was sideloaded with.
+
+So a `supportsFiles` fix reaches a real user only after:
+
+```sh
+cd clients/teams-bot
+node appPackage/make-package.mjs      # needs appPackage/local-ids.json
+# then re-upload appPackage/traycer-remote.zip in Teams and reinstall the app
+```
+
+A manifest change with no repackage-and-reinstall is a no-op that reads like
+a fix in the git history. Same trap as the flag itself: the thing that would
+falsify it is not in the repo.
+
 
 ## Two tabs: the app at `/next/`, and Help at `/help/`
 
