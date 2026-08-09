@@ -143,8 +143,19 @@ Environment=TRAYCER_TEAMS_DEMO_OID=$DEMO_OID
 # principal, which already carries one, rather than from its own env var.
 # Left as-is because that is a code change to index.ts, not a deploy fix.
 Environment=TRAYCER_TEAMS_HOST_ID=$HOST_ID
+# Where staged intake documents land. Equal to the code's own default, so it
+# changes nothing today — it is written explicitly because the live VM had it
+# set and NO committed script produced it, which meant the running unit could
+# not be reproduced from this repo. Anything the box needs belongs here.
+Environment=TRAYCER_TEAMS_STAGING_DIR=/srv/traycer/teams-bot/state/intake
 #
 # TRAYCER_TEAMS_TAB_URL IS DELIBERATELY NOT SET. See the note below the unit.
+#
+# TRAYCER_TEAMS_LOG_RAW_ATTACHMENTS is also absent on purpose. It is a
+# DIAGNOSTIC — it logs the shape of every inbound attachment so you can tell
+# "Teams never delivered a file" apart from "the file arrived and staging
+# refused it". Turn it on by hand while testing an attachment, then take it
+# off; it does not belong in a steady-state deploy.
 EnvironmentFile=$BOT_DIR/secret.env
 ExecStart=/usr/bin/node $BOT_DIR/bot.cjs
 Restart=always
