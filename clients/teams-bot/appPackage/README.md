@@ -1,6 +1,31 @@
 # Teams app package
 
-## The tab points at `/next/`, and there is only one of it
+## Two tabs: the app at `/next/`, and Help at `/help/`
+
+The section below argues for exactly one tab, and that argument still holds
+**for entries into the app**. The Help tab is not one: it is a static
+explainer served from our own origin at `/help/`, with no auth, no host
+access and no router. It does not boot the SPA, so it is not "a second entry
+to somewhere the first one can already reach".
+
+Source: `clients/teams-help/`. It is hand-written HTML/CSS/SVG with no build
+step and no dependencies, deployed by `clients/teams-help/deploy/vm-install-help.sh`.
+
+**`contentUrl` carries `?theme={theme}` and `websiteUrl` does not.** Teams
+substitutes `{theme}` (the TeamsJS **v1** placeholder name — mobile Teams
+supports only the v1 names, so `{app.theme}` would silently fail there) with
+`default`, `dark`, `glass` or `contrast` before requesting the page. That
+gives the help page a correct theme on its very first paint without a
+teams-js handshake, which matters because the page must render even when the
+handshake never completes. `websiteUrl` is the "open in a browser" target,
+where there is no Teams to ask, so it is left plain and the page falls back
+to the OS colour-scheme preference.
+
+`make-package.mjs` needed **no change** — its substitution loop already
+iterates every entry in `staticTabs`, and `validDomains` is derived from the
+same `tabHost`, so one host covers both tabs.
+
+## The app tab points at `/next/`, and there is only one of it
 
 `staticTabs` used to declare two tabs, `Waiting on you` and `Epics`, both under
 `/tab/` — the hand-built `clients/teams-tab` surface. **That package was deleted

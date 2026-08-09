@@ -29,6 +29,13 @@
       "contentUrl": "https://REPLACE_WITH_TAB_HOST/next/",
       "websiteUrl": "https://REPLACE_WITH_TAB_HOST/next/",
       "scopes": ["personal"]
+    },
+    {
+      "entityId": "traycer.help",
+      "name": "Help",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/help/?theme={theme}",
+      "websiteUrl": "https://REPLACE_WITH_TAB_HOST/help/",
+      "scopes": ["personal"]
     }
   ],
   "bots": [
