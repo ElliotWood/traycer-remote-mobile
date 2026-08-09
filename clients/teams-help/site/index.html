@@ -373,8 +373,12 @@
                   <span class="mock-when">now</span>
                 </div>
                 <div class="mock-body">
-                  <div class="mock-title">Before I start</div>
-                  <div>Looks like a new SensorMine opportunity. Is that right?</div>
+                  <div class="mock-head">
+                    <div class="mock-eyebrow">Before I start</div>
+                    <div class="mock-title">
+                      Looks like a new SensorMine opportunity. Is that right?
+                    </div>
+                  </div>
                   <div class="mock-actions">
                     <span class="mock-btn mock-btn-primary">Yes, go ahead</span>
                     <span class="mock-btn">Something else</span>
@@ -412,9 +416,13 @@
                   <span class="mock-when">now</span>
                 </div>
                 <div class="mock-body">
-                  <div class="mock-title">Assessment started</div>
-                  <div class="small">what about SensorMine for this one?</div>
-                  <div>It’s running — open it to watch progress. I’ll reply here when it’s done.</div>
+                  <div class="mock-head">
+                    <div class="mock-eyebrow mock-eyebrow-good">Assessment started</div>
+                    <div class="mock-title">what about SensorMine for this one?</div>
+                    <div class="mock-subtitle">
+                      It’s running — open it to watch progress. I’ll reply here when it’s done.
+                    </div>
+                  </div>
                   <div class="mock-actions">
                     <span class="mock-btn mock-btn-primary">Watch progress</span>
                   </div>
@@ -557,16 +565,18 @@
           <div class="cmd-row">
             <div><code class="cmd" data-copy="fleet">fleet</code></div>
             <div class="small">
-              The agents in this epic, newest and most active first. Up to twelve, each with
-              <strong>Reply</strong> and <strong>Activity</strong> buttons. Tapping the row
-              itself opens the agent.
+              The agents in this epic, newest and most active first. Up to twelve, each with an
+              <strong>Open</strong> button — tapping the row does the same thing. Everything
+              you can <em>do</em> to an agent lives one level down, on the card
+              <strong>Open</strong> takes you to.
             </div>
           </div>
           <div class="cmd-row">
             <div><code class="cmd" data-copy="chat">chat &lt;id&gt;</code></div>
             <div class="small">
               One agent’s status, with anything waiting on you pulled above the fold, its last
-              three messages, and a box to reply.
+              three messages, and a box to reply. This card carries the
+              <strong>Reply</strong> and <strong>History</strong> buttons.
             </div>
           </div>
           <div class="cmd-row">
@@ -630,15 +640,17 @@
                 <span class="mock-when">4m ago</span>
               </div>
               <div class="mock-body">
-                <div class="mock-title">Approval needed</div>
-                <div style="font-weight: 600; color: var(--fg-strong)">Write file</div>
+                <div class="mock-head">
+                  <div class="mock-eyebrow mock-eyebrow-attention">
+                    Agent action · approval needed
+                  </div>
+                  <div class="mock-title">Write file</div>
+                  <div class="mock-subtitle">Northgate RFP</div>
+                </div>
                 <div class="small">
                   Create <code>Sales/rfp/bids/northgate/decision-pack.md</code>
                 </div>
-                <dl class="mock-facts">
-                  <dt>Requested</dt><dd>4m ago</dd>
-                  <dt>Chat</dt><dd>Northgate RFP</dd>
-                </dl>
+                <div class="mock-meta">Requested 4m ago · Epic e0000000…</div>
                 <div class="mock-actions">
                   <span class="mock-btn">✓ Approve</span>
                   <span class="mock-btn">✕ Reject</span>
@@ -665,11 +677,12 @@
                 <span class="mock-when">2m ago</span>
               </div>
               <div class="mock-body">
-                <div class="mock-title">Interview waiting</div>
-                <dl class="mock-facts">
-                  <dt>Asked</dt><dd>2m ago</dd>
-                  <dt>Chat</dt><dd>Northgate RFP</dd>
-                </dl>
+                <div class="mock-head">
+                  <div class="mock-eyebrow mock-eyebrow-attention">Needs your answer</div>
+                  <div class="mock-title">Jurisdiction and deadline</div>
+                  <div class="mock-subtitle">Northgate RFP</div>
+                </div>
+                <div class="mock-meta">Asked 2m ago · Epic e0000000…</div>
                 <div style="font-weight: 600; color: var(--fg-strong)">
                   Which jurisdiction governs this tender?
                 </div>
@@ -679,7 +692,7 @@
                   <div>◯ Federal</div>
                 </div>
                 <div class="mock-actions">
-                  <span class="mock-btn mock-btn-primary">➤ Send answers</span>
+                  <span class="mock-btn mock-btn-primary">Send answers</span>
                 </div>
               </div>
             </div>

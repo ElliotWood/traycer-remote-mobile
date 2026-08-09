@@ -62,6 +62,23 @@ Keep it that way. A help page that quietly describes unshipped behaviour
 sends its reader to try something that answers with a help card, and they
 conclude the bot is broken rather than unfinished.
 
+## The card replicas track `teams/card-design`, not `main`
+
+The four Adaptive Card replicas in `site/index.html` — clarify, assessment
+started, approval, interview — are drawn against **`teams/card-design`
+(`855c8116`)**, which rebuilt all of them. Verified against that branch's
+`cards.ts`, not against a summary of it.
+
+**So `/help/` must not deploy before that branch merges**, or the replicas
+will not match the live bot.
+
+The change that is not cosmetic: the fleet row now carries **`Open` only**,
+and `Reply` / `History` moved down to the chat status card. That alters *how
+you reply to an agent*, which this page teaches.
+
+Replicas are divs rather than screenshots partly for this reason — a stale
+string is greppable, where a stale screenshot rots silently.
+
 ## Checking it
 
 ```sh

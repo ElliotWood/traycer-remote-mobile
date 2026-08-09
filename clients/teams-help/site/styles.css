@@ -361,27 +361,54 @@ kbd,
   gap: 0.6rem;
 }
 
+/*
+ * The card header grammar, as rebuilt on `teams/card-design`:
+ *
+ *   eyebrow    small, bolder, semantic colour — the card KIND
+ *   title      medium, bolder — the SUBJECT
+ *   subtitle   small, subtle — the context
+ *
+ * The semantic colour is carried by the eyebrow text alone. There is no
+ * toned header container any more: the rule in `cards.ts` is at most one
+ * toned container per card and never as the header, so a replica that keeps
+ * the old pink `attention` slab is wrong in the most visible way possible.
+ */
+.mock-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.mock-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--fg-muted);
+}
+
+.mock-eyebrow-attention {
+  color: var(--warn);
+}
+
+.mock-eyebrow-good {
+  color: var(--accent-text);
+}
+
 .mock-title {
   font-weight: 650;
   color: var(--fg-strong);
   font-size: 0.9375rem;
 }
 
-.mock-facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 0.75rem;
+.mock-subtitle {
   font-size: 0.8125rem;
-}
-
-.mock-facts dt {
   color: var(--fg-muted);
-  font-weight: 600;
 }
 
-.mock-facts dd {
-  margin: 0;
-  color: var(--fg-strong);
+/* Replaces the old two-column FactSet of ids: one subtle line under the
+   body, not a bold grid that competed with the title for attention. */
+.mock-meta {
+  font-size: 0.75rem;
+  color: var(--fg-faint);
 }
 
 .mock-actions {
