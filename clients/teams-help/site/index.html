@@ -490,7 +490,8 @@
                     <div class="mock-eyebrow mock-eyebrow-good">Assessment started</div>
                     <div class="mock-title">what about SensorMine for this one?</div>
                     <div class="mock-subtitle">
-                      It’s running — open it to watch progress. I’ll reply here when it’s done.
+                      It’s running. Open it to watch progress — I won’t ping you when it
+                      finishes.
                     </div>
                   </div>
                   <div class="mock-actions">
@@ -517,16 +518,24 @@
                 <span class="pill pill-warn">Not wired yet</span>
               </div>
               <p class="prose small">
-                The card above promises a follow-up. <strong>That follow-up does not exist
-                yet</strong> — nothing sends it. Until it does, check on the work yourself:
-                press <strong>Watch progress</strong>, or send
+                <strong>Nothing will arrive.</strong> The bot does not ping you when an
+                assessment finishes, and the card that starts one says so rather than leaving
+                you waiting. Come back and press <strong>Watch progress</strong>, or send
                 <code class="cmd">fleet</code> and open the agent from there.
               </p>
               <p class="annot">
-                When it does land, it will fire on the bundle being assembled from an
-                authorised bid — not on the chat finishing. Those are different events, and
-                treating “the agent stopped talking” as “the work is approved” is the mistake
-                the design is specifically avoiding.
+                It is badged <em>built, not connected yet</em> rather than <em>missing</em> for
+                a reason. When your assessment starts, the bot records where to send the
+                result — and <strong>refuses to start at all</strong> if it cannot, because an
+                assessment whose result has nowhere to go spends real time on a customer
+                document and produces something nobody receives. Everything is in place except
+                the last wire.
+              </p>
+              <p class="annot">
+                When that wire is connected, the reply will fire on the document bundle being
+                assembled from an <strong>authorised</strong> bid — not on the chat finishing.
+                Those are different events, and treating “the agent stopped talking” as “the
+                work is approved” is the mistake this whole design exists to avoid.
               </p>
             </div>
           </div>

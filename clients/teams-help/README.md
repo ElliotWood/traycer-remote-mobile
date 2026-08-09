@@ -72,6 +72,12 @@ started, approval, interview — are drawn against **`teams/card-design`
 **So `/help/` must not deploy before that branch merges**, or the replicas
 will not match the live bot.
 
+The same now applies to **`teams/ack-honesty`**, which rewrites
+`buildAssessmentStartedCard` so it stops promising a reply nothing sends. The
+page quotes its new subtitle (*"It's running. Open it to watch progress — I
+won't ping you when it finishes."*), so that branch is a second deploy
+prerequisite.
+
 The change that is not cosmetic: the fleet row now carries **`Open` only**,
 and `Reply` / `History` moved down to the chat status card. That alters *how
 you reply to an agent*, which this page teaches.
