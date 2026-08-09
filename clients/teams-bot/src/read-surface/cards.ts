@@ -1434,6 +1434,18 @@ const PART_NOUN: Record<string, string> = {
 };
 
 /**
+ * A VERB takes its object directly; a NOUN needs a colon.
+ *
+ * Caught in the render, not in review. "Ran bun test --filter cards" and
+ * "Edited cards.ts" read as sentences, so the same joiner was used
+ * throughout — and produced "Error styling unverified" and "Table coverage",
+ * which read as typos. The label after a verb is what was acted on; the
+ * label after a noun is what the thing IS, and English punctuates those
+ * differently.
+ */
+const PART_IS_VERB = new Set(["file_change", "file", "command", "tool"]);
+
+/**
  * One part of a message, as a line a salesperson can read.
  *
  * WAS `⟨error · styling unverified⟩` — monospace, angle brackets, a
@@ -1460,7 +1472,12 @@ export function partMarker(part: TranscriptPart): string {
       : part.kind === "file_change"
         ? shortenWorkspacePath(rawLabel)
         : rawLabel;
-  const head = label.length > 0 ? `${noun} ${label}` : noun;
+  const head =
+    label.length === 0
+      ? noun
+      : PART_IS_VERB.has(part.kind)
+        ? `${noun} ${label}`
+        : `${noun}: ${label}`;
   // "1 lines" appeared in front of a user. Pluralise.
   return part.lines > 0
     ? `${head} · ${String(part.lines)} line${part.lines === 1 ? "" : "s"}`
