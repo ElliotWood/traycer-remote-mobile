@@ -52,15 +52,32 @@ translucent theme Teams uses on Apple Vision Pro, which is missing from most
 
 ## It documents what actually ships
 
-Several steps of the assessment journey are designed but not connected: the
-proactive completion reply has no producer, attachments are never read, and a
-fully confident question falls through to the help card. The page draws the
-whole journey and badges each step *works today* / *built, not connected yet*
-/ *outside Teams, on purpose*.
+The page draws the whole assessment journey and badges each step *works
+today* / *built, not connected yet* / *outside Teams, on purpose*. As of
+`main` @ `438454c5` the one unconnected step is the **proactive completion
+reply**: `proactive/` has no production caller, so the bot never tells you an
+assessment finished.
 
 Keep it that way. A help page that quietly describes unshipped behaviour
-sends its reader to try something that answers with a help card, and they
-conclude the bot is broken rather than unfinished.
+sends its reader to try something that fails, and they conclude the bot is
+broken rather than unfinished.
+
+**And re-derive the badges whenever `clients/teams-bot/src` moves.** This
+section previously claimed attachments were never read and that a confident
+question fell through to the help card. Both were true when written and both
+were false six hours later, when `autobuild/opportunity-intake` merged — so
+the page was telling people a capability did not exist when it did, which is
+the more damaging direction to be wrong in. Every error pointed that way.
+Verify against the source, never against this file or the artifact:
+
+```sh
+# is the proactive reply wired yet?
+grep -rn "proactive/" --include=*.ts clients/teams-bot/src \
+  | grep -v __tests__ | grep -v "src/proactive/"
+
+# are attachments staged on the live path?
+grep -rn "stageAttachments" clients/teams-bot/src/index.ts
+```
 
 ## The card replicas track `teams/card-design`, not `main`
 
