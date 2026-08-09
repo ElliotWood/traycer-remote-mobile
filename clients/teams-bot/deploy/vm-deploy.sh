@@ -80,6 +80,19 @@ cat > "$BOT_DIR/identity-registry.json" <<REG
 REG
 chmod 600 "$BOT_DIR/identity-registry.json"
 
+# UNQUOTED delimiter, so $APP_ID and friends expand — that is the point.
+#
+# The cost: BACKTICKS AND $(...) IN THIS BODY EXECUTE, as root, on the VM,
+# including inside comment lines. Ten of them did. One was `traycer login`,
+# sitting in the very comment that explains how running `traycer login` as
+# root corrupts the host's credentials — the script would have caused the
+# fault it documents. It survived only because those binaries are not on
+# root's PATH, so the substitutions failed to empty strings and silently
+# mangled the comments instead.
+#
+# So: escape every backtick inside the heredoc, and any literal dollar.
+# Rendering the heredoc must produce empty stderr. If it prints anything, a
+# comment is being executed.
 cat > /etc/systemd/system/traycer-teams-bot.service <<UNIT
 [Unit]
 Description=Traycer Teams bot
