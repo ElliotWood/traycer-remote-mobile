@@ -90,17 +90,17 @@ Type=simple
 # MUST run as the tenant's own OS user, NOT root. This is load-bearing and
 # cost hours to find:
 #
-# The bot spawns `traycer-remote-bridge`, which shares the tenant's
+# The bot spawns \`traycer-remote-bridge\`, which shares the tenant's
 # credentials file and REWRITES it on token refresh. Running as root rewrote
-# `~/.traycer/cli/credentials` as root:root mode 600 — and the Traycer host
-# runs as `traycer`, so it could no longer READ its own credential. The host
-# then reported `UNAUTHORIZED: Host is not provisioned - sign in on this
-# machine to authorize it` to every client (bridge, CLI, and the PWA alike),
+# \`~/.traycer/cli/credentials\` as root:root mode 600 — and the Traycer host
+# runs as \`traycer\`, so it could no longer READ its own credential. The host
+# then reported \`UNAUTHORIZED: Host is not provisioned - sign in on this
+# machine to authorize it\` to every client (bridge, CLI, and the PWA alike),
 # while looking perfectly healthy: unit active, valid pid.json, live
 # WebSocket, and a fresh credentials file with the correct user id in it.
 #
 # The misleading part is that the message says "sign in on this machine",
-# which sends you to `traycer login` — and signing in AS ROOT rewrites the
+# which sends you to \`traycer login\` — and signing in AS ROOT rewrites the
 # file as root again, so the obvious remedy re-creates the fault. It is a
 # file-ownership problem wearing an authentication error's clothing.
 User=traycer
@@ -115,6 +115,23 @@ Environment=TRAYCER_AGENT_ID=$SENDER_AGENT_ID
 Environment=TRAYCER_TEAMS_DEFAULT_EPIC_ID=$DEFAULT_EPIC_ID
 Environment=TRAYCER_TEAMS_DEMO_IDENTITY=1
 Environment=TRAYCER_TEAMS_DEMO_OID=$DEMO_OID
+# Which host an assessment is started on. WITHOUT THIS, index.ts leaves
+# \`startAssessment\` undefined and every confirmed intake answers "This
+# deployment can't start assessments yet" — so the whole opportunity flow,
+# including the five-field intake form, was unreachable on this VM.
+#
+# The value was already here: \$HOST_ID is required at the top of this script
+# and written into identity-registry.json as the tenant's \`hostId\`. Nothing
+# new has to be discovered or typed; the deploy simply never passed it to the
+# variable the dispatcher reads.
+#
+# It is now specified TWICE — here and in the registry — and they can drift.
+# Better would be for the dispatcher to take the host from the resolved
+# principal, which already carries one, rather than from its own env var.
+# Left as-is because that is a code change to index.ts, not a deploy fix.
+Environment=TRAYCER_TEAMS_HOST_ID=$HOST_ID
+#
+# TRAYCER_TEAMS_TAB_URL IS DELIBERATELY NOT SET. See the note below the unit.
 EnvironmentFile=$BOT_DIR/secret.env
 ExecStart=/usr/bin/node $BOT_DIR/bot.cjs
 Restart=always
@@ -123,6 +140,35 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
+
+# --- why TRAYCER_TEAMS_TAB_URL is not set -------------------------------
+#
+# It would produce a "Watch progress" button that opens the WRONG PAGE, and
+# the card is better off without one.
+#
+# `intake/deep-link.ts` builds:
+#
+#     ${TRAYCER_TEAMS_TAB_URL}/epics/<epicId>/chats/<chatId>
+#
+# and its own docblock says that shape MIRRORS `clients/teams-tab`, which was
+# deleted in cb1edae3. The tab now served is upstream's gui-app at /next/,
+# whose route is `/epics/$epicId/$tabId` — no `/chats/` segment at all, and
+# `$tabId` is a CANVAS TAB id resolved from a client-side store, not a chat
+# id. `/epics/<id>/chats/<id>` is one segment too long to match, so the link
+# does not resolve to the chat; it falls into the SPA fallback and renders
+# something else. The user sees "the wrong page", not an error — precisely
+# the liability deep-link.ts warned about, now realised.
+#
+# deep-link.ts returns null on an empty base and the card then renders with
+# no OpenUrl button, which is the correct outcome by its own reasoning: "a
+# dead Watch progress button is worse than none". Since teams/ack-honesty the
+# no-link variant carries a working `My agents` button instead, so leaving
+# this unset is a complete card, not a degraded one.
+#
+# TO ENABLE IT: fix `chatDeepLink` to gui-app's real route first, verify a
+# built link actually lands on the chat, THEN set this to the tab origin. Do
+# not set it because the variable exists.
+
 
 # Everything the bot reads must be owned by the user it runs as. `secret.env`
 # and the registry are mode 600, so root ownership makes them unreadable to
