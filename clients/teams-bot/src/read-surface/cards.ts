@@ -15,6 +15,15 @@ import type {
 } from "./bridge-types";
 import type { BridgeCliFailureReason } from "./bridge-cli";
 import {
+  BUYER_INPUT_ID,
+  DEADLINE_DATE_INPUT_ID,
+  DEADLINE_TIME_INPUT_ID,
+  JURISDICTION_INPUT_ID,
+  OWNER_INPUT_ID,
+  SLUG_INPUT_ID,
+  TIME_ZONE_INPUT_ID,
+} from "../intake/intake-form";
+import {
   speakerLabel as sharedSpeakerLabel,
   humaniseToolName as sharedHumaniseToolName,
   shortenWorkspacePath as sharedShortenWorkspacePath,
@@ -113,6 +122,16 @@ export const FLEET_VERB = "traycer/fleet";
 export const CONFIRM_ROUTE_VERB = "traycer/confirmRoute";
 export const CLARIFY_OTHER_VERB = "traycer/clarifyOther";
 export const SEND_VERB = "traycer/send";
+/**
+ * The intake form's own submit. SEPARATE from {@link CONFIRM_ROUTE_VERB},
+ * which now only OPENS the form.
+ *
+ * Two verbs rather than one because they are two different acts: confirming a
+ * route commits nothing, and submitting the form starts an agent on a
+ * customer document. Collapsing them would put "start the work" behind the
+ * button whose job is "yes, that's the right kind of work".
+ */
+export const SUBMIT_INTAKE_VERB = "traycer/submitIntake";
 
 /**
  * Plain Unicode, NOT emoji: no variation selector, no colour font, no image
@@ -1961,6 +1980,21 @@ export function buildClarifyCard(options: {
    * field is an unbounded payload.
    */
   readonly spokenText?: string;
+  /**
+   * The staged documents and the requester's name, carried through the
+   * button so the intake form can be built from the press alone.
+   *
+   * They cannot be re-derived at that point: the confirm arrives as its OWN
+   * activity, with no attachments and — in a channel — no reliable sender
+   * name. The files were downloaded on the turn they arrived, which is the
+   * only turn their download URLs are valid on; `stagingId` is the handle to
+   * where they went. It is an opaque UUID, and it is re-validated as one
+   * before it is ever joined to a path.
+   */
+  readonly stagingId?: string;
+  readonly stagedNames?: readonly string[];
+  /** Whoever @-mentioned the bot. Prefills the owner field; not an identity. */
+  readonly requesterName?: string;
 }): Attachment {
   const canSuggest =
     options.suggestionLabel !== null &&
@@ -1987,6 +2021,11 @@ export function buildClarifyCard(options: {
                 intent: options.intent ?? "",
                 skill: options.skill ?? "",
                 text: (options.spokenText ?? "").slice(0, 900),
+                stagingId: options.stagingId ?? "",
+                [STAGED_NAMES_KEY]: JSON.stringify(
+                  (options.stagedNames ?? []).slice(0, STAGED_NAMES_SHOWN),
+                ),
+                requesterName: (options.requesterName ?? "").slice(0, 120),
               },
               { associateInputs: false },
             ),
@@ -1996,6 +2035,331 @@ export function buildClarifyCard(options: {
         associateInputs: false,
       }),
     ]),
+  ]);
+}
+
+/**
+ * THE INTAKE FORM — the five fields `new-bid.mjs` refuses to run without.
+ *
+ * Replaces a one-tap "Yes, go ahead". The classifier decides which skill; it
+ * cannot decide a slug, a buyer, a deadline, a jurisdiction or an accountable
+ * human, and the pipeline's entry point takes all five.
+ *
+ * FOUR THINGS ABOUT THE SHAPE, each of them a decision rather than a style:
+ *
+ * 1. NO `label`, `isRequired` or `errorMessage`. All three are Adaptive Cards
+ *    1.3 and this file emits 1.2, because Teams rendered 1.5 as
+ *    "cards.unsupported" on DESKTOP. Field names are `TextBlock`s above their
+ *    inputs, exactly as the interview card does it. Validation lives in
+ *    `intake-form.ts`, server-side — `Action.Submit` fires on an untouched
+ *    card, so client-side required-ness was never going to be the gate.
+ *
+ * 2. THE TIME ZONE IS A FIELD, not an inference. `Input.Date` and
+ *    `Input.Time` carry no offset and `new-bid.mjs` refuses a deadline
+ *    without one; reading it off the bot's own clock would be a fact about
+ *    where Azure put the VM. The user picks a place and `deadline.ts` derives
+ *    the offset for that instant — so DST is handled without anyone having to
+ *    know it exists. It is `expanded` rather than a dropdown so an
+ *    unselected zone is VISIBLY unselected; a compact ChoiceSet renders its
+ *    first option as if chosen.
+ *
+ * 3. THE OWNER IS PREFILLED WITH WHOEVER @-MENTIONED THE BOT, and is an
+ *    ordinary editable input. Settled by Elliot on 2026-08-09: the field is a
+ *    named accountable human so it cannot be silently inferred, but making
+ *    someone type a name that is usually their own is friction people route
+ *    around. Prefilled-and-confirmable is both.
+ *
+ * 4. THE ATTACHED FILES ARE LISTED BY NAME. The contract calls the intake
+ *    step "the natural place to catch the case where the user attached the
+ *    wrong document", and a count cannot do that. These are already staged by
+ *    the time this renders, so the list is what is on disk, not what was
+ *    promised.
+ */
+export interface IntakeFormPresentation {
+  readonly slug: string;
+  readonly buyer: string;
+  readonly deadlineDate: string;
+  readonly deadlineTime: string;
+  readonly timeZone: string;
+  readonly jurisdiction: string;
+  readonly owner: string;
+}
+
+export interface IntakeFormCardOptions {
+  readonly product: string;
+  readonly intent: string;
+  readonly skill: string;
+  /** Human wording for the route, e.g. "a SensorMine opportunity". */
+  readonly routeLabel: string | null;
+  /** The requester's own words, carried on to the instruction. */
+  readonly spokenText: string;
+  /** Opaque handle for the staged documents. Empty when nothing was attached. */
+  readonly stagingId: string;
+  readonly stagedNames: readonly string[];
+  readonly values: IntakeFormPresentation;
+  readonly errors: readonly {
+    readonly field: string;
+    readonly message: string;
+  }[];
+  readonly timeZones: readonly {
+    readonly id: string;
+    readonly label: string;
+  }[];
+}
+
+/** Field name above its input — the 1.2-safe stand-in for `label`. */
+function fieldLabel(content: string): unknown {
+  return text(content, { weight: "bolder", size: "small", spacing: "medium" });
+}
+
+/** The per-field message, rendered where the field is rather than only at the top. */
+function fieldError(
+  errors: IntakeFormCardOptions["errors"],
+  field: string,
+): readonly unknown[] {
+  const found = errors.find((error) => error.field === field);
+  return found === undefined
+    ? []
+    : [
+        text(found.message, {
+          size: "small",
+          color: "attention",
+          spacing: "none",
+        }),
+      ];
+}
+
+/** Names, capped, so a payload cannot grow without bound. */
+export const STAGED_NAMES_KEY = "stagedNames";
+const STAGED_NAMES_SHOWN = 12;
+
+export function buildIntakeFormCard(
+  options: IntakeFormCardOptions,
+): Attachment {
+  const { values, errors } = options;
+
+  const documents =
+    options.stagedNames.length === 0
+      ? [
+          text("No documents attached.", {
+            isSubtle: true,
+            size: "small",
+            spacing: "none",
+          }),
+        ]
+      : [
+          text(
+            `${String(options.stagedNames.length)} document${options.stagedNames.length === 1 ? "" : "s"} ready for the assessment:`,
+            { isSubtle: true, size: "small", spacing: "none" },
+          ),
+          ...options.stagedNames
+            .slice(0, STAGED_NAMES_SHOWN)
+            .map((name) =>
+              text(name, { size: "small", spacing: "none", wrap: true }),
+            ),
+          ...(options.stagedNames.length > STAGED_NAMES_SHOWN
+            ? [
+                text(
+                  `+${String(options.stagedNames.length - STAGED_NAMES_SHOWN)} more`,
+                  { isSubtle: true, size: "small", spacing: "none" },
+                ),
+              ]
+            : []),
+        ];
+
+  const body: unknown[] = [
+    container(
+      [
+        text("Start an assessment", {
+          weight: "bolder",
+          size: "medium",
+          spacing: "none",
+        }),
+        ...(options.routeLabel === null
+          ? []
+          : [
+              text(options.routeLabel, {
+                isSubtle: true,
+                size: "small",
+                spacing: "none",
+              }),
+            ]),
+      ],
+      { style: "emphasis" },
+    ),
+    ...documents,
+  ];
+
+  if (errors.length > 0) {
+    // A summary AND the per-field messages below. On a phone the fields run
+    // past the fold, so an error on the last one would otherwise be invisible
+    // from where the button is.
+    body.push(
+      container(
+        [
+          text(
+            errors.length === 1
+              ? "One thing to fix before I start:"
+              : `${String(errors.length)} things to fix before I start:`,
+            { weight: "bolder", color: "attention", spacing: "none" },
+          ),
+          ...errors.map((error) =>
+            text(`• ${error.message}`, { size: "small", spacing: "none" }),
+          ),
+        ],
+        { style: "attention", separator: true },
+      ),
+    );
+  }
+
+  body.push(
+    fieldLabel("Short name for the bid"),
+    text("Becomes the bid folder and the branch name.", {
+      isSubtle: true,
+      size: "small",
+      spacing: "none",
+    }),
+    {
+      type: "Input.Text",
+      id: SLUG_INPUT_ID,
+      placeholder: "acme-water-rfp",
+      value: values.slug,
+      maxLength: 48,
+    },
+    ...fieldError(errors, "slug"),
+
+    fieldLabel("Customer"),
+    {
+      type: "Input.Text",
+      id: BUYER_INPUT_ID,
+      placeholder: "Acme Water Corporation",
+      value: values.buyer,
+      maxLength: 120,
+    },
+    ...fieldError(errors, "buyer"),
+
+    fieldLabel("Deadline — date"),
+    { type: "Input.Date", id: DEADLINE_DATE_INPUT_ID, value: values.deadlineDate },
+    ...fieldError(errors, "deadlineDate"),
+
+    fieldLabel("Deadline — time"),
+    { type: "Input.Time", id: DEADLINE_TIME_INPUT_ID, value: values.deadlineTime },
+    ...fieldError(errors, "deadlineTime"),
+
+    fieldLabel("Deadline — time zone"),
+    text("A tender closing at 5pm closes at a different moment in each of these.", {
+      isSubtle: true,
+      size: "small",
+      spacing: "none",
+    }),
+    {
+      type: "Input.ChoiceSet",
+      id: TIME_ZONE_INPUT_ID,
+      style: "expanded",
+      isMultiSelect: false,
+      ...(values.timeZone.length > 0 ? { value: values.timeZone } : {}),
+      choices: options.timeZones.map((zone) => ({
+        title: zone.label,
+        value: zone.id,
+      })),
+    },
+    ...fieldError(errors, "timeZone"),
+
+    fieldLabel("Jurisdiction"),
+    {
+      type: "Input.Text",
+      id: JURISDICTION_INPUT_ID,
+      placeholder: "local",
+      value: values.jurisdiction,
+      maxLength: 31,
+    },
+    ...fieldError(errors, "jurisdiction"),
+
+    fieldLabel("Accountable for this bid"),
+    text("Prefilled with you — change it if someone else owns this one.", {
+      isSubtle: true,
+      size: "small",
+      spacing: "none",
+    }),
+    {
+      type: "Input.Text",
+      id: OWNER_INPUT_ID,
+      placeholder: "Bid manager's name",
+      value: values.owner,
+      maxLength: 120,
+    },
+    ...fieldError(errors, "owner"),
+
+    /*
+     * SAID OUT LOUD, on the card that starts the work.
+     *
+     * Teams is intake-only: it starts assessments and delivers review copies.
+     * It never decides go/no-go, authorises a claim, or lodges a tender —
+     * those stay with a named human in the repo. The prohibition is enforced
+     * by a test over the dispatcher; this is where the person pressing the
+     * button finds out.
+     */
+    text(
+      "I'll start the assessment and reply here. Deciding whether to bid, approving anything for a customer, and lodging stay with a person — I don't do any of those.",
+      { isSubtle: true, size: "small", separator: true, spacing: "medium" },
+    ),
+  );
+
+  return buildCard(body, [
+    submitAction(
+      "Start assessment",
+      SUBMIT_INTAKE_VERB,
+      {
+        product: options.product,
+        intent: options.intent,
+        skill: options.skill,
+        text: options.spokenText.slice(0, 900),
+        stagingId: options.stagingId,
+        // Carried so a validation re-render can still list the documents
+        // without a second directory read. These are file names the user
+        // chose and the card already displays; nothing here is a credential.
+        [STAGED_NAMES_KEY]: JSON.stringify(
+          options.stagedNames.slice(0, STAGED_NAMES_SHOWN),
+        ),
+      },
+      // REQUIRED. Without it Teams submits the action with none of the typed
+      // values and every field arrives empty — the same property that makes
+      // the composer send blank messages.
+      { associateInputs: true, style: "positive" },
+    ),
+  ]);
+}
+
+/**
+ * The documents could not be staged, so NOTHING IS OFFERED.
+ *
+ * Deliberately not a form with a warning on it. The alternative — render the
+ * intake form anyway and let someone start an assessment against zero
+ * documents — produces a confident-looking answer about a tender nobody read,
+ * which is the single worst outcome available on this path. A channel post,
+ * an undownloadable attachment and a duplicate file name all land here.
+ *
+ * The reason is written for the person, and it says what to do next: every
+ * case this renders for is one a human can resolve in the next message.
+ */
+export function buildIntakeRefusedCard(reason: string): Attachment {
+  return card([
+    container(
+      [
+        text("I can't start this one", {
+          weight: "bolder",
+          color: "warning",
+          spacing: "none",
+        }),
+        text(reason, { spacing: "small" }),
+      ],
+      { style: "warning" },
+    ),
+    text("Nothing has been started, and no assessment is running.", {
+      isSubtle: true,
+      size: "small",
+      spacing: "small",
+    }),
   ]);
 }
 

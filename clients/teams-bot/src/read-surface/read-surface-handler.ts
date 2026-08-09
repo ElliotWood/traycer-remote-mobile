@@ -14,11 +14,15 @@ import { logInfo, logWarn } from "../logger";
 import { stripMentions, type MentionEntity } from "../intake/mention";
 import { classify } from "../intake/classify";
 import { describeRoute } from "../intake/route-labels";
-import { buildClarifyCard } from "./cards";
+import { buildClarifyCard, buildIntakeRefusedCard } from "./cards";
 import {
   captureRawAttachments,
   RAW_ATTACHMENT_LOG_FLAG,
 } from "../intake/attachment-capture";
+import {
+  classifyAttachment,
+  type StagingOutcome,
+} from "../intake/attachment-staging";
 
 /**
  * The activity handler — messages and card actions.
@@ -117,31 +121,71 @@ class ReadSurfaceHandler extends ActivityHandler {
     // means "does this fit SensorMine?" gets a syntax card. So an
     // unrecognised message goes to the classifier instead, and only falls
     // back to help when the classifier recognises nothing either.
-    //
-    // Deliberately NOT dispatching a confident route yet — R5 owns
-    // create-epic-and-invoke, and a router wired to a half-built dispatch is
-    // the `Action.Execute` mistake again. A confident route falls through to
-    // help until R5 lands; an uncertain one is useful on its own.
     if (command.kind === "help" && spoken.text.trim().length > 0) {
       const classified = classify({
         text: spoken.text,
         hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
       });
-      if (classified.kind === "uncertain" && classified.suggestion !== null) {
+      const route =
+        classified.kind === "routed" ? classified.route : classified.suggestion;
+      if (route !== null) {
+        /*
+         * STAGED HERE, ON THIS TURN, AND NOWHERE ELSE.
+         *
+         * A Teams `downloadUrl` is only valid on the activity that carried
+         * it, and the confirm press arrives as a separate activity with no
+         * attachments. So the bytes have to be fetched now, before anyone has
+         * agreed to anything — the alternative is putting a pre-authorised
+         * download URL into a card payload and asking Bot Service to relay it
+         * back to us, which turns a credential into round-trip data.
+         *
+         * Gated on the classifier having produced a route, so an unrelated
+         * file dropped into the chat is not downloaded.
+         */
+        const staging = await this.stage(context);
+        if (staging.kind === "refused") {
+          // LOUD. Channel scope, an undownloadable attachment and a duplicate
+          // file name all land here, and every one of them would otherwise
+          // become an assessment against zero documents that reads as
+          // finished work.
+          await context.sendActivity(
+            MessageFactory.attachment(buildIntakeRefusedCard(staging.reason)),
+          );
+          logWarn("intake refused before it started", { reason: "staging" });
+          return;
+        }
+        const staged =
+          staging.kind === "staged"
+            ? { id: staging.stagingId, names: staging.files.map((f) => f.name) }
+            : { id: "", names: [] as readonly string[] };
+
         // The BUTTON carries the route. The handler must not re-derive it
         // from `suggestion` when the reply comes back — see buildClarifyCard.
+        //
+        // A CONFIDENT route gets the same card, not a silent dispatch: the
+        // intake form needs five fields nothing here can supply, so a
+        // confirmation step exists either way. What differs is the wording.
         await context.sendActivity(
           MessageFactory.attachment(
             buildClarifyCard({
-              suggestionLabel: describeRoute(classified.suggestion),
-              product: classified.suggestion.product,
-              intent: classified.suggestion.intent,
-              skill: classified.suggestion.skill,
+              suggestionLabel: describeRoute(route),
+              product: route.product,
+              intent: route.intent,
+              skill: route.skill,
               spokenText: spoken.text,
+              stagingId: staged.id,
+              stagedNames: staged.names,
+              // Display-only, and the intake form's owner prefill. NEVER an
+              // identity signal — who is acting still comes solely from
+              // `resolvePrincipal`, exactly as it does for every card action.
+              requesterName: context.activity.from?.name ?? "",
             }),
           ),
         );
-        logInfo("asked for clarification", { reason: classified.reason });
+        logInfo("offered an assessment", {
+          confident: classified.kind === "routed",
+          staged: staged.names.length,
+        });
         return;
       }
     }
@@ -170,6 +214,31 @@ class ReadSurfaceHandler extends ActivityHandler {
     for (const card of cards) {
       await context.sendActivity(MessageFactory.attachment(card));
     }
+  }
+
+  /**
+   * Stages the turn's attachments, or reports that this deployment cannot.
+   *
+   * A deployment with no `stageAttachments` wired REFUSES when files are
+   * present rather than proceeding without them: "assessment started" on a
+   * request whose documents were dropped is the false-success shape this
+   * whole client keeps finding. With no attachments at all it is simply a
+   * request with no files, which is legitimate.
+   */
+  private async stage(context: TurnContext): Promise<StagingOutcome> {
+    const attachments = context.activity.attachments;
+    if (this.deps.stageAttachments !== undefined) {
+      return this.deps.stageAttachments(attachments);
+    }
+    const files = (attachments ?? []).filter(
+      (attachment) => classifyAttachment(attachment).kind !== "not-a-file",
+    );
+    if (files.length === 0) return { kind: "none" };
+    return {
+      kind: "refused",
+      reason:
+        "I can't take file attachments on this deployment yet, and an assessment without your documents would be worthless.",
+    };
   }
 
   /**

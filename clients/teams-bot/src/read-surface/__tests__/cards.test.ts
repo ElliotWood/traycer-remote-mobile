@@ -22,8 +22,11 @@ import {
   partMarker,
   shortenWorkspacePath,
   buildContextStripCard,
+  buildClarifyCard,
+  buildIntakeFormCard,
   CONTEXT_STRIP_SIZE,
 } from "../cards";
+import { DEADLINE_TIME_ZONES } from "../../intake/deadline";
 import type {
   ChatStatus,
   PendingInterview,
@@ -1022,6 +1025,9 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     // allow-list is only as good as the claim behind each entry, and the
     // entry that lies is invisible: the test passes either way.
     "traycer/openChat",
+    "traycer/confirmRoute",
+    "traycer/clarifyOther",
+    "traycer/submitIntake",
   ]);
 
   function verbsIn(node: unknown): string[] {
@@ -1063,10 +1069,167 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     }
   });
 
+  it("the intake form emits only handled verbs", () => {
+    const emitted = verbsIn(
+      buildIntakeFormCard({
+        product: "sensormine",
+        intent: "new-opportunity",
+        skill: "smv4-new-opportunity",
+        routeLabel: null,
+        spokenText: "does this fit?",
+        stagingId: "1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607",
+        stagedNames: ["Tender.pdf"],
+        values: {
+          slug: "",
+          buyer: "",
+          deadlineDate: "",
+          deadlineTime: "",
+          timeZone: "",
+          jurisdiction: "",
+          owner: "",
+        },
+        errors: [],
+        timeZones: DEADLINE_TIME_ZONES,
+      }).content,
+    );
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const verb of emitted) expect(HANDLED.has(verb)).toBe(true);
+  });
+
   it("CONTROL: the check can fail — an invented verb is not in the handled set", () => {
     // Without this, a walker that silently found nothing would pass both
     // assertions above and prove the checker works when it doesn't.
     expect(HANDLED.has("traycer/notAThing")).toBe(false);
+  });
+
+  /**
+   * ─────────────────────────────────────────────────────────────────────
+   * TEAMS IS INTAKE-ONLY. Settled by Elliot, 2026-08-09.
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * The bot starts assessments and delivers review copies. It does NOT
+   * decide go/no-go, authorise a claim for a customer, or lodge a tender.
+   * The pipeline puts all three with a named human, in the repo, and says so
+   * repeatedly: the decision starts `pending` because "deciding to bid
+   * belongs to stage 1 and a named human"; `register-evidence` writes every
+   * claim as `draft` because "authorising a statement to go to a buyer is a
+   * judgement and a person sets that"; `closeout.mjs` exists because
+   * "rendering a bundle is not lodging a tender".
+   *
+   * A comment saying "don't wire this" is worth nothing the day someone
+   * wires it. These three tests fail instead.
+   */
+  const FORBIDDEN_TOOLS = ["authorise.mjs", "authorize.mjs", "closeout.mjs"];
+
+  it("PROHIBITION: no card emits a verb that reads as authorising or lodging", () => {
+    const everyVerb = [
+      ...verbsIn(buildFleetCard([AGENT]).content),
+      ...verbsIn(buildHelpCard().content),
+      ...verbsIn(
+        buildClarifyCard({
+          suggestionLabel: "a SensorMine opportunity",
+          product: "sensormine",
+          intent: "new-opportunity",
+          skill: "smv4-new-opportunity",
+        }).content,
+      ),
+      ...verbsIn(
+        buildIntakeFormCard({
+          product: "sensormine",
+          intent: "new-opportunity",
+          skill: "smv4-new-opportunity",
+          routeLabel: null,
+          spokenText: "",
+          stagingId: "",
+          stagedNames: [],
+          values: {
+            slug: "",
+            buyer: "",
+            deadlineDate: "",
+            deadlineTime: "",
+            timeZone: "",
+            jurisdiction: "",
+            owner: "",
+          },
+          errors: [],
+          timeZones: DEADLINE_TIME_ZONES,
+        }).content,
+      ),
+    ];
+    expect(everyVerb.length).toBeGreaterThan(0);
+    for (const verb of everyVerb) {
+      expect(verb, verb).not.toMatch(/authoris|authoriz|closeout|lodge/i);
+    }
+  });
+
+  // The dispatcher half of this prohibition — that no such verb is HANDLED —
+  // lives in `intake-flow.test.ts`, where a real `DispatchDeps` exists to run
+  // it against.
+
+  it("PROHIBITION: no source file in this bot names the pipeline's authorising tools", async () => {
+    /*
+     * The strongest of the three, and the one that fires FIRST.
+     *
+     * A verb check catches a button. This catches the wiring behind one —
+     * including a path that never becomes a card at all, such as a proactive
+     * job or a command. If a future change genuinely needs to name one of
+     * these tools, this test failing is the conversation that should happen.
+     */
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+
+    const offenders: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          // Tests are excluded — THIS file names all three, and a check that
+          // fails on its own assertions asserts nothing.
+          if (entry.name !== "__tests__") await walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        const source = await readFile(full, "utf8");
+        for (const tool of FORBIDDEN_TOOLS) {
+          if (source.includes(tool)) offenders.push(`${entry.name}: ${tool}`);
+        }
+      }
+    };
+    await walk(root);
+    expect(offenders).toEqual([]);
+  });
+
+  it("CONTROL: the source scan can fail — it finds a string that IS present", async () => {
+    // Without this, a walker pointed at the wrong directory reports a clean
+    // repo and proves nothing. `buildInstruction` is a real symbol in
+    // `src/intake/dispatch-assessment.ts`; if the scan cannot see it, it
+    // cannot see `authorise.mjs` either.
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+    let found = false;
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "__tests__") await walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        if ((await readFile(full, "utf8")).includes("export function buildInstruction")) {
+          found = true;
+        }
+      }
+    };
+    await walk(root);
+    expect(found).toBe(true);
   });
 });
 

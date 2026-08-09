@@ -26,7 +26,10 @@ import { chatDeepLink } from "./deep-link";
 import { toStoredReference } from "../state/conversation-reference-store";
 import type { ConversationReferenceStore } from "../state/conversation-reference-store";
 import { buildInstruction, buildChatTitle } from "./dispatch-assessment";
+import type { StagedDocuments } from "./dispatch-assessment";
 import type { ProductId, IntentId } from "./classify";
+import type { OpportunityDetails } from "./intake-form";
+import { listStagedFiles, stagingDirectory } from "./attachment-staging";
 
 export interface StartAssessmentConfig {
   readonly references: ConversationReferenceStore;
@@ -37,6 +40,10 @@ export interface StartAssessmentConfig {
   /** The tenant env for the acting principal — built by the caller. */
   readonly buildEnv: () => Promise<NodeJS.ProcessEnv | null>;
   readonly now: () => number;
+  /** Where staged intake documents live — see `./attachment-staging`. */
+  readonly stagingRoot: string;
+  /** Injected so tests can answer without a filesystem. */
+  readonly listStaged?: (directory: string) => Promise<readonly string[] | null>;
 }
 
 export function createStartAssessment(config: StartAssessmentConfig) {
@@ -48,7 +55,10 @@ export function createStartAssessment(config: StartAssessmentConfig) {
     readonly conversationReference: unknown;
     /** The words the person used. Carried verbatim into the instruction. */
     readonly spokenText?: string;
-    readonly attachmentCount?: number;
+    /** The five validated fields from the intake form. */
+    readonly opportunity: OpportunityDetails;
+    /** Handle for the staged documents, or `""` when nothing was attached. */
+    readonly stagingId?: string;
   }): Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }> => {
     // STEP 1 — minted ONCE, before anything can fail, and reused on retry.
     // `epic.createChat` is idempotent on it, so a repeat cannot make a second
@@ -91,6 +101,42 @@ export function createStartAssessment(config: StartAssessmentConfig) {
     const spoken = input.spokenText ?? "";
     const title = buildChatTitle(route, spoken);
 
+    /*
+     * THE PATH IS VERIFIED BEFORE IT IS PROMISED.
+     *
+     * The names also ride in the card payload, and this deliberately does not
+     * use them. Telling an agent "your documents are at /srv/…/<uuid>" is a
+     * CLAIM about a filesystem, and this is the only place able to check it —
+     * an id that was cleaned up, expired, or forged would otherwise become a
+     * confident path in an instruction, and the agent would assess a tender
+     * it could not open.
+     *
+     * A staging id we cannot resolve REFUSES rather than degrading to "no
+     * documents attached". The two are indistinguishable in the instruction
+     * and opposite in meaning: one is a request with no files, the other is a
+     * request whose files went missing.
+     */
+    let documents: StagedDocuments | null = null;
+    const stagingId = input.stagingId ?? "";
+    if (stagingId.length > 0) {
+      const directory = stagingDirectory(config.stagingRoot, stagingId);
+      const names =
+        directory === null
+          ? null
+          : await (config.listStaged ?? listStagedFiles)(directory);
+      if (directory === null || names === null || names.length === 0) {
+        return {
+          kind: "unconfirmed",
+          card: buildAssessmentUnconfirmedCard(
+            "I couldn't find the documents you attached any more, so I haven't started an assessment that would have run without them.",
+            // CERTAIN: nothing was created — we refused before the create.
+            { certain: true },
+          ),
+        };
+      }
+      documents = { directory, names };
+    }
+
     const created = await createChatAction(
       { chatId, title, hostId: config.hostId },
       env,
@@ -107,7 +153,7 @@ export function createStartAssessment(config: StartAssessmentConfig) {
 
     const sent = await sendMessageAction(
       created.value.chatId,
-      buildInstruction(route, spoken, input.attachmentCount ?? 0),
+      buildInstruction(route, spoken, input.opportunity, documents),
       env,
       config.bridgeCliConfig,
     );

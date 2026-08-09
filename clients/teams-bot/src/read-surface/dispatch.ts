@@ -33,6 +33,8 @@ import {
   type ReadSurfaceFailure,
 } from "./host-access";
 import type { ResolvePrincipal } from "./principal-source";
+import type { OpportunityDetails } from "../intake/intake-form";
+import type { StagingOutcome } from "../intake/attachment-staging";
 
 /**
  * Turns a parsed {@link Command} into exactly one card. No `TurnContext`,
@@ -62,8 +64,25 @@ export interface DispatchDeps extends HostAccessDeps {
     readonly conversationReference: unknown;
     /** The requester's own words, carried through the button. */
     readonly spokenText?: string;
-    readonly attachmentCount?: number;
+    /** The five fields the intake form collected, already validated. */
+    readonly opportunity: OpportunityDetails;
+    /** Handle for the staged documents; `""` when nothing was attached. */
+    readonly stagingId?: string;
   }) => Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }>;
+  /**
+   * Downloads the documents on an arriving message. OPTIONAL for the same
+   * reason `startAssessment` is: a deployment with nowhere to put them says
+   * so rather than starting an assessment with no documents.
+   */
+  readonly stageAttachments?: (
+    attachments: readonly unknown[] | undefined,
+  ) => Promise<StagingOutcome>;
+  /**
+   * Preselects the intake form's time zone. Deliberately NOT defaulted in
+   * code: an unset value means the user must choose, and a wrong offset on a
+   * tender deadline is invisible where a missing one is a red message.
+   */
+  readonly defaultTimeZone?: string;
   /** Injected so "requested 2m ago" labels are deterministic in tests. */
   readonly now: () => number;
 }
