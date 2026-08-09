@@ -538,9 +538,29 @@ const FLEET_ROW_LIMIT = 8;
  * answering a question it does not answer. Say what we actually know.
  */
 export interface AgentStatusPresentation {
+  /**
+   * The full, honest label. Unchanged, and still what
+   * {@link agentStatusLabel} returns — "Read-only — runs on another host"
+   * says the constraint first and the cause second, and both matter.
+   */
   readonly label: string;
+  /**
+   * The same status, SHORT ENOUGH FOR A COLUMN.
+   *
+   * The fleet row puts status in an `auto`-width column beside the title,
+   * and "Read-only — runs on another host" took nearly the full card width
+   * there — it collided with the agent's name and pushed it to a sliver.
+   * Rendered proof, not a guess.
+   *
+   * The cause is not dropped; it moves to {@link detail}, which the row
+   * prints on its metadata line next to the harness and surface. Same two
+   * facts, in the two slots that fit them, rather than one string doing a
+   * job it is too long for.
+   */
+  readonly badge: string;
+  /** The cause, when there is one, for the metadata line. `null` otherwise. */
+  readonly detail: string | null;
   readonly color: SemanticColor;
-  readonly emphasised: boolean;
 }
 
 /**
@@ -566,6 +586,19 @@ export function agentStatusPresentation(
   agent: AgentSummary,
 ): AgentStatusPresentation {
   const label = agentStatusLabel(agent);
+  /*
+   * DERIVED FROM `label`, not computed a second time from the three axes.
+   *
+   * Recomputing would be the exact defect this function was created to
+   * close: the label was moved to the capability and the colour was left on
+   * locality two lines below, so a row said "Active" in grey. A second
+   * derivation of the same fact is a second thing that can disagree with it.
+   *
+   * Splitting on the em dash is not string-parsing for its own sake — the
+   * em dash is precisely where `agentStatusLabel` puts the constraint/cause
+   * boundary, and it says so.
+   */
+  const [badge, ...cause] = label.split(" — ");
   /**
    * `good` + emphasis ONLY when activity is both OBSERVABLE and true.
    *
@@ -579,8 +612,17 @@ export function agentStatusPresentation(
   const running = agent.isLocal && agent.active;
   return {
     label,
+    // "Activity not visible from here" has no em dash and is still too long
+    // for the column, so it gets the one explicit shortening in here. Every
+    // other label is already short or splits on its own.
+    badge: badge === "Activity not visible from here" ? "Not visible" : badge,
+    detail:
+      cause.length > 0
+        ? cause.join(" — ")
+        : badge === "Activity not visible from here"
+          ? "activity not visible from here"
+          : null,
     color: running ? "good" : "default",
-    emphasised: running,
   };
 }
 
@@ -730,11 +772,25 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
     const presentation = agentStatusPresentation(agent);
     return container(
       [
-        // Title and status on ONE line. They were stacked, which spent a line
-        // on a word ("Active") that is at most fifteen characters and is the
-        // thing you scan the column of. `width: "auto"` on the status column
-        // means a long label ("Activity not visible from here") takes what it
-        // needs and the title takes the rest.
+        /*
+         * THE WHOLE ROW IS ONE `ColumnSet`: identity, status, action.
+         *
+         * Stacking them cost three lines and ~147px a row; side by side it
+         * is ~78px, so eight agents come to ~640px instead of ~1180px. That
+         * is the difference between a card Teams shows and a card Teams
+         * collapses behind "see more", which is the only height threshold
+         * that matters here.
+         *
+         * The action sits INSIDE a Column, which is plain element nesting
+         * rather than a feature — `ActionSet` is 1.2, `Column.items` takes
+         * elements, and neither is above the version we declare. Flagged
+         * anyway: this file's whole history is schema-says-yes /
+         * Teams-says-no, so if one thing here needs checking in the product
+         * first, it is this.
+         *
+         * `verticalContentAlignment: "center"` on all three is what stops
+         * the button floating above a two-line title at 320px.
+         */
         {
           type: "ColumnSet",
           spacing: "none",
@@ -748,6 +804,16 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
                   weight: "bolder",
                   spacing: "none",
                 }),
+                text(
+                  [
+                    agent.harnessId ?? "unknown",
+                    agent.surface,
+                    presentation.detail,
+                  ]
+                    .filter((segment): segment is string => segment !== null)
+                    .join(" · "),
+                  { isSubtle: true, size: "small", spacing: "none" },
+                ),
               ],
             },
             {
@@ -755,7 +821,7 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
               width: "auto",
               verticalContentAlignment: "center",
               items: [
-                text(presentation.label, {
+                text(presentation.badge, {
                   size: "small",
                   weight: "bolder",
                   color: presentation.color,
@@ -768,21 +834,41 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
                 }),
               ],
             },
+            {
+              type: "Column",
+              width: "auto",
+              verticalContentAlignment: "center",
+              items: [
+                actionSet([
+                  submitAction(
+                    "Open",
+                    OPEN_CHAT_VERB,
+                    { chatId: agent.agentId },
+                    { associateInputs: false },
+                  ),
+                ]),
+              ],
+            },
           ],
         },
-        text(`${agent.harnessId ?? "unknown"} · ${agent.surface}`, {
-          isSubtle: true,
-          size: "small",
-          spacing: "none",
-        }),
-        actionSet([
-          submitAction("Open", OPEN_CHAT_VERB, { chatId: agent.agentId }, {
-            associateInputs: false,
-          }),
-        ]),
       ],
       {
-        style: presentation.emphasised ? "emphasis" : "default",
+        /*
+         * NO PER-ROW CONTAINER STYLE, and the render is why.
+         *
+         * Active rows were `emphasis` and the rest `default`. Adaptive Cards
+         * only pads a Container that HAS a style, so the list came out
+         * ragged: three tall padded rows, then five tight unpadded ones,
+         * with no visual rule connecting them. Worse, the three adjacent
+         * `emphasis` rows merged into one continuous grey block and their
+         * separators vanished inside it — the styling meant to distinguish
+         * running agents destroyed the row boundaries between them.
+         *
+         * A green "Active" is already the most scannable thing on the row.
+         * Uniform geometry plus one coloured word beats alternating
+         * geometry, and it is rule 1 again one level down: the emphasis was
+         * a second signal saying what the colour already said.
+         */
         separator: true,
         spacing: "small",
         // Whole row tappable — the natural gesture is "tap the agent to see it".

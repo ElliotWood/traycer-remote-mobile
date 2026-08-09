@@ -30,6 +30,7 @@ import {
 } from "../cards";
 import { HANDLED_ACTION_VERBS } from "../dispatch-action";
 import type {
+  AgentSummary,
   ChatStatus,
   PendingInterview,
   Transcript,
@@ -914,14 +915,67 @@ describe("read-surface/cards — the label comes from the capability, not locali
     const p = agentStatusPresentation(remoteButSendable);
     // Not observable, so no green — and the label agrees.
     expect(p.color).toBe("default");
-    expect(p.emphasised).toBe(false);
     expect(p.label).toContain("not visible");
 
     // The genuinely running row is the only one that goes green.
     const running = agentStatusPresentation({ ...local, active: true });
     expect(running.color).toBe("good");
-    expect(running.emphasised).toBe(true);
     expect(running.label).toBe("Active");
+  });
+
+  /**
+   * `emphasised` IS GONE, and this is what replaced the assertions on it.
+   *
+   * It existed to put an `emphasis` container behind a running row. The
+   * 2026-08-09 design pass removed that: Adaptive Cards only pads a styled
+   * Container, so a list mixing styled and unstyled rows renders ragged, and
+   * three adjacent `emphasis` rows merged into one grey block that swallowed
+   * their separators. `color` already carried exactly the same fact, so the
+   * field was a second signal that could drift from the first — which is the
+   * defect `agentStatusPresentation` was created to close.
+   *
+   * The split into `badge` and `detail` is the new thing that could drift,
+   * so it is the new thing under test: both must be derived from `label`,
+   * and together they must lose nothing it said.
+   */
+  it("CONTRACT: badge and detail are a split of the label, not a second derivation", () => {
+    const remoteRow = agentStatusPresentation(remote);
+    expect(remoteRow.label).toBe("Read-only — runs on another host");
+    expect(remoteRow.badge).toBe("Read-only");
+    expect(remoteRow.detail).toBe("runs on another host");
+
+    // Short labels pass through whole, with nothing invented for `detail`.
+    const runningRow = agentStatusPresentation({ ...local, active: true });
+    expect(runningRow.badge).toBe("Active");
+    expect(runningRow.detail).toBeNull();
+
+    // The one label with no em dash that is still too long for a column.
+    const unobservable = agentStatusPresentation({
+      ...remote,
+      capabilities: { readTranscript: true, sendMessage: true },
+      active: true,
+    });
+    expect(unobservable.label).toBe("Activity not visible from here");
+    expect(unobservable.badge).toBe("Not visible");
+    expect(unobservable.detail).toBe("activity not visible from here");
+  });
+
+  it("CONTRACT: no badge is long enough to crowd the title out of its column", () => {
+    // The failure this guards is a rendered one: the full label took nearly
+    // the whole card width in an `auto` column and squeezed the agent's name
+    // to a sliver. 16 characters is "Activity not visible from here" cut to
+    // something that fits beside a title at 320px.
+    const rows: readonly AgentSummary[] = [
+      local,
+      { ...local, active: true },
+      remote,
+      { ...remote, capabilities: { readTranscript: true, sendMessage: true } },
+      { ...local, capabilities: { readTranscript: true, sendMessage: false } },
+    ];
+    for (const row of rows) {
+      const { badge } = agentStatusPresentation(row);
+      expect(badge.length, badge).toBeLessThanOrEqual(16);
+    }
   });
 
   it("a remote unreachable row is never painted as running", () => {
@@ -929,7 +983,6 @@ describe("read-surface/cards — the label comes from the capability, not locali
     // have. Painting it green would be the fabricated status column again.
     const p = agentStatusPresentation({ ...remote, active: true });
     expect(p.color).toBe("default");
-    expect(p.emphasised).toBe(false);
   });
 
   it("a sendable agent still reads Active or Idle — the control", () => {
