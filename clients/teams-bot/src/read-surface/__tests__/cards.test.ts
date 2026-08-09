@@ -1258,6 +1258,97 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     }
   });
 
+  /**
+   * NOTHING ABOVE THE VERSION WE DECLARE.
+   *
+   * `buildApprovalCard` carried `Input.Text.label`, which is Adaptive Cards
+   * **1.3**, on a card pinned to 1.2. It had been there for months and every
+   * screenshot showed it rendering perfectly — because the local
+   * `adaptivecards` library is current and permissive, which is the exact
+   * wrong-specimen measurement this codebase already lost a release to.
+   *
+   * A comment saying "don't exceed 1.2" cannot catch that: the property looks
+   * ordinary, the card builds, and the renderer we own agrees with it. Only
+   * something that walks the emitted JSON can.
+   *
+   * DELIBERATELY A DENY-LIST, not an allow-list of every 1.0–1.2 property.
+   * An allow-list would need updating for every legitimate addition and would
+   * fail closed on things that are fine, so it would be turned off. This
+   * names the properties above 1.2 that are PLAUSIBLE to reach for — the ones
+   * an editor autocompletes and a schema doc recommends — and says so rather
+   * than claiming completeness.
+   *
+   * Raise the entries out of this list in the same change that raises
+   * `ADAPTIVE_CARD_VERSION`, as a deliberate decision. That is the rule the
+   * file's own version docblock states: "the lowest version that renders what
+   * we actually emit", not "the lowest number".
+   */
+  const ABOVE_1_2: readonly (readonly [string, string])[] = [
+    ["label", "1.3 — use a TextBlock above the input"],
+    ["isRequired", "1.3"],
+    ["errorMessage", "1.3"],
+    ["targetWidth", "1.5 — and ignored on Teams iOS"],
+    ["style: heading", "1.5"],
+    ["Action.Execute", "1.4 — and silently dead on Teams mobile"],
+    ["Table", "1.5"],
+    ["RichTextBlock", "1.2 element, but Teams support is unverified"],
+  ];
+
+  function propertiesIn(node: unknown): Set<string> {
+    const found = new Set<string>();
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (const item of value) walk(item);
+        return;
+      }
+      if (typeof value !== "object" || value === null) return;
+      const record = value as Record<string, unknown>;
+      for (const key of Object.keys(record)) {
+        found.add(key);
+        // Element and style names travel as VALUES, not keys.
+        if (
+          (key === "type" || key === "style") &&
+          typeof record[key] === "string"
+        ) {
+          found.add(`${key}: ${record[key] as string}`);
+          found.add(record[key] as string);
+        }
+        walk(record[key]);
+      }
+    };
+    walk(node);
+    return found;
+  }
+
+  it.each(EVERY_CARD)("%s emits nothing above Adaptive Cards 1.2", (_name, build) => {
+    const present = propertiesIn(build());
+    for (const [property, why] of ABOVE_1_2) {
+      expect(
+        present.has(property),
+        `emits "${property}" (${why}) while ADAPTIVE_CARD_VERSION is 1.2. Teams drops what it does not know, silently, and our local renderer will not show you.`,
+      ).toBe(false);
+    }
+  });
+
+  it("CONTROL: the version check can fail, and reads nested properties", () => {
+    // The walker returning nothing would pass every case above. This is the
+    // exact shape that shipped: a 1.3 property on an input, two containers
+    // deep, inside a card body.
+    const offending = {
+      type: "AdaptiveCard",
+      body: [
+        {
+          type: "Container",
+          items: [{ type: "Input.Text", id: "x", label: "Reason" }],
+        },
+      ],
+    };
+    expect(propertiesIn(offending).has("label")).toBe(true);
+    expect(propertiesIn(offending).has("Input.Text")).toBe(true);
+    // And a clean card is clean, so the check is not simply always true.
+    expect(propertiesIn(buildHelpCard().content).has("label")).toBe(false);
+  });
+
   it("CONTROL: the checks can fail", () => {
     // Without these, a walker that silently found nothing and a regex that
     // matched nothing would both pass everything above.

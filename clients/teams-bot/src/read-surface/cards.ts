@@ -1831,10 +1831,40 @@ export function buildApprovalCard(
         `Requested ${approvalAgeLabel(approval.requestedAt, now)}`,
         epicSegment(epicId),
       ]),
+      /*
+       * A `TextBlock` LABEL, not `Input.Text.label` — corrected 2026-08-09.
+       *
+       * `label` on an input is Adaptive Cards **1.3**, and this card declares
+       * 1.2. It was the only 1.3 property in the file, and it had been here
+       * long enough to look settled: my own screenshots showed the label
+       * rendering perfectly, because the local `adaptivecards` library is
+       * current and permissive.
+       *
+       * That is precisely the measurement this file already has a docblock
+       * about — "verified in Web Chat was a true measurement of the wrong
+       * specimen". A renderer more permissive than Teams cannot tell you what
+       * Teams drops. And a dropped label here is not cosmetic: it leaves an
+       * unexplained empty box above Approve and Reject, which invites someone
+       * to type their reasoning for APPROVING into a field only Reject sends.
+       *
+       * Raising the version to 1.3 for one property would be the wrong trade
+       * on a file whose recorded history is a 1.5 pin rendering every card as
+       * "cards.unsupported" on Teams desktop. A TextBlock is 1.0, needs no
+       * version change, and is what the interview card already does for its
+       * question headings — so this makes the file consistent rather than
+       * adding a second convention.
+       *
+       * Flagged by the opportunity-intake agent, who hit the same 1.2/1.3
+       * boundary building the intake form and stayed on the right side of it.
+       */
+      text("Reason (optional — sent to the agent if you reject)", {
+        size: "small",
+        isSubtle: true,
+        spacing: "medium",
+      }),
       {
         type: "Input.Text",
         id: "rejectReason",
-        label: "Reason (optional — sent to the agent if you reject)",
         isMultiline: true,
         // Keep it short so the card stays compact at phone width.
         maxLength: 400,
