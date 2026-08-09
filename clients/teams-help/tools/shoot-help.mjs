@@ -117,17 +117,23 @@ function overflowingElements() {
   const bad = [];
   const limit = document.documentElement.clientWidth + 1;
   for (const el of document.querySelectorAll("body *")) {
-    // Walk up looking for a deliberate horizontal scroller. `.nav` and
-    // `.seq-scroll` both are; their children are allowed to be wider.
-    let inScroller = false;
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const ox = getComputedStyle(p).overflowX;
-      if (ox === "auto" || ox === "scroll" || ox === "hidden") {
-        inScroller = true;
-        break;
-      }
-    }
-    if (inScroller) continue;
+    // The exemption is an opt-in list, not a sniff of computed `overflow-x`.
+    //
+    // Sniffing looked equivalent and was not: it also exempted `hidden`, and
+    // `hidden` CLIPS where `auto` scrolls. Content too wide for a container
+    // that clips is GONE, not swipeable — which is the defect this check
+    // exists to catch, so it was blind in exactly the place it mattered.
+    // Measured on the unmodified page: 165 of 448 elements were exempt via
+    // `hidden` against 49 via a real scroller, and the containers doing it
+    // were `.mock` and `.cmd-list` — every card replica and both reference
+    // tables, i.e. the page's actual content.
+    //
+    // These two are the whole list, verified in styles.css rather than
+    // assumed: `.nav` and `.seq-scroll` are the only `overflow-x: auto`
+    // rules in the file, and they are the two the previous comment already
+    // named. Matching from the PARENT keeps a scroller's own box honest —
+    // only its children are allowed to be wider than the viewport.
+    if (el.parentElement?.closest(".nav, .seq-scroll")) continue;
 
     const r = el.getBoundingClientRect();
     if (r.width > 0 && r.right > limit) {
