@@ -746,7 +746,14 @@ export async function dispatchActionInvoke(
   switch (result.kind) {
     case "ok":
       return {
-        card: buildActionOutcomeCard(result.outcome, decision.kind),
+        card: buildActionOutcomeCard(result.outcome, decision.kind, {
+          // The approval card put `chatId` in its own action data, so the
+          // outcome card can offer the way back to the chat its copy tells
+          // the reader to open. `""` when a card predates that, which
+          // `openChatAction` renders as no button rather than a dead one.
+          chatId: readString(request.data, "chatId") ?? "",
+          title: readString(request.data, "chatTitle"),
+        }),
         acted: true,
       };
     case "principal_refused":

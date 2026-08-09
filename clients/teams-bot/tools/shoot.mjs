@@ -219,18 +219,20 @@ add("10-approval", () =>
   C.buildApprovalCard(CHAT_REF, EPIC_ID, APPROVAL, Date.now()),
 );
 add("11-outcome-applied", () =>
-  C.buildActionOutcomeCard({ kind: "applied" }, "approve"),
+  C.buildActionOutcomeCard({ kind: "applied" }, "approve", CHAT_REF),
 );
 add("12-outcome-rejected", () =>
   C.buildActionOutcomeCard(
     { kind: "rejected", reason: "not this file — see the epic", code: null },
     "reject",
+    CHAT_REF,
   ),
 );
 add("13-outcome-failed", () =>
   C.buildActionOutcomeCard(
     { kind: "failed", reason: "reconcile window expired after 45s" },
     "approve",
+    CHAT_REF,
   ),
 );
 add("14-usage", () =>

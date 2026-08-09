@@ -15,8 +15,12 @@ import {
   buildHelpCard,
   buildPrincipalRefusedCard,
   buildTranscriptCard,
+  buildActionOutcomeCard,
   buildAssessmentStartedCard,
   buildAssessmentUnconfirmedCard,
+  buildInterviewOutcomeCard,
+  buildMessageOutcomeCard,
+  OPEN_CHAT_VERB,
   speakerLabel,
   modelMarker,
   humaniseToolName,
@@ -1716,6 +1720,60 @@ describe("CONTRACT: no card promises a later reply while nothing delivers one", 
     };
     await walk(root);
     expect(sawAnImport).toBe(true);
+  });
+
+  /**
+   * IF THE COPY SAYS GO SOMEWHERE, THE CARD CARRIES THE WAY THERE.
+   *
+   * A defect I introduced. The three outcome `failed` branches used to say
+   * *check with "chat &lt;id&gt;"*; I rewrote them to *open the chat and
+   * check* while taking the CLI out of every other card — and those cards had
+   * no Open button. The old copy named a command that worked. The new copy
+   * named a gesture with no affordance on the card saying it, which is
+   * strictly worse than what it replaced.
+   *
+   * Same shape as the ack card promising a reply nothing sends, one size
+   * down: an instruction whose subject is not on screen. I had spent the day
+   * auditing other people's cards for exactly this.
+   *
+   * Deliberately keyed on "Open the chat" rather than on every imperative in
+   * English. A general "does this sentence ask for an action" check would be
+   * guesswork; this is the one phrase the cards actually use, and a new one
+   * should be added here in the change that introduces it.
+   */
+  it("CONTRACT: a card that says 'open the chat' offers a button that does", () => {
+    const chat = { chatId: "c1", title: "A chat" };
+    const failed = { kind: "failed" as const, reason: "window expired" };
+
+    const sayers = [
+      ["approval outcome", buildActionOutcomeCard(failed, "approve", chat)],
+      ["message outcome", buildMessageOutcomeCard(failed, chat)],
+      ["interview outcome", buildInterviewOutcomeCard(failed, chat)],
+    ] as const;
+
+    for (const [name, attachment] of sayers) {
+      const content = attachment.content as {
+        actions?: readonly unknown[];
+      };
+      const text = JSON.stringify(content);
+      // The premise: these really are the cards that give the instruction.
+      // Without this the loop passes vacuously if the copy is reworded.
+      expect(text.toLowerCase(), name).toContain("open the chat");
+      expect(content.actions ?? [], name).not.toHaveLength(0);
+      expect(text, name).toContain(OPEN_CHAT_VERB);
+    }
+  });
+
+  it("CONTROL: an outcome card with nothing to say offers nothing", () => {
+    // Restraint is the other half of the rule — a button on every card is
+    // the fleet-row defect again. `applied` gives no instruction, so it gets
+    // no action.
+    const applied = { kind: "applied" as const };
+    const content = buildActionOutcomeCard(applied, "approve", {
+      chatId: "c1",
+      title: null,
+    }).content as { actions?: readonly unknown[] };
+    expect(content.actions ?? []).toHaveLength(0);
   });
 
   it("the ack card always offers exactly one action, with or without a deep link", () => {
