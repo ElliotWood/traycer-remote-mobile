@@ -20,6 +20,11 @@ import {
 } from "./read-surface/epic-binding-store";
 import { createReadSurfaceHandler } from "./read-surface/read-surface-handler";
 import { createStartAssessment } from "./intake/start-assessment";
+import {
+  stageAttachments,
+  stagingRootFromEnv,
+} from "./intake/attachment-staging";
+import { isKnownTimeZone } from "./intake/deadline";
 import { DurableConversationReferenceStore } from "./state/conversation-reference-store";
 import { resolveTenantEnv } from "./read-surface/host-access";
 import type { ResolvePrincipal } from "./read-surface/principal-source";
@@ -123,6 +128,40 @@ async function main(): Promise<void> {
    * card renders with NO "Watch progress" button, which is better than a
    * button that goes nowhere.
    */
+  /*
+   * WHERE CUSTOMER TENDER DOCUMENTS LAND.
+   *
+   * Owned by the `traycer` user this process runs as, `0700` on the
+   * directories and `0600` on the files — a shared VM's default umask would
+   * otherwise leave a customer's tender world-readable. Configurable because
+   * the deploy, not this file, knows which filesystem has the room.
+   *
+   * Nothing here cleans it up. That is on purpose: a bot that deletes
+   * customer documents on a timer it invented is worse than a directory that
+   * grows, and the deploy notes hand over a `tmpfiles.d` line instead.
+   */
+  const stagingRoot = stagingRootFromEnv(process.env);
+  logInfo("intake staging root", { directory: stagingRoot });
+
+  /*
+   * The intake form's preselected time zone.
+   *
+   * VALIDATED AGAINST THE OFFERED LIST AND OTHERWISE DROPPED, loudly. A typo
+   * here would silently select nothing, which is the safe direction but reads
+   * as the variable having no effect — so it says so.
+   */
+  const configuredZone = process.env.TRAYCER_TEAMS_DEFAULT_TIMEZONE?.trim();
+  const defaultTimeZone =
+    configuredZone !== undefined && isKnownTimeZone(configuredZone)
+      ? configuredZone
+      : undefined;
+  if (configuredZone !== undefined && defaultTimeZone === undefined) {
+    logWarn("TRAYCER_TEAMS_DEFAULT_TIMEZONE is not one of the offered zones", {
+      value: configuredZone,
+      consequence: "the intake form will open with no zone selected",
+    });
+  }
+
   const assessmentHostId = process.env.TRAYCER_TEAMS_HOST_ID?.trim() ?? "";
   const startAssessment =
     assessmentHostId.length > 0 &&
@@ -155,6 +194,7 @@ async function main(): Promise<void> {
             });
           },
           now: Date.now,
+          stagingRoot,
         })
       : undefined;
 
@@ -172,6 +212,14 @@ async function main(): Promise<void> {
     parentEnv: process.env,
     resolvePrincipal,
     startAssessment,
+    // `globalThis.fetch` rather than an HTTP client: the URL is absolute and
+    // pre-authorised, so there is nothing to configure and nothing to add.
+    stageAttachments: (attachments) =>
+      stageAttachments(attachments, {
+        stagingRoot,
+        fetchImpl: globalThis.fetch,
+      }),
+    defaultTimeZone,
     now: Date.now,
   });
 

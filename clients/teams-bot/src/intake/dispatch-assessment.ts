@@ -27,6 +27,7 @@ import {
   type ConversationReferenceStore,
 } from "../state/conversation-reference-store";
 import type { SkillRoute } from "./classify";
+import type { OpportunityDetails } from "./intake-form";
 
 export interface DispatchDeps {
   /** Bridge `create-chat`. Idempotent on `chatId`. */
@@ -53,27 +54,79 @@ export type DispatchOutcome =
    */
   | { readonly kind: "unconfirmed"; readonly reason: string };
 
-/** The first message, which is what actually invokes the skill. */
+/**
+ * The documents, as the agent can actually reach them.
+ *
+ * `directory` is an ABSOLUTE path on the same machine the agent runs on, and
+ * it is the whole of G2: the previous version of this file said "2 documents
+ * attached" and gave no path, so an agent asked to assess a tender had no way
+ * to open one.
+ */
+export interface StagedDocuments {
+  readonly directory: string;
+  readonly names: readonly string[];
+}
+
+/**
+ * The first message, which is what actually invokes the skill.
+ *
+ * WHAT IT CARRIES, AND WHY EACH PART IS THERE:
+ *
+ *   the skill name        routing — `classify` decided this, nothing else
+ *   the five fields       `new-bid.mjs` refuses without them
+ *   the requester's words VERBATIM. The classifier decided the route; it did
+ *                         not decide what they meant, and the skill should
+ *                         read the question rather than our summary of it
+ *   the staging path      where the bytes are
+ *   the boundary          what this bot will not do, stated to the agent
+ *
+ * IT DOES NOT SAY WHERE THE DOCUMENTS BELONG. The skill's own SKILL.md tells
+ * the agent to run `new-bid.mjs` and land them under the bid's source
+ * directory "exactly as supplied". Repeating that layout here would couple
+ * the bot to a path the pipeline owns and revalidates, and it would break
+ * silently the first time the pipeline reorganises.
+ */
 export function buildInstruction(
   route: SkillRoute,
   spokenText: string,
-  attachmentCount: number,
+  opportunity: OpportunityDetails,
+  documents: StagedDocuments | null,
 ): string {
   const skill = route.skill ?? "(no skill configured for this route)";
   const files =
-    attachmentCount === 0
-      ? "No documents were attached."
-      : `${String(attachmentCount)} document${attachmentCount === 1 ? "" : "s"} attached to the request.`;
-  // The user's own words are included VERBATIM and marked as theirs. The
-  // classifier decided the route; it did not decide what they meant, and the
-  // skill should read the question rather than our summary of it.
+    documents === null
+      ? ["No documents were attached to the request."]
+      : [
+          `The attached documents are staged on this machine at:\n${documents.directory}`,
+          "",
+          ...documents.names.map((name) => `  - ${name}`),
+          "",
+          "Take them from there exactly as supplied — do not rename them.",
+        ];
   return [
     `Use the ${skill} skill.`,
+    "",
+    "New opportunity intake, captured in Microsoft Teams. These are the fields",
+    "`new-bid.mjs` requires; they were entered and confirmed by a person:",
+    "",
+    `  slug:         ${opportunity.slug}`,
+    `  buyer:        ${opportunity.buyer}`,
+    `  deadline:     ${opportunity.deadline}`,
+    `  jurisdiction: ${opportunity.jurisdiction}`,
+    `  owner:        ${opportunity.owner}`,
     "",
     "The request, in the requester's own words:",
     spokenText,
     "",
-    files,
+    ...files,
+    "",
+    // THE BOUNDARY, stated to the agent as well as on the card. Teams is
+    // intake-only: it starts assessments and delivers review copies. The
+    // go/no-go decision, authorising a claim for a customer, and lodgement
+    // all stay with a named human in the repo.
+    "This request came from Teams, which is intake-only. Deciding go/no-go,",
+    "authorising claims, and lodging are a named human's, in the repo — do not",
+    "treat a Teams request as authority for any of them.",
   ].join("\n");
 }
 
@@ -92,7 +145,10 @@ export async function dispatchAssessment(
   input: {
     readonly route: SkillRoute;
     readonly spokenText: string;
-    readonly attachmentCount: number;
+    /** The five fields, already validated — see `./intake-form`. */
+    readonly opportunity: OpportunityDetails;
+    /** Where the staged documents are, or `null` when none were attached. */
+    readonly documents: StagedDocuments | null;
     /** Raw Bot Framework conversation reference for this turn. */
     readonly conversationReference: unknown;
   },
@@ -117,7 +173,12 @@ export async function dispatchAssessment(
     });
     await deps.sendMessage(
       created.chatId,
-      buildInstruction(input.route, input.spokenText, input.attachmentCount),
+      buildInstruction(
+        input.route,
+        input.spokenText,
+        input.opportunity,
+        input.documents,
+      ),
     );
     return { kind: "started", chatId: created.chatId };
   } catch (error) {

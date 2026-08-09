@@ -24,11 +24,15 @@ import {
   buildContextStripCard,
   buildClarifyCard,
   buildComposeCard,
+  buildIntakeFormCard,
+  buildIntakeRefusedCard,
   buildUnknownChatCard,
   buildUsageCard,
   CONTEXT_STRIP_SIZE,
 } from "../cards";
+import type { IntakeFormCardOptions } from "../cards";
 import { HANDLED_ACTION_VERBS } from "../dispatch-action";
+import { DEADLINE_TIME_ZONES } from "../../intake/deadline";
 import type {
   AgentSummary,
   ChatStatus,
@@ -1084,6 +1088,13 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
    * neither of which emits any of the four.
    *
    * A copy of a list is a claim about the list. Import the list.
+   *
+   * MERGE NOTE, 2026-08-09. `autobuild/opportunity-intake` carried its own
+   * hand-typed copy of this set with `traycer/submitIntake` in it. Keeping
+   * that copy would have hidden a real defect: `SUBMIT_INTAKE_VERB` is
+   * dispatched in `dispatch-action.ts` but was NOT in `HANDLED_ACTION_VERBS`,
+   * so the two branches disagreed and the test file was the one that lied.
+   * The copy is gone and the verb is in the exported set.
    */
   const HANDLED = HANDLED_ACTION_VERBS;
 
@@ -1161,6 +1172,28 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     ],
   };
 
+  /** The intake form's options, with nothing filled in — the state it opens in. */
+  const INTAKE_FORM = {
+    product: "sensormine",
+    intent: "new-opportunity",
+    skill: "smv4-new-opportunity",
+    routeLabel: null,
+    spokenText: "does this fit?",
+    stagingId: "1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607",
+    stagedNames: ["Tender.pdf"],
+    values: {
+      slug: "",
+      buyer: "",
+      deadlineDate: "",
+      deadlineTime: "",
+      timeZone: "",
+      jurisdiction: "",
+      owner: "",
+    },
+    errors: [],
+    timeZones: DEADLINE_TIME_ZONES,
+  } satisfies IntakeFormCardOptions;
+
   /**
    * EVERY card, not two of them.
    *
@@ -1211,6 +1244,42 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
           skill: "smv4-new-opportunity",
         }).content,
     ],
+    /*
+     * The two intake cards, added when `autobuild/opportunity-intake` merged.
+     *
+     * They arrived with per-card copies of the two contract checks below,
+     * written so that branch was honest in isolation. Putting them in this
+     * table instead is the point of the table being a table: the form is now
+     * covered by every contract in this describe, including ones its author
+     * never saw, and a future card gets the same treatment by adding one row
+     * rather than by remembering to write three tests.
+     *
+     * The form is the case that matters most here — the biggest card in the
+     * file and the one most tempted by 1.3, since `label`, `isRequired` and
+     * `errorMessage` are exactly what an input form reaches for.
+     */
+    ["intake form (empty)", () => buildIntakeFormCard(INTAKE_FORM).content],
+    [
+      // WITH errors and values, because the error path is the one that would
+      // reach for `errorMessage`, and it renders nodes the empty form has not.
+      "intake form (filled, with errors)",
+      () =>
+        buildIntakeFormCard({
+          ...INTAKE_FORM,
+          routeLabel: "a SensorMine opportunity",
+          values: {
+            slug: "acme",
+            buyer: "Acme",
+            deadlineDate: "2026-09-15",
+            deadlineTime: "17:00",
+            timeZone: "Australia/Perth",
+            jurisdiction: "local",
+            owner: "Elliot Wood",
+          },
+          errors: [{ field: "slug", message: "Give the bid a short name." }],
+        }).content,
+    ],
+    ["intake refused", () => buildIntakeRefusedCard("Two files share a name.").content],
   ];
 
   it.each(EVERY_CARD)("%s emits only handled verbs", (_name, build) => {
@@ -1356,6 +1425,111 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     expect(FORBIDDEN.test("traycer/authorise")).toBe(true);
     expect(FORBIDDEN.test("traycer/closeout")).toBe(true);
     expect(FORBIDDEN.test("traycer/reply")).toBe(false);
+  });
+
+  /**
+   * ─────────────────────────────────────────────────────────────────────
+   * TEAMS IS INTAKE-ONLY. Settled by Elliot, 2026-08-09.
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * The bot starts assessments and delivers review copies. It does NOT
+   * decide go/no-go, authorise a claim for a customer, or lodge a tender.
+   * The pipeline puts all three with a named human, in the repo, and says so
+   * repeatedly: the decision starts `pending` because "deciding to bid
+   * belongs to stage 1 and a named human"; `register-evidence` writes every
+   * claim as `draft` because "authorising a statement to go to a buyer is a
+   * judgement and a person sets that"; `closeout.mjs` exists because
+   * "rendering a bundle is not lodging a tender".
+   *
+   * A comment saying "don't wire this" is worth nothing the day someone
+   * wires it. These tests fail instead.
+   *
+   * MERGE NOTE, 2026-08-09. This arrived with a third test — a verb walk over
+   * four hand-listed cards — which is the same axis as
+   * "no card offers to authorise, lodge, or decide go/no-go" above, and a
+   * strictly weaker version of it: that one walks EVERY_CARD, so it cannot go
+   * stale when a card is added. The two below are NOT duplicates of it. They
+   * are the axis it cannot reach: a card-verb check sees a button, and this
+   * sees the wiring — including a path that never becomes a card at all.
+   */
+  const FORBIDDEN_TOOLS = ["authorise.mjs", "authorize.mjs", "closeout.mjs"];
+
+  // The dispatcher half of this prohibition — that no such verb is HANDLED —
+  // lives in `intake-flow.test.ts`, where a real `DispatchDeps` exists to run
+  // it against.
+
+  it("PROHIBITION: no source file in this bot names the pipeline's authorising tools", async () => {
+    /*
+     * The strongest of the three, and the one that fires FIRST.
+     *
+     * A verb check catches a button. This catches the wiring behind one —
+     * including a path that never becomes a card at all, such as a proactive
+     * job or a command. If a future change genuinely needs to name one of
+     * these tools, this test failing is the conversation that should happen.
+     *
+     * IT MATCHES RAW TEXT, so a COMMENT naming one of these files fails it
+     * too. That is not a false positive worth engineering away — it caught a
+     * real one on the 2026-08-09 merge, where `buildApprovalCard`'s docblock
+     * cited both filenames while explaining this very boundary, and the fix
+     * was to say "the pipeline's authorising or closeout tools" instead. A
+     * comment-aware scanner would be more code, more fragile, and would buy
+     * back only the right to write a filename in prose.
+     */
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+
+    const offenders: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          // Tests are excluded — THIS file names all three, and a check that
+          // fails on its own assertions asserts nothing.
+          if (entry.name !== "__tests__") await walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        const source = await readFile(full, "utf8");
+        for (const tool of FORBIDDEN_TOOLS) {
+          if (source.includes(tool)) offenders.push(`${entry.name}: ${tool}`);
+        }
+      }
+    };
+    await walk(root);
+    expect(offenders).toEqual([]);
+  });
+
+  it("CONTROL: the source scan can fail — it finds a string that IS present", async () => {
+    // Without this, a walker pointed at the wrong directory reports a clean
+    // repo and proves nothing. `buildInstruction` is a real symbol in
+    // `src/intake/dispatch-assessment.ts`; if the scan cannot see it, it
+    // cannot see `authorise.mjs` either.
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+    let found = false;
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "__tests__") await walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        if ((await readFile(full, "utf8")).includes("export function buildInstruction")) {
+          found = true;
+        }
+      }
+    };
+    await walk(root);
+    expect(found).toBe(true);
   });
 });
 

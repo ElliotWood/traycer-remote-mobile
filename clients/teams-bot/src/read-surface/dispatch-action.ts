@@ -29,10 +29,15 @@ import {
   OLDER_VERB,
   NEWER_VERB,
   FULL_HISTORY_VERB,
+  SUBMIT_INTAKE_VERB,
+  STAGED_NAMES_KEY,
   TRANSCRIPT_PAGE_SIZE,
+  buildIntakeFormCard,
   buildTranscriptCard,
   type ChatRef,
 } from "./cards";
+import { DEADLINE_TIME_ZONES } from "../intake/deadline";
+import { parseIntakeForm, readIntakeFormValues } from "../intake/intake-form";
 import {
   submitApprovalDecision,
   submitChatMessage,
@@ -394,7 +399,36 @@ async function dispatchPage(
 }
 
 /**
- * The user confirmed a route we were not confident enough to take.
+ * The names of the staged documents, as the card carried them.
+ *
+ * DISPLAY ONLY. They label the form so someone can see they attached last
+ * quarter's tender; they never decide anything, and the instruction's list
+ * comes from reading the staging directory rather than from here — see
+ * `start-assessment.ts`. A malformed payload therefore costs a label, not a
+ * document.
+ */
+function readStagedNames(
+  data: Readonly<Record<string, unknown>>,
+): readonly string[] {
+  const raw = readString(data, STAGED_NAMES_KEY);
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((name): name is string => typeof name === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The route is confirmed — so ASK FOR THE FIVE FIELDS. Nothing starts here.
+ *
+ * This used to start the agent directly, and that was the gap: `classify`
+ * yields product × intent, and `new-bid.mjs` refuses without a slug, a buyer,
+ * a deadline carrying an offset, a jurisdiction and a named owner. A confirm
+ * button could never have supplied them.
  *
  * READS THE ROUTE FROM THE BUTTON, never from `classify`. The card put
  * `product`, `intent` and `skill` in the action's data precisely so this
@@ -404,13 +438,13 @@ async function dispatchPage(
  *
  * A missing skill is REFUSED rather than dispatched. `classify` reports a
  * known route with `skill: null` when no skill is built for it — a DR Migrate
- * RFP, today — and starting an agent with no skill named would spend real
- * time producing nothing anyone asked for.
+ * RFP, today — and opening a form for work nothing can perform wastes the
+ * user's typing as well as the agent's time.
  */
-async function dispatchConfirmedRoute(
+function dispatchConfirmedRoute(
   request: ActionInvokeRequest,
   deps: DispatchDeps,
-): Promise<ActionInvokeResult> {
+): ActionInvokeResult {
   const skill = readString(request.data, "skill");
   if (skill === null) {
     return {
@@ -422,9 +456,91 @@ async function dispatchConfirmedRoute(
   }
   if (deps.startAssessment === undefined) {
     // Wired at composition time. Absent means the deployment cannot start
-    // assessments, and saying so beats a button that appears to work.
+    // assessments, and saying so beats a form that appears to work.
     return {
       card: buildUsageCard("This deployment can't start assessments yet."),
+      acted: false,
+    };
+  }
+
+  return {
+    card: buildIntakeFormCard({
+      product: readString(request.data, "product") ?? "",
+      intent: readString(request.data, "intent") ?? "",
+      skill,
+      routeLabel: null,
+      spokenText: readString(request.data, "text") ?? "",
+      stagingId: readString(request.data, "stagingId") ?? "",
+      stagedNames: readStagedNames(request.data),
+      values: {
+        slug: "",
+        buyer: "",
+        deadlineDate: "",
+        deadlineTime: "",
+        // Preselected ONLY when the deployment configured one. Absent means
+        // the user chooses, which is the safe direction: a wrong offset is
+        // invisible and a missing one is a red message on the card.
+        timeZone: deps.defaultTimeZone ?? "",
+        jurisdiction: "",
+        // The prefill Elliot settled on: the person who @-mentioned the bot,
+        // confirmable or replaceable, never silently used.
+        owner: readString(request.data, "requesterName") ?? "",
+      },
+      errors: [],
+      timeZones: DEADLINE_TIME_ZONES,
+    }),
+    // Nothing was mutated, and nothing failed — a form was opened.
+    acted: true,
+  };
+}
+
+/**
+ * The intake form was submitted. THIS is where an agent starts.
+ *
+ * Validation runs BEFORE identity, unlike every other action in this file,
+ * and the difference is deliberate: a malformed form is answered by
+ * re-rendering it, which needs no host and no principal. Resolving identity
+ * first would mean a user with a typo'd slug is told their sign-in is broken.
+ * Nothing has been issued at that point, so nothing is at risk.
+ *
+ * On failure the form comes back WITH WHAT THEY TYPED. A form that clears
+ * itself on a validation error is a form people abandon.
+ */
+async function dispatchSubmitIntake(
+  request: ActionInvokeRequest,
+  deps: DispatchDeps,
+): Promise<ActionInvokeResult> {
+  const skill = readString(request.data, "skill");
+  if (skill === null) {
+    return {
+      card: buildUsageCard("That form was missing which assessment to run."),
+      acted: false,
+    };
+  }
+  if (deps.startAssessment === undefined) {
+    return {
+      card: buildUsageCard("This deployment can't start assessments yet."),
+      acted: false,
+    };
+  }
+
+  const values = readIntakeFormValues(request.data);
+  const parsed = parseIntakeForm(values, deps.now());
+  if (parsed.kind === "invalid") {
+    return {
+      card: buildIntakeFormCard({
+        product: readString(request.data, "product") ?? "",
+        intent: readString(request.data, "intent") ?? "",
+        skill,
+        routeLabel: null,
+        spokenText: readString(request.data, "text") ?? "",
+        stagingId: readString(request.data, "stagingId") ?? "",
+        stagedNames: readStagedNames(request.data),
+        values: parsed.values,
+        errors: parsed.errors,
+        timeZones: DEADLINE_TIME_ZONES,
+      }),
+      // NOT acted: nothing was started. The form is a refusal, not a result.
       acted: false,
     };
   }
@@ -436,6 +552,8 @@ async function dispatchConfirmedRoute(
     intent: readString(request.data, "intent") ?? "",
     conversationReference: request.conversationReference,
     spokenText: readString(request.data, "text") ?? "",
+    opportunity: parsed.details,
+    stagingId: readString(request.data, "stagingId") ?? "",
   });
 
   return outcome.kind === "started"
@@ -476,6 +594,20 @@ export const HANDLED_ACTION_VERBS: ReadonlySet<string> = new Set([
   OPEN_CHAT_VERB,
   CONFIRM_ROUTE_VERB,
   CLARIFY_OTHER_VERB,
+  /*
+   * Added when `autobuild/opportunity-intake` merged, 2026-08-09, and it is
+   * the exact failure this set exists to make impossible.
+   *
+   * The intake branch added a `SUBMIT_INTAKE_VERB` branch to
+   * `dispatchActionInvoke` below and put the verb in the card test's own
+   * hand-typed copy of this list — the copy this docblock had just finished
+   * arguing against. Merged as-was, the tree would have had a verb that IS
+   * dispatched and IS NOT declared handled, with a green suite either way:
+   * the copy said it was handled, and the contract check that reads THIS set
+   * did not walk the intake form. Both branches were green in isolation and
+   * the disagreement only existed in the merge.
+   */
+  SUBMIT_INTAKE_VERB,
 ]);
 
 export async function dispatchActionInvoke(
@@ -484,6 +616,9 @@ export async function dispatchActionInvoke(
 ): Promise<ActionInvokeResult> {
   if (request.verb === CONFIRM_ROUTE_VERB) {
     return dispatchConfirmedRoute(request, deps);
+  }
+  if (request.verb === SUBMIT_INTAKE_VERB) {
+    return dispatchSubmitIntake(request, deps);
   }
   if (request.verb === CLARIFY_OTHER_VERB) {
     return {
