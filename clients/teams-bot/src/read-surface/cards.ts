@@ -2776,6 +2776,43 @@ export function buildIntakeRefusedCard(reason: string): Attachment {
  * retry cannot produce a second agent. The neighbouring artifact create takes
  * no client id and needs the opposite advice — identical-looking states,
  * opposite correct actions, and the only way to know is to read the contract.
+ *
+ * ────────────────────────────────────────────────────────────────────────
+ * NO "I'LL REPLY HERE WHEN IT'S DONE". Removed 2026-08-09. Nothing replies.
+ *
+ * `proactive/` has no production caller: nothing outside that directory
+ * imports it, `index.ts` constructs no store and no adapter send, and
+ * `send-via-adapter.ts` still says "THIS HAS NEVER BEEN RUN". So the card
+ * ended a live workflow with a sentence telling a salesperson to wait for
+ * something that cannot arrive — worse than silence, because silence does
+ * not stop you checking.
+ *
+ * WHAT MAKES IT INDEFENSIBLE RATHER THAN MERELY STALE is one file over.
+ * `start-assessment.ts` captures the conversation reference, persists it
+ * with `references.remember`, and REFUSES TO START AT ALL if it cannot —
+ * because, in its own words, "an assessment whose result has nowhere to go
+ * spends agent time on a customer document and produces something nobody
+ * receives". That is a precise description of what shipped. The write side
+ * is built and guarded; the read side was never connected, and the guard
+ * protecting the wire is the only part of it running.
+ *
+ * The replacement states the negative OUTRIGHT rather than just dropping
+ * the claim. The question this card has to answer is "do I need to come
+ * back?", and "come back and check" only answers it if the reader also
+ * knows nothing will arrive. Leaving that implicit is how the old wording
+ * got read as a promise in the first place.
+ *
+ * ALWAYS EXACTLY ONE BUTTON, NEVER ZERO. Without a deep link the card used
+ * to render no action at all — a promise, no link, and no instruction, which
+ * is the worst of the three states and the one the VM deploy actually ships,
+ * because `TRAYCER_TEAMS_TAB_URL` is unset there.
+ *
+ * When R7 is wired — keyed on `assemble-bundle` exiting 0 against an
+ * authorised bid, NOT on chat completion, per the epic's
+ * `opportunity-skill-handoff` — put the sentence back. The test guarding
+ * this permits it automatically at that point; see "no card promises a
+ * later reply while nothing delivers one" in `cards.test.ts`.
+ * ────────────────────────────────────────────────────────────────────────
  */
 export function buildAssessmentStartedCard(options: {
   readonly title: string;
@@ -2792,19 +2829,22 @@ export function buildAssessmentStartedCard(options: {
         title: options.title,
         subtitle:
           options.deepLink === null
-            ? "It's running. I'll reply here when it's done."
-            : "It's running — open it to watch progress. I'll reply here when it's done.",
+            ? "It's running. Press My agents to check on it — I won't ping you when it finishes."
+            : "It's running. Open it to watch progress — I won't ping you when it finishes.",
       }),
     ],
-    options.deepLink === null
-      ? []
-      : [
-          {
+    [
+      options.deepLink === null
+        ? // The fleet is the only place to see it without a tab URL, and
+          // `traycer/fleet` is already handled — so this is a real
+          // destination rather than a button added to fill the gap.
+          submitAction("My agents", FLEET_VERB, {}, { associateInputs: false })
+        : {
             type: "Action.OpenUrl",
             title: "Watch progress",
             url: options.deepLink,
           },
-        ],
+    ],
   );
 }
 

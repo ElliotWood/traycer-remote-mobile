@@ -15,6 +15,7 @@ import {
   buildHelpCard,
   buildPrincipalRefusedCard,
   buildTranscriptCard,
+  buildAssessmentStartedCard,
   buildAssessmentUnconfirmedCard,
   speakerLabel,
   modelMarker,
@@ -1530,6 +1531,170 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     };
     await walk(root);
     expect(found).toBe(true);
+  });
+});
+
+/**
+ * A CARD MAY NOT PROMISE WHAT NOTHING DELIVERS.
+ *
+ * `buildAssessmentStartedCard` said "I'll reply here when it's done." Nothing
+ * replies: `proactive/` has no production caller — nothing outside that
+ * directory imports it, and `index.ts` constructs neither a store nor an
+ * adapter send. So a salesperson started an assessment, read a sentence
+ * telling them to wait, and never heard again.
+ *
+ * The wording is the instance. The class is that anyone can add a delivery
+ * promise to any card at any time and nothing notices, which is how this one
+ * arrived: it was TRUE AS DESIGNED, and the design was three-quarters built.
+ * `start-assessment.ts` still captures the conversation reference, persists
+ * it, and refuses to start without it.
+ *
+ * THIS TEST ENCODES THE DEPENDENCY, NOT A SNAPSHOT — which is the whole point
+ * and the reason it is not just an assertion that a string is absent. It
+ * fails only while BOTH are true: a card promises a later reply, AND nothing
+ * imports the delivery path. Wire R7 and it goes quiet on its own, no edit
+ * needed, and the sentence can come back in the same change.
+ *
+ * A test that had to be deleted to ship the feature would be deleted early.
+ */
+describe("CONTRACT: no card promises a later reply while nothing delivers one", () => {
+  /**
+   * Phrasings that commit the bot to speaking FIRST, later.
+   *
+   * Not every future-tense sentence: "it's running" and "I'll try again" make
+   * no such commitment. These are the ones that tell a reader they may stop
+   * checking, which is the behaviour that costs them the result.
+   */
+  const PROMISES = [
+    /I'?ll reply/i,
+    /I'?ll let you know/i,
+    /I'?ll tell you/i,
+    /I'?ll message you/i,
+    /I'?ll ping you/i,
+    /I'?ll send/i,
+    /notify you/i,
+    /you'?ll (?:get|receive|hear)/i,
+    /we'?ll (?:reply|let you know|notify)/i,
+  ];
+
+  /** Every card in one place — the same table the verb and version checks use. */
+  const CARD_TEXT = (): string =>
+    JSON.stringify([
+      buildAssessmentStartedCard({ title: "An assessment", deepLink: null }),
+      buildAssessmentStartedCard({
+        title: "An assessment",
+        deepLink: "https://example.invalid/tab",
+      }),
+      buildAssessmentUnconfirmedCard("socket closed", undefined),
+      buildAssessmentUnconfirmedCard("refused", { certain: true }),
+      buildHelpCard(),
+      buildClarifyCard({
+        suggestionLabel: "a new opportunity",
+        product: "p",
+        intent: "i",
+        skill: "s",
+      }),
+    ]);
+
+  /**
+   * Is the delivery path wired? Read from the SOURCE, not from a constant
+   * someone would have to remember to flip.
+   *
+   * "Wired" is defined as: some non-test file outside `src/proactive/`
+   * imports from it. That is the exact thing whose absence makes the promise
+   * false, so it is the exact thing to measure.
+   */
+  async function proactiveIsWired(): Promise<boolean> {
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+    let wired = false;
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          // Skip the implementation itself — `proactive/` importing
+          // `proactive/` is not a caller — and skip tests, which import it
+          // precisely because it is unwired.
+          if (entry.name !== "__tests__" && entry.name !== "proactive") {
+            await walk(full);
+          }
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        if (/from\s+"[^"]*\/proactive\//.test(await readFile(full, "utf8"))) {
+          wired = true;
+        }
+      }
+    };
+    await walk(root);
+    return wired;
+  }
+
+  it("no card promises a later reply, unless the proactive path is wired", async () => {
+    const text = CARD_TEXT();
+    const promising = PROMISES.filter((re) => re.test(text)).map(String);
+    if (promising.length === 0) return;
+
+    expect(
+      await proactiveIsWired(),
+      `a card promises a later reply (${promising.join(", ")}) but nothing outside src/proactive/ imports it, so nothing sends one. Either remove the promise or wire the delivery — R7 fires on assemble-bundle exiting 0 against an authorised bid, not on chat completion.`,
+    ).toBe(true);
+  });
+
+  it("CONTROL: both halves of the check can fire", async () => {
+    // Half one: the phrasing test catches the exact sentence that shipped,
+    // and does not fire on the honest replacement. Without this the guard
+    // passes because its regexes match nothing anywhere.
+    const shipped = "It's running. I'll reply here when it's done.";
+    expect(PROMISES.some((re) => re.test(shipped))).toBe(true);
+    expect(
+      PROMISES.some((re) =>
+        re.test("It's running. Open it to watch progress — I won't ping you when it finishes."),
+      ),
+    ).toBe(false);
+
+    // Half two: the source scan reaches real files. It must find the bot's
+    // own imports; if it cannot see `./cards`, it could not see a
+    // `proactive/` import either and would report "unwired" forever — which
+    // is the direction that fails SILENTLY, since an unwired verdict only
+    // matters when a promise exists.
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+    let sawAnImport = false;
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "__tests__") await walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        if (/from\s+"\.\/cards"/.test(await readFile(full, "utf8"))) {
+          sawAnImport = true;
+        }
+      }
+    };
+    await walk(root);
+    expect(sawAnImport).toBe(true);
+  });
+
+  it("the ack card always offers exactly one action, with or without a deep link", () => {
+    // Without a deep link it used to render NO action — a promise, no link,
+    // and no instruction, which is the state the VM deploy actually ships
+    // because TRAYCER_TEAMS_TAB_URL is unset there.
+    for (const deepLink of [null, "https://example.invalid/tab"]) {
+      const content = buildAssessmentStartedCard({ title: "An assessment", deepLink })
+        .content as { actions?: readonly unknown[] };
+      expect(content.actions, `deepLink=${String(deepLink)}`).toHaveLength(1);
+    }
   });
 });
 
