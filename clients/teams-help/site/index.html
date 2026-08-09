@@ -154,7 +154,7 @@
                 <path class="seq-glyph" d="M 186 44 v -6" stroke="var(--accent-text)"
                       stroke-width="2" />
                 <text class="seq-label" x="186" y="118" text-anchor="middle">Bot</text>
-                <text x="186" y="134" text-anchor="middle">confirms what you meant</text>
+                <text x="186" y="134" text-anchor="middle">confirms, then takes the details</text>
               </g>
 
               <!-- 3. the long-running assessment -->
@@ -228,8 +228,12 @@
              is what a screen reader, a printed page, and a reader with
              images disabled all get instead. -->
         <ol class="sr-only">
-          <li>You ask the bot, attaching the customer's document.</li>
+          <li>You ask the bot in a direct message, attaching the customer's document.</li>
           <li>The bot confirms which product and which kind of request it thinks you meant.</li>
+          <li>
+            You fill in the five things it cannot guess: a short name, the buyer, a deadline
+            with a timezone, the jurisdiction, and an accountable owner.
+          </li>
           <li>An assessment starts and runs for a while on your own machine.</li>
           <li>A review copy is produced for the bid team.</li>
           <li>A named human authorises it and lodges it. The bot does neither.</li>
@@ -309,12 +313,13 @@
             <div class="step-num">1</div>
             <div class="step-body">
               <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
-                <h3 class="h-card">Ask, in your own words</h3>
-                <span class="pill pill-warn">Partly live</span>
+                <h3 class="h-card">Ask, in your own words, and attach the document</h3>
+                <span class="pill pill-live">Live</span>
               </div>
               <p class="prose small">
-                Open the bot’s chat and describe what you have. It reads plain language — you
-                do not need a command.
+                Open the bot’s chat, describe what you have, and attach the file. It reads
+                plain language — you do not need a command, and you do not need to be precise.
+                “Does this fit SensorMine?” and “what about SensorMine for this one?” both work.
               </p>
 
               <div class="thread" aria-hidden="true">
@@ -336,16 +341,19 @@
               </div>
 
               <p class="annot">
-                The file is <strong>not read yet.</strong> Attaching it tells the bot the
-                request is probably an opportunity, which changes what it offers — but the
-                document itself does not reach the agent, and the agent is told
-                <em>“No documents were attached.”</em> Paste the important parts into the
-                message for now.
+                <strong>Attach the file to this first message.</strong> It is captured the
+                moment you send it, before you have agreed to anything — a Teams download link
+                is only valid on the message that carried it, so a file attached to a later
+                reply cannot be picked up. Up to 100&nbsp;MB each.
               </p>
               <p class="annot">
-                Ask a <em>fully</em> specific question — “does this fit SensorMine?” — and you
-                currently get the general help card instead. Naming the product without a
-                phrase like “RFP” or “does this fit” is what opens the flow below.
+                <strong>Send it as a direct message, not in a channel.</strong> Files posted in
+                a channel live in SharePoint, which the bot cannot read yet — it will say so
+                rather than starting an assessment against nothing.
+              </p>
+              <p class="annot">
+                Two files with the same name are refused, because the bid pack cannot hold two
+                documents with one name. Rename one and attach them again.
               </p>
             </div>
           </div>
@@ -395,17 +403,79 @@
           </div>
           <div class="step-rail" aria-hidden="true"></div>
 
-          <!-- step 3 -->
+          <!-- step 3 — the intake form -->
           <div class="step reveal">
             <div class="step-num">3</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">You fill in five things it cannot guess</h3>
+                <span class="pill pill-live">Live</span>
+              </div>
+              <p class="prose small">
+                <strong>Yes, go ahead</strong> opens a form rather than starting immediately.
+                The classifier can work out <em>which</em> skill to run; it cannot invent a
+                deadline or decide who is accountable, and the bid tooling refuses to start
+                without them.
+              </p>
+
+              <div class="mock" aria-hidden="true" style="max-width: 27rem">
+                <div class="mock-bar">
+                  <div class="mock-avatar">T</div>
+                  <span class="mock-who">Traycer</span>
+                  <span class="mock-when">now</span>
+                </div>
+                <div class="mock-body">
+                  <div class="mock-head">
+                    <div class="mock-title">Start an assessment</div>
+                    <div class="mock-subtitle">a new SensorMine opportunity</div>
+                  </div>
+                  <div class="mock-meta">1 document ready for the assessment:</div>
+                  <div class="small" style="color: var(--fg-strong)">
+                    Northgate-RFP-2026.pdf
+                  </div>
+                  <div class="small" style="display: grid; gap: 0.45rem">
+                    <div><strong>Short name</strong> — northgate-water-2026</div>
+                    <div><strong>Buyer</strong> — Northgate Water Authority</div>
+                    <div><strong>Deadline</strong> — 2026-09-14 · 17:00 · AEST</div>
+                    <div><strong>Jurisdiction</strong> — Local</div>
+                    <div><strong>Accountable owner</strong> — Sam Lowe</div>
+                  </div>
+                  <div class="mock-actions">
+                    <span class="mock-btn mock-btn-primary">Start assessment</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="annot">
+                <strong>The deadline needs a timezone.</strong> Not a nicety — a tender closing
+                “5pm” is a different instant in Perth and Auckland, and the tooling refuses a
+                deadline without an explicit offset rather than guessing one.
+              </p>
+              <p class="annot">
+                <strong>The owner is prefilled with you</strong>, and you can replace it. It
+                names the human accountable for the bid, so it cannot be silently inferred —
+                but making you type your own name every time is friction people route around.
+              </p>
+              <p class="annot">
+                Get a field wrong and the form comes back with your other answers intact and
+                the problem named. Errors are listed at the top as well as beside the field,
+                because on a phone the last field is below the fold.
+              </p>
+            </div>
+          </div>
+          <div class="step-rail" aria-hidden="true"></div>
+
+          <!-- step 4 -->
+          <div class="step reveal">
+            <div class="step-num">4</div>
             <div class="step-body">
               <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
                 <h3 class="h-card">The assessment starts, and you get a link</h3>
                 <span class="pill pill-live">Live</span>
               </div>
               <p class="prose small">
-                Pressing <strong>Yes, go ahead</strong> creates a new agent on your host and
-                hands it the request. This takes a few seconds — the card below replaces the
+                Submitting the form creates a new agent on your host and hands it the request
+                and the documents. This takes a few seconds — the card below replaces the
                 waiting, and the work then runs for far longer than the conversation does.
               </p>
 
@@ -438,9 +508,9 @@
           </div>
           <div class="step-rail" aria-hidden="true"></div>
 
-          <!-- step 4 -->
+          <!-- step 5 -->
           <div class="step reveal step-todo">
-            <div class="step-num">4</div>
+            <div class="step-num">5</div>
             <div class="step-body">
               <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
                 <h3 class="h-card">It replies again when the work is done</h3>
@@ -462,9 +532,9 @@
           </div>
           <div class="step-rail" aria-hidden="true"></div>
 
-          <!-- step 5 -->
+          <!-- step 6 -->
           <div class="step reveal step-todo">
-            <div class="step-num">5</div>
+            <div class="step-num">6</div>
             <div class="step-body">
               <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
                 <h3 class="h-card">A human authorises and lodges</h3>
