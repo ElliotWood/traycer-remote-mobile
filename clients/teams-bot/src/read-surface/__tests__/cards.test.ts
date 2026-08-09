@@ -15,6 +15,7 @@ import {
   buildHelpCard,
   buildPrincipalRefusedCard,
   buildTranscriptCard,
+  buildAssessmentStartedCard,
   buildAssessmentUnconfirmedCard,
   speakerLabel,
   modelMarker,
@@ -1014,53 +1015,34 @@ describe("read-surface/cards — the label comes from the capability, not locali
  *
  * These tests are the cheap thing that would have caught it.
  */
-describe("CONTRACT: cards stay within the version they declare", () => {
-  const ALL_CARDS = [
-    buildHelpCard(),
-    buildFleetCard([
-      {
-        agentId: "a1000000-0000-4000-8000-000000000001",
-        title: "Migrate config loader to zod",
-        harnessId: "claude",
-        surface: "gui",
-        active: true,
-        isLocal: true,
-        hostId: "h-1",
-        capabilities: { readTranscript: true, sendMessage: true },
-      },
-    ]),
-    buildEpicPickerCard([{ epicId: "e-1", title: "My Epic" }]),
-    buildEpicNotBoundCard(),
-    buildBridgeUnavailableCard("spawn_timed_out", "took too long"),
-  ];
-
-  it("declares 1.2 — the highest version any emitted feature requires", () => {
-    for (const card of ALL_CARDS) {
-      expect((card.content as { version?: string }).version).toBe("1.2");
-    }
-  });
-
-  it("emits no element or property that needs more than 1.2", () => {
-    // Every name here is 1.3+. If one becomes necessary, RAISE the version —
-    // this test is a tripwire on drift, not an argument against the feature.
-    const ABOVE_1_2 = [
-      "targetWidth",        // 1.5
-      "Action.Execute",     // 1.4
-      '"Table"',            // 1.5
-      "RichTextBlock",      // 1.2 element but 1.5 `style: heading` pairs with it
-      '"heading"',          // 1.5
-      '"refresh"',          // 1.4
-      "Input.ChoiceSet",    // not used; would need care
-      "Action.ToggleVisibility", // 1.2 — listed to catch accidental adoption
-    ];
-    for (const card of ALL_CARDS) {
-      const json = JSON.stringify(card.content);
-      for (const feature of ABOVE_1_2) {
-        expect(json).not.toContain(feature.replace(/"/g, ""));
-      }
-    }
-  });
-});
+/*
+ * REMOVED 2026-08-09: a second version test, and it carried a live landmine.
+ *
+ * The 2026-08-09 merge landed two "cards stay within 1.2" tests. This one
+ * hand-listed five cards and matched substrings; the surviving one walks
+ * `EVERY_CARD` and matches property names. Two checks of the same rule drift,
+ * and this one already had.
+ *
+ * ITS DENY-LIST FORBADE `Input.ChoiceSet`, commented "not used; would need
+ * care". `Input.ChoiceSet` is used five times in `cards.ts` — the interview
+ * questions, and the intake form's time zone and jurisdiction pickers — and
+ * it is a **1.0** element, so it is entirely legal. The test passed only
+ * because none of its five hand-listed cards emit one.
+ *
+ * That is the trap: the next person to WIDEN its coverage gets a red build
+ * telling them a correct, shipping card is illegal, and the cheapest way out
+ * is to narrow the coverage again. Verified rather than assumed — adding
+ * `buildInterviewCard` to its list fails it.
+ *
+ * `Action.ToggleVisibility` was in the same list, annotated "1.2 — listed to
+ * catch accidental adoption". At 1.2 it is legal, so it is a POLICY entry in
+ * a VERSION test, under a header reading "Every name here is 1.3+", which was
+ * false for two of its eight entries. Policy about which legal features we
+ * choose to use needs its own test and its own argument, not a smuggled row.
+ *
+ * Carried across to the survivor: the `version === "1.2"` assertion, which
+ * only this one had, and `refresh` (1.4), which only this one listed.
+ */
 
 /**
  * THE CLASS, not the instances.
@@ -1132,6 +1114,20 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     description: "Change a file.",
     requestedAt: 0,
   };
+  /**
+   * TWO questions, and the second one HAS OPTIONS deliberately.
+   *
+   * `options: []` is the free-text branch, which emits `Input.Text`. With
+   * only that, no card in `EVERY_CARD` ever emitted an `Input.ChoiceSet` —
+   * so the version check above could not have caught a bad property on the
+   * ChoiceSet path, which three real cards use (interview answers, and the
+   * intake form's time zone and jurisdiction pickers).
+   *
+   * This mattered concretely: the duplicate version test deleted above
+   * forbade `Input.ChoiceSet` outright, on a comment claiming it was unused.
+   * Removing that entry is not evidence the false positive is gone — a fixture
+   * that reaches the branch is. Both question branches are now covered.
+   */
   const INTERVIEW_FIXTURE: PendingInterview = {
     blockId: "iv-1",
     requestedAt: 0,
@@ -1144,6 +1140,16 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
         header: null,
         options: [],
         multiSelect: false,
+      },
+      {
+        questionId: "q2",
+        question: "Pick any that apply",
+        header: "Scope",
+        options: [
+          { label: "One", description: "the first", preview: null },
+          { label: "Two", description: null, preview: null },
+        ],
+        multiSelect: true,
       },
     ],
   };
@@ -1361,6 +1367,9 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     ["Action.Execute", "1.4 — and silently dead on Teams mobile"],
     ["Table", "1.5"],
     ["RichTextBlock", "1.2 element, but Teams support is unverified"],
+    // Carried over from the duplicate version test deleted above — the one
+    // entry it had that this list did not.
+    ["refresh", "1.4 — and Universal Actions are dead on Teams mobile"],
   ];
 
   function propertiesIn(node: unknown): Set<string> {
@@ -1397,6 +1406,30 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
         `emits "${property}" (${why}) while ADAPTIVE_CARD_VERSION is 1.2. Teams drops what it does not know, silently, and our local renderer will not show you.`,
       ).toBe(false);
     }
+  });
+
+  it("COVERAGE: the card set actually reaches the ChoiceSet branch", () => {
+    // The deny-list is only as good as what the fixtures reach. `Input.Text`
+    // and `Input.ChoiceSet` are different code paths in
+    // `interviewQuestionElements`, and for a long time only the first was
+    // exercised — so a version violation on the second could not have been
+    // caught. This fails if a fixture change quietly drops that coverage.
+    const emitted = new Set(
+      EVERY_CARD.flatMap(([, build]) => [...propertiesIn(build())]),
+    );
+    expect(emitted.has("Input.ChoiceSet")).toBe(true);
+    expect(emitted.has("Input.Text")).toBe(true);
+    expect(emitted.has("ActionSet")).toBe(true);
+    expect(emitted.has("ColumnSet")).toBe(true);
+  });
+
+  it.each(EVERY_CARD)("%s declares version 1.2", (_name, build) => {
+    // Carried over from the duplicate version test deleted above, which was
+    // the only one asserting this. Without it, the deny-list above could pass
+    // on a card that had quietly declared 1.5 — the pin and the contents
+    // would agree, and both would be wrong.
+    const content = build() as { version?: string };
+    expect(content.version).toBe("1.2");
   });
 
   it("CONTROL: the version check can fail, and reads nested properties", () => {
@@ -1530,6 +1563,170 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     };
     await walk(root);
     expect(found).toBe(true);
+  });
+});
+
+/**
+ * A CARD MAY NOT PROMISE WHAT NOTHING DELIVERS.
+ *
+ * `buildAssessmentStartedCard` said "I'll reply here when it's done." Nothing
+ * replies: `proactive/` has no production caller — nothing outside that
+ * directory imports it, and `index.ts` constructs neither a store nor an
+ * adapter send. So a salesperson started an assessment, read a sentence
+ * telling them to wait, and never heard again.
+ *
+ * The wording is the instance. The class is that anyone can add a delivery
+ * promise to any card at any time and nothing notices, which is how this one
+ * arrived: it was TRUE AS DESIGNED, and the design was three-quarters built.
+ * `start-assessment.ts` still captures the conversation reference, persists
+ * it, and refuses to start without it.
+ *
+ * THIS TEST ENCODES THE DEPENDENCY, NOT A SNAPSHOT — which is the whole point
+ * and the reason it is not just an assertion that a string is absent. It
+ * fails only while BOTH are true: a card promises a later reply, AND nothing
+ * imports the delivery path. Wire R7 and it goes quiet on its own, no edit
+ * needed, and the sentence can come back in the same change.
+ *
+ * A test that had to be deleted to ship the feature would be deleted early.
+ */
+describe("CONTRACT: no card promises a later reply while nothing delivers one", () => {
+  /**
+   * Phrasings that commit the bot to speaking FIRST, later.
+   *
+   * Not every future-tense sentence: "it's running" and "I'll try again" make
+   * no such commitment. These are the ones that tell a reader they may stop
+   * checking, which is the behaviour that costs them the result.
+   */
+  const PROMISES = [
+    /I'?ll reply/i,
+    /I'?ll let you know/i,
+    /I'?ll tell you/i,
+    /I'?ll message you/i,
+    /I'?ll ping you/i,
+    /I'?ll send/i,
+    /notify you/i,
+    /you'?ll (?:get|receive|hear)/i,
+    /we'?ll (?:reply|let you know|notify)/i,
+  ];
+
+  /** Every card in one place — the same table the verb and version checks use. */
+  const CARD_TEXT = (): string =>
+    JSON.stringify([
+      buildAssessmentStartedCard({ title: "An assessment", deepLink: null }),
+      buildAssessmentStartedCard({
+        title: "An assessment",
+        deepLink: "https://example.invalid/tab",
+      }),
+      buildAssessmentUnconfirmedCard("socket closed", undefined),
+      buildAssessmentUnconfirmedCard("refused", { certain: true }),
+      buildHelpCard(),
+      buildClarifyCard({
+        suggestionLabel: "a new opportunity",
+        product: "p",
+        intent: "i",
+        skill: "s",
+      }),
+    ]);
+
+  /**
+   * Is the delivery path wired? Read from the SOURCE, not from a constant
+   * someone would have to remember to flip.
+   *
+   * "Wired" is defined as: some non-test file outside `src/proactive/`
+   * imports from it. That is the exact thing whose absence makes the promise
+   * false, so it is the exact thing to measure.
+   */
+  async function proactiveIsWired(): Promise<boolean> {
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+    let wired = false;
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          // Skip the implementation itself — `proactive/` importing
+          // `proactive/` is not a caller — and skip tests, which import it
+          // precisely because it is unwired.
+          if (entry.name !== "__tests__" && entry.name !== "proactive") {
+            await walk(full);
+          }
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        if (/from\s+"[^"]*\/proactive\//.test(await readFile(full, "utf8"))) {
+          wired = true;
+        }
+      }
+    };
+    await walk(root);
+    return wired;
+  }
+
+  it("no card promises a later reply, unless the proactive path is wired", async () => {
+    const text = CARD_TEXT();
+    const promising = PROMISES.filter((re) => re.test(text)).map(String);
+    if (promising.length === 0) return;
+
+    expect(
+      await proactiveIsWired(),
+      `a card promises a later reply (${promising.join(", ")}) but nothing outside src/proactive/ imports it, so nothing sends one. Either remove the promise or wire the delivery — R7 fires on assemble-bundle exiting 0 against an authorised bid, not on chat completion.`,
+    ).toBe(true);
+  });
+
+  it("CONTROL: both halves of the check can fire", async () => {
+    // Half one: the phrasing test catches the exact sentence that shipped,
+    // and does not fire on the honest replacement. Without this the guard
+    // passes because its regexes match nothing anywhere.
+    const shipped = "It's running. I'll reply here when it's done.";
+    expect(PROMISES.some((re) => re.test(shipped))).toBe(true);
+    expect(
+      PROMISES.some((re) =>
+        re.test("It's running. Open it to watch progress — I won't ping you when it finishes."),
+      ),
+    ).toBe(false);
+
+    // Half two: the source scan reaches real files. It must find the bot's
+    // own imports; if it cannot see `./cards`, it could not see a
+    // `proactive/` import either and would report "unwired" forever — which
+    // is the direction that fails SILENTLY, since an unwired verdict only
+    // matters when a promise exists.
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const root = new URL("../../", import.meta.url).pathname.replace(
+      /^\/([A-Za-z]:)/,
+      "$1",
+    );
+    let sawAnImport = false;
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "__tests__") await walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts")) continue;
+        if (/from\s+"\.\/cards"/.test(await readFile(full, "utf8"))) {
+          sawAnImport = true;
+        }
+      }
+    };
+    await walk(root);
+    expect(sawAnImport).toBe(true);
+  });
+
+  it("the ack card always offers exactly one action, with or without a deep link", () => {
+    // Without a deep link it used to render NO action — a promise, no link,
+    // and no instruction, which is the state the VM deploy actually ships
+    // because TRAYCER_TEAMS_TAB_URL is unset there.
+    for (const deepLink of [null, "https://example.invalid/tab"]) {
+      const content = buildAssessmentStartedCard({ title: "An assessment", deepLink })
+        .content as { actions?: readonly unknown[] };
+      expect(content.actions, `deepLink=${String(deepLink)}`).toHaveLength(1);
+    }
   });
 });
 
