@@ -116,8 +116,17 @@ ls -la "$ROOT"
 # under a `try_files` fallback a wrong path can still return 200 with HTML
 # where a stylesheet was expected, which is how a blank deployed tab has
 # gone unnoticed here before.
+# EVERY file that was copied, not a sample of them. theme.css was missing
+# from this loop, and it is the one carrying every colour — a 404 there
+# leaves a page that renders, reads correctly, and is entirely unstyled,
+# which no status-code check on the other three would notice.
+#
+# `/help` WITHOUT the slash is checked too, because it behaves differently:
+# it resolves, but the page then loads its assets from `/theme.css` and
+# `/styles.css` and gets nothing. Teams always sends the slash (both manifest
+# URLs carry it); a pasted short link does not.
 echo "-- local verify"
-for path in /help/ /help/styles.css /help/help.js; do
+for path in /help/ /help/index.html /help/theme.css /help/styles.css /help/help.js /help; do
   code_type=$(curl -sS -o /dev/null -w '%{http_code} %{content_type}' \
     --resolve "localhost:443:127.0.0.1" -k "https://localhost$path" || echo "ERR")
   echo "   $path -> $code_type"

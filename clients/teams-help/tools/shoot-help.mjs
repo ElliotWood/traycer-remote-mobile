@@ -117,17 +117,22 @@ function overflowingElements() {
   const bad = [];
   const limit = document.documentElement.clientWidth + 1;
   for (const el of document.querySelectorAll("body *")) {
-    // Walk up looking for a deliberate horizontal scroller. `.nav` and
-    // `.seq-scroll` both are; their children are allowed to be wider.
-    let inScroller = false;
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const ox = getComputedStyle(p).overflowX;
-      if (ox === "auto" || ox === "scroll" || ox === "hidden") {
-        inScroller = true;
-        break;
-      }
-    }
-    if (inScroller) continue;
+    /*
+     * Opt IN to the two deliberate scrollers by name, rather than inferring
+     * them from computed `overflow-x`.
+     *
+     * The inferring version treated `hidden` as a scroller and so exempted
+     * everything inside `.mock` and `.cmd-list` — six card replicas and both
+     * reference tables, which is most of the page's content. `hidden` does
+     * not scroll, it CLIPS: content overflowing there is silently lost,
+     * which is precisely the defect this check exists to catch, at precisely
+     * the 380px viewport where it happens.
+     *
+     * So the check could not fail over the majority of the page. A check
+     * that cannot fail is worse than a missing one — it reports green and
+     * buys confidence it never earned.
+     */
+    if (el.closest(".nav, .seq-scroll")) continue;
 
     const r = el.getBoundingClientRect();
     if (r.width > 0 && r.right > limit) {
@@ -281,8 +286,14 @@ console.log("\nno-javascript");
   const page = await context.newPage();
   await page.goto(`${base}?theme=default`);
   // No scrollThrough here: with scripting off there is no observer to
-  // trigger, and page.evaluate cannot run either. That is the point — the
+  // trigger, so there is nothing to scroll for. That is the point — the
   // content must already be visible without any of it.
+  //
+  // The two checks below DO work despite `javaScriptEnabled: false`, which
+  // reads like a contradiction and is not: the flag disables the PAGE's
+  // scripts, while `page.evaluate` runs through CDP's `Runtime.evaluate`,
+  // which is unaffected. Said explicitly because the obvious reading is
+  // "these can't be running" and the obvious next step is to delete them.
   await page.waitForTimeout(400);
 
   // The whole page must still be readable. Without `[data-js]` scoping,
