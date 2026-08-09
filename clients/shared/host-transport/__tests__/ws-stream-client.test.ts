@@ -2831,6 +2831,42 @@ describe("WsStreamClient host credential provisioning", () => {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  /**
+   * Wait for the reconnect to have produced a socket, rather than for a
+   * duration and a hope.
+   *
+   * The reconnect-loop test below used to `await wait(30)` after each
+   * `fireClose` and then take `sockets[sockets.length - 1]`. That races the
+   * client's own 10ms `initialBackoffMs`, and under a loaded parallel run it
+   * lost: the array still ended at the socket that had just closed, so
+   * `fireOpen()` on it emitted nothing, `textSent[0]` was `undefined`, and the
+   * handshake helper died in `JSON.parse` with `"undefined" is not valid JSON`.
+   * That was the whole of this suite's intermittent failure — it passed alone
+   * and failed in the full 85-file run.
+   *
+   * Reproduced deterministically before being fixed: `wait(30)` → `wait(0)`
+   * gives the identical `SyntaxError`, which is what identifies the fixed delay
+   * as the mechanism rather than anything about the client.
+   *
+   * The throw matters as much as the poll. Returning the last socket
+   * regardless would restore the same silent misread under a slower runner,
+   * one indirection further from the assertion that noticed.
+   */
+  async function waitForSocketBeyond(
+    sockets: readonly RecordedSocket[],
+    previousCount: number,
+  ): Promise<StubStreamWebSocket> {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      if (sockets.length > previousCount) {
+        return sockets[sockets.length - 1].socket;
+      }
+      await wait(5);
+    }
+    throw new Error(
+      `no socket beyond #${String(previousCount)} after 200 polls — the client never reconnected`,
+    );
+  }
+
   function provisioned(
     overrides: Partial<Provisioned> &
       Pick<Provisioned, "token" | "refreshToken">,
@@ -3106,9 +3142,9 @@ describe("WsStreamClient host credential provisioning", () => {
     expect(mint).toHaveBeenCalledTimes(1);
 
     for (let i = 0; i < 4; i += 1) {
+      const countBefore = sockets.length;
       sockets[sockets.length - 1].socket.fireClose(1000, "drop", false);
-      await wait(30);
-      const latest = sockets[sockets.length - 1].socket;
+      const latest = await waitForSocketBeyond(sockets, countBefore);
       completeProvisionHandshake(latest, "missing");
       await flush();
     }

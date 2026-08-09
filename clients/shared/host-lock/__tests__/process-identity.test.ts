@@ -188,19 +188,41 @@ describe("verifyProcessIdentity reads the creation stamp, not the timestamp", ()
  * rather than a stub: the identity a reader observes for a given process must
  * not move when the wall clock does.
  *
- * The second assertion is the control. `readLiveProcessStartTimeMs` is the
- * derivation this replaced - `Date.now()` minus an elapsed time measured from
- * boot - and it shifts by the full size of the clock step, which is precisely
- * how a healthy WSL2 host came to look like a recycled pid. Keeping both in
- * one test means a future "simplification" of the identity reader back onto a
- * clock-anchored derivation cannot pass.
+ * The second assertion is the control, and which control is available depends
+ * on the platform - a fact about the two readers, not about this test.
+ *
+ * On POSIX, `readLiveProcessStartTimeMs` is the derivation this replaced:
+ * `ps -o etime=` for the elapsed term and an in-process `Date.now()` for the
+ * anchor, so a faked clock moves it by the whole step. That is precisely how a
+ * healthy WSL2 host came to look like a recycled pid, and asserting the shift
+ * next to the property means a future "simplification" of the identity reader
+ * back onto a clock-anchored derivation cannot pass.
+ *
+ * On Windows that same function is `(Get-Process -Id ...).StartTime` - an
+ * absolute timestamp the OS hands back through a child process, anchored to
+ * nothing this process owns. It cannot shift, because Windows never had the
+ * derivation the WSL2 defect lived in. Asserting the POSIX shift there made
+ * this test permanently red for a reason that says nothing about the product;
+ * it was measured at exactly 0ms of drift against a required 10,800,000.
+ *
+ * Dropping the control instead would be worse than platform-specific: with the
+ * step unobserved, the property assertion above passes whether or not the
+ * clock ever moved. So Windows keeps the weaker control that can still fire -
+ * that the step is visible in-process at all. That is enough to make the
+ * property meaningful, and the property does have teeth here: replacing the
+ * win32 identity branch with a `Date.now()`-derived string fails the assertion
+ * above, on this platform, naming both values.
  */
 describe("start identity survives a wall-clock step", () => {
   const CLOCK_STEP_MS = 6 * 60 * 60 * 1000;
+  // POSIX derives the start time from an in-process clock read; Windows reads
+  // an absolute OS timestamp. Only the former can shift under a faked clock.
+  const REPLACED_DERIVATION_IS_CLOCK_ANCHORED = process.platform !== "win32";
 
-  it("reads identical bytes before and after the clock jumps, where the timestamp reader does not", () => {
+  it("reads identical bytes before and after the clock jumps, where the clock step is observable", () => {
     const identityBefore = readProcessStartIdentity(process.pid);
     const derivedBefore = readLiveProcessStartTimeMs(process.pid);
+    const nowBefore = Date.now();
     expect(identityBefore).not.toBeNull();
     expect(derivedBefore).not.toBeNull();
 
@@ -211,6 +233,11 @@ describe("start identity survives a wall-clock step", () => {
 
     expect(readProcessStartIdentity(process.pid)).toBe(identityBefore);
 
+    // The control: the step has to be observable, or the equality above is
+    // trivially true.
+    expect(Date.now() - nowBefore).toBeGreaterThan(CLOCK_STEP_MS / 2);
+
+    if (!REPLACED_DERIVATION_IS_CLOCK_ANCHORED) return;
     const derivedAfter = readLiveProcessStartTimeMs(process.pid);
     expect(derivedAfter).not.toBeNull();
     if (derivedBefore === null || derivedAfter === null) return;
