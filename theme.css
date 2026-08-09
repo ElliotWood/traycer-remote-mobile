@@ -1,0 +1,300 @@
+/*
+ * Theme tokens for the four themes Teams actually reports.
+ *
+ * FOUR, not three. `app.theme` is documented as `default | dark | glass |
+ * contrast` — `glass` is the translucent theme Teams uses on Apple Vision
+ * Pro, and it is missing from every "Teams has three themes" summary,
+ * including the one this page was briefed against. It is handled here
+ * rather than falling through to light, because a translucent host chrome
+ * behind an opaque white page looks broken rather than merely wrong.
+ *
+ * The theme arrives WITHOUT JAVASCRIPT. The manifest's contentUrl carries
+ * `?theme={theme}`, which Teams substitutes before the document is ever
+ * requested, and a ~10-line inline script in <head> — deliberately inline
+ * and render-blocking, so there is no second round trip to flash across —
+ * copies it onto <html data-theme>. The first paint is already correct.
+ *
+ * That is the whole reason this page does not depend on teams-js. The
+ * handshake is unreliable by measurement (this repo's deleted teams-tab
+ * recorded `initialize()` HANGING FOREVER under a non-Teams parent rather
+ * than rejecting, and painting an empty document as a result), and a help
+ * page that cannot render until Teams answers is a help page you cannot
+ * read when Teams is the thing that is broken.
+ *
+ * Neutrals are Fluent's Teams theme values, so the page sits in the host's
+ * chrome rather than next to it. The accent is Traycer's own #148A7A
+ * (the manifest's accentColor), not Teams purple: the chrome belongs to
+ * Teams, the product does not.
+ */
+
+:root,
+:root[data-theme="default"] {
+  color-scheme: light;
+
+  /* Surfaces, back to front. */
+  --bg-canvas: #f5f5f5;
+  --bg-surface: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-sunken: #fafafa;
+  --bg-inset: #f0f0f0;
+
+  /* Text, most to least prominent. */
+  --fg-strong: #242424;
+  --fg: #424242;
+  --fg-muted: #616161;
+  --fg-faint: #707070;
+
+  /* Lines. */
+  --stroke: #e0e0e0;
+  --stroke-strong: #d1d1d1;
+
+  /*
+   * Two accents, because one cannot do both jobs accessibly. `--accent` is
+   * for large shapes and fills where 3:1 is the bar; `--accent-text` is the
+   * darkened variant for body-sized text and thin strokes, where 4.5:1 is.
+   * Using #148A7A for both would ship ~4.4:1 text on white — a fail that
+   * looks fine until someone actually needs the contrast.
+   */
+  --accent: #148a7a;
+  --accent-text: #0f6b5f;
+  --accent-weak: #e6f4f1;
+  --accent-line: #9fd6cc;
+  --on-accent: #ffffff;
+
+  /* The bot's own voice in mock transcripts. Teams purple, deliberately:
+     these are replicas of Teams chrome, not of our page. */
+  --teams-brand: #5b5fc7;
+  --teams-brand-weak: #e8ebfa;
+
+  --warn: #bc4b09;
+  --warn-weak: #fdf6f3;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --focus-ring: var(--accent-text);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-canvas: #1f1f1f;
+  --bg-surface: #292929;
+  --bg-raised: #333333;
+  --bg-sunken: #141414;
+  --bg-inset: #383838;
+
+  --fg-strong: #ffffff;
+  --fg: #d6d6d6;
+  --fg-muted: #adadad;
+  --fg-faint: #949494;
+
+  --stroke: #3d3d3d;
+  --stroke-strong: #666666;
+
+  /* Inverted relationship: on a dark surface the BRIGHT teal is the one
+     that passes for text, and the mid teal is the one for large fills. */
+  --accent: #2ec4ad;
+  --accent-text: #4fd9c4;
+  --accent-weak: #16332f;
+  --accent-line: #2a6b62;
+  --on-accent: #10312c;
+
+  --teams-brand: #7f85f5;
+  --teams-brand-weak: #2b2b40;
+
+  --warn: #ff9a6b;
+  --warn-weak: #33231c;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --focus-ring: var(--accent-text);
+}
+
+/*
+ * `glass` — Vision Pro. The host paints a translucent, blurred chrome over
+ * whatever the wearer is looking at, so the page must NOT lay an opaque
+ * sheet across it. Surfaces go transparent-to-barely-there and every
+ * foreground is pushed to full strength, because the backdrop is unknown
+ * and could be anything.
+ *
+ * Derived from the dark ramp rather than invented: glass is a dark-family
+ * theme, and inheriting keeps the two from drifting apart.
+ */
+:root[data-theme="glass"] {
+  color-scheme: dark;
+
+  --bg-canvas: transparent;
+  --bg-surface: rgba(255, 255, 255, 0.08);
+  --bg-raised: rgba(255, 255, 255, 0.14);
+  --bg-sunken: rgba(0, 0, 0, 0.18);
+  --bg-inset: rgba(255, 255, 255, 0.1);
+
+  --fg-strong: #ffffff;
+  --fg: #f0f0f0;
+  --fg-muted: #d6d6d6;
+  --fg-faint: #c0c0c0;
+
+  --stroke: rgba(255, 255, 255, 0.22);
+  --stroke-strong: rgba(255, 255, 255, 0.4);
+
+  --accent: #5fe0cb;
+  --accent-text: #7fead9;
+  --accent-weak: rgba(95, 224, 203, 0.16);
+  --accent-line: rgba(95, 224, 203, 0.45);
+  --on-accent: #06251f;
+
+  --teams-brand: #a3a8f8;
+  --teams-brand-weak: rgba(163, 168, 248, 0.18);
+
+  --warn: #ffb08a;
+  --warn-weak: rgba(255, 176, 138, 0.16);
+
+  --shadow-card: none;
+  --shadow-raised: none;
+  --focus-ring: #ffffff;
+}
+
+/*
+ * High contrast is NOT dark-with-more-contrast. It is a distinct
+ * accessibility mode with a fixed palette — pure black, pure white, a cyan
+ * accent and a yellow link — and users who turn it on rely on those exact
+ * values. Mapping it onto the dark theme, the common shortcut, produces a
+ * page that is unreadable for precisely the people who asked for help.
+ *
+ * Everything here is a system-palette value or a pure channel. No greys:
+ * mid-tones are the thing this mode exists to remove.
+ */
+:root[data-theme="contrast"] {
+  color-scheme: dark;
+
+  --bg-canvas: #000000;
+  --bg-surface: #000000;
+  --bg-raised: #000000;
+  --bg-sunken: #000000;
+  --bg-inset: #000000;
+
+  --fg-strong: #ffffff;
+  --fg: #ffffff;
+  --fg-muted: #ffffff;
+  --fg-faint: #ffffff;
+
+  --stroke: #ffffff;
+  --stroke-strong: #ffffff;
+
+  --accent: #1aebff;
+  --accent-text: #1aebff;
+  --accent-weak: #000000;
+  --accent-line: #1aebff;
+  --on-accent: #000000;
+
+  --teams-brand: #1aebff;
+  --teams-brand-weak: #000000;
+
+  --warn: #ffff00;
+  --warn-weak: #000000;
+
+  --shadow-card: none;
+  --shadow-raised: none;
+  --focus-ring: #1aebff;
+}
+
+/*
+ * Outside Teams there is no `?theme=` to read, so the OS preference decides.
+ * These only apply when nothing has set `data-theme`, so they can never
+ * override the host — inside Teams the attribute is always present.
+ *
+ * `prefers-contrast: more` is checked BEFORE `prefers-color-scheme`, since
+ * a user who asked for high contrast should get high contrast whether their
+ * OS is in light or dark mode. Source order does that work: the contrast
+ * rule is last, so it wins over whichever colour-scheme rule also matched.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --bg-canvas: #1f1f1f;
+    --bg-surface: #292929;
+    --bg-raised: #333333;
+    --bg-sunken: #141414;
+    --bg-inset: #383838;
+
+    --fg-strong: #ffffff;
+    --fg: #d6d6d6;
+    --fg-muted: #adadad;
+    --fg-faint: #949494;
+
+    --stroke: #3d3d3d;
+    --stroke-strong: #666666;
+
+    --accent: #2ec4ad;
+    --accent-text: #4fd9c4;
+    --accent-weak: #16332f;
+    --accent-line: #2a6b62;
+    --on-accent: #10312c;
+
+    --teams-brand: #7f85f5;
+    --teams-brand-weak: #2b2b40;
+
+    --warn: #ff9a6b;
+    --warn-weak: #33231c;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --bg-canvas: #000000;
+    --bg-surface: #000000;
+    --bg-raised: #000000;
+    --bg-sunken: #000000;
+    --bg-inset: #000000;
+
+    --fg-strong: #ffffff;
+    --fg: #ffffff;
+    --fg-muted: #ffffff;
+    --fg-faint: #ffffff;
+
+    --stroke: #ffffff;
+    --stroke-strong: #ffffff;
+
+    --accent: #1aebff;
+    --accent-text: #1aebff;
+    --accent-weak: #000000;
+    --accent-line: #1aebff;
+    --on-accent: #000000;
+
+    --teams-brand: #1aebff;
+    --teams-brand-weak: #000000;
+
+    --warn: #ffff00;
+    --warn-weak: #000000;
+
+    --shadow-card: none;
+    --shadow-raised: none;
+  }
+}
+
+/*
+ * Windows high-contrast / forced-colors is a THIRD path, separate from both
+ * of the above: the browser substitutes system colours for ours whether we
+ * cooperate or not. What it cannot do is guess that an SVG stroke carries
+ * meaning, so the diagrams are re-anchored to system keywords here.
+ */
+@media (forced-colors: active) {
+  :root {
+    --accent: CanvasText;
+    --accent-text: LinkText;
+    --stroke: CanvasText;
+    --stroke-strong: CanvasText;
+  }
+
+  .card,
+  .panel,
+  .mock {
+    border: 1px solid CanvasText;
+  }
+}

@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Traycer in Teams — Help</title>
+    <meta
+      name="description"
+      content="What the Traycer bot can do in Microsoft Teams, and how to use it."
+    />
+
+    <!--
+      Render-blocking and deliberately INLINE.
+
+      Teams substitutes `?theme=` into the tab's contentUrl before the
+      document is requested, so the correct theme is already in the URL by
+      the time this runs. Doing it here rather than in help.js means the
+      first paint is correct — an external script would be a second round
+      trip to flash a white page across, and inside a dark Teams that flash
+      is the most visible defect the page could ship.
+
+      Setting `data-js` here too, which is what un-hides the animated
+      elements. If scripting is off or blocked, the attribute is absent and
+      styles.css never applies the `opacity: 0` that waits on an observer —
+      so the page degrades to a plain, complete, readable document rather
+      than to a blank one.
+    -->
+    <script>
+      (function () {
+        var el = document.documentElement;
+        el.setAttribute("data-js", "on");
+        try {
+          var raw = new URLSearchParams(window.location.search).get("theme");
+          // Allow-list rather than pass-through: `data-theme` drives an
+          // attribute selector, and an unrecognised value (including a
+          // literal "{theme}" from a host that did not substitute) must
+          // fall through to the OS preference, not select nothing.
+          if (raw && /^(default|dark|glass|contrast)$/.test(raw)) {
+            el.setAttribute("data-theme", raw);
+          }
+        } catch (e) {
+          /* URLSearchParams is absent on very old WebViews. The OS
+             preference media queries still apply, so this is survivable. */
+        }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="help.js" defer></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <span class="brand">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="1" y="1" width="18" height="18" rx="5"
+                  fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M5.5 10.5 L8.75 13.5 L14.5 6.5" fill="none"
+                  stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Traycer in Teams
+        </span>
+
+        <nav class="nav" data-nav aria-label="Sections">
+          <a href="#start">Before you start</a>
+          <a href="#journey">Assessments</a>
+          <a href="#commands">Day to day</a>
+          <a href="#waiting">Waiting on you</a>
+          <a href="#trouble">When it breaks</a>
+        </nav>
+
+        <!--
+          A preview control, not a preference. See help.js: it never
+          persists, so the host's theme always wins on load.
+        -->
+        <div class="theme-switch" data-theme-switch role="group" aria-label="Preview theme">
+          <button type="button" data-set-theme="default" aria-pressed="true">Light</button>
+          <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
+          <button type="button" data-set-theme="contrast" aria-pressed="false">Contrast</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="shell">
+      <!-- ============================================================ hero -->
+      <div class="hero">
+        <div class="hero-copy reveal">
+          <span class="eyebrow">Help</span>
+          <h1 class="h-hero">Ask an agent for something, from the chat you already have open.</h1>
+          <p class="lede">
+            Traycer runs agents on a machine you own. This bot is a way to reach them from
+            Teams — see what they are doing, answer them when they are stuck, and start an
+            assessment of a customer document. It is a <strong>front door</strong>, not the
+            product.
+          </p>
+        </div>
+
+        <figure class="panel reveal" id="hero-seq">
+          <figcaption class="small" style="margin-bottom: 0.9rem">
+            <strong style="color: var(--fg-strong)">The assessment journey, end to end.</strong>
+            The last two stages happen outside Teams, on purpose.
+          </figcaption>
+
+          <!--
+            aria-hidden + a real text equivalent below. A screen reader
+            given this SVG would get a tour of its geometry; what it needs
+            is the sequence, which the <ol> after it states in words.
+          -->
+          <div class="seq-scroll">
+            <svg class="seq" viewBox="0 0 720 168" aria-hidden="true" focusable="false">
+              <!--
+                Connectors, left to right. Three styles, three meanings —
+                see the legend below the diagram.
+
+                The two live links DRAW (a line-drawing animation reads as
+                "this carries something"). The dashed one cannot draw, since
+                both effects want `stroke-dasharray`, so it fades. The two
+                outside-Teams links draw in grey: they are real and they
+                happen, just not here.
+              -->
+              <path class="seq-line draw" style="--delay: 120ms" pathLength="1"
+                    d="M 86 62 H 148" />
+              <path class="seq-line draw" style="--delay: 420ms" pathLength="1"
+                    d="M 220 62 H 282" />
+
+              <!-- the proactive completion reply: designed, not connected -->
+              <path class="seq-line seq-line-todo fade" style="--delay: 720ms"
+                    d="M 354 62 H 416" />
+
+              <!-- authorisation and lodgement: outside Teams, by design -->
+              <path class="seq-line seq-line-outside draw" style="--delay: 1020ms" pathLength="1"
+                    d="M 488 62 H 550" />
+              <path class="seq-line seq-line-outside draw" style="--delay: 1320ms" pathLength="1"
+                    d="M 622 62 H 668" />
+
+              <!-- 1. the salesperson -->
+              <g class="pop" style="--delay: 0ms">
+                <circle class="seq-node seq-node-accent" cx="54" cy="62" r="32" />
+                <circle class="seq-glyph" cx="54" cy="54" r="7" />
+                <path class="seq-glyph" d="M 40 78 a 14 12 0 0 1 28 0 z" />
+                <text class="seq-label" x="54" y="118" text-anchor="middle">You</text>
+                <text x="54" y="134" text-anchor="middle">ask, with a file</text>
+              </g>
+
+              <!-- 2. the bot -->
+              <g class="pop" style="--delay: 300ms">
+                <circle class="seq-node seq-node-accent" cx="186" cy="62" r="32" />
+                <rect class="seq-glyph" x="173" y="50" width="26" height="20" rx="5" />
+                <circle cx="180" cy="58" r="2.5" fill="var(--accent-weak)" />
+                <circle cx="192" cy="58" r="2.5" fill="var(--accent-weak)" />
+                <path class="seq-glyph" d="M 186 44 v -6" stroke="var(--accent-text)"
+                      stroke-width="2" />
+                <text class="seq-label" x="186" y="118" text-anchor="middle">Bot</text>
+                <text x="186" y="134" text-anchor="middle">confirms, then takes the details</text>
+              </g>
+
+              <!-- 3. the long-running assessment -->
+              <g class="pop" style="--delay: 600ms">
+                <circle class="seq-node seq-node-accent" cx="318" cy="62" r="32" />
+                <circle class="seq-dot pulse" cx="304" cy="62" r="4" style="--delay: 0ms" />
+                <circle class="seq-dot pulse" cx="318" cy="62" r="4" style="--delay: 300ms" />
+                <circle class="seq-dot pulse" cx="332" cy="62" r="4" style="--delay: 600ms" />
+                <text class="seq-label" x="318" y="118" text-anchor="middle">Assessment</text>
+                <text x="318" y="134" text-anchor="middle">runs for a while</text>
+              </g>
+
+              <!-- 4. the review copy -->
+              <g class="pop" style="--delay: 900ms">
+                <circle class="seq-node" cx="450" cy="62" r="32" />
+                <path class="seq-glyph-warn"
+                      d="M 439 46 h 15 l 7 7 v 22 a 2 2 0 0 1 -2 2 h -20 a 2 2 0 0 1 -2 -2 z" />
+                <text class="seq-label" x="450" y="118" text-anchor="middle">Review copy</text>
+                <text x="450" y="134" text-anchor="middle">for the bid team</text>
+              </g>
+
+              <!-- 5. the human gate. A square, not a circle: it is the one
+                   stage that is not a step in a pipeline but a decision. -->
+              <g class="pop" style="--delay: 1200ms">
+                <rect class="seq-node seq-node-gate" x="550" y="30" width="72" height="64" rx="10" />
+                <path class="seq-glyph-warn" d="M 579 64 h 14 v 12 h -14 z" />
+                <path d="M 581 64 v -5 a 5 5 0 0 1 10 0 v 5" fill="none"
+                      stroke="var(--warn)" stroke-width="2.5" />
+                <text class="seq-label" x="586" y="118" text-anchor="middle">A human</text>
+                <text x="586" y="134" text-anchor="middle">authorises · lodges</text>
+              </g>
+
+              <!-- 6. the customer -->
+              <g class="pop" style="--delay: 1500ms">
+                <circle class="seq-node" cx="690" cy="62" r="26" />
+                <path class="seq-glyph" d="M 678 54 h 24 v 16 h -24 z" opacity="0.85" />
+                <path d="M 678 54 l 12 9 l 12 -9" fill="none" stroke="var(--bg-surface)"
+                      stroke-width="2" />
+                <text class="seq-label" x="690" y="118" text-anchor="middle">Customer</text>
+              </g>
+
+              <!--
+                The document, travelling. Its path covers only the two links
+                that actually carry it today — running it on past the dashed
+                connector would animate a delivery that does not happen, and
+                the animation would be the most persuasive thing on the page.
+              -->
+              <circle class="seq-dot travel" r="4.5" style="--delay: 1800ms;
+                      offset-path: path('M 86 62 H 148 M 220 62 H 282');" />
+            </svg>
+          </div>
+
+          <p class="seq-legend">
+            <span><i></i> works today</span>
+            <span><i class="k-todo"></i> built, not connected yet</span>
+            <span><i class="k-outside"></i> outside Teams, on purpose</span>
+          </p>
+
+          <button class="replay" type="button" data-replay="hero-seq">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M 6 1.5 a 4.5 4.5 0 1 1 -4.2 2.9" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linecap="round" />
+              <path d="M 1.2 1 v 3.6 h 3.6" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Play again
+          </button>
+        </figure>
+
+        <!-- The text equivalent of the diagram above. Not decoration: this
+             is what a screen reader, a printed page, and a reader with
+             images disabled all get instead. -->
+        <ol class="sr-only">
+          <li>You ask the bot in a direct message, attaching the customer's document.</li>
+          <li>The bot confirms which product and which kind of request it thinks you meant.</li>
+          <li>
+            You fill in the five things it cannot guess: a short name, the buyer, a deadline
+            with a timezone, the jurisdiction, and an accountable owner.
+          </li>
+          <li>An assessment starts and runs for a while on your own machine.</li>
+          <li>A review copy is produced for the bid team.</li>
+          <li>A named human authorises it and lodges it. The bot does neither.</li>
+          <li>Only then does anything reach the customer.</li>
+        </ol>
+      </div>
+
+      <!-- ================================================== before you start -->
+      <section class="section" id="start">
+        <div class="section-head reveal">
+          <span class="eyebrow">Before you start</span>
+          <h2 class="h-section">Three things have to be true, and none of them are self-service.</h2>
+          <p class="lede">
+            If the bot answers <em>“Couldn’t verify who you are”</em> or
+            <em>“Access denied”</em>, it is one of these — not something you can fix by
+            rephrasing.
+          </p>
+        </div>
+
+        <div class="grid grid-3 reveal-group">
+          <div class="card">
+            <h3 class="h-card">1. Installed for you personally</h3>
+            <p class="small" style="margin-top: 0.5rem">
+              The app installs into a <strong>one-to-one chat with the bot</strong>. There is
+              no channel or group-chat version, so @-mentioning it in a team channel does
+              nothing — the message never reaches it.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="h-card">2. Your account is linked to a host</h3>
+            <p class="small" style="margin-top: 0.5rem">
+              Whoever set this up has to add your account to the registry. Until they do,
+              every command that touches a host answers
+              <em>“Your account isn’t linked to a Traycer host yet.”</em>
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="h-card">3. Your host is awake and signed in</h3>
+            <p class="small" style="margin-top: 0.5rem">
+              The agents run on <strong>your machine</strong>, not in the cloud. If it is
+              asleep, the bot can see nothing. Sign in there with
+              <code class="cmd">traycer login</code>.
+            </p>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top: 1.25rem">
+          <div>
+            <strong style="color: var(--fg-strong)">Everything is scoped to one epic.</strong>
+            <span class="small">
+              The bot answers about the epic this conversation is bound to. Send
+              <code class="cmd">epics</code> to list them and
+              <code class="cmd">epic &lt;id&gt;</code> to pick one. A binding is held in memory,
+              so it can be forgotten if the bot restarts — if answers suddenly look empty,
+              re-bind before assuming something is broken.
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================== journey -->
+      <section class="section" id="journey">
+        <div class="section-head reveal">
+          <span class="eyebrow">The headline journey</span>
+          <h2 class="h-section">Assessing a customer RFP or RFI</h2>
+          <p class="lede">
+            The journey the bot is built around. Some of it works today and some of it is
+            designed but not yet connected — each step says which, because a help page that
+            hides the difference just sends you to try something that answers with a help
+            card.
+          </p>
+        </div>
+
+        <!--
+          The badges describe the CODE. This says whether the deployment can
+          reach it, which is a different question and the one a reader
+          actually has.
+
+          Without it steps 3 and 4 read "Live" while the confirm press
+          answers "This deployment can't start assessments yet." — the page
+          contradicting the bot, with the page sounding more confident.
+        -->
+        <div class="note note-warn" style="margin-bottom: 1.75rem">
+          <div class="small">
+            <strong style="color: var(--fg-strong)">
+              Check this works on your deployment before relying on it.
+            </strong>
+            Starting an assessment needs the bot to be told which host to start it
+            <em>on</em>. If that is not configured, pressing <strong>Yes, go ahead</strong>
+            answers <em>“This deployment can’t start assessments yet”</em> and you never reach
+            the form — nothing below step 2 is reachable. It is a deployment setting, not
+            something you can fix from Teams. The steps below describe the bot as built.
+          </div>
+        </div>
+
+        <div class="journey">
+          <!-- step 1 -->
+          <div class="step reveal">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">Ask, in your own words, and attach the document</h3>
+                <span class="pill pill-live">Live</span>
+              </div>
+              <p class="prose small">
+                Open the bot’s chat, describe what you have, and attach the file. It reads
+                plain language — you do not need a command, and you do not need to be precise.
+                “Does this fit SensorMine?” and “what about SensorMine for this one?” both work.
+              </p>
+
+              <div class="thread" aria-hidden="true">
+                <div class="msg">
+                  <div class="msg-avatar msg-avatar-person">SL</div>
+                  <div class="msg-bubble">
+                    <span class="mention">@Traycer</span> what about SensorMine for this one?
+                    <span class="attach">
+                      <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                        <path d="M 3 5 h 6 M 3 7.5 h 4" stroke="currentColor" stroke-width="1.2"
+                              stroke-linecap="round" />
+                        <path d="M 2 1.5 h 5 l 3 3 v 6 h -8 z" fill="none" stroke="currentColor"
+                              stroke-width="1.2" stroke-linejoin="round" />
+                      </svg>
+                      Northgate-RFP-2026.pdf
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="annot">
+                <strong>Attach the file to this first message.</strong> It is captured the
+                moment you send it, before you have agreed to anything — a Teams download link
+                is only valid on the message that carried it, so a file attached to a later
+                reply cannot be picked up. Up to 100&nbsp;MB each.
+              </p>
+              <p class="annot">
+                <strong>Send it as a direct message, not in a channel.</strong> Files posted in
+                a channel live in SharePoint, which the bot cannot read yet — it will say so
+                rather than starting an assessment against nothing.
+              </p>
+              <p class="annot">
+                Two files with the same name are refused, because the bid pack cannot hold two
+                documents with one name. Rename one and attach them again.
+              </p>
+            </div>
+          </div>
+          <div class="step-rail" aria-hidden="true"></div>
+
+          <!-- step 2 -->
+          <div class="step reveal">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">It checks it understood you</h3>
+                <span class="pill pill-live">Live</span>
+              </div>
+              <p class="prose small">
+                Rather than guessing, the bot names what it thinks you want and waits. Two
+                products are recognised — <strong>SensorMine</strong> and
+                <strong>DR&nbsp;Migrate</strong> — and only a SensorMine opportunity has an
+                assessment skill behind it today.
+              </p>
+
+              <div class="mock" aria-hidden="true" style="max-width: 27rem">
+                <div class="mock-bar">
+                  <div class="mock-avatar">T</div>
+                  <span class="mock-who">Traycer</span>
+                  <span class="mock-when">now</span>
+                </div>
+                <div class="mock-body">
+                  <div class="mock-head">
+                    <div class="mock-eyebrow">Before I start</div>
+                    <div class="mock-title">
+                      Looks like a new SensorMine opportunity. Is that right?
+                    </div>
+                  </div>
+                  <div class="mock-actions">
+                    <span class="mock-btn mock-btn-primary">Yes, go ahead</span>
+                    <span class="mock-btn">Something else</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="annot">
+                <strong>Something else</strong> is not a dead end — it replies
+                <em>“No problem — tell me what you’d like me to do with it,”</em> and you can
+                rephrase.
+              </p>
+            </div>
+          </div>
+          <div class="step-rail" aria-hidden="true"></div>
+
+          <!-- step 3 — the intake form -->
+          <div class="step reveal">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">You fill in five things it cannot guess</h3>
+                <span class="pill pill-live">Live</span>
+              </div>
+              <p class="prose small">
+                <strong>Yes, go ahead</strong> opens a form rather than starting immediately.
+                The classifier can work out <em>which</em> skill to run; it cannot invent a
+                deadline or decide who is accountable, and the bid tooling refuses to start
+                without them.
+              </p>
+
+              <div class="mock" aria-hidden="true" style="max-width: 27rem">
+                <div class="mock-bar">
+                  <div class="mock-avatar">T</div>
+                  <span class="mock-who">Traycer</span>
+                  <span class="mock-when">now</span>
+                </div>
+                <div class="mock-body">
+                  <div class="mock-head">
+                    <div class="mock-title">Start an assessment</div>
+                    <div class="mock-subtitle" data-sample>a new SensorMine opportunity</div>
+                  </div>
+                  <div class="mock-meta">1 document ready for the assessment:</div>
+                  <div class="small" style="color: var(--fg-strong)">
+                    Northgate-RFP-2026.pdf
+                  </div>
+                  <div class="small" style="display: grid; gap: 0.45rem">
+                    <div><strong>Short name</strong> — northgate-water-2026</div>
+                    <div><strong>Buyer</strong> — Northgate Water Authority</div>
+                    <div><strong>Deadline</strong> — 2026-09-14 · 17:00 · AEST</div>
+                    <div><strong>Jurisdiction</strong> — Local</div>
+                    <div><strong>Accountable owner</strong> — Sam Lowe</div>
+                  </div>
+                  <div class="mock-actions">
+                    <span class="mock-btn mock-btn-primary">Start assessment</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="annot">
+                <strong>The deadline needs a timezone.</strong> Not a nicety — a tender closing
+                “5pm” is a different instant in Perth and Auckland, and the tooling refuses a
+                deadline without an explicit offset rather than guessing one.
+              </p>
+              <p class="annot">
+                <strong>The owner is prefilled with you</strong>, and you can replace it. It
+                names the human accountable for the bid, so it cannot be silently inferred —
+                but making you type your own name every time is friction people route around.
+              </p>
+              <p class="annot">
+                Get a field wrong and the form comes back with your other answers intact and
+                the problem named. Errors are listed at the top as well as beside the field,
+                because on a phone the last field is below the fold.
+              </p>
+            </div>
+          </div>
+          <div class="step-rail" aria-hidden="true"></div>
+
+          <!-- step 4 -->
+          <div class="step reveal">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">The assessment starts, and you get a link</h3>
+                <span class="pill pill-live">Live</span>
+              </div>
+              <p class="prose small">
+                Submitting the form creates a new agent on your host and hands it the request
+                and the documents. This takes a few seconds — the card below replaces the
+                waiting, and the work then runs for far longer than the conversation does.
+              </p>
+
+              <div class="mock" aria-hidden="true" style="max-width: 27rem">
+                <div class="mock-bar">
+                  <div class="mock-avatar">T</div>
+                  <span class="mock-who">Traycer</span>
+                  <span class="mock-when">now</span>
+                </div>
+                <div class="mock-body">
+                  <div class="mock-head">
+                    <div class="mock-eyebrow mock-eyebrow-good">Assessment started</div>
+                    <div class="mock-title">what about SensorMine for this one?</div>
+                    <div class="mock-subtitle">
+                      It’s running. Open it to watch progress — I won’t ping you when it
+                      finishes.
+                    </div>
+                  </div>
+                  <div class="mock-actions">
+                    <span class="mock-btn mock-btn-primary">Watch progress</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="annot">
+                If the card says <em>“Couldn’t confirm it started”</em>, ask again exactly the
+                same way. The request is de-duplicated, so repeating it cannot start a second
+                assessment. If it says <em>“I haven’t started”</em>, nothing was created at all.
+              </p>
+            </div>
+          </div>
+          <div class="step-rail" aria-hidden="true"></div>
+
+          <!-- step 5 -->
+          <div class="step reveal step-todo">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">It replies again when the work is done</h3>
+                <span class="pill pill-warn">Not wired yet</span>
+              </div>
+              <p class="prose small">
+                <strong>Nothing will arrive.</strong> The bot does not ping you when an
+                assessment finishes, and the card that starts one says so rather than leaving
+                you waiting. Come back and press <strong>Watch progress</strong>, or send
+                <code class="cmd">fleet</code> and open the agent from there.
+              </p>
+              <p class="annot">
+                It is badged <em>built, not connected yet</em> rather than <em>missing</em> for
+                a reason. When your assessment starts, the bot records where to send the
+                result — and <strong>refuses to start at all</strong> if it cannot, because an
+                assessment whose result has nowhere to go spends real time on a customer
+                document and produces something nobody receives. Everything is in place except
+                the last wire.
+              </p>
+              <p class="annot">
+                When that wire is connected, the reply will fire on the document bundle being
+                assembled from an <strong>authorised</strong> bid — not on the chat finishing.
+                Those are different events, and treating “the agent stopped talking” as “the
+                work is approved” is the mistake this whole design exists to avoid.
+              </p>
+            </div>
+          </div>
+          <div class="step-rail" aria-hidden="true"></div>
+
+          <!-- step 6 -->
+          <div class="step reveal step-todo">
+            <div class="step-num">6</div>
+            <div class="step-body">
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+                <h3 class="h-card">A human authorises and lodges</h3>
+                <span class="pill">By design, outside Teams</span>
+              </div>
+              <p class="prose small">
+                This step is not missing and will not be added. It is the point of the whole
+                design.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ------------------------------------------------------- the gate -->
+        <h3 class="h-section reveal" style="margin: 2.5rem 0 1rem; font-size: 1.3rem">
+          The one thing to take away
+        </h3>
+
+        <div class="gate reveal">
+          <div class="gate-side">
+            <span class="gate-label">What the bot gives you</span>
+            <p style="color: var(--fg-strong); font-weight: 600">A review copy.</p>
+            <ul class="small" style="display: grid; gap: 0.4rem">
+              <li>— Assembled for the <strong>bid team</strong>, not the buyer.</li>
+              <li>— Every claim in it is a <strong>draft</strong> until a person says otherwise.</li>
+              <li>— Labelled as a review copy, naming the human who authorised it.</li>
+            </ul>
+          </div>
+
+          <div class="gate-rule" aria-hidden="true"></div>
+
+          <div class="gate-side">
+            <span class="gate-label">What only a person does</span>
+            <p style="color: var(--fg-strong); font-weight: 600">Decides, authorises, lodges.</p>
+            <ul class="small" style="display: grid; gap: 0.4rem">
+              <li>— The <strong>go / no-go</strong> call on whether to bid at all.</li>
+              <li>— Signing off each evidence claim that goes to a buyer.</li>
+              <li>— Actually <strong>lodging</strong> the tender.</li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="prose reveal" style="margin-top: 1rem; color: var(--fg-strong); font-weight: 600">
+          A reply containing documents is not permission to send them to the customer.
+          <span style="font-weight: 400; color: var(--fg-muted)">
+            Rendering a bundle is not lodging a tender, and the bot has no way to authorise
+            one — it holds read-only access to the bid and there is no button anywhere that
+            changes that.
+          </span>
+        </p>
+
+        <!-- --------------------------------------------------- two outcomes -->
+        <h3 class="h-section reveal" style="margin: 2.5rem 0 1rem; font-size: 1.3rem">
+          Two endings, both of them correct
+        </h3>
+
+        <div class="grid grid-2 reveal-group">
+          <div class="outcome">
+            <div class="outcome-head">
+              <span class="pill pill-live">Bid</span>
+              <h4 class="h-card">You get documents</h4>
+            </div>
+            <p class="small">
+              The assessment found a fit worth pursuing. Once a human has authorised the
+              claims, a bundle is assembled and the bot delivers a review copy of it.
+            </p>
+          </div>
+
+          <div class="outcome">
+            <div class="outcome-head">
+              <span class="pill">No-bid</span>
+              <h4 class="h-card">You get no documents at all</h4>
+            </div>
+            <p class="small">
+              The assessment concluded this one is not worth bidding, so
+              <strong>no bundle is ever produced</strong>. You get the reasoning instead.
+              <strong style="color: var(--fg-strong)">
+                This is a successful run, not a failure</strong>, and it is expected to be a
+              common one. Nothing is broken and there is nothing to retry.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= commands -->
+      <section class="section" id="commands">
+        <div class="section-head reveal">
+          <span class="eyebrow">Day to day</span>
+          <h2 class="h-section">Seven things you can type</h2>
+          <p class="lede">
+            You can also just ask in plain language. These are the shortcuts when you know
+            what you want. Ids come from <code class="cmd">fleet</code> — you never have to
+            memorise one.
+          </p>
+        </div>
+
+        <div class="cmd-list reveal">
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="fleet">fleet</code></div>
+            <div class="small">
+              The agents in this epic, newest and most active first. Up to eight, each with an
+              <strong>Open</strong> button — tapping the row does the same thing. Everything
+              you can <em>do</em> to an agent lives one level down, on the card
+              <strong>Open</strong> takes you to.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="chat">chat &lt;id&gt;</code></div>
+            <div class="small">
+              One agent’s status, with anything waiting on you pulled above the fold, its last
+              three messages, and a box to reply. This card carries the
+              <strong>Reply</strong> and <strong>History</strong> buttons.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="log">log &lt;id&gt;</code></div>
+            <div class="small">
+              Its history, five messages at a time, newest first. Page with
+              <strong>↑ Older</strong> and <strong>↓ Newer</strong>.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="say">say &lt;id&gt; &lt;message&gt;</code></div>
+            <div class="small">
+              Send an agent a message. Leave the message off and you get a compose box
+              instead, which is easier for anything long.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="epics">epics</code></div>
+            <div class="small">Your epics, so you can bind one to this conversation.</div>
+          </div>
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="epic">epic &lt;id&gt;</code></div>
+            <div class="small">
+              Bind this conversation to an epic. Send it bare and it tells you the syntax.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><code class="cmd" data-copy="help">help</code></div>
+            <div class="small">The starting card. An empty message does the same thing.</div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top: 1.25rem">
+          <div class="small">
+            <strong style="color: var(--fg-strong)">Ids are long; you only need the start.</strong>
+            The cards show a shortened form and the buttons carry the full one, so the reliable
+            move is always to run <code class="cmd">fleet</code> and press a button rather than
+            to type an id by hand. If you do mistype one, the bot answers
+            <em>“That doesn’t look like a chat.”</em>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================== waiting -->
+      <section class="section" id="waiting">
+        <div class="section-head reveal">
+          <span class="eyebrow">Waiting on you</span>
+          <h2 class="h-section">When an agent needs an answer</h2>
+          <p class="lede">
+            Agents stop and ask. Both kinds of question show up inside
+            <code class="cmd">chat &lt;id&gt;</code>, above everything else.
+          </p>
+        </div>
+
+        <div class="grid grid-2 reveal-group">
+          <div>
+            <div class="mock" aria-hidden="true">
+              <div class="mock-bar">
+                <div class="mock-avatar">T</div>
+                <span class="mock-who">Traycer</span>
+                <span class="mock-when">4m ago</span>
+              </div>
+              <div class="mock-body">
+                <div class="mock-head">
+                  <div class="mock-eyebrow mock-eyebrow-attention">
+                    Agent action · approval needed
+                  </div>
+                  <div class="mock-title">Write file</div>
+                  <div class="mock-subtitle" data-sample>Northgate RFP</div>
+                </div>
+                <div class="small">
+                  Create <code>Sales/rfp/bids/northgate/decision-pack.md</code>
+                </div>
+                <div class="mock-meta">Requested 4m ago · Epic e0000000…</div>
+                <div class="mock-actions">
+                  <span class="mock-btn">✓ Approve</span>
+                  <span class="mock-btn">✕ Reject</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="h-card" style="margin-top: 0.9rem">Approvals</h3>
+            <p class="small" style="margin-top: 0.35rem">
+              The agent wants to do something and is waiting for a yes. Rejecting takes an
+              optional reason, and the reason is sent to the agent — so it is worth writing.
+            </p>
+            <p class="annot">
+              The buttons stay on the card after you press them. That is a Teams limitation,
+              not a failed press: look for the <strong>Approved</strong> or
+              <strong>Rejected</strong> card that appears underneath.
+            </p>
+          </div>
+
+          <div>
+            <div class="mock" aria-hidden="true">
+              <div class="mock-bar">
+                <div class="mock-avatar">T</div>
+                <span class="mock-who">Traycer</span>
+                <span class="mock-when">2m ago</span>
+              </div>
+              <div class="mock-body">
+                <div class="mock-head">
+                  <div class="mock-eyebrow mock-eyebrow-attention">Needs your answer</div>
+                  <div class="mock-title">Jurisdiction and deadline</div>
+                  <div class="mock-subtitle" data-sample>Northgate RFP</div>
+                </div>
+                <div class="mock-meta">Asked 2m ago · Epic e0000000…</div>
+                <div style="font-weight: 600; color: var(--fg-strong)">
+                  Which jurisdiction governs this tender?
+                </div>
+                <div class="small" style="display: grid; gap: 0.3rem">
+                  <div>◯ Commonwealth</div>
+                  <div>◯ State</div>
+                  <div>◯ Local</div>
+                  <div>◯ Enterprise</div>
+                </div>
+                <div class="mock-actions">
+                  <span class="mock-btn mock-btn-primary">Send answers</span>
+                </div>
+              </div>
+            </div>
+            <h3 class="h-card" style="margin-top: 0.9rem">Interviews</h3>
+            <p class="small" style="margin-top: 0.35rem">
+              A set of questions the agent needs answered before it can carry on. Every
+              question has to be filled in before it will send.
+            </p>
+            <p class="annot">
+              Some interviews cannot be answered from Teams and say so — the questions did not
+              reach the bot. Those have to be answered on the desktop.
+            </p>
+          </div>
+        </div>
+
+        <div class="note note-warn" style="margin-top: 1.5rem">
+          <div class="small">
+            <strong style="color: var(--fg-strong)">
+              If a reply says it couldn’t confirm, do not press again.
+            </strong>
+            An unconfirmed approval or answer may well have landed. Re-sending is a second
+            real instruction the agent will act on, not a harmless retry. Run
+            <code class="cmd">chat &lt;id&gt;</code> first — if the question is gone from the
+            list, it went through.
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================== trouble -->
+      <section class="section" id="trouble">
+        <div class="section-head reveal">
+          <span class="eyebrow">When it breaks</span>
+          <h2 class="h-section">What the bot says, and what it means</h2>
+          <p class="lede">
+            Most failures are your host being unreachable rather than anything you typed. The
+            bot deliberately never shows raw errors, so these headlines are the diagnosis.
+          </p>
+        </div>
+
+        <div class="cmd-list reveal">
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Couldn’t reach your Traycer host</strong></div>
+            <div class="small">
+              Your machine is asleep, offline, or the host process is not running. Wake it and
+              try again. Nothing was changed.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Your host isn’t signed in</strong></div>
+            <div class="small">
+              Run <code class="cmd">traycer login</code> on the machine running your host.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Your host sign-in expired</strong></div>
+            <div class="small">
+              Send the same command again — it refreshes on its own. This one genuinely does
+              fix itself on a retry.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Your host took too long to answer</strong></div>
+            <div class="small">
+              It went over twenty seconds. Usually a busy or waking machine. Nothing was
+              changed.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Host unreachable</strong></div>
+            <div class="small">
+              Shown in place of a status. The card cannot be refreshed, so it is not shown at
+              all rather than showing you something stale.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Read-only from here</strong></div>
+            <div class="small">
+              You can read this agent but not message it — it runs on a host you cannot reach.
+              Nothing is wrong; it is somebody else’s machine.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">Not quite</strong></div>
+            <div class="small">
+              A command was almost right. The sentence underneath says which part. Rephrasing
+              in plain language usually works better than fixing the syntax.
+            </div>
+          </div>
+          <div class="cmd-row">
+            <div><strong style="color: var(--fg-strong)">This deployment can’t start assessments yet</strong></div>
+            <div class="small">
+              Not your fault and not fixable from Teams — the deployment is missing the
+              configuration that says which host to start assessments on. Tell whoever runs
+              it.
+            </div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top: 1.5rem">
+          <div class="small">
+            <strong style="color: var(--fg-strong)">One thing worth knowing about attribution.</strong>
+            A message or an interview answer sent from Teams is recorded in the agent’s
+            transcript under the <em>host owner’s</em> name, not yours. If several people use
+            the same host, the transcript cannot tell you who actually pressed the button.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell footer">
+      <span>Traycer Remote — help for the Teams app.</span>
+      <span>
+        Agents run on your own machine. This bot is a window onto them, and a human still
+        signs off anything a customer sees.
+      </span>
+    </footer>
+  </body>
+</html>
