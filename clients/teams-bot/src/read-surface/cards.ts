@@ -45,6 +45,51 @@ import {
  * that can overflow, short labels, no fixed wide layouts.
  */
 
+/**
+ * THE VISUAL SYSTEM, 2026-08-09. Read this before adding a card.
+ *
+ * The rules above (semantic tokens only, no hex, responsive by construction)
+ * were right and are unchanged. What they did not say is HOW MUCH, and the
+ * result was a set of cards that each used the vocabulary correctly and
+ * looked, together, like a stack of alert boxes. Rendered evidence, at 500px:
+ *
+ *   - the chat card was three full-bleed colour slabs in a row — grey header,
+ *     pink approvals, pink interviews — separated by hairlines, which reads
+ *     as a rendering fault rather than as hierarchy;
+ *   - the fleet card spent five lines and two buttons per row, so eight
+ *     agents measured ~1560px and Teams would collapse it behind "see more";
+ *   - the transcript rendered `⟨error · styling unverified⟩ ⟨model · claude⟩`
+ *     in monospace angle brackets — debug-console vocabulary in a surface
+ *     Altra sales staff use in front of customers;
+ *   - identifiers nobody can act on (`Epic e0000000…`) sat in bold FactSet
+ *     rows, which is the heaviest treatment the schema has, for the least
+ *     useful thing on the card.
+ *
+ * So three rules, and they are about RESTRAINT rather than about tokens:
+ *
+ * 1. ONE TONED CONTAINER PER CARD, AT MOST.
+ *    `attention` / `warning` / `good` are for a card whose ENTIRE subject is
+ *    that state — an outcome, a refusal, a failure. A card that carries a
+ *    toned header AND toned content below it has told the reader nothing:
+ *    if everything is coloured, colour has stopped marking the exception.
+ *    Headers are `emphasis` (neutral) and the semantic signal is carried by
+ *    ONE coloured word inside them. See {@link cardHeader}.
+ *
+ * 2. ONE GRAMMAR FOR HEADERS, ONE FOR FOOTERS.
+ *    Header: eyebrow (small, bolder, semantic colour) — what KIND of card
+ *    this is; title (medium, bolder) — the subject; subtitle (small, subtle)
+ *    — one line of context. Footer: {@link metaLine}, one subtle small line
+ *    of `a · b · c`. Identifiers live in the footer, never in a FactSet.
+ *    `FactSet` is kept for genuine label/value pairs a reader quotes — the
+ *    `Code` row on a refusal — and nothing else.
+ *
+ * 3. HEIGHT IS A DESIGN PROPERTY.
+ *    Teams collapses a tall card behind "see more", and a card you must
+ *    expand before reading has failed before it is read. Rows get one
+ *    action, not two; lists get a limit that fits; the second action moves to
+ *    the card the first one opens.
+ */
+
 const ADAPTIVE_CARD_SCHEMA =
   "http://adaptivecards.io/schemas/adaptive-card.json";
 /**
@@ -123,7 +168,21 @@ export const SEND_VERB = "traycer/send";
  */
 export const APPROVE_TITLE = "✓ Approve";
 export const REJECT_TITLE = "✕ Reject";
-export const SEND_TITLE = "➤ Send";
+/**
+ * NO GLYPH, unlike Approve/Reject, and the difference is the whole rule.
+ *
+ * The glyphs on Approve and Reject are load-bearing: two opposite,
+ * irreversible decisions sitting side by side, whose colour Teams may drop,
+ * so the distinction has to survive in something no host can strip. `Send`
+ * is a single primary button with nothing to be confused with. A `➤` there
+ * is decoration, and decoration applied inconsistently is what made the set
+ * look ad hoc — `➤ Send`, `✓ Approve`, `↑ Older`, `My agents`, `Reply`, all
+ * on adjacent cards.
+ *
+ * The test: would removing this glyph make two actions harder to tell
+ * apart? On Approve/Reject, yes. Here, no.
+ */
+export const SEND_TITLE = "Send";
 /**
  * ↑/↓ rather than ⌃/⌄: the arrowhead glyphs fell back to a plain caret and
  * "v" in the render, which reads as a typo. Caught in a screenshot — the
@@ -298,12 +357,111 @@ function container(
   };
 }
 
-/** `FactSet` aligns and themes itself — far better than `"a · b · c"` concatenation, which wrapped mid-phrase at 320px. */
+/**
+ * `FactSet` aligns and themes itself. RESERVED, now, for pairs a reader
+ * genuinely compares or quotes — in practice the `Code` row on a refusal.
+ *
+ * It was carrying rows like `Epic  e0000000…`, and a FactSet title is bold:
+ * the heaviest treatment the schema has, spent on the one thing on the card
+ * nobody can act on. Identifiers moved to {@link metaLine}.
+ */
 function facts(pairs: readonly (readonly [string, string])[]): unknown {
   return {
     type: "FactSet",
     facts: pairs.map(([title, value]) => ({ title, value })),
   };
+}
+
+/**
+ * The one header grammar, used by every card.
+ *
+ * `emphasis` — NEVER a semantic tone — and the reason is the same one
+ * `buildChatCard` already recorded for itself and then nothing else adopted:
+ * an `attention`-styled container wrapping a green "Running" badge reads as
+ * self-contradictory. Generalised: a header describes the SUBJECT, and the
+ * subject's state belongs to one word inside it, not to a slab of colour
+ * behind it.
+ *
+ * `eyebrow` is where the semantic colour goes. It says what kind of card this
+ * is — "Approval needed", "Fleet", "Needs your answer" — so a reader who sees
+ * six cards in a thread can tell them apart without reading any of them.
+ *
+ * `tone: null` renders NO container at all, for cards short enough that a
+ * grey band would be most of the card.
+ */
+function cardHeader(options: {
+  readonly eyebrow: string | null;
+  readonly eyebrowColor?: SemanticColor;
+  readonly title: string;
+  readonly subtitle?: string | null;
+  readonly tone?: ContainerStyle | null;
+}): unknown {
+  const items: unknown[] = [];
+  if (options.eyebrow !== null) {
+    items.push(
+      text(options.eyebrow, {
+        size: "small",
+        weight: "bolder",
+        color: options.eyebrowColor ?? "default",
+        isSubtle: options.eyebrowColor === undefined,
+        spacing: "none",
+      }),
+    );
+  }
+  items.push(
+    text(options.title, {
+      weight: "bolder",
+      size: "medium",
+      spacing: options.eyebrow === null ? "none" : "small",
+    }),
+  );
+  const subtitle = options.subtitle ?? null;
+  if (subtitle !== null && subtitle.length > 0) {
+    items.push(
+      text(subtitle, { isSubtle: true, size: "small", spacing: "small" }),
+    );
+  }
+  const tone = options.tone === undefined ? "emphasis" : options.tone;
+  return tone === null
+    ? container(items, { spacing: "none" })
+    : container(items, { style: tone });
+}
+
+/**
+ * The one footer grammar: `a · b · c`, subtle, small, last.
+ *
+ * Everything a reader might need but will not act on — a chat title, an epic
+ * id, how long ago something was asked — goes here in one line. Empty and
+ * null segments are dropped rather than rendering ` ·  · `, because the
+ * callers assemble these from optional fields.
+ *
+ * WRAPS, unlike the old FactSet. The FactSet's narrow title column forced
+ * short labels and then wrapped both columns anyway at 320px; one flowing
+ * line degrades to two flowing lines, which is the failure mode you want.
+ */
+function metaLine(segments: readonly (string | null)[]): unknown {
+  const shown = segments.filter(
+    (segment): segment is string => segment !== null && segment.length > 0,
+  );
+  return text(shown.join("  ·  "), {
+    isSubtle: true,
+    size: "small",
+    separator: true,
+    spacing: "small",
+  });
+}
+
+/**
+ * An epic id as a footer segment, or `null` when there is nothing to say.
+ *
+ * The information is kept — an approval is a decision prompt and "approve
+ * this" is ambiguous across epics, which is why it was added — but its
+ * WEIGHT is not. A truncated UUID in bold was claiming to be a fact someone
+ * would use. Here it is what it actually is: something to quote at whoever
+ * asks "which epic?".
+ */
+function epicSegment(epicId: string): string | null {
+  return epicId.length === 0 ? null : `Epic ${shortId(epicId)}`;
 }
 
 /**
@@ -352,8 +510,20 @@ function shortId(id: string): string {
   return id.length <= 12 ? id : `${id.slice(0, 8)}…`;
 }
 
-/** Long fleets are truncated with an honest count rather than dumped as N uniform rows. */
-const FLEET_ROW_LIMIT = 12;
+/**
+ * Long fleets are truncated with an honest count rather than dumped as N
+ * uniform rows.
+ *
+ * WAS 12, and 12 never fitted. Measured at 500px, the old five-line row came
+ * to ~195px, so twelve rows plus a header was ~2400px — several times past
+ * where Teams collapses a card behind "see more". A limit that produces a
+ * card nobody can read without expanding it is not a limit.
+ *
+ * The row is now ~85px, so eight rows plus a header land near 750px, which
+ * fits. The number is derived from the row height; if the row grows, this
+ * shrinks.
+ */
+const FLEET_ROW_LIMIT = 8;
 
 /**
  * "Idle" is a CLAIM, and for a remote agent we have no basis for it.
@@ -477,8 +647,12 @@ export function agentDisplayName(agent: AgentSummary): string {
 export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
   if (agents.length === 0) {
     return card([
-      text("Fleet", { weight: "bolder", size: "medium" }),
-      text("No agents in this epic yet.", { isSubtle: true }),
+      cardHeader({
+        eyebrow: null,
+        title: "Fleet",
+        subtitle: "No agents in this epic yet.",
+        tone: null,
+      }),
     ]);
   }
 
@@ -498,8 +672,10 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
   const shown = sorted.slice(0, FLEET_ROW_LIMIT);
 
   const header = [
-    text("Fleet", { weight: "bolder", size: "medium", spacing: "none" }),
-    text(
+    cardHeader({
+      eyebrow: null,
+      title: "Fleet",
+      subtitle:
       /*
        * NO "N active". The count was structurally incapable of being right.
        *
@@ -521,42 +697,86 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
        * fleet.
        */
       observable === agents.length
-        ? `${String(agents.length)} agent${agents.length === 1 ? "" : "s"}`
-        : `${String(agents.length)} agent${agents.length === 1 ? "" : "s"} · ${String(observable)} visible from here`,
-      { isSubtle: true, size: "small", spacing: "none" },
-    ),
+          ? `${String(agents.length)} agent${agents.length === 1 ? "" : "s"}`
+          : `${String(agents.length)} agent${agents.length === 1 ? "" : "s"} · ${String(observable)} visible from here`,
+    }),
   ];
 
+  /*
+   * ONE ACTION PER ROW, and the second one did not disappear — it moved.
+   *
+   * The row carried `Reply` and `Activity`, so eight agents rendered sixteen
+   * outlined buttons. Measured at 500px, the button chrome alone was more
+   * card height than every agent title put together, and the eye had nothing
+   * to land on: a list whose loudest element repeats identically on every row
+   * has no scanning order at all.
+   *
+   * `Open` is the row's one destination, and it is the same thing tapping the
+   * row already did — so the button is now the row gesture MADE VISIBLE
+   * rather than a third competing affordance. `Reply` and `History` are
+   * offered by {@link buildChatCard}, which is where `Open` lands. Two taps
+   * to send a message instead of one; a list you can read instead of one you
+   * expand.
+   *
+   * NOT GATED on `capabilities.sendMessage` any more, and that is the point
+   * of moving it: `Open` is a read, and every agent here is readable. The
+   * gate did not weaken, it went to the card that offers the write — see
+   * `buildChatCard`'s `canSend`. Offering a Reply button this host cannot
+   * honour was the failure the gate existed to stop, and it still cannot
+   * happen; it just cannot happen one screen later.
+   */
   const rows = shown.map((agent) => {
     // One derivation for label and styling — see agentStatusPresentation.
     const presentation = agentStatusPresentation(agent);
     return container(
       [
-        text(agentDisplayName(agent), {
-          weight: "bolder",
+        // Title and status on ONE line. They were stacked, which spent a line
+        // on a word ("Active") that is at most fifteen characters and is the
+        // thing you scan the column of. `width: "auto"` on the status column
+        // means a long label ("Activity not visible from here") takes what it
+        // needs and the title takes the rest.
+        {
+          type: "ColumnSet",
+          spacing: "none",
+          columns: [
+            {
+              type: "Column",
+              width: "stretch",
+              verticalContentAlignment: "center",
+              items: [
+                text(agentDisplayName(agent), {
+                  weight: "bolder",
+                  spacing: "none",
+                }),
+              ],
+            },
+            {
+              type: "Column",
+              width: "auto",
+              verticalContentAlignment: "center",
+              items: [
+                text(presentation.label, {
+                  size: "small",
+                  weight: "bolder",
+                  color: presentation.color,
+                  isSubtle: presentation.color === "default",
+                  spacing: "none",
+                  // The one place `wrap: false` is right: this column is
+                  // sized to its content, so wrapping it would mean it had
+                  // taken width it then refused to use.
+                  wrap: false,
+                }),
+              ],
+            },
+          ],
+        },
+        text(`${agent.harnessId ?? "unknown"} · ${agent.surface}`, {
+          isSubtle: true,
+          size: "small",
           spacing: "none",
         }),
-        statusBadge(
-          presentation.label,
-          presentation.color,
-          `${agent.harnessId ?? "unknown"} · ${agent.surface}`,
-        ),
-        // The row's actions, carrying the id so nobody has to see it.
-        // `Reply` is the one that matters: it was `say <guid> <text>`.
-        //
-        // GATED ON `capabilities.sendMessage`, for the same reason the tab
-        // gates Approve/Reject on `canAct`: offering an action this host
-        // cannot perform is a promise the next tap breaks. `Activity` is
-        // always offered because reading is not the same permission.
         actionSet([
-          ...(agent.capabilities.sendMessage
-            ? [
-                submitAction("Reply", REPLY_VERB, { chatId: agent.agentId }, {
-                  associateInputs: false,
-                }),
-              ]
-            : []),
-          submitAction("Activity", LOG_VERB, { chatId: agent.agentId }, {
+          submitAction("Open", OPEN_CHAT_VERB, { chatId: agent.agentId }, {
             associateInputs: false,
           }),
         ]),
@@ -623,22 +843,34 @@ function runStatusColor(runStatus: ChatStatus["runStatus"]): SemanticColor {
  * different card and never renders the live view. Now a `warning`-styled
  * Container rather than a bold line with an emoji.
  */
-export function buildChatCard(status: ChatStatus, epicId: string): Attachment {
+export function buildChatCard(
+  status: ChatStatus,
+  epicId: string,
+  /**
+   * Whether this host can send to this chat.
+   *
+   * NEW, and it is the gate the fleet row used to hold. `Reply` moved here
+   * when the row went down to one action, and the promise it makes had to
+   * move with it — a Reply button on a chat that cannot receive one is the
+   * exact "button that lies" the fleet card's own docblock refused to ship.
+   *
+   * Defaults to `false`: a caller that has not established the capability
+   * must not be able to produce a composer button by omission. `dispatch.ts`
+   * reads it from the same `fetchChatCapabilities` it already called.
+   */
+  canSend = false,
+): Attachment {
   if (!status.connected) {
+    // The WHOLE subject of this card is the degraded state, so the whole card
+    // is toned — that is what rule 1 permits, and the reason it permits it.
     return card([
-      container(
-        [
-          text("Host unreachable", { weight: "bolder", color: "warning" }),
-          text(
-            "The status below could not be refreshed, so it is not shown. Try again shortly.",
-            { isSubtle: true, spacing: "small" },
-          ),
-        ],
-        { style: "warning" },
-      ),
-      text(status.title ?? status.chatId, {
-        weight: "bolder",
-        separator: true,
+      cardHeader({
+        eyebrow: "Host unreachable",
+        eyebrowColor: "warning",
+        title: status.title ?? shortId(status.chatId),
+        subtitle:
+          "The status could not be refreshed, so it is not shown. Try again shortly.",
+        tone: "warning",
       }),
     ]);
   }
@@ -647,10 +879,11 @@ export function buildChatCard(status: ChatStatus, epicId: string): Attachment {
   const interviews = status.pendingInterviews;
   const needsAttention = approvals.length > 0 || interviews.length > 0;
 
-  // Header is ALWAYS `emphasis`, never `attention`. An `attention`-styled
-  // (error-red) container wrapping a green "Running" badge reads as
-  // self-contradictory — is it fine or is it broken? The needs-input signal
-  // belongs on the block that actually describes what is pending, below.
+  // Header is ALWAYS `emphasis`, never `attention` — the reason this card
+  // recorded for itself, and which {@link cardHeader} now applies to every
+  // card: an error-red container wrapping a green "Running" badge reads as
+  // self-contradictory. The needs-input signal belongs on the block that
+  // describes what is pending, below.
   const body: unknown[] = [
     container(
       [
@@ -673,47 +906,54 @@ export function buildChatCard(status: ChatStatus, epicId: string): Attachment {
     ),
   ];
 
-  // Name WHAT is pending, not just how many. A FactSet reading
-  // "Pending approvals: 1" tells the user nothing about what they would be
-  // approving, so they have to go and look — which defeats the point of the
-  // card. Caught by a failing test after a FactSet refactor dropped the
-  // tool name; the fix is to restore the information, not relax the test.
-  if (approvals.length > 0) {
-    const first = approvals[0];
-    const more = approvals.length - 1;
-    body.push(
-      container(
-        [
-          text(
-            more > 0
-              ? `Waiting on you: ${first.toolName} (+${String(more)} more)`
-              : `Waiting on you: ${first.toolName}`,
-            { weight: "bolder", color: "attention", spacing: "none" },
-          ),
-          text(summariseDescription(first.description), { spacing: "small" }),
-        ],
-        { style: "attention", separator: true },
-      ),
-    );
-  }
-
-  if (interviews.length > 0) {
-    body.push(
-      container(
-        [
-          text(
-            interviews.length === 1
-              ? "An interview is waiting for an answer"
-              : `${String(interviews.length)} interviews waiting for answers`,
-            { weight: "bolder", color: "attention", spacing: "none" },
-          ),
-        ],
-        { style: "attention", separator: true },
-      ),
-    );
-  }
-
-  if (!needsAttention) {
+  /*
+   * ONE pending block, not one per kind — rule 1, and the render is why.
+   *
+   * An approval and an interview both pending produced TWO `attention`
+   * containers stacked directly on top of each other with a hairline
+   * between, under a grey one. Three full-bleed slabs in a 600px card. It
+   * did not read as two things waiting; it read as a display fault.
+   *
+   * They are the same fact to the reader — *this agent is blocked on you* —
+   * so they are one block, and what is pending is enumerated INSIDE it.
+   *
+   * Naming WHAT is pending rather than how many is preserved deliberately;
+   * it has a test, and the test is right. "Pending approvals: 1" tells you
+   * nothing about what you would be approving.
+   */
+  if (needsAttention) {
+    const lines: unknown[] = [
+      text("Waiting on you", {
+        weight: "bolder",
+        color: "attention",
+        spacing: "none",
+      }),
+    ];
+    if (approvals.length > 0) {
+      const first = approvals[0];
+      const more = approvals.length - 1;
+      lines.push(
+        text(
+          more > 0
+            ? `${first.toolName} (+${String(more)} more)`
+            : first.toolName,
+          { weight: "bolder", spacing: "small" },
+        ),
+        text(summariseDescription(first.description), { spacing: "none" }),
+      );
+    }
+    if (interviews.length > 0) {
+      lines.push(
+        text(
+          interviews.length === 1
+            ? "An interview is waiting for an answer."
+            : `${String(interviews.length)} interviews are waiting for answers.`,
+          { spacing: approvals.length > 0 ? "small" : "none" },
+        ),
+      );
+    }
+    body.push(container(lines, { style: "attention", separator: true }));
+  } else {
     body.push(
       text("Nothing waiting on you.", {
         isSubtle: true,
@@ -725,13 +965,35 @@ export function buildChatCard(status: ChatStatus, epicId: string): Attachment {
 
   // Epic context: an approval is a decision prompt, and with several epics
   // in play "approve this" is ambiguous without saying approve-it-in-what.
-  body.push(
-    facts([
-      ["Epic", shortId(epicId)],
-      ["Chat", shortId(status.chatId)],
-    ]),
-  );
-  return card(body);
+  // In the footer now, not a bold FactSet — see `metaLine`.
+  body.push(metaLine([epicSegment(epicId), `Chat ${shortId(status.chatId)}`]));
+
+  /*
+   * THE ACTIONS THE FLEET ROW GAVE UP.
+   *
+   * This card had none at all. It announced a blocked agent in a red block
+   * and then offered no way to do anything about it — the typed `chat <id>`
+   * path happens to append a composer and an approval card AFTER it, so the
+   * hole was invisible from the command line and total from a button, since
+   * `dispatchActionInvoke` returns exactly one card.
+   *
+   * `Reply` is gated on `canSend`, which is the fleet row's old gate in its
+   * new home. `History` is not gated: reading is not the same permission,
+   * which is the distinction the fleet card drew and this one inherits.
+   */
+  const actions = [
+    ...(canSend
+      ? [
+          submitAction("Reply", REPLY_VERB, { chatId: status.chatId }, {
+            associateInputs: false,
+          }),
+        ]
+      : []),
+    submitAction("History", LOG_VERB, { chatId: status.chatId }, {
+      associateInputs: false,
+    }),
+  ];
+  return buildCard(body, actions);
 }
 
 /**
@@ -1042,7 +1304,7 @@ export function speakerLabel(message: TranscriptMessage): string {
 export function modelMarker(message: TranscriptMessage): string | null {
   if (message.role !== "assistant") return null;
   const model = message.author?.trim() ?? "";
-  return model.length > 0 ? `⟨model · ${model}⟩` : null;
+  return model.length > 0 ? model : null;
 }
 
 /**
@@ -1066,13 +1328,43 @@ export function shortenWorkspacePath(raw: string): string {
   return sharedShortenWorkspacePath(raw);
 }
 
+/**
+ * What a part is, as a WORD a reader already knows.
+ *
+ * `part.kind` is protocol vocabulary — `file_change`, `other`, `command` —
+ * and it was being printed raw. This maps it to the verb a person would use
+ * for the same thing, which is the same move `humaniseToolName` makes one
+ * level down.
+ */
+const PART_NOUN: Record<string, string> = {
+  file_change: "Edited",
+  file: "Edited",
+  code: "Code",
+  table: "Table",
+  command: "Ran",
+  tool: "Used",
+  error: "Error",
+  other: "Content",
+};
+
+/**
+ * One part of a message, as a line a salesperson can read.
+ *
+ * WAS `⟨error · styling unverified⟩` — monospace, angle brackets, a
+ * protocol noun and a raw label. Rendered in a live transcript next to
+ * `⟨command · bun test --filter cards⟩` and `⟨model · claude⟩`, and the
+ * effect is a debug console pasted into a chat. This is the surface Altra
+ * sales staff run customer RFP work in.
+ *
+ * The angle brackets were doing a real job — separating metadata from the
+ * agent's own prose so nobody read "⟨code · 24 lines⟩" as something the
+ * agent wrote. That job is now done by POSITION and WEIGHT instead: markers
+ * live on their own subtle small line beneath the prose, which is the
+ * convention every other card here already uses for metadata. Punctuation
+ * was carrying styling's weight.
+ */
 export function partMarker(part: TranscriptPart): string {
-  const noun =
-    part.kind === "file_change"
-      ? "file"
-      : part.kind === "other"
-        ? "content"
-        : part.kind;
+  const noun = PART_NOUN[part.kind] ?? "Content";
   const rawLabel = part.label.trim();
   // Only tool labels are identifiers; a heading is already human and must not
   // be run through the humaniser. File paths get their own treatment.
@@ -1082,11 +1374,11 @@ export function partMarker(part: TranscriptPart): string {
       : part.kind === "file_change"
         ? shortenWorkspacePath(rawLabel)
         : rawLabel;
-  const head = label.length > 0 ? `${noun} · ${label}` : noun;
+  const head = label.length > 0 ? `${noun} ${label}` : noun;
   // "1 lines" appeared in front of a user. Pluralise.
   return part.lines > 0
-    ? `⟨${head} · ${String(part.lines)} line${part.lines === 1 ? "" : "s"}⟩`
-    : `⟨${head}⟩`;
+    ? `${head} · ${String(part.lines)} line${part.lines === 1 ? "" : "s"}`
+    : head;
 }
 
 /**
@@ -1162,13 +1454,17 @@ function transcriptRow(
   ];
   if (markers.length > 0) {
     // Markers on their own line: they are metadata about the message, not
-    // part of its prose, and running them together reads as if the agent
-    // wrote "⟨code · 24 lines⟩".
+    // part of its prose.
+    //
+    // NO LONGER MONOSPACE. `fontType: "monospace"` was chosen to separate
+    // metadata from prose, and it does — into a fixed-width block that reads
+    // as terminal output. Monospace is for text whose ALIGNMENT carries
+    // meaning, which is a diff, and a transcript row is not one. The subtle
+    // small treatment separates them just as well and looks like a product.
     items.push(
-      text(markers.join("  "), {
+      text(markers.join("  ·  "), {
         isSubtle: true,
         size: "small",
-        fontType: "monospace",
         spacing: preview.length > 0 ? "small" : "none",
       }),
     );
@@ -1194,22 +1490,14 @@ function transcriptHeader(transcript: Transcript, shown: number): unknown {
   const { totalCount, offset } = transcript;
   const from = totalCount - offset - shown + 1;
   const to = totalCount - offset;
-  return container(
-    [
-      text(chatLabel({ chatId: transcript.chatId, title: transcript.title }), {
-        weight: "bolder",
-        size: "medium",
-        spacing: "none",
-      }),
-      text(
-        totalCount <= shown
-          ? `${String(totalCount)} messages`
-          : `${String(Math.max(1, from))}–${String(to)} of ${String(totalCount)}`,
-        { isSubtle: true, size: "small", spacing: "none" },
-      ),
-    ],
-    { style: "emphasis" },
-  );
+  return cardHeader({
+    eyebrow: "History",
+    title: chatLabel({ chatId: transcript.chatId, title: transcript.title }),
+    subtitle:
+      totalCount <= shown
+        ? `${String(totalCount)} messages`
+        : `${String(Math.max(1, from))}–${String(to)} of ${String(totalCount)}`,
+  });
 }
 
 /**
@@ -1319,6 +1607,8 @@ export function buildContextStripCard(
     remaining > 0
       ? [
           submitAction(
+            // `↑` kept: it points the same way `OLDER_TITLE` does, and both
+            // mean "further back". Direction is meaning here, not decoration.
             `↑ Full history (${String(remaining)} more)`,
             FULL_HISTORY_VERB,
             { chatId: transcript.chatId, offset: "0" },
@@ -1358,25 +1648,14 @@ export const MESSAGE_INPUT_ID = "messageText";
 export function buildComposeCard(chat: ChatRef, epicId: string): Attachment {
   return buildCard(
     [
-      container(
-        [
-          text("Reply to", { isSubtle: true, size: "small", spacing: "none" }),
-          text(chatLabel(chat), {
-            weight: "bolder",
-            size: "medium",
-            spacing: "none",
-          }),
-          // Epic sits in the header, NOT between the input and Send. A fact
-          // row wedged there separates the button from the thing it acts on,
-          // which reads as though it belongs to the button.
-          text(`Epic ${shortId(epicId)}`, {
-            isSubtle: true,
-            size: "small",
-            spacing: "small",
-          }),
-        ],
-        { style: "emphasis" },
-      ),
+      // Epic sits in the header, NOT between the input and Send. A fact row
+      // wedged there separates the button from the thing it acts on, which
+      // reads as though it belongs to the button.
+      cardHeader({
+        eyebrow: "Reply to",
+        title: chatLabel(chat),
+        subtitle: epicSegment(epicId),
+      }),
       {
         type: "Input.Text",
         id: MESSAGE_INPUT_ID,
@@ -1407,9 +1686,24 @@ export function buildComposeCard(chat: ChatRef, epicId: string): Attachment {
 }
 
 /**
- * One pending approval, actionable. `attention`-styled because a blocked
- * agent is the thing the user most needs to see, and the reason the product
- * exists.
+ * One pending approval, actionable.
+ *
+ * NO LONGER an `attention`-styled header, and this is rule 1's clearest
+ * case. The old card opened with a full-bleed pink slab holding two lines,
+ * which is the treatment an ERROR gets. An approval is not an error; it is
+ * the product working. A salesperson seeing red across the top of a card
+ * reads "something has gone wrong", and then has to read the body to find
+ * out that nothing has. The signal is carried by one red word in an
+ * otherwise neutral header, which is enough — nothing else on any card is
+ * red — and the card stops shouting.
+ *
+ * "AGENT ACTION" IS LOAD-BEARING, not decoration. Settled 2026-08-09: Teams
+ * is intake-only and this bot never authorises a customer-facing document.
+ * `Edit` as a bare headline is ambiguous about what is being approved — the
+ * eyebrow says which kind of thing it is, on the card where confusing the
+ * two would be most expensive. The enumeration test asserts no card verb
+ * maps to `authorise.mjs` or `closeout.mjs`; this is the same rule stated
+ * where a person can see it.
  */
 export function buildApprovalCard(
   chat: ChatRef,
@@ -1420,26 +1714,16 @@ export function buildApprovalCard(
   const chatId = chat.chatId;
   return buildCard(
     [
-      container(
-        [
-          text("Approval needed", {
-            weight: "bolder",
-            color: "attention",
-            spacing: "none",
-          }),
-          text(approval.toolName, {
-            weight: "bolder",
-            size: "medium",
-            spacing: "small",
-          }),
-        ],
-        { style: "attention" },
-      ),
+      cardHeader({
+        eyebrow: "Agent action · approval needed",
+        eyebrowColor: "attention",
+        title: humaniseToolName(approval.toolName),
+        subtitle: chatLabel(chat),
+      }),
       ...describeApproval(approval.description),
-      facts([
-        ["Requested", approvalAgeLabel(approval.requestedAt, now)],
-        ["Chat", chatLabel(chat)],
-        ["Epic", shortId(epicId)],
+      metaLine([
+        `Requested ${approvalAgeLabel(approval.requestedAt, now)}`,
+        epicSegment(epicId),
       ]),
       {
         type: "Input.Text",
@@ -1468,7 +1752,8 @@ export function buildApprovalCard(
 }
 
 export const ANSWER_VERB = "traycer/answer";
-export const ANSWER_TITLE = "➤ Send answers";
+/** No glyph, for the reason {@link SEND_TITLE} gives. */
+export const ANSWER_TITLE = "Send answers";
 
 /**
  * Input id for question `index`. The index — not the `questionId` — because
@@ -1517,30 +1802,22 @@ export function buildInterviewCard(
   interview: PendingInterview,
   now: number,
 ): Attachment {
-  const header = container(
-    [
-      text("Interview waiting", {
-        weight: "bolder",
-        color: "attention",
-        spacing: "none",
-      }),
-      ...(interview.title === null
-        ? []
-        : [
-            text(interview.title, {
-              weight: "bolder",
-              size: "medium",
-              spacing: "small",
-            }),
-          ]),
-    ],
-    { style: "attention" },
-  );
+  // `emphasis`, not `attention` — rule 1. A question is not a fault, and the
+  // form below it is the longest content on any card here; opening it with a
+  // pink slab set the wrong tone for what is really a short survey.
+  //
+  // The title falls back to the chat rather than disappearing: a header with
+  // no subject was leaving "Needs your answer" floating alone above a form.
+  const header = cardHeader({
+    eyebrow: "Needs your answer",
+    eyebrowColor: "attention",
+    title: interview.title ?? chatLabel(chat),
+    subtitle: interview.title === null ? null : chatLabel(chat),
+  });
 
-  const identity = facts([
-    ["Asked", approvalAgeLabel(interview.requestedAt, now)],
-    ["Chat", chatLabel(chat)],
-    ["Epic", shortId(epicId)],
+  const identity = metaLine([
+    `Asked ${approvalAgeLabel(interview.requestedAt, now)}`,
+    epicSegment(epicId),
   ]);
 
   const questions = interview.questions;
@@ -1677,6 +1954,40 @@ function interviewQuestionElements(
  * invite a second press, so it says exactly what it knows and points at
  * re-checking rather than retrying.
  */
+/**
+ * The one shape every outcome card has, so the nine of them stop drifting.
+ *
+ * They were nine hand-built `container([bolder text, body text], {style})`
+ * blocks, and they had already drifted: the title was default-size here and
+ * `medium` on every other card's header, the body was `isSubtle` on success
+ * and not on failure, and the `Code` FactSet appeared on two of three
+ * branches. None of that was a decision.
+ *
+ * A toned container IS correct here and does not breach rule 1 — an outcome
+ * card's entire subject is the outcome, and there is exactly one block.
+ */
+function outcomeCard(
+  tone: ContainerStyle & SemanticColor,
+  title: string,
+  body: string,
+  extras: readonly unknown[] = [],
+): Attachment {
+  return card([
+    cardHeader({
+      eyebrow: null,
+      title,
+      subtitle: body,
+      tone,
+    }),
+    ...extras,
+  ]);
+}
+
+/** The machine-readable code, when the host gave one. See `buildPrincipalRefusedCard`. */
+function codeFacts(code: string | null): readonly unknown[] {
+  return code === null ? [] : [facts([["Code", code]])];
+}
+
 export function buildActionOutcomeCard(
   outcome: ActionOutcome,
   decision: "approve" | "reject",
@@ -1684,48 +1995,22 @@ export function buildActionOutcomeCard(
   const verb = decision === "approve" ? "Approved" : "Rejected";
   switch (outcome.kind) {
     case "applied":
-      return card([
-        container(
-          [
-            text(verb, { weight: "bolder", color: "good", spacing: "none" }),
-            text("The agent has been told and should continue.", {
-              isSubtle: true,
-              spacing: "small",
-            }),
-          ],
-          { style: "good" },
-        ),
-      ]);
+      return outcomeCard(
+        "good",
+        verb,
+        "The agent has been told and should continue.",
+      );
     case "rejected":
-      return card([
-        container(
-          [
-            text("The host declined this decision", {
-              weight: "bolder",
-              color: "warning",
-              spacing: "none",
-            }),
-            text(outcome.reason ?? "No reason given.", { spacing: "small" }),
-          ],
-          { style: "warning" },
-        ),
-        ...(outcome.code === null ? [] : [facts([["Code", outcome.code]])]),
-      ]);
+      return outcomeCard(
+        "warning",
+        "The host declined this decision",
+        outcome.reason ?? "No reason given.",
+        codeFacts(outcome.code),
+      );
     case "failed":
-      return card([
-        container(
-          [
-            text("Couldn't confirm this decision", {
-              weight: "bolder",
-              color: "attention",
-              spacing: "none",
-            }),
-            text(outcome.reason, { spacing: "small" }),
-          ],
-          { style: "attention" },
-        ),
+      return outcomeCard("attention", "Couldn't confirm this decision", outcome.reason, [
         text(
-          'It may or may not have been applied. Check with "chat <id>" before deciding again rather than pressing again.',
+          "It may or may not have been applied. Open the chat and check before deciding again rather than pressing again.",
           { isSubtle: true, size: "small", spacing: "medium" },
         ),
       ]);
@@ -1746,52 +2031,22 @@ export function buildMessageOutcomeCard(
 ): Attachment {
   switch (outcome.kind) {
     case "applied":
-      return card([
-        container(
-          [
-            text("Message sent", {
-              weight: "bolder",
-              color: "good",
-              spacing: "none",
-            }),
-            text(`Delivered to ${chatLabel(chat)}.`, {
-              isSubtle: true,
-              spacing: "small",
-            }),
-          ],
-          { style: "good" },
-        ),
-      ]);
+      return outcomeCard(
+        "good",
+        "Message sent",
+        `Delivered to ${chatLabel(chat)}.`,
+      );
     case "rejected":
-      return card([
-        container(
-          [
-            text("The host declined this message", {
-              weight: "bolder",
-              color: "warning",
-              spacing: "none",
-            }),
-            text(outcome.reason ?? "No reason given.", { spacing: "small" }),
-          ],
-          { style: "warning" },
-        ),
-        ...(outcome.code === null ? [] : [facts([["Code", outcome.code]])]),
-      ]);
+      return outcomeCard(
+        "warning",
+        "The host declined this message",
+        outcome.reason ?? "No reason given.",
+        codeFacts(outcome.code),
+      );
     case "failed":
-      return card([
-        container(
-          [
-            text("Couldn't confirm this message", {
-              weight: "bolder",
-              color: "attention",
-              spacing: "none",
-            }),
-            text(outcome.reason, { spacing: "small" }),
-          ],
-          { style: "attention" },
-        ),
+      return outcomeCard("attention", "Couldn't confirm this message", outcome.reason, [
         text(
-          'It may already have reached the agent. Check with "chat <id>" before sending again — a duplicate is a second message the agent will act on, not a no-op.',
+          "It may already have reached the agent. Open the chat and check before sending again — a duplicate is a second message the agent will act on, not a no-op.",
           { isSubtle: true, size: "small", spacing: "medium" },
         ),
       ]);
@@ -1814,52 +2069,18 @@ export function buildInterviewOutcomeCard(
 ): Attachment {
   switch (outcome.kind) {
     case "applied":
-      return card([
-        container(
-          [
-            text("Answers sent", {
-              weight: "bolder",
-              color: "good",
-              spacing: "none",
-            }),
-            text(`${chatLabel(chat)} can continue.`, {
-              isSubtle: true,
-              spacing: "small",
-            }),
-          ],
-          { style: "good" },
-        ),
-      ]);
+      return outcomeCard("good", "Answers sent", `${chatLabel(chat)} can continue.`);
     case "rejected":
-      return card([
-        container(
-          [
-            text("The host declined these answers", {
-              weight: "bolder",
-              color: "warning",
-              spacing: "none",
-            }),
-            text(outcome.reason ?? "No reason given.", { spacing: "small" }),
-          ],
-          { style: "warning" },
-        ),
-        ...(outcome.code === null ? [] : [facts([["Code", outcome.code]])]),
-      ]);
+      return outcomeCard(
+        "warning",
+        "The host declined these answers",
+        outcome.reason ?? "No reason given.",
+        codeFacts(outcome.code),
+      );
     case "failed":
-      return card([
-        container(
-          [
-            text("Couldn't confirm these answers", {
-              weight: "bolder",
-              color: "attention",
-              spacing: "none",
-            }),
-            text(outcome.reason, { spacing: "small" }),
-          ],
-          { style: "attention" },
-        ),
+      return outcomeCard("attention", "Couldn't confirm these answers", outcome.reason, [
         text(
-          'They may already have reached the agent. Check with "chat <id>" first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.',
+          "They may already have reached the agent. Open the chat first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.",
           { isSubtle: true, size: "small", spacing: "medium", wrap: true },
         ),
       ]);
@@ -1897,11 +2118,11 @@ export function buildInterviewOutcomeCard(
  */
 export function buildHelpCard(): Attachment {
   return card([
-    text("Traycer", { weight: "bolder", size: "medium" }),
-    text("Ask in your own words, or pick one of these.", {
-      isSubtle: true,
-      size: "small",
-      spacing: "none",
+    cardHeader({
+      eyebrow: null,
+      title: "Traycer",
+      subtitle: "Ask in your own words, or pick one of these.",
+      tone: null,
     }),
     /*
      * ONLY BUTTONS THAT WORK.
@@ -1968,13 +2189,17 @@ export function buildClarifyCard(options: {
     options.intent !== null;
 
   return card([
-    text("Before I start", { weight: "bolder", size: "medium" }),
-    text(
-      canSuggest
-        ? `Looks like ${options.suggestionLabel}. Is that right?`
+    // The QUESTION is the title, not "Before I start". A card that asks
+    // something should lead with the thing it is asking — the old version
+    // gave the biggest type on the card to a stock phrase and set the actual
+    // question in body text below it.
+    cardHeader({
+      eyebrow: "Before I start",
+      title: canSuggest
+        ? `Looks like ${options.suggestionLabel ?? ""}. Is that right?`
         : "I'm not sure what you'd like me to do with that.",
-      { spacing: "none" },
-    ),
+      tone: null,
+    }),
     actionSet([
       ...(canSuggest
         ? [
@@ -2024,14 +2249,18 @@ export function buildAssessmentStartedCard(options: {
 }): Attachment {
   return buildCard(
     [
-      text("Assessment started", { weight: "bolder", size: "medium" }),
-      text(options.title, { isSubtle: true, spacing: "none" }),
-      text(
-        options.deepLink === null
-          ? "It's running. I'll reply here when it's done."
-          : "It's running — open it to watch progress. I'll reply here when it's done.",
-        { spacing: "small" },
-      ),
+      // The assessment's own title is the subject; "Assessment started" is
+      // the card kind and belongs in the eyebrow. It was the other way round,
+      // so three of these in a thread were indistinguishable at a glance.
+      cardHeader({
+        eyebrow: "Assessment started",
+        eyebrowColor: "good",
+        title: options.title,
+        subtitle:
+          options.deepLink === null
+            ? "It's running. I'll reply here when it's done."
+            : "It's running — open it to watch progress. I'll reply here when it's done.",
+      }),
     ],
     options.deepLink === null
       ? []
@@ -2073,34 +2302,43 @@ export function buildAssessmentUnconfirmedCard(
 ): Attachment {
   const certain = options?.certain === true;
   return card([
-    text(certain ? "I haven’t started" : "Couldn’t confirm it started", {
-      weight: "bolder",
-      size: "medium",
-      color: "warning",
-    }),
-    text(
-      certain
+    cardHeader({
+      eyebrow: null,
+      title: certain ? "I haven’t started" : "Couldn’t confirm it started",
+      subtitle: certain
         ? "Nothing was created, so just ask again."
         : "Ask again the same way — it’s the same request, so it can’t start a second assessment.",
-      { spacing: "none" },
-    ),
-    text(reason, { isSubtle: true, size: "small", spacing: "small" }),
+      tone: "warning",
+    }),
+    // The cause, quotable but quiet — it is for whoever gets asked about it,
+    // not for the person reading the card.
+    metaLine([reason]),
   ]);
 }
 
 export function buildEpicPickerCard(epics: readonly EpicSummary[]): Attachment {
   if (epics.length === 0) {
-    return card([text("No epics found for your account.", { isSubtle: true })]);
+    return card([
+      cardHeader({
+        eyebrow: null,
+        title: "No epics",
+        subtitle: "Nothing found for your account.",
+        tone: null,
+      }),
+    ]);
   }
   return card([
-    text("Pick an epic", { weight: "bolder", size: "medium" }),
+    cardHeader({ eyebrow: null, title: "Pick an epic", tone: null }),
     ...epics.map((epic) =>
       container(
         [
-          text(epic.title ?? epic.epicId, {
+          text(epic.title ?? "Untitled epic", {
             weight: "bolder",
             spacing: "none",
           }),
+          // The full id, because this is the ONE card where it is an input:
+          // the reply is `epic <id>` and a truncated one cannot be typed.
+          // Everywhere else it is a label and gets `shortId`.
           text(`epic ${epic.epicId}`, {
             isSubtle: true,
             size: "small",
@@ -2115,52 +2353,34 @@ export function buildEpicPickerCard(epics: readonly EpicSummary[]): Attachment {
 
 export function buildEpicNotBoundCard(): Attachment {
   return card([
-    container(
-      [
-        text("No epic selected", { weight: "bolder", spacing: "none" }),
-        text('Use "epic <id>" to choose one, then "fleet" to see its agents.', {
-          isSubtle: true,
-          spacing: "small",
-        }),
-      ],
-      { style: "emphasis" },
-    ),
+    cardHeader({
+      eyebrow: null,
+      title: "No epic selected",
+      subtitle: 'Use "epic <id>" to choose one, then "fleet" to see its agents.',
+    }),
   ]);
 }
 
 export function buildEpicBoundCard(epicId: string): Attachment {
   return card([
-    container(
-      [
-        text("Epic selected", {
-          weight: "bolder",
-          color: "good",
-          spacing: "none",
-        }),
-        text(epicId, { isSubtle: true, size: "small", spacing: "small" }),
-      ],
-      { style: "good" },
-    ),
-    text('Reply "fleet" to see its agents.', {
-      isSubtle: true,
-      size: "small",
+    cardHeader({
+      eyebrow: null,
+      title: "Epic selected",
+      subtitle: 'Reply "fleet" to see its agents.',
+      tone: "good",
     }),
+    metaLine([epicId]),
   ]);
 }
 
 export function buildPrincipalRefusedCard(reason: RefusalReason): Attachment {
   return card([
-    container(
-      [
-        text("Access denied", {
-          weight: "bolder",
-          color: "attention",
-          spacing: "none",
-        }),
-        text(REFUSAL_COPY[reason], { spacing: "small" }),
-      ],
-      { style: "attention" },
-    ),
+    cardHeader({
+      eyebrow: null,
+      title: "Access denied",
+      subtitle: REFUSAL_COPY[reason],
+      tone: "attention",
+    }),
     // The machine-readable reason is kept as a short CODE, not as the
     // explanation. Someone reporting this needs something exact to quote,
     // but "unmapped_principal" is not an explanation — it is internal
@@ -2253,17 +2473,12 @@ export function buildBridgeUnavailableCard(
   const known = KNOWN_FAILURES.find((f) => f.match.test(detail));
   const { headline, guidance } = known ?? GENERIC_FAILURE[reason];
   return card([
-    container(
-      [
-        text(headline, {
-          weight: "bolder",
-          color: "warning",
-          spacing: "none",
-        }),
-        text(guidance, { isSubtle: true, spacing: "small" }),
-      ],
-      { style: "warning" },
-    ),
+    cardHeader({
+      eyebrow: null,
+      title: headline,
+      subtitle: guidance,
+      tone: "warning",
+    }),
   ]);
 }
 
@@ -2277,19 +2492,11 @@ export function buildBridgeUnavailableCard(
  */
 export function buildReadOnlyChatCard(chat: ChatRef): Attachment {
   return card([
-    container(
-      [
-        text("Read-only from here", {
-          weight: "bolder",
-          spacing: "none",
-        }),
-        text(
-          `You can read ${chatLabel(chat)}, but sending needs the host it runs on.`,
-          { isSubtle: true, spacing: "small" },
-        ),
-      ],
-      { style: "emphasis" },
-    ),
+    cardHeader({
+      eyebrow: null,
+      title: "Read-only from here",
+      subtitle: `You can read ${chatLabel(chat)}, but sending needs the host it runs on.`,
+    }),
   ]);
 }
 
@@ -2305,40 +2512,27 @@ export function buildReadOnlyChatCard(chat: ChatRef): Attachment {
  * message won't land.
  */
 export function buildUnknownChatCard(chatId: string): Attachment {
-  return card([
-    container(
-      [
-        text("That doesn't look like a chat", {
-          weight: "bolder",
-          color: "warning",
-          spacing: "none",
-        }),
-        text(`No reachable chat matched “${shortId(chatId)}”.`, {
-          isSubtle: true,
-          spacing: "small",
-        }),
-      ],
-      { style: "warning" },
-    ),
-    // Short labels: a FactSet's title column is narrow, and "To message an
-    // agent" wrapped onto two lines at 320px while its value wrapped too.
-    facts([
-      ["Message", "say <chat-id> <message>"],
-      ["Find ids", "fleet"],
-    ]),
-  ]);
+  return buildCard(
+    [
+      cardHeader({
+        eyebrow: null,
+        title: "That doesn't look like a chat",
+        subtitle: `No reachable chat matched “${shortId(chatId)}”.`,
+        tone: "warning",
+      }),
+    ],
+    // WAS a FactSet spelling out `say <chat-id> <message>` and `fleet` — a
+    // card teaching the CLI, on the card a mistyped CLI command produces.
+    // The button is the same recovery without the lesson: it lists the chats
+    // there are, which is what the person needed.
+    [submitAction("My agents", FLEET_VERB, {}, { associateInputs: false })],
+  );
 }
 
 /** A recognised command used wrongly — says what was expected instead of silently showing help. */
 export function buildUsageCard(usage: string): Attachment {
   return card([
-    container(
-      [
-        text("Not quite", { weight: "bolder", spacing: "none" }),
-        text(usage, { spacing: "small" }),
-      ],
-      { style: "emphasis" },
-    ),
+    cardHeader({ eyebrow: null, title: "Not quite", subtitle: usage }),
     /*
      * NOT "Type help for all commands."
      *
@@ -2362,17 +2556,12 @@ export function buildUsageCard(usage: string): Attachment {
 /** Shown when no verified principal could be obtained. A refusal, not a degraded mode. */
 export function buildIdentityUnavailableCard(reason: string): Attachment {
   return card([
-    container(
-      [
-        text("Couldn't verify who you are", {
-          weight: "bolder",
-          color: "attention",
-          spacing: "none",
-        }),
-        text(reason, { spacing: "small" }),
-      ],
-      { style: "attention" },
-    ),
+    cardHeader({
+      eyebrow: null,
+      title: "Couldn't verify who you are",
+      subtitle: reason,
+      tone: "attention",
+    }),
   ]);
 }
 

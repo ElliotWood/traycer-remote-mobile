@@ -12,7 +12,10 @@ import {
   type TestJwksServer,
 } from "../../auth/__tests__/test-jwks-server";
 import { dispatchCommand, type DispatchDeps } from "../dispatch";
-import { dispatchActionInvoke } from "../dispatch-action";
+import {
+  dispatchActionInvoke,
+  HANDLED_ACTION_VERBS,
+} from "../dispatch-action";
 import { ANSWER_VERB, SEND_VERB } from "../cards";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
 import type { OneShotSpawnFn } from "../one-shot-spawn";
@@ -422,6 +425,82 @@ describe("read-surface/dispatch-action — the send path", () => {
       expect(JSON.stringify(result.card.content)).toContain("Nothing to send");
     }
     expect(spawned).toBe(false);
+  });
+
+  /**
+   * THE CLAIM BEHIND EACH ENTRY, checked.
+   *
+   * `cards.test.ts` asserts every verb a card emits is in
+   * `HANDLED_ACTION_VERBS`. That is only worth something if membership means
+   * something — and the old hand-copied version of that list carried
+   * `traycer/openChat` for a while BEFORE the verb had a handler, on the
+   * strength of a comment claiming it was handled. The test passed both
+   * before and after the handler existed.
+   *
+   * So: drive every verb in the set through the real dispatcher and require
+   * it not to fall through to "Unknown card action". Deliberately asserts
+   * nothing about the OUTCOME — most of these fail here, on a spawn that
+   * returns `{}` or an identity that resolves to a stub — because what is
+   * under test is routing, not behaviour. A verb that reaches a handler and
+   * then reports a bridge failure has been routed; a verb that reaches the
+   * fallback has not.
+   */
+  it("CONTRACT: every verb in HANDLED_ACTION_VERBS actually reaches a handler", async () => {
+    const deps = sendDeps({
+      resolvePrincipal: resolved,
+      spawnFn: async () => ({
+        code: 0,
+        stdout: "{}",
+        stderr: "",
+        timedOut: false,
+      }),
+    });
+
+    for (const verb of HANDLED_ACTION_VERBS) {
+      const result = await dispatchActionInvoke(
+        {
+          verb,
+          conversationId: "conv-1",
+          // Enough payload that a handler is reached rather than refused for
+          // a missing id — a "missing its chat id" card is still a handler
+          // answering, but this keeps the failure mode one thing at a time.
+          data: {
+            chatId: CHAT_ID,
+            approvalId: "ap-1",
+            offset: "0",
+            skill: "some-skill",
+            messageText: "text",
+          },
+        },
+        deps,
+      );
+      expect(
+        JSON.stringify(result.card.content),
+        `${verb} fell through to the unknown-verb branch`,
+      ).not.toContain("Unknown card action");
+    }
+  });
+
+  it("CONTROL: a verb outside the set DOES hit the unknown branch", async () => {
+    // Without this the assertion above passes if `dispatchActionInvoke` stops
+    // producing that string at all.
+    const result = await dispatchActionInvoke(
+      {
+        verb: "traycer/notAThing",
+        conversationId: "conv-1",
+        data: { chatId: CHAT_ID },
+      },
+      sendDeps({
+        resolvePrincipal: resolved,
+        spawnFn: async () => ({
+          code: 0,
+          stdout: "{}",
+          stderr: "",
+          timedOut: false,
+        }),
+      }),
+    );
+    expect(JSON.stringify(result.card.content)).toContain("Unknown card action");
   });
 
   it("CONTRACT: identity is resolved BEFORE the message is issued", async () => {

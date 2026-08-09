@@ -22,8 +22,13 @@ import {
   partMarker,
   shortenWorkspacePath,
   buildContextStripCard,
+  buildClarifyCard,
+  buildComposeCard,
+  buildUnknownChatCard,
+  buildUsageCard,
   CONTEXT_STRIP_SIZE,
 } from "../cards";
+import { HANDLED_ACTION_VERBS } from "../dispatch-action";
 import type {
   ChatStatus,
   PendingInterview,
@@ -764,7 +769,12 @@ describe("read-surface/cards — transcript", () => {
     expect(joined).toContain("Here:");
     expect(joined).toContain("done");
     expect(joined).not.toContain("const x = 1;");
-    expect(joined).toContain("⟨code · a.ts · 3 lines⟩");
+    // The MARKER, not the code. Its punctuation changed in the 2026-08-09
+    // design pass — `⟨code · a.ts · 3 lines⟩` in monospace angle brackets was
+    // debug-console vocabulary — but what it must carry did not: which file,
+    // and how much of it there is.
+    expect(joined).toContain("a.ts");
+    expect(joined).toContain("3 lines");
   });
 
   it("a parts-only message renders its markers, not an empty bubble", () => {
@@ -780,7 +790,9 @@ describe("read-surface/cards — transcript", () => {
         0,
       ).content,
     );
-    expect(visible.join(" ")).toContain("⟨command · bun test⟩");
+    // "Ran bun test" — the part's kind rendered as a verb a reader knows,
+    // rather than the protocol's own word for it. See `PART_NOUN`.
+    expect(visible.join(" ")).toContain("Ran bun test");
   });
 
   it("the context strip truncates HARDER than the full transcript", () => {
@@ -1006,23 +1018,19 @@ describe("CONTRACT: cards stay within the version they declare", () => {
  * next unhandled button fails here rather than in front of a user.
  */
 describe("CONTRACT: every verb a card emits has a handler", () => {
-  const HANDLED = new Set([
-    "traycer/approve",
-    "traycer/reject",
-    "traycer/send",
-    "traycer/older",
-    "traycer/newer",
-    "traycer/history",
-    "traycer/fleet",
-    "traycer/reply",
-    "traycer/log",
-    // Emitted by every fleet row's `selectAction` — tapping the row. It was
-    // in this list before it had a handler, on the strength of a comment I
-    // wrote saying it was "handled by the same reply path". It wasn't. An
-    // allow-list is only as good as the claim behind each entry, and the
-    // entry that lies is invisible: the test passes either way.
-    "traycer/openChat",
-  ]);
+  /**
+   * IMPORTED from the dispatcher, not retyped here.
+   *
+   * This was a hand-copied literal, and it drifted in both directions at
+   * once: it carried `traycer/openChat` before that verb had a handler (the
+   * flaw the old comment named), and it was MISSING `traycer/answer`,
+   * `traycer/confirmRoute` and `traycer/clarifyOther`, which have handlers.
+   * Both errors were invisible because the check only walked two cards,
+   * neither of which emits any of the four.
+   *
+   * A copy of a list is a claim about the list. Import the list.
+   */
+  const HANDLED = HANDLED_ACTION_VERBS;
 
   function verbsIn(node: unknown): string[] {
     const found: string[] = [];
@@ -1051,22 +1059,157 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     capabilities: { readTranscript: true, sendMessage: true },
   };
 
-  it("fleet card emits only handled verbs", () => {
-    const emitted = verbsIn(buildFleetCard([AGENT]).content);
-    expect(emitted.length).toBeGreaterThan(0);
-    for (const verb of emitted) expect(HANDLED.has(verb)).toBe(true);
-  });
+  const CHAT = { chatId: "c1", title: "A chat" };
+  const APPROVAL_FIXTURE = {
+    approvalId: "ap-1",
+    toolName: "Edit",
+    description: "Change a file.",
+    requestedAt: 0,
+  };
+  const INTERVIEW_FIXTURE: PendingInterview = {
+    blockId: "iv-1",
+    requestedAt: 0,
+    title: "A question",
+    description: null,
+    questions: [
+      {
+        questionId: "q1",
+        question: "Which one?",
+        header: null,
+        options: [],
+        multiSelect: false,
+      },
+    ],
+  };
+  const STATUS: ChatStatus = {
+    chatId: "c1",
+    title: "A chat",
+    runStatus: "running",
+    pendingApprovals: [APPROVAL_FIXTURE],
+    pendingInterviews: [INTERVIEW_FIXTURE],
+    connected: true,
+  };
+  const TRANSCRIPT_FIXTURE: Transcript = {
+    chatId: "c1",
+    title: "A chat",
+    totalCount: 40,
+    offset: 5,
+    messages: [
+      {
+        messageId: "m1",
+        role: "assistant",
+        author: "claude",
+        timestamp: 0,
+        text: "hello",
+        parts: [],
+      },
+    ],
+  };
 
-  it("help card emits only handled verbs", () => {
-    for (const verb of verbsIn(buildHelpCard().content)) {
+  /**
+   * EVERY card, not two of them.
+   *
+   * The check walked `buildFleetCard` and `buildHelpCard`, which were the two
+   * that had shipped a dead button — so it covered the instances that had
+   * already failed, which is the thing its own docblock says it exists not to
+   * do. A bad verb on the chat card, the composer, the approval card or the
+   * context strip would have passed.
+   *
+   * That was not hypothetical when this list was written: the 2026-08-09
+   * design pass moved `Reply` and `History` OFF the fleet row and ONTO the
+   * chat card, so the two most-pressed buttons in the product had just left
+   * the only card under test.
+   */
+  const EVERY_CARD: readonly (readonly [string, () => unknown])[] = [
+    ["fleet", () => buildFleetCard([AGENT]).content],
+    ["fleet (empty)", () => buildFleetCard([]).content],
+    ["help", () => buildHelpCard().content],
+    ["chat (sendable)", () => buildChatCard(STATUS, "e1", true).content],
+    ["chat (read-only)", () => buildChatCard(STATUS, "e1", false).content],
+    [
+      "chat (disconnected)",
+      () => buildChatCard({ ...STATUS, connected: false }, "e1", true).content,
+    ],
+    ["compose", () => buildComposeCard(CHAT, "e1").content],
+    [
+      "approval",
+      () => buildApprovalCard(CHAT, "e1", APPROVAL_FIXTURE, 0).content,
+    ],
+    [
+      "interview",
+      () => buildInterviewCard(CHAT, "e1", INTERVIEW_FIXTURE, 0).content,
+    ],
+    ["transcript", () => buildTranscriptCard(TRANSCRIPT_FIXTURE, 0).content],
+    [
+      "context strip",
+      () => buildContextStripCard(TRANSCRIPT_FIXTURE, 0).content,
+    ],
+    ["unknown chat", () => buildUnknownChatCard("hi").content],
+    ["usage", () => buildUsageCard("epic <id>").content],
+    [
+      "clarify",
+      () =>
+        buildClarifyCard({
+          suggestionLabel: "a new opportunity",
+          product: "sensormine",
+          intent: "new-opportunity",
+          skill: "smv4-new-opportunity",
+        }).content,
+    ],
+  ];
+
+  it.each(EVERY_CARD)("%s emits only handled verbs", (_name, build) => {
+    for (const verb of verbsIn(build())) {
       expect(HANDLED.has(verb)).toBe(true);
     }
   });
 
-  it("CONTROL: the check can fail — an invented verb is not in the handled set", () => {
-    // Without this, a walker that silently found nothing would pass both
-    // assertions above and prove the checker works when it doesn't.
+  it("at least one card under test actually emits a verb", () => {
+    // The walker returning `[]` for everything would pass every case above.
+    const total = EVERY_CARD.flatMap(([, build]) => verbsIn(build()));
+    expect(total.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * TEAMS IS INTAKE-ONLY. Settled by Elliot, 2026-08-09.
+   *
+   * The bot starts assessments and delivers review copies. It does NOT
+   * authorise claims, decide go/no-go, or lodge a tender — those belong to a
+   * named human, in the repo, via `authorise.mjs` and `closeout.mjs`. The
+   * `smv4-opportunity-pipeline` skill writes every claim `draft` on purpose
+   * and keeps `closeout.mjs` separate precisely because "rendering a bundle
+   * is not lodging a tender".
+   *
+   * A comment saying "don't add such a verb" is worth less than a test that
+   * fails when someone does, because the person who adds it will be adding a
+   * button that looks exactly like every other button here.
+   *
+   * MATCHES ON THE VERB STRING, so it catches a new verb nobody thought to
+   * add to `HANDLED` as well as one they did. It cannot catch a verb whose
+   * name hides what it does — `traycer/finalise` would pass — so it is a
+   * floor, not a proof. The floor is worth having: the obvious spelling of
+   * the mistake is the one somebody makes.
+   */
+  const FORBIDDEN = /authoris|authoriz|closeout|close-out|lodge|lodgement|submit-?tender|go-?no-?go/i;
+
+  it("CONTRACT: no card offers to authorise, lodge, or decide go/no-go", () => {
+    for (const [name, build] of EVERY_CARD) {
+      for (const verb of verbsIn(build())) {
+        expect(
+          FORBIDDEN.test(verb),
+          `${name} emits "${verb}", which reads as a customer-facing authorisation. Teams is intake-only — see the epic's opportunity-skill-handoff.`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("CONTROL: the checks can fail", () => {
+    // Without these, a walker that silently found nothing and a regex that
+    // matched nothing would both pass everything above.
     expect(HANDLED.has("traycer/notAThing")).toBe(false);
+    expect(FORBIDDEN.test("traycer/authorise")).toBe(true);
+    expect(FORBIDDEN.test("traycer/closeout")).toBe(true);
+    expect(FORBIDDEN.test("traycer/reply")).toBe(false);
   });
 });
 
@@ -1111,7 +1254,11 @@ describe("transcript rendering — facts in the slot that means them", () => {
   });
 
   it("the model moves to the metadata line, where being a model is unambiguous", () => {
-    expect(modelMarker(assistant)).toBe("⟨model · haiku⟩");
+    // The `⟨model · …⟩` wrapper went with the rest of the angle-bracket
+    // vocabulary. What this test is actually about survives unchanged: the
+    // model appears for an ASSISTANT turn and never for an incoming one,
+    // where the same field means the sending agent's title.
+    expect(modelMarker(assistant)).toBe("haiku");
     expect(modelMarker(fromAgent)).toBeNull();
   });
 

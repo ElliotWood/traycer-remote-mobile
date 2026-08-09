@@ -443,6 +443,41 @@ async function dispatchConfirmedRoute(
     : { card: outcome.card, acted: false };
 }
 
+/**
+ * Every verb {@link dispatchActionInvoke} routes, in ONE place next to the
+ * routing itself.
+ *
+ * The card test used to keep its own hand-copied list, and its own docblock
+ * had already spotted the flaw — "an allow-list is only as good as the claim
+ * behind each entry, and the entry that lies is invisible". What it did not
+ * spot is the other direction: the list was missing `traycer/answer`,
+ * `traycer/confirmRoute` and `traycer/clarifyOther`, all of which ARE
+ * handled here. The test passed anyway, because it only walked two cards and
+ * neither of them emits those.
+ *
+ * Living here means adding a verb to the dispatcher and forgetting the test
+ * is no longer possible in the direction that matters: a card emitting a verb
+ * absent from this set fails, and this set is what you edit when you add a
+ * branch below. `dispatch-action.test.ts` asserts every entry actually
+ * resolves to something other than "Unknown card action", so an entry that
+ * lies is no longer invisible either.
+ */
+export const HANDLED_ACTION_VERBS: ReadonlySet<string> = new Set([
+  APPROVE_VERB,
+  REJECT_VERB,
+  SEND_VERB,
+  ANSWER_VERB,
+  OLDER_VERB,
+  NEWER_VERB,
+  FULL_HISTORY_VERB,
+  FLEET_VERB,
+  REPLY_VERB,
+  LOG_VERB,
+  OPEN_CHAT_VERB,
+  CONFIRM_ROUTE_VERB,
+  CLARIFY_OTHER_VERB,
+]);
+
 export async function dispatchActionInvoke(
   request: ActionInvokeRequest,
   deps: DispatchDeps,
@@ -482,10 +517,26 @@ export async function dispatchActionInvoke(
     request.verb === LOG_VERB ||
     request.verb === OPEN_CHAT_VERB
   ) {
-    // Each button is exactly the command it replaced, so the two ingresses
-    // cannot drift: `Reply` is `chat <id>` (whose card carries the composer)
-    // and `Activity` is `log <id>`. The id travels in the button's data, so
-    // nobody reads or types it.
+    /*
+     * `Reply` IS `compose <id>`, NOT `chat <id>` — corrected 2026-08-09.
+     *
+     * It was `chat <id>`, and the comment here said so on the grounds that
+     * "whose card carries the composer". `dispatchCommand` does return a
+     * composer for `chat` — as the LAST of up to five cards. This path takes
+     * `cards[0]` and drops the rest. So the button labelled Reply returned
+     * the status card and nothing else: no composer, no reply box, nothing
+     * to type into.
+     *
+     * That is the `Action.Execute` failure in a different costume — the
+     * button renders, it is pressable, it appears to work, and the thing it
+     * promised is not there. It survived because the CLAIM in the comment was
+     * true about `dispatchCommand` and false about this call site, which is
+     * two lines below it.
+     *
+     * `compose` returns exactly one card and that card is the reply box. The
+     * two ingresses still cannot drift, because it is still the same command
+     * a person could type.
+     */
     let command: Parameters<typeof dispatchCommand>[0];
     if (request.verb === FLEET_VERB) {
       command = { kind: "fleet" };
@@ -497,10 +548,13 @@ export async function dispatchActionInvoke(
           acted: false,
         };
       }
-      command =
-        request.verb === REPLY_VERB || request.verb === OPEN_CHAT_VERB
-          ? { kind: "chat", chatId }
-          : { kind: "log", chatId, offset: 0 };
+      if (request.verb === REPLY_VERB) {
+        command = { kind: "compose", chatId };
+      } else if (request.verb === OPEN_CHAT_VERB) {
+        command = { kind: "chat", chatId };
+      } else {
+        command = { kind: "log", chatId, offset: 0 };
+      }
     }
     const cards = await dispatchCommand(
       command,

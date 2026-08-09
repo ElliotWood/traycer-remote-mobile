@@ -13,3 +13,4 @@
  */
 export * from "../cards";
 export { SHOOT_AGENTS } from "./shoot-agents";
+export { shootInterviews } from "./shoot-interviews";

@@ -147,7 +147,29 @@ export async function dispatchCommand(
         return [failureCard(result)];
       }
       const { epicId } = result;
-      const cards: Attachment[] = [buildChatCard(result.status, epicId)];
+      /**
+       * The capability read moved ABOVE the status card, because the status
+       * card now offers `Reply` and has to know whether it may.
+       *
+       * Same call, same cost, one step earlier — and it is skipped entirely
+       * when the chat is disconnected, since that card carries no actions
+       * either way. Gating Reply on `connected` alone was measured wrong once
+       * already: 53 of 56 agents are readable and not messageable.
+       */
+      const caps = result.status.connected
+        ? await fetchChatCapabilities(
+            principal,
+            conversationId,
+            command.chatId,
+            deps,
+          )
+        : null;
+      const canSend =
+        caps !== null && caps.kind === "ok" && caps.capabilities.sendMessage;
+
+      const cards: Attachment[] = [
+        buildChatCard(result.status, epicId, canSend),
+      ];
       // Only offer buttons when the bridge says the subscription is genuinely
       // live. Acting on a stale snapshot is how you approve something that
       // was already resolved — `connected: false` means every field above may
@@ -197,13 +219,9 @@ export async function dispatchCommand(
         // gating on `connected` put a Send box on 53 chats that could not
         // receive one. Same class as the composer `say hi` opened onto a
         // chat that did not exist, one field over.
-        const caps = await fetchChatCapabilities(
-          principal,
-          conversationId,
-          command.chatId,
-          deps,
-        );
-        const canSend = caps.kind === "ok" && caps.capabilities.sendMessage;
+        //
+        // `canSend` is read once, above, and used TWICE — here and by the
+        // status card's Reply button. Two reads could disagree.
         cards.push(
           canSend
             ? buildComposeCard(chat, epicId)

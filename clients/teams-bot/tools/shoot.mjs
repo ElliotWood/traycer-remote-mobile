@@ -236,13 +236,23 @@ add("13-outcome-failed", () =>
 add("14-usage", () =>
   C.buildUsageCard("epic <id> — select an epic for this chat"),
 );
+/**
+ * TYPED fixtures — see `__fixtures__/shoot-interviews.ts`. The literal that
+ * used to sit here was `{ blockId, requestedAt }`, the shape
+ * `PendingInterview` had before it grew `questions`, so `15-interview` threw
+ * on every run and the harness rendered NOTHING. The answerable interview
+ * card — the one with the form — had never been screenshotted at all.
+ */
+const INTERVIEWS = C.shootInterviews(Date.now());
+
 add("15-interview", () =>
-  C.buildInterviewCard(
-    CHAT_REF,
-    EPIC_ID,
-    { blockId: "iv-22", requestedAt: Date.now() - 30_000 },
-    Date.now(),
-  ),
+  C.buildInterviewCard(CHAT_REF, EPIC_ID, INTERVIEWS.answerable, Date.now()),
+);
+add("15b-interview-unreadable", () =>
+  C.buildInterviewCard(CHAT_REF, EPIC_ID, INTERVIEWS.unreadable, Date.now()),
+);
+add("15c-interview-empty", () =>
+  C.buildInterviewCard(CHAT_REF, EPIC_ID, INTERVIEWS.empty, Date.now()),
 );
 add("16-epic-bound", () => C.buildEpicBoundCard(EPIC_ID));
 add("17-identity-unavailable", () =>
