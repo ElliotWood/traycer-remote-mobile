@@ -218,6 +218,7 @@ function makeSession(
     endpoint: () => mockLocalHostEntry,
     bearer: () => new MutableBearerLease("token-abc", "user-1"),
     auth: null,
+    hostCredentialMint: null,
     webSocketFactory: factory,
     dialTimeoutMs: 1000,
     openAckTimeoutMs: 1000,
