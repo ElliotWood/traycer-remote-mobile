@@ -1,5 +1,60 @@
 # Teams app package
 
+## 🔴 `supportsFiles` must stay `true` — the intake path depends on it
+
+It was `false`, which is the schema default, and that silently disabled the
+whole document-ingestion feature.
+
+`intake/attachment-staging.ts` only stages an attachment whose `contentType`
+is `application/vnd.microsoft.teams.file.download.info` (`:136`). Microsoft's
+own documentation gates delivery of that attachment on this flag:
+
+> To send and receive files in the agent, set the `supportsFiles` property in
+> the manifest to `true`. … **If the agent does not enable `supportsFiles`,
+> the features listed in this section do not work.**
+
+"Receive files in personal chat" is one of those features. So with `false`,
+Teams never delivers the attachment, and every line of `attachment-staging.ts`
+— roughly 434 of them, plus its tests — is unreachable in the shipped
+package. The bot would answer an RFP with an assessment against zero
+documents.
+
+It was not a placeholder oversight: the **built** package (`build/manifest.json`,
+and the manifest inside `traycer-remote.zip`) carried the real App ID and the
+real FQDN alongside `"supportsFiles": false`. The sideloadable app declared no
+file support.
+
+> ⚠️ **This cannot be confirmed from source.** It is platform behaviour, and
+> the only proof is a live message: attach a PDF to the bot in a 1:1 chat and
+> look for the `attachments staged` INFO line (it carries `count` and
+> `directory`). Either it is there or it is not. Do that before trusting the
+> intake flow end to end.
+>
+> Found by the Help-tab review agent; the docs quote above is what settled it.
+
+Enabling it does not, on its own, make the bot send files: upload needs a
+`FileConsentCard`, which nothing here builds.
+
+### Merging the fix is NOT enough — the app must be repackaged and re-uploaded
+
+`manifest.json` here is a **template**. What Teams actually installed is the
+manifest inside `traycer-remote.zip`, built by `make-package.mjs` — and both
+`appPackage/build/` and `*.zip` are untracked, so nothing in a merge touches
+them. The installed app keeps whatever it was sideloaded with.
+
+So a `supportsFiles` fix reaches a real user only after:
+
+```sh
+cd clients/teams-bot
+node appPackage/make-package.mjs      # needs appPackage/local-ids.json
+# then re-upload appPackage/traycer-remote.zip in Teams and reinstall the app
+```
+
+A manifest change with no repackage-and-reinstall is a no-op that reads like
+a fix in the git history. Same trap as the flag itself: the thing that would
+falsify it is not in the repo.
+
+
 ## Two tabs: the app at `/next/`, and Help at `/help/`
 
 The section below argues for exactly one tab, and that argument still holds

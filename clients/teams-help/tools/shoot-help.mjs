@@ -117,22 +117,32 @@ function overflowingElements() {
   const bad = [];
   const limit = document.documentElement.clientWidth + 1;
   for (const el of document.querySelectorAll("body *")) {
-    // The exemption is an opt-in list, not a sniff of computed `overflow-x`.
-    //
-    // Sniffing looked equivalent and was not: it also exempted `hidden`, and
-    // `hidden` CLIPS where `auto` scrolls. Content too wide for a container
-    // that clips is GONE, not swipeable — which is the defect this check
-    // exists to catch, so it was blind in exactly the place it mattered.
-    // Measured on the unmodified page: 165 of 448 elements were exempt via
-    // `hidden` against 49 via a real scroller, and the containers doing it
-    // were `.mock` and `.cmd-list` — every card replica and both reference
-    // tables, i.e. the page's actual content.
-    //
-    // These two are the whole list, verified in styles.css rather than
-    // assumed: `.nav` and `.seq-scroll` are the only `overflow-x: auto`
-    // rules in the file, and they are the two the previous comment already
-    // named. Matching from the PARENT keeps a scroller's own box honest —
-    // only its children are allowed to be wider than the viewport.
+    /*
+     * Opt IN to the two deliberate scrollers by name, rather than inferring
+     * them from computed `overflow-x`.
+     *
+     * The inferring version treated `hidden` as a scroller and so exempted
+     * everything inside `.mock` and `.cmd-list` — six card replicas and both
+     * reference tables, which is most of the page's content. `hidden` does
+     * not scroll, it CLIPS: content overflowing there is silently lost,
+     * which is precisely the defect this check exists to catch, at precisely
+     * the 380px viewport where it happens.
+     *
+     * So the check could not fail over the majority of the page. A check
+     * that cannot fail is worse than a missing one — it reports green and
+     * buys confidence it never earned.
+     *
+     * "Most of the page" is measured rather than estimated: at 500px, 165 of
+     * 448 elements were exempt via `hidden` against 49 via a real scroller.
+     * These two selectors are the whole list, verified as the only
+     * `overflow-x: auto` rules in styles.css rather than assumed.
+     *
+     * Matched from the PARENT, which is not incidental: the old walk started
+     * at `el.parentElement`, so a scroller's own box was always checked, and
+     * `el.closest()` would quietly stop checking it. Only a scroller's
+     * CHILDREN may be wider than the viewport — `.nav` itself running off
+     * the screen is a bug like any other.
+     */
     if (el.parentElement?.closest(".nav, .seq-scroll")) continue;
 
     const r = el.getBoundingClientRect();
@@ -287,8 +297,14 @@ console.log("\nno-javascript");
   const page = await context.newPage();
   await page.goto(`${base}?theme=default`);
   // No scrollThrough here: with scripting off there is no observer to
-  // trigger, and page.evaluate cannot run either. That is the point — the
+  // trigger, so there is nothing to scroll for. That is the point — the
   // content must already be visible without any of it.
+  //
+  // The two checks below DO work despite `javaScriptEnabled: false`, which
+  // reads like a contradiction and is not: the flag disables the PAGE's
+  // scripts, while `page.evaluate` runs through CDP's `Runtime.evaluate`,
+  // which is unaffected. Said explicitly because the obvious reading is
+  // "these can't be running" and the obvious next step is to delete them.
   await page.waitForTimeout(400);
 
   // The whole page must still be readable. Without `[data-js]` scoping,

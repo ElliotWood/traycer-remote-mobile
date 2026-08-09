@@ -307,6 +307,28 @@
           </p>
         </div>
 
+        <!--
+          The badges describe the CODE. This says whether the deployment can
+          reach it, which is a different question and the one a reader
+          actually has.
+
+          Without it steps 3 and 4 read "Live" while the confirm press
+          answers "This deployment can't start assessments yet." — the page
+          contradicting the bot, with the page sounding more confident.
+        -->
+        <div class="note note-warn" style="margin-bottom: 1.75rem">
+          <div class="small">
+            <strong style="color: var(--fg-strong)">
+              Check this works on your deployment before relying on it.
+            </strong>
+            Starting an assessment needs the bot to be told which host to start it
+            <em>on</em>. If that is not configured, pressing <strong>Yes, go ahead</strong>
+            answers <em>“This deployment can’t start assessments yet”</em> and you never reach
+            the form — nothing below step 2 is reachable. It is a deployment setting, not
+            something you can fix from Teams. The steps below describe the bot as built.
+          </div>
+        </div>
+
         <div class="journey">
           <!-- step 1 -->
           <div class="step reveal">
@@ -644,7 +666,7 @@
           <div class="cmd-row">
             <div><code class="cmd" data-copy="fleet">fleet</code></div>
             <div class="small">
-              The agents in this epic, newest and most active first. Up to twelve, each with an
+              The agents in this epic, newest and most active first. Up to eight, each with an
               <strong>Open</strong> button — tapping the row does the same thing. Everything
               you can <em>do</em> to an agent lives one level down, on the card
               <strong>Open</strong> takes you to.
@@ -766,9 +788,10 @@
                   Which jurisdiction governs this tender?
                 </div>
                 <div class="small" style="display: grid; gap: 0.3rem">
-                  <div>◯ Local</div>
+                  <div>◯ Commonwealth</div>
                   <div>◯ State</div>
-                  <div>◯ Federal</div>
+                  <div>◯ Local</div>
+                  <div>◯ Enterprise</div>
                 </div>
                 <div class="mock-actions">
                   <span class="mock-btn mock-btn-primary">Send answers</span>
