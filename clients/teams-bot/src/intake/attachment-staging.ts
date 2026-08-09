@@ -387,6 +387,34 @@ async function defaultWriteFile(file: string, data: Uint8Array): Promise<void> {
 }
 
 /**
+ * What a deployment with NO stager wired should do about this message.
+ *
+ * Lives here rather than in the handler because the handler is deliberately
+ * the one file with no unit test — it adapts an SDK `TurnContext` and holds
+ * almost no logic, by design. This is a decision, so it belongs where a
+ * decision can be asserted.
+ *
+ * With no attachments it is `none`: a request with no files is legitimate.
+ * With files present it REFUSES — "assessment started" on a request whose
+ * documents were silently dropped is the false-success shape this client
+ * keeps finding, and an assessment of a tender nobody read is worse than no
+ * assessment.
+ */
+export function stagingUnavailable(
+  attachments: readonly unknown[] | undefined,
+): StagingOutcome {
+  const files = (attachments ?? []).filter(
+    (attachment) => classifyAttachment(attachment).kind !== "not-a-file",
+  );
+  if (files.length === 0) return { kind: "none" };
+  return {
+    kind: "refused",
+    reason:
+      "I can't take file attachments on this deployment yet, and an assessment without your documents would be worthless.",
+  };
+}
+
+/**
  * What is ACTUALLY on disk in a staging directory, read at dispatch time.
  *
  * The names also travel in the card payload, and this is deliberately not

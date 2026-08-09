@@ -20,7 +20,7 @@ import {
   RAW_ATTACHMENT_LOG_FLAG,
 } from "../intake/attachment-capture";
 import {
-  classifyAttachment,
+  stagingUnavailable,
   type StagingOutcome,
 } from "../intake/attachment-staging";
 
@@ -227,18 +227,9 @@ class ReadSurfaceHandler extends ActivityHandler {
    */
   private async stage(context: TurnContext): Promise<StagingOutcome> {
     const attachments = context.activity.attachments;
-    if (this.deps.stageAttachments !== undefined) {
-      return this.deps.stageAttachments(attachments);
-    }
-    const files = (attachments ?? []).filter(
-      (attachment) => classifyAttachment(attachment).kind !== "not-a-file",
-    );
-    if (files.length === 0) return { kind: "none" };
-    return {
-      kind: "refused",
-      reason:
-        "I can't take file attachments on this deployment yet, and an assessment without your documents would be worthless.",
-    };
+    return this.deps.stageAttachments === undefined
+      ? stagingUnavailable(attachments)
+      : this.deps.stageAttachments(attachments);
   }
 
   /**

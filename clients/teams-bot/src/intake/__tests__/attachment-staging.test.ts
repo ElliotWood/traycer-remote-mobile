@@ -11,6 +11,7 @@ import {
   stageAttachments,
   stagingDirectory,
   stagingRootFromEnv,
+  stagingUnavailable,
   MAX_FILE_BYTES,
   type StagingOutcome,
 } from "../attachment-staging";
@@ -347,6 +348,19 @@ describe("stageAttachments — bytes on disk, or a loud refusal", () => {
     expect(second.kind).toBe("staged");
     if (first.kind !== "staged" || second.kind !== "staged") return;
     expect(first.directory).not.toBe(second.directory);
+  });
+
+  it("CONTRACT: a deployment with no stager refuses files rather than dropping them", () => {
+    // The alternative is "assessment started" on a request whose documents
+    // were silently discarded — a confident answer about a tender nobody
+    // read. A request with no files at all is still legitimate.
+    expect(stagingUnavailable(undefined).kind).toBe("none");
+    expect(
+      stagingUnavailable([{ contentType: "text/html", content: "<p/>" }]).kind,
+    ).toBe("none");
+    expect(stagingUnavailable([personalFile("Tender.pdf")]).kind).toBe("refused");
+    // A channel reference too: it is still a document the user attached.
+    expect(stagingUnavailable([CHANNEL_FILE]).kind).toBe("refused");
   });
 
   it("listStagedFiles returns null for a directory that is not there", async () => {
