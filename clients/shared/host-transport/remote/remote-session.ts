@@ -13,11 +13,11 @@ import {
   checkStreamMethodCompatibility,
 } from "@traycer/protocol/framework/stream-compat";
 import type { VersionedStreamRpcRegistry } from "@traycer/protocol/framework/versioned-stream-rpc";
-import type { BearerSourceProvider } from "@traycer-clients/shared/auth/bearer-source";
+import type { BearerSourceProvider } from "../../auth/bearer-source";
 import type {
   RevalidateOutcome,
   StreamAuthRevalidator,
-} from "@traycer-clients/shared/auth/bearer-revalidator";
+} from "../../auth/bearer-revalidator";
 import type { IStreamWebSocketFactory } from "../ws-stream-factory";
 import type {
   IStreamSession,

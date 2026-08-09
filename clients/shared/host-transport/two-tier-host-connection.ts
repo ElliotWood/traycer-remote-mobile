@@ -194,7 +194,7 @@ export class WatchingConnection {
   constructor(
     auth: StreamConnectionAuth,
     entry: MachineEndpoint,
-    webSocketFactory: IStreamWebSocketFactory = createWhatwgStreamWebSocketFactory(),
+    webSocketFactory: IStreamWebSocketFactory,
   ) {
     this.hostId = entry.hostId;
     this.client = new WsStreamClient<WatchingStreamRpcRegistry>({
@@ -283,7 +283,7 @@ export class TwoTierHostConnectionManager {
   constructor(
     private readonly auth: StreamConnectionAuth,
     drivingEntry: MachineEndpoint,
-    deps: TwoTierHostConnectionManagerDeps = {},
+    deps: TwoTierHostConnectionManagerDeps,
   ) {
     this.createDriving =
       deps.createDriving ??
@@ -292,7 +292,10 @@ export class TwoTierHostConnectionManager {
           hostWsUrl: e.websocketUrl,
           hostId: e.hostId,
         }));
-    this.createWatching = deps.createWatching ?? ((a, e) => new WatchingConnection(a, e));
+    this.createWatching =
+      deps.createWatching ??
+      ((a, e) =>
+        new WatchingConnection(a, e, createWhatwgStreamWebSocketFactory()));
     this.promoteDialTimeoutMs = deps.promoteDialTimeoutMs ?? PROMOTE_DIAL_TIMEOUT_MS;
     this.driving = this.createDriving(auth, drivingEntry);
     this.drivingEntry = drivingEntry;

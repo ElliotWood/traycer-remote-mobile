@@ -3,10 +3,12 @@ import { Registry } from "../registry";
 
 const AGENT_A = "11111111-1111-1111-1111-111111111111";
 
-function upsertA(registry: Registry, hostId = "host-a"): void {
+// No `hostId` parameter: all six call sites took the default, so the argument
+// only ever described one host.
+function upsertA(registry: Registry): void {
   registry.upsert({
     agentId: AGENT_A,
-    hostId,
+    hostId: "host-a",
     label: "machine a",
     version: "1.0.0",
     reachableUrl: "http://100.0.0.1:6001",

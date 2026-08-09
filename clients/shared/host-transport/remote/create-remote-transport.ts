@@ -1,7 +1,7 @@
 import type { VersionedRpcRegistry } from "@traycer/protocol/framework/index";
 import type { VersionedStreamRpcRegistry } from "@traycer/protocol/framework/versioned-stream-rpc";
-import type { BearerSourceProvider } from "@traycer-clients/shared/auth/bearer-source";
-import type { StreamAuthRevalidator } from "@traycer-clients/shared/auth/bearer-revalidator";
+import type { BearerSourceProvider } from "../../auth/bearer-source";
+import type { StreamAuthRevalidator } from "../../auth/bearer-revalidator";
 import type { IStreamWebSocketFactory } from "../ws-stream-factory";
 import { RemoteSession, type IRemoteSession } from "./remote-session";
 import { RemoteHostMessenger } from "./remote-host-messenger";

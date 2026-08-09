@@ -22,7 +22,7 @@ async function listenEphemeral(server: net.Server | http.Server): Promise<number
   return address.port;
 }
 
-function baseConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
+function baseConfig(overrides: Partial<GatewayConfig>): GatewayConfig {
   return {
     publicListen: { host: "127.0.0.1", port: 0 },
     internalListen: { host: "127.0.0.1", port: 0 },
@@ -92,7 +92,7 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
       reachableUrl: `http://127.0.0.1:${tunnelPort}`,
     });
 
-    const config = baseConfig();
+    const config = baseConfig({});
     const gatewayServer = http.createServer((_req, res) => {
       res.writeHead(404);
       res.end();
@@ -187,7 +187,7 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
     const fakeHost = net.createServer((s) => s.on("data", (c) => received.push(c as Buffer)));
     cleanup.push(() => fakeHost.close());
     const registry = new Registry(60_000); // nothing registered
-    const config = baseConfig();
+    const config = baseConfig({});
     const gatewayServer = http.createServer((_req, res) => res.end());
     attachProxy(gatewayServer, { registry, config });
     const gatewayPort = await listenEphemeral(gatewayServer);

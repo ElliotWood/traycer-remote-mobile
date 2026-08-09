@@ -24,8 +24,8 @@ import {
   decodeMuxFrame,
   encodeMuxFrame,
 } from "@traycer/protocol/host-transport/mux";
-import { MutableBearerLease } from "@traycer-clients/shared/auth/bearer-source";
-import type { StreamAuthRevalidator } from "@traycer-clients/shared/auth/bearer-revalidator";
+import { MutableBearerLease } from "../../../auth/bearer-source";
+import type { StreamAuthRevalidator } from "../../../auth/bearer-revalidator";
 import type {
   IStreamWebSocketFactory,
   StreamWebSocketLike,
