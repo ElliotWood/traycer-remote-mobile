@@ -8,10 +8,17 @@ import {
   vi,
 } from "vitest";
 import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { promisify } from "node:util";
 import {
   SHUTDOWN_FORCE_EXIT_MS,
@@ -38,6 +45,7 @@ import {
   smAppServiceAgentLabelId,
 } from "../../label";
 import { CLI_ERROR_CODES } from "../../../runner/errors";
+import { NO_POSIX_SHELL, posixShell } from "../../../__tests__/posix-shell";
 
 const execFileAsync = promisify(execFile);
 
@@ -217,8 +225,9 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
       await chmod(oldCli, 0o700);
       await chmod(newCli, 0o700);
 
-      await execFileAsync("/bin/sh", ["-c", script, oldCli]);
-      await execFileAsync("/bin/sh", [
+      const sh = posixShell() ?? "/bin/sh";
+      await execFileAsync(sh, ["-c", script, oldCli]);
+      await execFileAsync(sh, [
         "-c",
         script,
         newCli,
@@ -239,7 +248,7 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
   // names the login item after the file, not after /bin/sh), and BOTH CLI
   // generations must still start. Executes the real emitted file, exactly
   // like the inline-form row above.
-  it("launcher file: starts both an N-1 CLI without --service-label and a current CLI with it, preserving leading invocation args", async () => {
+  it.skipIf(NO_POSIX_SHELL)("launcher file: starts both an N-1 CLI without --service-label and a current CLI with it, preserving leading invocation args", async () => {
     const work = mkdtempSync(join(tmpdir(), "traycer-host-start-launcher-"));
     const launcher = join(work, "traycer-host-start");
     const oldCli = join(work, "old-cli.sh");
@@ -275,8 +284,20 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
       await chmod(oldCli, 0o700);
       await chmod(newCli, 0o700);
 
-      await execFileAsync(launcher, [oldCli]);
-      await execFileAsync(launcher, [newCli, "--entry=cli-entry.js"]);
+      // launchd execs the launcher directly and the KERNEL honours its
+      // `#!/bin/sh` shebang. Windows has no shebang handling at all, so a
+      // direct spawn there fails ENOENT on a file that plainly exists. Handing
+      // the file to the shell its own shebang names is what the kernel would
+      // have done, so this stays a test of the launcher's CONTENT instead of
+      // becoming a skip. Naming the platform is right here: shebang exec IS a
+      // POSIX kernel feature, not a capability that varies within one.
+      const runLauncher = (args: readonly string[]): Promise<unknown> =>
+        process.platform === "win32"
+          ? execFileAsync(posixShell() ?? "/bin/sh", [launcher, ...args])
+          : execFileAsync(launcher, [...args]);
+
+      await runLauncher([oldCli]);
+      await runLauncher([newCli, "--entry=cli-entry.js"]);
 
       expect(await readFile(oldArgs, "utf8")).toBe("host\nstart\n");
       expect(await readFile(newArgs, "utf8")).toBe(
@@ -300,7 +321,24 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
     });
 
     const launcherPath = serviceLauncherScriptPath(label);
-    expect(launcherPath.endsWith(`/${label.id}/traycer-host-start`)).toBe(true);
+    // The claim is the ORDER - a per-label directory, then the fixed basename
+    // macOS surfaces in Login Items - so it is checked against the running
+    // platform's separator rather than a hardcoded "/".
+    //
+    // Not cosmetic, and it is a real limitation of this row rather than a
+    // tidy-up: `serviceLauncherScriptPath` builds with `node:path`'s `join`,
+    // so off macOS it emits backslashes, and the shared recognizer
+    // (`attestTraycerRegistration`) finds a launcher's label by looking for a
+    // literal `/<label-id>/`. Those two disagree on Windows. It costs nothing
+    // today because the launcher is written only by the macOS installer - but
+    // that makes this POSIX-shape coupling untested rather than safe, and it
+    // is the owner's call, not a test's, whether the helper should be building
+    // a `path.posix` path by construction. See the lockstep suite, where the
+    // same separator assumption is what degrades attestation to
+    // `indeterminate` off macOS.
+    expect(
+      launcherPath.split(sep).join("/").endsWith(`/${label.id}/traycer-host-start`),
+    ).toBe(true);
     expect(plist).toContain(`<key>ProgramArguments</key>
   <array>
     <string>${launcherPath}</string>
@@ -2501,9 +2539,51 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
     });
 
     // Runs the body with the LaunchAgents directory unreadable, so `stat` on
-    // the manifest inside it fails with EACCES rather than ENOENT. Skipped
-    // under root, which bypasses permission checks entirely.
-    const itUnlessRoot = it.skipIf(process.getuid?.() === 0);
+    // the manifest inside it fails with EACCES rather than ENOENT.
+    //
+    // `chmod(dir, 0o000)` cannot always deliver that condition, and there is
+    // more than one principal it fails for. Root bypasses permission checks;
+    // on Windows `chmod` only toggles the read-only attribute and the owner
+    // keeps reading. Both leave the fixture silently NOT creating the state it
+    // is named for - but they fail in opposite directions, which is why only
+    // one of them had been noticed. Root reads as a false GREEN (the repair
+    // path finds a readable manifest and the row passes for the wrong reason);
+    // Windows reads as a false RED, and it did: `retireCompetingRegistration`
+    // correctly returned `nothing-to-retire` / `retired` and the suite reported
+    // it as a product defect.
+    //
+    // So the guard probes the CONDITION rather than enumerating principals.
+    // The previous `process.getuid?.() === 0` form is subsumed - root now fails
+    // this probe for the same reason it bypassed the fixture - and no future
+    // platform has to be added to a list for the fixture to stay honest.
+    function canMakeDirectoryUnreadable(): boolean {
+      let probeDir: string | null = null;
+      try {
+        probeDir = mkdtempSync(join(tmpdir(), "traycer-unreadable-probe-"));
+        writeFileSync(join(probeDir, "sentinel"), "x", "utf8");
+        chmodSync(probeDir, 0o000);
+        try {
+          statSync(join(probeDir, "sentinel"));
+          // The read succeeded, so the directory is not unreadable to us.
+          return false;
+        } catch {
+          return true;
+        }
+      } catch {
+        return false;
+      } finally {
+        if (probeDir !== null) {
+          try {
+            chmodSync(probeDir, 0o700);
+            rmSync(probeDir, { recursive: true, force: true });
+          } catch {
+            // Best-effort cleanup of a temp dir; never fail the suite for it.
+          }
+        }
+      }
+    }
+
+    const itWhenUnreadableIsReachable = it.skipIf(!canMakeDirectoryUnreadable());
 
     async function withUnreadableLaunchAgentsDir(
       body: () => Promise<void>,
@@ -2516,7 +2596,7 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
       }
     }
 
-    itUnlessRoot(
+    itWhenUnreadableIsReachable(
       "reports an unreadable manifest as a failed repair, never as a clean machine",
       async () => {
         const calls: RecordedCall[] = [];
@@ -2544,7 +2624,7 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
       },
     );
 
-    itUnlessRoot(
+    itWhenUnreadableIsReachable(
       "still evicts the competing host when the manifest cannot be read",
       async () => {
         const calls: RecordedCall[] = [];

@@ -10,6 +10,7 @@ import {
   runHostCapabilities,
 } from "../capabilities";
 import { COMPATIBLE_HOST_START_SCRIPT_PREFIX } from "../../service/platforms/host-start-script";
+import { NO_POSIX_SHELL, posixShell } from "../../__tests__/posix-shell";
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(
@@ -144,9 +145,9 @@ describe("`traycer host capabilities` as a subprocess", () => {
    * Only the probe prefix is executed, never the `exec … host start` arms -
    * those would spawn a supervisor against the developer's own data dir.
    */
-  it("the probe the emitters actually embed returns 0 against the real CLI", async () => {
+  it.skipIf(NO_POSIX_SHELL)("the probe the emitters actually embed returns 0 against the real CLI", async () => {
     await expect(
-      execFileAsync("/bin/sh", [
+      execFileAsync(posixShell() ?? "/bin/sh", [
         "-c",
         `${COMPATIBLE_HOST_START_SCRIPT_PREFIX} >/dev/null 2>&1`,
         "bun",
@@ -155,13 +156,13 @@ describe("`traycer host capabilities` as a subprocess", () => {
     ).resolves.toBeDefined();
   });
 
-  it("that same probe returns non-zero when the token is not advertised", async () => {
+  it.skipIf(NO_POSIX_SHELL)("that same probe returns non-zero when the token is not advertised", async () => {
     const wrongToken = COMPATIBLE_HOST_START_SCRIPT_PREFIX.replace(
       HOST_CAPABILITY_SERVICE_LABEL,
       "not-a-capability",
     );
     await expect(
-      execFileAsync("/bin/sh", [
+      execFileAsync(posixShell() ?? "/bin/sh", [
         "-c",
         `${wrongToken} >/dev/null 2>&1`,
         "bun",

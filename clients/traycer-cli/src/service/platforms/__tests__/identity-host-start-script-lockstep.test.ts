@@ -1,3 +1,4 @@
+import { sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   attestTraycerRegistration,
@@ -30,6 +31,28 @@ import { serviceLauncherScriptPath } from "../../label";
  *
  * These rows fail if either side moves alone.
  */
+/**
+ * `serviceLauncherScriptPath` builds with `node:path`'s `join`, so it emits the
+ * host platform's separator - while `attestTraycerRegistration` finds a
+ * launcher's label by looking for a literal `/<label-id>/`. On macOS, the only
+ * platform that writes a launcher, those agree. Off it they do not, and the
+ * attestation degrades to `indeterminate` - which is the exact lockout this
+ * suite exists to prevent, arriving through the separator rather than through
+ * the prefix.
+ *
+ * Normalising here keeps the lockstep property - emitter layout against
+ * recognizer matching - under test on every platform, which is the claim these
+ * rows are actually making. It does NOT establish that the pair works off
+ * macOS; it does not, and the reason it costs nothing today is that the
+ * launcher is written only by the macOS installer. That makes the POSIX-shape
+ * coupling untested rather than safe. Whether `serviceLauncherScriptPath`
+ * should build a `path.posix` path by construction is the helper owner's call,
+ * not something a test should decide by reaching into it.
+ */
+function asPosixPath(value: string): string {
+  return value.split(sep).join("/");
+}
+
 describe("host-start script / identity attestation lockstep", () => {
   const labelId = "ai.traycer.host.dev";
   const programArgumentsFor = (script: string): readonly string[] => [
@@ -109,12 +132,14 @@ describe("host-start script / identity attestation lockstep", () => {
     // launcher-form plist would attest `indeterminate` and stop being
     // evictable. This row uses the REAL `serviceLauncherScriptPath` so the
     // two cannot drift silently.
-    const launcherPath = serviceLauncherScriptPath({
-      id: labelId,
-      displayName: "Traycer Host (Dev)",
-      environment: "dev",
-      devSlot: null,
-    });
+    const launcherPath = asPosixPath(
+      serviceLauncherScriptPath({
+        id: labelId,
+        displayName: "Traycer Host (Dev)",
+        environment: "dev",
+        devSlot: null,
+      }),
+    );
     const attestation = attestTraycerRegistration({
       labelId,
       knownLabels: null,
@@ -193,12 +218,14 @@ describe("host-start script / identity attestation lockstep", () => {
 
   it("emits a launcher file whose basename macOS will surface, carrying the same capability probe", () => {
     expect(
-      serviceLauncherScriptPath({
-        id: labelId,
-        displayName: "Traycer Host (Dev)",
-        environment: "dev",
-        devSlot: null,
-      }).endsWith(`/${labelId}/${HOST_START_LAUNCHER_BASENAME}`),
+      asPosixPath(
+        serviceLauncherScriptPath({
+          id: labelId,
+          displayName: "Traycer Host (Dev)",
+          environment: "dev",
+          devSlot: null,
+        }),
+      ).endsWith(`/${labelId}/${HOST_START_LAUNCHER_BASENAME}`),
     ).toBe(true);
     const script = buildHostStartLauncherScript(labelId);
     expect(script.startsWith("#!/bin/sh\n")).toBe(true);
