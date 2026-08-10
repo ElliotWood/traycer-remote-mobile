@@ -138,6 +138,11 @@ function sourceFiles(directory: string): string[] {
         : sourceFiles(absolutePath);
     }
     if (!/\.tsx?$/.test(entry.name)) return [];
-    return [path.relative(guiAppSrc, absolutePath)];
+    // Forward slashes always. `path.relative` uses the host separator, so on
+    // Windows every entry comes back as `hooks\git\…` and fails to match the
+    // forward-slash inventories above - a red that says nothing about the
+    // code under test. The inventories are written the way the repo writes
+    // paths, so normalise the produced side rather than the expected one.
+    return [path.relative(guiAppSrc, absolutePath).split(path.sep).join("/")];
   });
 }
