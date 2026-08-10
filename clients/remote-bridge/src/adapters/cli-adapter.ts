@@ -12,7 +12,7 @@
  */
 import { z } from "zod";
 import { interviewAnswerSchema } from "@traycer/protocol/persistence/epic/content-blocks";
-import type { BridgeClient } from "../bridge-client";
+import type { BridgeClient, BridgePermissionMode } from "../bridge-client";
 import type { ChatStatus } from "../action-surface";
 import type { ILogger } from "../logger";
 import { WatchEventTracker } from "./watch-events";
@@ -145,8 +145,10 @@ export async function runSend(
   chatId: string,
   text: string,
   logger: ILogger,
+  /** Only consulted for a chat with no settings yet — see `sendMessage`. */
+  permissionMode?: BridgePermissionMode,
 ): Promise<void> {
-  const outcome = await bridge.sendMessage(chatId, text);
+  const outcome = await bridge.sendMessage(chatId, text, permissionMode);
   logger.info("send outcome", { chatId, outcome });
   process.stdout.write(`${JSON.stringify(outcome)}\n`);
   if (outcome.kind !== "applied") process.exitCode = 1;

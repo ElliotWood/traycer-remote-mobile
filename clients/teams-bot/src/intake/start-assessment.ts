@@ -151,11 +151,37 @@ export function createStartAssessment(config: StartAssessmentConfig) {
       };
     }
 
+    /*
+     * `full_access`, and this is the one place in the bot that asks for it.
+     *
+     * The bridge mints every chat `supervised`, which is correct for a chat
+     * someone is sitting in front of and wrong for this one. An assessment is
+     * dispatched by a salesperson who has just been told the work is running
+     * and to come back later; supervised means it stops at its FIRST tool call
+     * and waits for a tap from someone who has left. Nothing tells them —
+     * the completion reply is still unwired — so the run is stranded silently
+     * and indefinitely. Observed live: an assessment sat on "Waiting on you:
+     * Bash — Search filesystem for smv4-related files" having done nothing.
+     *
+     * Scoped deliberately to this call rather than changed in the bridge's
+     * default: every OTHER caller here is a person in a conversation, and for
+     * them stopping to ask is the feature.
+     *
+     * This does not weaken the human gate that matters. That gate is on
+     * releasing a document to a customer; it lives in the bid repo, behind
+     * tools this bot is forbidden from naming — there is a source-scanning
+     * test in `read-surface/__tests__/cards.test.ts` that fails if any file
+     * here mentions them, and it caught the first draft of this very comment.
+     * How freely the agent may read files while assessing is a separate
+     * question from who may release its output, and only the former changes
+     * here.
+     */
     const sent = await sendMessageAction(
       created.value.chatId,
       buildInstruction(route, spoken, input.opportunity, documents),
       env,
       config.bridgeCliConfig,
+      "full_access",
     );
     if (sent.kind !== "ok") {
       // The chat EXISTS and is empty. Say that rather than implying nothing

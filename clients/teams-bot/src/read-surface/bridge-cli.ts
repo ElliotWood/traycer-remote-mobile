@@ -243,8 +243,24 @@ export function sendMessageAction(
   text: string,
   env: NodeJS.ProcessEnv,
   config: BridgeCliConfig,
+  /**
+   * The mode the chat is BROUGHT TO LIFE in. The bridge consults it only for
+   * a chat that has no settings yet, so in practice it applies to the first
+   * send after `create-chat` and is ignored on every send after that.
+   *
+   * Omitted by every interactive caller on purpose: someone replying from the
+   * composer wants the bridge's `supervised` default, where the agent stops
+   * and asks them. It is passed ONLY by the assessment dispatch — the one
+   * caller whose user has been told "it's running, come back later" and is
+   * therefore not there to answer. See `intake/start-assessment.ts`.
+   */
+  permissionMode?: "supervised" | "auto_accept_edits" | "full_access",
 ): Promise<BridgeCliResult<ActionOutcome>> {
-  return runAction(["send", chatId, text], env, config);
+  const args =
+    permissionMode === undefined
+      ? ["send", chatId, text]
+      : ["send", chatId, text, "--permission-mode", permissionMode];
+  return runAction(args, env, config);
 }
 
 /**

@@ -6,7 +6,11 @@
  * output never has protocol noise mixed in.
  */
 import { Command } from "commander";
-import { BridgeClient } from "./bridge-client";
+import {
+  BridgeClient,
+  BRIDGE_PERMISSION_MODES,
+  type BridgePermissionMode,
+} from "./bridge-client";
 import { createLogger } from "./logger";
 import { checkDeleteTarget } from "./delete-guard";
 import {
@@ -150,14 +154,51 @@ program
     "--sender-agent-id <id>",
     "Sender agent id (defaults to $TRAYCER_AGENT_ID)",
   )
+  /**
+   * The mode a chat is BROUGHT TO LIFE in, not a per-message flag: it is only
+   * consulted for a chat that has no settings yet, which in practice is the
+   * first send after `create-chat`.
+   *
+   * It exists because `supervised` — correct for a chat someone is sitting in
+   * front of — silently strands one nobody is watching. An assessment
+   * dispatched from Teams stops at its first tool call and waits for a tap
+   * from a person who has been told to come back later, and (until the
+   * completion reply is wired) is never told it stopped.
+   *
+   * Validated against the list rather than passed through: an unrecognised
+   * mode would otherwise reach the host inside a settings tuple and be
+   * rejected there, or worse accepted and ignored.
+   */
+  .option(
+    "--permission-mode <mode>",
+    `Run mode for a chat with no settings yet (${BRIDGE_PERMISSION_MODES.join(" | ")})`,
+  )
   .action(
     async (
       chatId: string,
       text: string,
-      opts: { epicId?: string; senderAgentId?: string },
+      opts: {
+        epicId?: string;
+        senderAgentId?: string;
+        permissionMode?: string;
+      },
     ) => {
       const logger = createLogger("info");
-      await withBridge(opts, (bridge) => runSend(bridge, chatId, text, logger));
+      const mode = opts.permissionMode;
+      if (
+        mode !== undefined &&
+        !BRIDGE_PERMISSION_MODES.includes(mode as BridgePermissionMode)
+      ) {
+        process.stderr.write(
+          `[bridge] --permission-mode must be one of: ${BRIDGE_PERMISSION_MODES.join(", ")}
+`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+      await withBridge(opts, (bridge) =>
+        runSend(bridge, chatId, text, logger, mode as BridgePermissionMode | undefined),
+      );
     },
   );
 

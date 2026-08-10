@@ -60,6 +60,27 @@ const DEFAULT_HARNESS = "claude";
 /** `supervised` routes tool/file-edit approvals back to a human — the mode every adapter on top of this bridge (Teams, D3 CLI) expects by default. */
 const DEFAULT_PERMISSION_MODE = "supervised";
 
+/**
+ * The three modes a chat can run in, mirroring gui-app's own list.
+ *
+ * `supervised` is right for a chat a person is sitting in front of, and wrong
+ * for one nobody is watching: the agent stops at its first tool call and waits
+ * for a tap that is never coming. A Teams-started assessment is the second
+ * kind — it is dispatched by someone who has been told "it's running, come
+ * back later" — so that caller passes `full_access` explicitly. The default
+ * stays `supervised`, because every other caller IS interactive.
+ */
+export type BridgePermissionMode =
+  | "supervised"
+  | "auto_accept_edits"
+  | "full_access";
+
+export const BRIDGE_PERMISSION_MODES: readonly BridgePermissionMode[] = [
+  "supervised",
+  "auto_accept_edits",
+  "full_access",
+];
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -271,8 +292,18 @@ export class BridgeClient implements RemoteBridgeActions {
     return this.ensureChatSession(chatId).answerInterview(blockId, answers);
   }
 
-  async sendMessage(chatId: string, text: string): Promise<ActionOutcome> {
-    return this.ensureChatSession(chatId).sendMessage(text);
+  async sendMessage(
+    chatId: string,
+    text: string,
+    /**
+     * Applies only to a chat that has NO settings yet — i.e. the first send
+     * after `create-chat`. Once the host has persisted a chat's settings this
+     * is not consulted again, which is the honest semantic: it is the mode the
+     * chat is brought to life in, not a per-message flag.
+     */
+    permissionMode?: BridgePermissionMode,
+  ): Promise<ActionOutcome> {
+    return this.ensureChatSession(chatId, permissionMode).sendMessage(text);
   }
 
   /**
@@ -411,7 +442,10 @@ export class BridgeClient implements RemoteBridgeActions {
     this.auth.dispose();
   }
 
-  private ensureChatSession(chatId: string): ChatSession {
+  private ensureChatSession(
+    chatId: string,
+    permissionMode?: BridgePermissionMode,
+  ): ChatSession {
     let session = this.chatSessions.get(chatId);
     if (session === undefined) {
       session = new ChatSession({
@@ -421,7 +455,7 @@ export class BridgeClient implements RemoteBridgeActions {
         wsStreamClient: this.streamClient,
         auth: this.auth,
         onDiagnostic: (message) => this.logger.debug(message, null),
-        resolveDefaultSettings: () => this.resolveDefaultSettings(),
+        resolveDefaultSettings: () => this.resolveDefaultSettings(permissionMode),
       });
       this.chatSessions.set(chatId, session);
     }
@@ -438,7 +472,9 @@ export class BridgeClient implements RemoteBridgeActions {
    * failure to resolve (no endpoint, the RPC failing, or the harness listing
    * no models) — the caller refuses to send rather than guessing a slug.
    */
-  private async resolveDefaultSettings(): Promise<ChatRunSettings | null> {
+  private async resolveDefaultSettings(
+    permissionMode: BridgePermissionMode = DEFAULT_PERMISSION_MODE,
+  ): Promise<ChatRunSettings | null> {
     const endpoint = this.endpointPoller.get();
     if (endpoint === null) return null;
     let response;
@@ -464,7 +500,7 @@ export class BridgeClient implements RemoteBridgeActions {
     return {
       harnessId: DEFAULT_HARNESS,
       model,
-      permissionMode: DEFAULT_PERMISSION_MODE,
+      permissionMode,
       reasoningEffort: null,
       serviceTier: null,
       agentMode: "regular",
