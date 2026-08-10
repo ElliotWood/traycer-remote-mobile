@@ -269,11 +269,11 @@ export class BridgeClient implements RemoteBridgeActions {
   }
 
   async getStatus(chatId: string): Promise<ChatStatus> {
-    return this.ensureChatSession(chatId).getStatus();
+    return this.ensureChatSession(chatId, undefined).getStatus();
   }
 
   async approve(chatId: string, approvalId: string): Promise<ActionOutcome> {
-    return this.ensureChatSession(chatId).approve(approvalId);
+    return this.ensureChatSession(chatId, undefined).approve(approvalId);
   }
 
   async reject(
@@ -281,7 +281,7 @@ export class BridgeClient implements RemoteBridgeActions {
     approvalId: string,
     reason: string | null,
   ): Promise<ActionOutcome> {
-    return this.ensureChatSession(chatId).reject(approvalId, reason);
+    return this.ensureChatSession(chatId, undefined).reject(approvalId, reason);
   }
 
   async answerInterview(
@@ -289,7 +289,7 @@ export class BridgeClient implements RemoteBridgeActions {
     blockId: string,
     answers: readonly InterviewAnswer[],
   ): Promise<ActionOutcome> {
-    return this.ensureChatSession(chatId).answerInterview(blockId, answers);
+    return this.ensureChatSession(chatId, undefined).answerInterview(blockId, answers);
   }
 
   async sendMessage(
@@ -300,8 +300,15 @@ export class BridgeClient implements RemoteBridgeActions {
      * after `create-chat`. Once the host has persisted a chat's settings this
      * is not consulted again, which is the honest semantic: it is the mode the
      * chat is brought to life in, not a per-message flag.
+     *
+     * `| undefined` rather than `?:`, and NOW ON THE INTERFACE. The two read
+     * identically at a call site and differ in what the compiler demands —
+     * and `action-surface.ts` promises a channel adapter is "implementable
+     * against this file alone". An optional parameter is invisible there, so
+     * that promise was quietly false for the one value deciding what a
+     * brand-new chat may do unattended.
      */
-    permissionMode?: BridgePermissionMode,
+    permissionMode: BridgePermissionMode | undefined,
   ): Promise<ActionOutcome> {
     return this.ensureChatSession(chatId, permissionMode).sendMessage(text);
   }
@@ -395,7 +402,7 @@ export class BridgeClient implements RemoteBridgeActions {
     offset: number,
     limit: number,
   ): Promise<Transcript> {
-    return this.ensureChatSession(chatId).getTranscript(offset, limit);
+    return this.ensureChatSession(chatId, undefined).getTranscript(offset, limit);
   }
 
   /**
@@ -444,7 +451,12 @@ export class BridgeClient implements RemoteBridgeActions {
 
   private ensureChatSession(
     chatId: string,
-    permissionMode?: BridgePermissionMode,
+    /**
+     * Only consulted when this call CREATES the session — every other caller
+     * passes `undefined` and says so, which is the point of the explicit
+     * union: reading a call site tells you whether a mode was considered.
+     */
+    permissionMode: BridgePermissionMode | undefined,
   ): ChatSession {
     let session = this.chatSessions.get(chatId);
     if (session === undefined) {
@@ -473,8 +485,18 @@ export class BridgeClient implements RemoteBridgeActions {
    * no models) — the caller refuses to send rather than guessing a slug.
    */
   private async resolveDefaultSettings(
-    permissionMode: BridgePermissionMode = DEFAULT_PERMISSION_MODE,
+    permissionMode: BridgePermissionMode | undefined,
   ): Promise<ChatRunSettings | null> {
+    /*
+     * The fallback moved OUT of the signature and into the body, on purpose.
+     *
+     * As a default parameter it silently handed a caller who never considered
+     * the question whatever `DEFAULT_PERMISSION_MODE` happens to become — on
+     * the value that decides what a brand-new chat may do unattended. Here it
+     * is one readable line at the point of use, and changing the constant is
+     * a change you can see the blast radius of.
+     */
+    const mode = permissionMode ?? DEFAULT_PERMISSION_MODE;
     const endpoint = this.endpointPoller.get();
     if (endpoint === null) return null;
     let response;
@@ -500,7 +522,7 @@ export class BridgeClient implements RemoteBridgeActions {
     return {
       harnessId: DEFAULT_HARNESS,
       model,
-      permissionMode,
+      permissionMode: mode,
       reasoningEffort: null,
       serviceTier: null,
       agentMode: "regular",
@@ -543,7 +565,7 @@ export class BridgeClient implements RemoteBridgeActions {
           entry.epicId === this.epicId &&
           entry.chatId !== null
         ) {
-          this.ensureChatSession(entry.chatId);
+          this.ensureChatSession(entry.chatId, undefined);
         }
       }
     });

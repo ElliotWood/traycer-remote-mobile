@@ -72,12 +72,8 @@ class FakeStore implements ProactiveStore {
   targetFor(epicId: string): ProactiveTarget | null {
     return this.targets.get(epicId) ?? null;
   }
-  bindTarget(
-    epicId: string,
-    reference: StoredConversationReference,
-    boundAt: number,
-  ): void {
-    this.targets.set(epicId, { reference, boundAt });
+  bindTarget(epicId: string, target: ProactiveTarget): void {
+    this.targets.set(epicId, target);
   }
   discardTarget(epicId: string): void {
     this.targets.delete(epicId);
@@ -103,15 +99,24 @@ interface Harness {
   readonly deps: PushDeps;
   readonly store: FakeStore;
   readonly warnings: string[];
-  readonly sends: number[];
+  readonly sends: readonly { readonly event: WatchEvent }[];
 }
 
 function harness(store: FakeStore, send: SendProactive): Harness {
   const warnings: string[] = [];
-  const sends: number[] = [];
-  const counting: SendProactive = async (reference, event) => {
-    sends.push(1);
-    await send(reference, event);
+  /*
+   * RECORDS THE EVENTS, not a count.
+   *
+   * This was `number[]` — one `1` pushed per call — which could answer "how
+   * many sends" and nothing else. Once a `resolved` event can also produce a
+   * send, a count cannot tell a correction from a second copy of the request,
+   * and those are opposite outcomes: one fixes a stale card, the other is the
+   * duplicate this file's whole ordering argument is about.
+   */
+  const sends: { readonly event: WatchEvent }[] = [];
+  const counting: SendProactive = async (target, event) => {
+    sends.push({ event });
+    await send(target, event);
   };
   return {
     store,
@@ -220,13 +225,76 @@ describe("idempotency across a bridge restart", () => {
      * `forgetSent`. The final assertion flips to "duplicate" — a re-raised
      * approval silently swallowed, which the user cannot tell from an agent
      * that never asked.
+     *
+     * UPDATED 2026-08-10: this asserted `kind: "forgotten"` and
+     * `sends.length === 1` — i.e. that a resolution sends NOTHING. That
+     * behaviour changed deliberately (see below), so the assertion changed
+     * with it. The property this test actually exists to protect — that the
+     * bookkeeping is cleared, so a re-raise notifies again — is unchanged and
+     * still the last two lines.
      */
     const h = harness(new FakeStore(["epic-1"]), succeeds);
     await pushWatchEvent(h.deps, approval("e1", "epic-1"));
 
-    const forget = await pushWatchEvent(h.deps, resolved("e1", "epic-1"));
-    expect(forget).toEqual({ kind: "forgotten", eventId: "e1" });
-    expect(h.sends.length).toBe(1); // resolved sends nothing
+    const resolvedResult = await pushWatchEvent(h.deps, resolved("e1", "epic-1"));
+    expect(resolvedResult).toEqual({ kind: "corrected", eventId: "e1" });
+
+    const reRaised = await pushWatchEvent(h.deps, approval("e1", "epic-1"));
+    expect(reRaised.kind).toBe("sent");
+  });
+
+  it("CONTRACT: a resolution CORRECTS a card we already sent", async () => {
+    /*
+     * Elliot rejected an approval from the CLI and Teams went on showing a
+     * card that said it needed him. The card cannot refresh itself — every
+     * action this bot emits is `Action.Submit`, which has no in-place update —
+     * so the last thing on screen was a live-looking request for a decision
+     * already made elsewhere.
+     *
+     * A notification that becomes false and stays on screen is worse than no
+     * notification: the interface is asserting something untrue and the user
+     * cannot tell it from a real one.
+     */
+    const h = harness(new FakeStore(["epic-1"]), succeeds);
+    await pushWatchEvent(h.deps, approval("e1", "epic-1"));
+    expect(h.sends.length).toBe(1);
+
+    await pushWatchEvent(h.deps, resolved("e1", "epic-1"));
+    expect(h.sends.length).toBe(2);
+    // The second send is the RESOLUTION, not a repeat of the request.
+    expect(h.sends[1].event.type).toBe("resolved");
+  });
+
+  it("CONTRACT: a resolution for something we never announced stays silent", async () => {
+    /*
+     * The gate is `hasSent`, and it is the whole difference between
+     * correcting a claim and inventing one. Without it, every approval
+     * resolved on the desktop — the overwhelming majority, since the desktop
+     * is where people work — would produce a Teams message about a request
+     * the user never saw. That is noise, and noise is what trains someone to
+     * ignore the channel that also carries the real ones.
+     */
+    const h = harness(new FakeStore(["epic-1"]), succeeds);
+    const result = await pushWatchEvent(h.deps, resolved("never-sent", "epic-1"));
+    expect(result).toEqual({ kind: "forgotten", eventId: "never-sent" });
+    expect(h.sends.length).toBe(0);
+  });
+
+  it("clears the bookkeeping even when the correction cannot be sent", async () => {
+    /*
+     * Keeping the entry on a failed correction would mean a re-raise of the
+     * same id never notifies — trading a missed courtesy message for a missed
+     * APPROVAL, which is the wrong way round. The failure is a journal line,
+     * not a retry.
+     */
+    // Fails ONLY the correction, so the re-raise on the last line is a real
+    // measurement of the bookkeeping rather than of a still-broken sender.
+    const h = harness(new FakeStore(["epic-1"]), async (_target, event) => {
+      if (event.type === "resolved") throw new Error("boom");
+    });
+    await pushWatchEvent(h.deps, approval("e1", "epic-1"));
+    const result = await pushWatchEvent(h.deps, resolved("e1", "epic-1"));
+    expect(result).toEqual({ kind: "corrected", eventId: "e1" });
 
     const reRaised = await pushWatchEvent(h.deps, approval("e1", "epic-1"));
     expect(reRaised.kind).toBe("sent");

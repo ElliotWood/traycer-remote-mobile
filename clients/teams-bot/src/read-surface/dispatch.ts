@@ -84,6 +84,24 @@ export interface DispatchDeps extends HostAccessDeps {
    * tender deadline is invisible where a missing one is a red message.
    */
   readonly defaultTimeZone?: string;
+  /**
+   * Records where proactive notifications for an epic should go.
+   *
+   * Called on a TURN, because a conversation reference exists nowhere else —
+   * and until something calls it, `pushWatchEvent` has no route for any epic
+   * and every approval is dropped with a "no Teams conversation bound" line.
+   * That is half of why no approval has ever reached Teams.
+   *
+   * Synchronous, idempotent and cheap: it parses, compares against what is
+   * stored, and returns without writing when nothing changed. Safe to call on
+   * every message. `user` supplies the @-mention and `null` is a legitimate
+   * state — it costs the tag, not the notification.
+   */
+  readonly rememberProactiveTarget?: (
+    epicId: string,
+    reference: unknown,
+    user: { readonly id: string; readonly name: string } | null,
+  ) => void;
   /** Injected so "requested 2m ago" labels are deterministic in tests. */
   readonly now: () => number;
   /**

@@ -258,4 +258,65 @@ describe("buildChatTitle", () => {
   it("CONTRACT: never empty — an unnamed agent stays unnamed for life", () => {
     expect(buildChatTitle(ROUTE, "   ").length).toBeGreaterThan(0);
   });
+
+  describe("quote tidying", () => {
+    // The observed defect: the first real intake named its chat
+    // `does this fit SensorMine?"`.
+    it("drops a stray trailing quote", () => {
+      expect(buildChatTitle(ROUTE, 'does this fit SensorMine?"')).toBe(
+        "does this fit SensorMine?",
+      );
+    });
+
+    it("unwraps a fully quoted question", () => {
+      expect(buildChatTitle(ROUTE, '"does this fit SensorMine?"')).toBe(
+        "does this fit SensorMine?",
+      );
+    });
+
+    it("drops a stray leading double quote", () => {
+      expect(buildChatTitle(ROUTE, '"does this fit SensorMine?')).toBe(
+        "does this fit SensorMine?",
+      );
+    });
+
+    it("handles curly quotes, which Teams substitutes as you type", () => {
+      expect(buildChatTitle(ROUTE, "“does this fit SensorMine?”")).toBe(
+        "does this fit SensorMine?",
+      );
+      expect(buildChatTitle(ROUTE, "does this fit SensorMine?”")).toBe(
+        "does this fit SensorMine?",
+      );
+    });
+
+    // CONTROLS. Each of these would break if the rule were "strip any quote
+    // at either end", which is the obvious wrong implementation.
+    it("keeps a balanced quotation inside the line", () => {
+      expect(buildChatTitle(ROUTE, 'they call it "SensorMine" apparently')).toBe(
+        'they call it "SensorMine" apparently',
+      );
+    });
+
+    it("keeps apostrophes, including a leading one", () => {
+      expect(buildChatTitle(ROUTE, "don't drop the client's apostrophe")).toBe(
+        "don't drop the client's apostrophe",
+      );
+      // `'twas` opens with a legitimate lone apostrophe.
+      expect(buildChatTitle(ROUTE, "'twas a council RFT")).toBe(
+        "'twas a council RFT",
+      );
+    });
+
+    it("CONTRACT: tidying never reaches the instruction", () => {
+      const spoken = 'does this fit SensorMine?"';
+      const text = buildInstruction(ROUTE, spoken, OPPORTUNITY, null);
+      // The person's words are carried verbatim, stray quote and all. The
+      // title is display; the instruction is evidence of what was asked.
+      expect(text).toContain(spoken);
+    });
+
+    it("falls back when the line is only quote characters", () => {
+      expect(buildChatTitle(ROUTE, '""').length).toBeGreaterThan(0);
+    });
+  });
 });

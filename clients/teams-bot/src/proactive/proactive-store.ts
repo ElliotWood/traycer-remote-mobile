@@ -62,6 +62,26 @@ export interface ProactiveTarget {
   readonly reference: StoredConversationReference;
   /** When this epic was bound to that conversation. */
   readonly boundAt: number;
+  /**
+   * Who to @-mention, and it lives HERE rather than on the reference.
+   *
+   * A tag is what turns a message into a notification — the difference
+   * between the two complaints Elliot made — and it needs a DISPLAY NAME.
+   * `StoredConversationReference` deliberately carries no name: its own
+   * docblock says widening the on-disk shape is a decision rather than an
+   * accident, and that shape is shared with the reply-target store which has
+   * no use for one.
+   *
+   * So the name is kept on the proactive target, which is the only record
+   * that needs it. `id` is the Teams channel account id (`29:1…`) — the same
+   * value as `reference.user.id`, duplicated deliberately so a mention can
+   * never be assembled from two records that disagree.
+   *
+   * OPTIONAL, and absent is a real state: a target bound before this field
+   * existed, or a turn with no user on the activity. The send degrades to an
+   * untagged message rather than to broken markup — see `teams/mention.ts`.
+   */
+  readonly mention?: { readonly id: string; readonly name: string };
 }
 
 export interface SentRecord {
@@ -75,7 +95,7 @@ export interface SentRecord {
 export interface ProactiveStore {
   /** Where notifications for this epic go, or `null` if nowhere. */
   targetFor(epicId: string): ProactiveTarget | null;
-  bindTarget(epicId: string, reference: StoredConversationReference, boundAt: number): void;
+  bindTarget(epicId: string, target: ProactiveTarget): void;
   /**
    * Drop the route for an epic. Called ONLY on a `gone` outcome — the 403
    * branch. Every other failure keeps it.
@@ -127,12 +147,8 @@ export class DurableProactiveStore implements ProactiveStore {
     return this.targets.get(epicId);
   }
 
-  bindTarget(
-    epicId: string,
-    reference: StoredConversationReference,
-    boundAt: number,
-  ): void {
-    this.targets.set(epicId, { reference, boundAt });
+  bindTarget(epicId: string, target: ProactiveTarget): void {
+    this.targets.set(epicId, target);
   }
 
   discardTarget(epicId: string): void {

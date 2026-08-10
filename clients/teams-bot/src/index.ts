@@ -26,6 +26,13 @@ import {
   stagingRootFromEnv,
 } from "./intake/attachment-staging";
 import { isKnownTimeZone } from "./intake/deadline";
+import { DurableProactiveStore } from "./proactive/proactive-store";
+import { rememberProactiveTarget } from "./proactive/remember-target";
+import { pushWatchEvent } from "./proactive/push-notifications";
+import { createAdapterSend } from "./proactive/send-via-adapter";
+import { createWatchRunner } from "./proactive/watch-runner";
+import { nodeSpawnWatchFn } from "./proactive/spawn-watch";
+import { proactiveCardFor } from "./proactive/render-card";
 import { DurableConversationReferenceStore } from "./state/conversation-reference-store";
 import { resolveTenantEnv } from "./read-surface/host-access";
 import type { ResolvePrincipal } from "./read-surface/principal-source";
@@ -163,20 +170,30 @@ async function main(): Promise<void> {
     });
   }
 
+  /*
+   * HOISTED so the proactive path can read it too.
+   *
+   * It was constructed inline inside `createStartAssessment`, which made it
+   * invisible to everything else — and the reference it holds, keyed by chat
+   * id, is exactly what an approval raised inside that chat needs to route
+   * back to the conversation that started it.
+   */
+  const stateDir =
+    process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ?? "/srv/traycer/teams-bot/state";
+  const assessmentReferences = new DurableConversationReferenceStore(
+    `${stateDir}/conversation-refs.json`,
+    (message: string, detail: string) => {
+      logWarn(message, { detail });
+    },
+  );
+
   const assessmentHostId = process.env.TRAYCER_TEAMS_HOST_ID?.trim() ?? "";
   const startAssessment =
     assessmentHostId.length > 0 &&
     defaultEpicId !== undefined &&
     defaultEpicId.length > 0
       ? createStartAssessment({
-          references: new DurableConversationReferenceStore(
-            process.env.TRAYCER_TEAMS_STATE_DIR !== undefined
-              ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/conversation-refs.json`
-              : "/srv/traycer/teams-bot/state/conversation-refs.json",
-            (message: string, detail: string) => {
-              logWarn(message, { detail });
-            },
-          ),
+          references: assessmentReferences,
           hostId: assessmentHostId,
           epicId: defaultEpicId,
           tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
@@ -214,13 +231,36 @@ async function main(): Promise<void> {
    * who you were talking to and nothing on screen changed, so the next thing
    * you type lands on the command path and renders a help card.
    *
-   * Same state dir and same fallback as the conversation references above,
-   * under its own filename so the two cannot collide.
+   * Keyed off `stateDir` like every other durable store here, under its own
+   * filename so the two cannot collide. It arrived open-coding that same
+   * env-var-or-default expression, from a branch written before `stateDir`
+   * existed; one definition is the point of having it.
    */
   const focusedChats = new DurableFocusedChatStore(
-    process.env.TRAYCER_TEAMS_STATE_DIR !== undefined
-      ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/focused-chats.json`
-      : "/srv/traycer/teams-bot/state/focused-chats.json",
+    `${stateDir}/focused-chats.json`,
+    (message: string, detail: string) => {
+      logWarn(message, { detail });
+    },
+  );
+
+  /*
+   * ─────────────────────────────────────────────────────────────────────
+   * THE PROACTIVE PATH — every piece of which existed and none of which ran
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * `watch-line.ts`, `proactive-store.ts`, `push-notifications.ts`,
+   * `classify-send-failure.ts` and `send-via-adapter.ts` were all built and
+   * unit-tested, and a grep for their entry points outside tests returned
+   * nothing. The producer existed too. This block is the composition that was
+   * missing, and it is why Elliot's approvals never reached Teams.
+   *
+   * OPTIONAL, like every other long-running wire here: no epic configured
+   * means nothing to watch, and it says so rather than starting a child that
+   * can never succeed.
+   */
+  const proactiveStore = new DurableProactiveStore(
+    `${stateDir}/proactive-targets.json`,
+    `${stateDir}/proactive-sent.json`,
     (message: string, detail: string) => {
       logWarn(message, { detail });
     },
@@ -235,6 +275,26 @@ async function main(): Promise<void> {
     parentEnv: process.env,
     resolvePrincipal,
     startAssessment,
+    // The route a notification travels back along. Captured on a turn because
+    // a conversation reference exists nowhere else; idempotent, so calling it
+    // on every message costs a parse and a comparison.
+    rememberProactiveTarget: (epicId, reference, user) => {
+      const outcome = rememberProactiveTarget(
+        proactiveStore,
+        epicId,
+        reference,
+        user,
+        Date.now(),
+      );
+      if (outcome.kind === "bound") {
+        logInfo("proactive route bound", { epicId, tagged: user !== null });
+      } else if (outcome.kind === "unusable") {
+        logWarn("could not record where to send notifications for this epic", {
+          epicId,
+          consequence: "approvals in this epic will not reach Teams",
+        });
+      }
+    },
     // `globalThis.fetch` rather than an HTTP client: the URL is absolute and
     // pre-authorised, so there is nothing to configure and nothing to add.
     stageAttachments: (attachments) =>
@@ -245,6 +305,121 @@ async function main(): Promise<void> {
     defaultTimeZone,
     now: Date.now,
   });
+
+  /*
+   * The watcher, started only when there is an epic to watch and an app id to
+   * send as.
+   *
+   * `MicrosoftAppId` doubles as the outbound Connector client id — the same
+   * value `loadBotFrameworkAuthConfigFromEnv` already refused to start
+   * without — so its absence is impossible here rather than merely unlikely.
+   *
+   * INTERVIEWS ARE DELIBERATELY NOT WIRED YET. `bridge watch` does emit
+   * `interview.requested`, but `InterviewAppeared` carries no `questions`,
+   * and `buildInterviewCard` renders its `questions: null` branch as "Answer
+   * it on the desktop" — advice that is wrong for an interview which is
+   * perfectly answerable in Teams one tap away. Sending the right card with
+   * the wrong instruction is worse than sending nothing, so the interview
+   * branch throws to the journal until `buildInterviewWaitingCard` lands
+   * (owned by the card surface, agreed 2026-08-10).
+   */
+  const watcher =
+    defaultEpicId !== undefined && defaultEpicId.length > 0
+      ? createWatchRunner({
+          command: requireEnv("TRAYCER_REMOTE_BRIDGE_BIN"),
+          epicId: defaultEpicId,
+          buildEnv: async () => {
+            // Rebuilt per attempt: it carries a token that expires and this
+            // process is meant to run for weeks.
+            const identity = await resolvePrincipal();
+            if (identity.kind === "unavailable") return null;
+            return resolveTenantEnv(identity.principal, defaultEpicId, {
+              registry,
+              epicBindings,
+              bridgeCliConfig,
+              senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
+              parentEnv: process.env,
+            });
+          },
+          spawnWatch: nodeSpawnWatchFn,
+          onEvent: (event) =>
+            pushWatchEvent(
+              {
+                store: proactiveStore,
+                /*
+                 * CHAT FIRST, EPIC SECOND.
+                 *
+                 * `startAssessment` already writes a conversation reference
+                 * keyed by chat id, before anything that can fail — so an
+                 * approval raised inside a chat somebody launched from Teams
+                 * routes back to the exact conversation that launched it,
+                 * which is both more precise and more obviously correct than
+                 * "whichever conversation holds the epic".
+                 *
+                 * It also means this works with NO epic route bound: the
+                 * handler-side binding lives on another branch, and without
+                 * this fallback the whole path would notify nowhere until
+                 * that landed.
+                 *
+                 * No `mention` on the chat route — that store's shape is
+                 * shared with the reply-target store and deliberately carries
+                 * no display name. So an assessment-launched approval arrives
+                 * untagged until the epic route is bound, which is a weaker
+                 * notification rather than an absent one.
+                 */
+                resolveTarget: (event) => {
+                  const fromChat = assessmentReferences.recall(event.chatId);
+                  if (fromChat !== null) {
+                    return { reference: fromChat, boundAt: fromChat.capturedAt };
+                  }
+                  return proactiveStore.targetFor(event.epicId);
+                },
+                send: createAdapterSend(
+                  adapter,
+                  inboundAuthConfig.audience,
+                  (appeared) => proactiveCardFor(appeared, Date.now()),
+                ),
+                now: Date.now,
+                onWarn: (message, detail) => {
+                  logWarn(message, { detail });
+                },
+              },
+              event,
+            ).then((result) => {
+              logInfo("proactive event", {
+                kind: result.kind,
+                type: event.type,
+              });
+            }),
+          onInfo: (message, detail) => {
+            logInfo(message, { detail });
+          },
+          onWarn: (message, detail) => {
+            logWarn(message, { detail });
+          },
+          schedule: (fn, ms) => {
+            const timer = setTimeout(fn, ms);
+            // `unref` so a pending restart cannot hold the process open on a
+            // shutdown that has already closed the server.
+            timer.unref();
+            return {
+              cancel: () => {
+                clearTimeout(timer);
+              },
+            };
+          },
+          now: Date.now,
+        })
+      : null;
+
+  if (watcher === null) {
+    logWarn("proactive notifications disabled — no epic configured", {
+      variable: "TRAYCER_TEAMS_DEFAULT_EPIC_ID",
+      consequence: "approvals will never reach Teams",
+    });
+  } else {
+    watcher.start();
+  }
 
   const server = createHttpServer({
     adapter,

@@ -146,7 +146,7 @@ export async function runSend(
   text: string,
   logger: ILogger,
   /** Only consulted for a chat with no settings yet — see `sendMessage`. */
-  permissionMode?: BridgePermissionMode,
+  permissionMode: BridgePermissionMode | undefined,
 ): Promise<void> {
   const outcome = await bridge.sendMessage(chatId, text, permissionMode);
   logger.info("send outcome", { chatId, outcome });

@@ -44,7 +44,7 @@ function open(): DurableProactiveStore {
 
 describe("routes survive a restart", () => {
   it("recalls a bound target from a store reopened off disk", () => {
-    open().bindTarget("epic-1", REFERENCE, 42);
+    open().bindTarget("epic-1", { reference: REFERENCE, boundAt: 42 });
 
     const reopened = open();
     expect(reopened.targetFor("epic-1")).toEqual({
@@ -87,7 +87,7 @@ describe("the two stores are independent", () => {
      * everything that was outstanding" the moment it is reinstalled.
      */
     const store = open();
-    store.bindTarget("epic-1", REFERENCE, 42);
+    store.bindTarget("epic-1", { reference: REFERENCE, boundAt: 42 });
     store.recordSent("e1", 1000);
 
     store.discardTarget("epic-1");
@@ -110,7 +110,7 @@ describe("delivery honesty", () => {
      */
     const store = open();
     store.recordSent("e1", 1000);
-    store.bindTarget("epic-1", REFERENCE, 42);
+    store.bindTarget("epic-1", { reference: REFERENCE, boundAt: 42 });
 
     expect(open().sentEventIds()).toEqual(["e1"]);
     const onDisk: unknown = JSON.parse(readFileSync(sentPath, "utf8"));

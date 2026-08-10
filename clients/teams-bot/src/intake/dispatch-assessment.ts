@@ -130,13 +130,78 @@ export function buildInstruction(
   ].join("\n");
 }
 
+/**
+ * Quote pairs stripped from a TITLE. Straight and curly both, because Teams'
+ * composer substitutes curly quotes as you type and anyone pasting from Word
+ * brings them along.
+ */
+const TITLE_QUOTE_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ['"', '"'],
+  ["“", "”"],
+  ["'", "'"],
+  ["‘", "’"],
+];
+
+/**
+ * Tidy quote characters off a title.
+ *
+ * ONLY the title. `spokenText` reaches `buildInstruction` verbatim and must
+ * keep doing so — the classifier decided the route, it did not decide what the
+ * person meant, and the skill should read the question rather than our
+ * cleaned-up version of it.
+ *
+ * The first real intake produced the chat title `does this fit SensorMine?"`.
+ * Nothing in this codebase adds that quote: it arrives through the card
+ * action's `data.text` exactly as typed, so it is genuinely what was sent. A
+ * half-quoted question is a normal way to write and a bad way to name a row in
+ * a list someone scans.
+ *
+ * A LEADING lone quote is stripped for double quotes only, never for an
+ * apostrophe: `'twas` and `'til` open with one legitimately, and a title that
+ * begins with a quote reads fine regardless. A title that ENDS with a stray
+ * one reads as damage.
+ */
+function tidyTitleQuotes(input: string): string {
+  let out = input;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const before = out;
+    for (const [open, close] of TITLE_QUOTE_PAIRS) {
+      if (out.length >= 2 && out.startsWith(open) && out.endsWith(close)) {
+        out = out.slice(open.length, -close.length).trim();
+      }
+    }
+    for (const [open, close] of TITLE_QUOTE_PAIRS) {
+      // Unbalanced tail. For straight quotes open === close, so one count is
+      // the whole story; for curly, the two counts have to disagree.
+      const opens = out.split(open).length - 1;
+      const closes = open === close ? opens : out.split(close).length - 1;
+      const unbalanced = open === close ? opens % 2 === 1 : closes > opens;
+      if (unbalanced && out.endsWith(close)) {
+        out = out.slice(0, -close.length).trimEnd();
+      }
+    }
+    for (const [open, close] of TITLE_QUOTE_PAIRS) {
+      if (open === "'" || open === "‘") continue; // see the docblock
+      const opens = out.split(open).length - 1;
+      const closes = open === close ? opens : out.split(close).length - 1;
+      const unbalanced = open === close ? opens % 2 === 1 : opens > closes;
+      if (unbalanced && out.startsWith(open)) {
+        out = out.slice(open.length).trimStart();
+      }
+    }
+    if (out === before) break;
+  }
+  return out;
+}
+
 /** A short, human title. The chat is a thing someone will scan in a list. */
 export function buildChatTitle(route: SkillRoute, spokenText: string): string {
-  const first = spokenText.split("\n")[0]?.trim() ?? "";
+  const first = tidyTitleQuotes(spokenText.split("\n")[0]?.trim() ?? "");
   const trimmed = first.length > 60 ? `${first.slice(0, 59).trimEnd()}…` : first;
   if (trimmed.length > 0) return trimmed;
   // Never an empty title: the host accepts one and the agent stays unnamed
-  // for life.
+  // for life. Also reached when a message was nothing but quote characters,
+  // which tidying leaves empty.
   return `${route.product} — ${route.intent}`;
 }
 

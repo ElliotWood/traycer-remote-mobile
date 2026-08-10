@@ -275,8 +275,9 @@ export async function submitChatMessage(
     text,
     env,
     deps.bridgeCliConfig,
-    // Deliberately no permission mode: an interactive reply wants the
-    // bridge's `supervised` default, where the agent stops and asks.
+    // Omitted ON PURPOSE, and now said out loud: a person replying from the
+    // composer wants the bridge's `supervised` default, where the agent stops
+    // and asks them.
     undefined,
   );
 
