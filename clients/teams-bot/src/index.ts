@@ -169,20 +169,30 @@ async function main(): Promise<void> {
     });
   }
 
+  /*
+   * HOISTED so the proactive path can read it too.
+   *
+   * It was constructed inline inside `createStartAssessment`, which made it
+   * invisible to everything else — and the reference it holds, keyed by chat
+   * id, is exactly what an approval raised inside that chat needs to route
+   * back to the conversation that started it.
+   */
+  const stateDir =
+    process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ?? "/srv/traycer/teams-bot/state";
+  const assessmentReferences = new DurableConversationReferenceStore(
+    `${stateDir}/conversation-refs.json`,
+    (message: string, detail: string) => {
+      logWarn(message, { detail });
+    },
+  );
+
   const assessmentHostId = process.env.TRAYCER_TEAMS_HOST_ID?.trim() ?? "";
   const startAssessment =
     assessmentHostId.length > 0 &&
     defaultEpicId !== undefined &&
     defaultEpicId.length > 0
       ? createStartAssessment({
-          references: new DurableConversationReferenceStore(
-            process.env.TRAYCER_TEAMS_STATE_DIR !== undefined
-              ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/conversation-refs.json`
-              : "/srv/traycer/teams-bot/state/conversation-refs.json",
-            (message: string, detail: string) => {
-              logWarn(message, { detail });
-            },
-          ),
+          references: assessmentReferences,
           hostId: assessmentHostId,
           epicId: defaultEpicId,
           tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
@@ -226,8 +236,6 @@ async function main(): Promise<void> {
    * means nothing to watch, and it says so rather than starting a child that
    * can never succeed.
    */
-  const stateDir =
-    process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ?? "/srv/traycer/teams-bot/state";
   const proactiveStore = new DurableProactiveStore(
     `${stateDir}/proactive-targets.json`,
     `${stateDir}/proactive-sent.json`,
@@ -315,6 +323,34 @@ async function main(): Promise<void> {
             pushWatchEvent(
               {
                 store: proactiveStore,
+                /*
+                 * CHAT FIRST, EPIC SECOND.
+                 *
+                 * `startAssessment` already writes a conversation reference
+                 * keyed by chat id, before anything that can fail — so an
+                 * approval raised inside a chat somebody launched from Teams
+                 * routes back to the exact conversation that launched it,
+                 * which is both more precise and more obviously correct than
+                 * "whichever conversation holds the epic".
+                 *
+                 * It also means this works with NO epic route bound: the
+                 * handler-side binding lives on another branch, and without
+                 * this fallback the whole path would notify nowhere until
+                 * that landed.
+                 *
+                 * No `mention` on the chat route — that store's shape is
+                 * shared with the reply-target store and deliberately carries
+                 * no display name. So an assessment-launched approval arrives
+                 * untagged until the epic route is bound, which is a weaker
+                 * notification rather than an absent one.
+                 */
+                resolveTarget: (event) => {
+                  const fromChat = assessmentReferences.recall(event.chatId);
+                  if (fromChat !== null) {
+                    return { reference: fromChat, boundAt: fromChat.capturedAt };
+                  }
+                  return proactiveStore.targetFor(event.epicId);
+                },
                 send: createAdapterSend(
                   adapter,
                   inboundAuthConfig.audience,

@@ -84,6 +84,24 @@ export type SendProactive = (
 
 export interface PushDeps {
   readonly store: ProactiveStore;
+  /**
+   * WHERE THIS EVENT'S NOTIFICATION GOES — and it is per-event, not per-epic.
+   *
+   * The default is the epic route, which is the general case: any Teams
+   * conversation bound to an epic hears about anything blocking in it.
+   *
+   * It is overridable because there is a MORE PRECISE answer available for
+   * chats this bot started. `state/conversation-reference-store.ts` already
+   * holds a reference keyed by chat id, written by `start-assessment` before
+   * anything that can fail — so an approval in a chat somebody launched from
+   * Teams can be routed back to the exact conversation that launched it,
+   * rather than to whichever conversation happens to hold the epic.
+   *
+   * That also means this path works with NO epic route bound at all, which
+   * matters while the handler-side binding is owned by another branch: an
+   * assessment started from Teams notifies back correctly on its own.
+   */
+  readonly resolveTarget?: (event: WatchEvent) => ProactiveTarget | null;
   readonly send: SendProactive;
   /** Injected so tests do not depend on the clock. */
   readonly now: () => number;
@@ -120,6 +138,13 @@ export type PushResult =
       readonly outcome: SendOutcome;
       readonly referenceDiscarded: boolean;
     };
+
+/** The resolver, with the epic route as the documented default. */
+function targetOf(deps: PushDeps, event: WatchEvent): ProactiveTarget | null {
+  return deps.resolveTarget === undefined
+    ? deps.store.targetFor(event.epicId)
+    : deps.resolveTarget(event);
+}
 
 export async function pushWatchEvent(
   deps: PushDeps,
@@ -163,7 +188,7 @@ export async function pushWatchEvent(
     if (!announced) {
       return { kind: "forgotten", eventId: event.eventId };
     }
-    const target = deps.store.targetFor(event.epicId);
+    const target = targetOf(deps, event);
     if (target === null) {
       return { kind: "forgotten", eventId: event.eventId };
     }
@@ -186,7 +211,7 @@ export async function pushWatchEvent(
     return { kind: "duplicate", eventId: event.eventId };
   }
 
-  const target = deps.store.targetFor(event.epicId);
+  const target = targetOf(deps, event);
   if (target === null) {
     // Not an error state: an epic nobody has bound a Teams conversation to
     // is the normal case for every epic the user drives from the desktop.
