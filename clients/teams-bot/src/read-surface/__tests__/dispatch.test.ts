@@ -18,6 +18,7 @@ import {
 } from "../dispatch-action";
 import { ANSWER_VERB, SEND_VERB } from "../cards";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
+import { InMemoryFocusedChatStore } from "../focused-chat-store";
 import type { OneShotSpawnFn } from "../one-shot-spawn";
 import type { ResolvePrincipal } from "../principal-source";
 
@@ -97,6 +98,7 @@ describe("read-surface/dispatch — routing and identity gating", () => {
     return {
       registry,
       epicBindings: opts.epicBindings,
+      focusedChats: new InMemoryFocusedChatStore(),
       bridgeCliConfig: {
         command: "/absolute/traycer-remote-bridge",
         timeoutMs: 5000,
@@ -333,6 +335,7 @@ describe("read-surface/dispatch-action — the send path", () => {
     return {
       registry: sendRegistry,
       epicBindings,
+      focusedChats: new InMemoryFocusedChatStore(),
       bridgeCliConfig: {
         command: "/absolute/traycer-remote-bridge",
         timeoutMs: 5000,
@@ -1000,6 +1003,7 @@ describe("read-surface/dispatch — an unreachable chat never gets an actionable
     const deps: DispatchDeps = {
       registry: registry3,
       epicBindings,
+      focusedChats: new InMemoryFocusedChatStore(),
       bridgeCliConfig: {
         command: "/absolute/traycer-remote-bridge",
         timeoutMs: 5000,
@@ -1064,6 +1068,7 @@ describe("read-surface/dispatch — an unreachable chat never gets an actionable
     const deps: DispatchDeps = {
       registry: registry3,
       epicBindings,
+      focusedChats: new InMemoryFocusedChatStore(),
       bridgeCliConfig: {
         command: "/absolute/traycer-remote-bridge",
         timeoutMs: 5000,
@@ -1123,6 +1128,7 @@ describe("read-surface/dispatch — no Send box on a chat that cannot receive on
     const deps: DispatchDeps = {
       registry: gateRegistry,
       epicBindings,
+      focusedChats: new InMemoryFocusedChatStore(),
       bridgeCliConfig: {
         command: "/absolute/traycer-remote-bridge",
         timeoutMs: 5000,
@@ -1213,17 +1219,36 @@ describe("read-surface/dispatch — no Send box on a chat that cannot receive on
     await jwks4.close();
   });
 
-  it("CONTRACT: sendMessage=false renders no composer, despite connected=true", async () => {
+  /**
+   * REWRITTEN 2026-08-10, and what it is about did not change.
+   *
+   * These asserted the presence and absence of the COMPOSER CARD — an
+   * `Input.Text` with its own Send button, rendered directly above Teams' own
+   * compose box. That card is gone: replying is now focus, and the way in is
+   * the status card's `Reply` button.
+   *
+   * The CONTRACT under test is unchanged and is the reason these exist: a
+   * chat this host cannot send to must not offer a way to send to it, and
+   * must say why rather than leaving an unexplained absence. Only the shape
+   * of "a way to send" moved, from an input to a button.
+   */
+  it("CONTRACT: sendMessage=false offers no way to send, despite connected=true", async () => {
     const body = await chatBody(false);
+    // No composer — that card no longer exists anywhere.
     expect(body).not.toContain("Input.Text");
     expect(body).not.toContain("traycer/send");
+    // And no Reply button, which is what replaced it.
+    expect(body).not.toContain("traycer/reply");
     // And says WHY — a missing box with no explanation reads as broken.
     expect(body).toContain("Read-only from here");
   });
 
-  it("sendMessage=true still renders the composer — the control", async () => {
+  it("sendMessage=true offers Reply, and still no composer — the control", async () => {
     const body = await chatBody(true);
-    expect(body).toContain("traycer/send");
+    expect(body).toContain("traycer/reply");
     expect(body).not.toContain("Read-only from here");
+    // The composer is gone on BOTH branches, so its absence above is not
+    // evidence of the gate. This is what makes that test discriminating.
+    expect(body).not.toContain("Input.Text");
   });
 });

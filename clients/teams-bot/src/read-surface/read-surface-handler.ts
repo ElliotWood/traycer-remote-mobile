@@ -8,13 +8,32 @@ import type {
   AdaptiveCardInvokeValue,
 } from "@microsoft/agents-hosting";
 import { parseCommand } from "./commands";
+import { routeWhileFocused } from "./focus-routing";
+import type { FocusedChat } from "./focused-chat-store";
+
+/**
+ * The label a card would use for this chat — the string the echo check looks
+ * for. Mirrors `chatLabel` in `cards.ts`, which is not exported; kept as one
+ * line rather than widening that module's surface for a heuristic.
+ */
+function chatLabelOf(chat: FocusedChat): string {
+  const title = chat.title?.trim() ?? "";
+  return title.length > 0 ? title : chat.chatId.slice(0, 8);
+}
 import { dispatchCommand, type DispatchDeps } from "./dispatch";
 import { dispatchActionInvoke } from "./dispatch-action";
 import { logInfo, logWarn } from "../logger";
 import { stripMentions, type MentionEntity } from "../intake/mention";
 import { classify } from "../intake/classify";
 import { describeRoute } from "../intake/route-labels";
-import { buildClarifyCard, buildIntakeRefusedCard } from "./cards";
+import {
+  buildClarifyCard,
+  buildIntakeRefusedCard,
+  buildFocusEndedCard,
+  focusExpiredText,
+  focusInterceptedText,
+  focusSentText,
+} from "./cards";
 import {
   captureRawAttachments,
   RAW_ATTACHMENT_LOG_FLAG,
@@ -111,8 +130,61 @@ class ReadSurfaceHandler extends ActivityHandler {
       context.activity.entities as readonly MentionEntity[] | undefined,
       context.activity.recipient?.id,
     );
-    const command = parseCommand(spoken.text);
     const conversationId = context.activity.conversation?.id ?? "";
+
+    /*
+     * ══════════════════════════════════════════════════════════════════
+     * FOCUS, BEFORE ANYTHING ELSE READS THE TEXT.
+     *
+     * When a chat is focused, an unrecognised sentence is A MESSAGE TO AN
+     * AGENT rather than a request for help. That inverts the meaning of
+     * everything below, so it cannot be a branch inside the fallback — it
+     * has to come first, before `parseCommand` and before `classify`.
+     *
+     * The precedence rule and the argument for it live in
+     * `focus-routing.ts`, deliberately as a pure function: this is the one
+     * decision in the feature that can misdirect a message, so it is the
+     * one that has to be testable without standing up a turn.
+     * ══════════════════════════════════════════════════════════════════
+     */
+    const focus = await this.deps.focusedChats.get(conversationId, this.deps.now());
+    if (focus.kind === "focused") {
+      const routing = routeWhileFocused({
+        text: spoken.text,
+        hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
+      });
+      if (routing.kind === "send") {
+        await this.sendWhileFocused(context, conversationId, focus.chat, routing.text);
+        return;
+      }
+      if (routing.kind === "exit") {
+        await this.deps.focusedChats.clear(conversationId);
+        await context.sendActivity(
+          MessageFactory.attachment(buildFocusEndedCard(focus.chat)),
+        );
+        logInfo("focus cleared", { by: "word" });
+        return;
+      }
+      // A reserved word. Say WHY it did not go to the agent, then run it —
+      // in that order, so the explanation is above the result rather than
+      // below it. `intercepted` is empty for an attachment or an empty
+      // message, neither of which the user typed as a command.
+      if (routing.intercepted.length > 0) {
+        await context.sendActivity(
+          MessageFactory.text(focusInterceptedText(routing.intercepted, focus.chat)),
+        );
+      }
+    } else if (focus.kind === "expired" && spoken.text.trim().length > 0) {
+      // NOT silently dropped. The message is not sent — that is the safe
+      // direction and it is not in question — but the user's model was "I
+      // am talking to Foo" and nothing had contradicted it.
+      await context.sendActivity(
+        MessageFactory.text(focusExpiredText(focus.title)),
+      );
+      logInfo("focus expired", {});
+    }
+
+    const command = parseCommand(spoken.text);
 
     // NATURAL LANGUAGE FIRST, commands as the fallback.
     //
@@ -230,6 +302,66 @@ class ReadSurfaceHandler extends ActivityHandler {
     return this.deps.stageAttachments === undefined
       ? stagingUnavailable(attachments)
       : this.deps.stageAttachments(attachments);
+  }
+
+  /**
+   * Deliver a typed message to the focused chat.
+   *
+   * ROUTES THROUGH `dispatchCommand({ kind: "say" })`, which is the same path
+   * the typed `say <id> <text>` command uses. Not a shortcut to
+   * `submitChatMessage`: that command already validates the destination
+   * before sending, refuses a chat the bridge cannot resolve, and renders the
+   * outcome through `buildMessageOutcomeCard` — including the "may already
+   * have reached the agent" wording that a duplicate send depends on. A
+   * second, thinner send path would have had to reproduce all of it, and the
+   * one it forgot would be the one that matters.
+   *
+   * `touchedAt` is refreshed BEFORE the send, not after. The window matters:
+   * a send that hangs and then fails should still have counted as activity,
+   * because the user was demonstrably here. Refreshing afterwards would let a
+   * slow failure expire the focus the user is actively using.
+   */
+  private async sendWhileFocused(
+    context: TurnContext,
+    conversationId: string,
+    chat: FocusedChat,
+    text: string,
+  ): Promise<void> {
+    await this.deps.focusedChats.set(conversationId, {
+      ...chat,
+      touchedAt: this.deps.now(),
+    });
+
+    const cards = await dispatchCommand(
+      { kind: "say", chatId: chat.chatId, text },
+      conversationId,
+      this.deps,
+    );
+
+    /*
+     * THE ECHO, and it is the answer to "how do I know where my typing is
+     * going".
+     *
+     * `dispatchCommand` already returns an outcome card, and on the happy
+     * path that card says "Message sent — Delivered to Foo". So the echo is
+     * only added when the send did NOT produce one that names the target:
+     * two confirmations for one message is noise, and noise is what makes
+     * people stop reading the thing that matters.
+     *
+     * The invariant, not the implementation: after every message, the last
+     * thing in the conversation names the agent it went to. If it does not,
+     * you are not focused.
+     */
+    const named = cards.some((card) =>
+      JSON.stringify(card.content).includes(chatLabelOf(chat)),
+    );
+    for (const card of cards) {
+      await context.sendActivity(MessageFactory.attachment(card));
+    }
+    if (!named) {
+      await context.sendActivity(MessageFactory.text(focusSentText(chat)));
+    }
+    logInfo("sent while focused", { named });
   }
 
   /**

@@ -3,6 +3,7 @@ import { IdentityRegistry } from "@traycer-clients/shared/identity-registry/regi
 import { dispatchActionInvoke } from "../dispatch-action";
 import type { DispatchDeps } from "../dispatch";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
+import { InMemoryFocusedChatStore } from "../focused-chat-store";
 import {
   CONFIRM_ROUTE_VERB,
   SUBMIT_INTAKE_VERB,
@@ -45,6 +46,7 @@ function makeDeps(opts: {
   readonly defaultTimeZone: string | undefined;
 }): DispatchDeps {
   return {
+    focusedChats: new InMemoryFocusedChatStore(),
     registry: IdentityRegistry.fromConfig(
       {
         tenants: [

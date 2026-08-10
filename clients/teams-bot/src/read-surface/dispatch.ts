@@ -3,7 +3,7 @@ import {
   buildApprovalCard,
   buildBridgeUnavailableCard,
   buildChatCard,
-  buildComposeCard,
+  buildFocusStartedCard,
   buildContextStripCard,
   buildTranscriptCard,
   buildUnknownChatCard,
@@ -33,6 +33,7 @@ import {
   type ReadSurfaceFailure,
 } from "./host-access";
 import type { ResolvePrincipal } from "./principal-source";
+import type { FocusedChatStore } from "./focused-chat-store";
 import type { OpportunityDetails } from "../intake/intake-form";
 import type { StagingOutcome } from "../intake/attachment-staging";
 
@@ -85,6 +86,14 @@ export interface DispatchDeps extends HostAccessDeps {
   readonly defaultTimeZone?: string;
   /** Injected so "requested 2m ago" labels are deterministic in tests. */
   readonly now: () => number;
+  /**
+   * Where this conversation's next typed message goes. REQUIRED, not
+   * optional: an unwired store would make `Reply` appear to work and then
+   * quietly send nothing, which is the failure this whole feature exists to
+   * remove. A deployment that cannot focus should fail to construct, not
+   * fail per message.
+   */
+  readonly focusedChats: FocusedChatStore;
 }
 
 function failureCard(failure: ReadSurfaceFailure): Attachment {
@@ -226,26 +235,27 @@ export async function dispatchCommand(
         if (transcript.kind === "ok") {
           cards.push(buildContextStripCard(transcript.transcript, now));
         }
-        // The composer goes LAST, after anything awaiting a decision. A chat
-        // you can watch but not talk to was the functional hole; putting the
-        // reply box above the approvals would bury the thing that is
-        // actually blocking the agent.
-        //
-        // But ONLY when this host can actually send. `connected` is not
-        // sufficient evidence: it describes the subscription, which works
-        // fine for a remote chat — that is how the transcript above arrives.
-        // Measured, 53 of 56 agents are readable and NOT messageable, so
-        // gating on `connected` put a Send box on 53 chats that could not
-        // receive one. Same class as the composer `say hi` opened onto a
-        // chat that did not exist, one field over.
-        //
-        // `canSend` is read once, above, and used TWICE — here and by the
-        // status card's Reply button. Two reads could disagree.
-        cards.push(
-          canSend
-            ? buildComposeCard(chat, epicId)
-            : buildReadOnlyChatCard(chat),
-        );
+        /*
+         * NO COMPOSER CARD. Removed 2026-08-10.
+         *
+         * This used to append `buildComposeCard`, an `Input.Text` with its own
+         * Send button — rendered directly above Teams' real compose box. Two
+         * inputs, one of them fake. Elliot, from the live install: "reply
+         * being embedded in a card instead of being natural".
+         *
+         * Replying is now focus: the status card's `Reply` button points the
+         * conversation at this chat and you type in Teams' own box. So the
+         * card that used to be here is the button that is already up there.
+         *
+         * `buildReadOnlyChatCard` SURVIVES, and its reason survives with it:
+         * "a missing composer with no explanation is the white-screen failure
+         * in miniature". Omitting the Reply button on an unsendable chat
+         * silently poses the same question — where is the reply box — so the
+         * answer is still said out loud rather than inferred from an absence.
+         */
+        if (!canSend) {
+          cards.push(buildReadOnlyChatCard(chat));
+        }
       }
       return cards;
     }
@@ -310,12 +320,38 @@ export async function dispatchCommand(
       if (!result.status.connected) {
         return [buildUnknownChatCard(command.chatId)];
       }
-      return [
-        buildComposeCard(
-          { chatId: result.status.chatId, title: result.status.title },
-          result.epicId,
-        ),
-      ];
+
+      /*
+       * THE ONE PLACE FOCUS IS SET, and it is here rather than in the action
+       * dispatcher for a reason worth stating: `Reply` on a card and
+       * `compose <id>` typed by hand are the same intention, and this is
+       * already the command both of them run. Setting focus in the button's
+       * handler would have left the typed path rendering the old composer —
+       * two ways to talk to an agent, only one of them the new one.
+       *
+       * It is also AFTER the `connected` check, deliberately. Focus is a
+       * destination for everything the user types next; binding it to an id
+       * the bridge could not resolve is `say hi` again, and this time the
+       * mistake would be silent for every subsequent message rather than
+       * visible on one card.
+       */
+      const target = {
+        chatId: result.status.chatId,
+        title: result.status.title,
+      };
+      // `canSend` is NOT checked here, and that is not an oversight — it is
+      // the one gap in this design worth naming. `fetchChatCapabilities`
+      // costs a second spawn, and the send itself already refuses and reports
+      // through `buildMessageOutcomeCard`. Focusing an unsendable chat
+      // therefore fails on the first message with a real reason rather than
+      // on the button with a guessed one. If that proves confusing in use,
+      // the fix is a capability read here, not a silent send.
+      await deps.focusedChats.set(conversationId, {
+        chatId: target.chatId,
+        title: target.title,
+        touchedAt: deps.now(),
+      });
+      return [buildFocusStartedCard(target, result.epicId)];
     }
     case "say": {
       // Validate the destination BEFORE sending, for the same reason the

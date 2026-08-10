@@ -1912,6 +1912,160 @@ export function buildApprovalCard(
   );
 }
 
+/**
+ * An interview is waiting — as a NOTIFICATION, not as the form.
+ *
+ * For the proactive path only, and it exists because `InterviewAppeared` does
+ * not carry `questions`. The only thing that transport can pass to
+ * {@link buildInterviewCard} is `questions: null`, and that is the branch
+ * which renders "its questions didn't reach the bot — answer it on the
+ * desktop". True about this bot's knowledge; wrong as advice to someone whose
+ * interview is answerable one tap away.
+ *
+ * `null` meaning two things with OPPOSITE correct advice — "the bridge could
+ * not find the block" and "this transport does not carry questions" — is the
+ * `active: false → "Idle"` shape again: a value true about a neighbouring
+ * subject, rendered in the slot a reader parses as instruction.
+ *
+ * WHY THIS IS NOT A SECOND VOCABULARY, which `send-via-adapter.ts` rightly
+ * forbids: the FORM stays `buildInterviewCard` and only that. This is a
+ * pointer to it — a different kind of artefact, not a second dialect of the
+ * same one. The user still answers in exactly one place.
+ *
+ * READS COLD, by requirement. It arrives with no preceding message, so
+ * nothing here refers back to a request, a card, or a conversation. Every
+ * noun is named outright.
+ */
+export function buildInterviewWaitingCard(
+  chat: ChatRef,
+  epicId: string,
+  requestedAt: number,
+  now: number,
+): Attachment {
+  return buildCard(
+    [
+      cardHeader({
+        eyebrow: "Needs your answer",
+        eyebrowColor: "attention",
+        title: chatLabel(chat),
+        subtitle: "This agent has stopped to ask you something.",
+      }),
+      metaLine([`Asked ${approvalAgeLabel(requestedAt, now)}`, epicSegment(epicId)]),
+    ],
+    // "Open and answer", not "Open the chat": it says what happens next, and
+    // the questions are one tap away rather than on another machine.
+    [
+      submitAction("Open and answer", OPEN_CHAT_VERB, { chatId: chat.chatId }, {
+        associateInputs: false,
+      }),
+    ],
+  );
+}
+
+/**
+ * FOCUS — replying without a fake compose box.
+ *
+ * The composer used to be an `Input.Text` inside a card, which put a second
+ * compose box directly above Teams' real one. Elliot: "reply being embedded
+ * in a card instead of being natural". So `Reply` now points the conversation
+ * at a chat and you type in Teams' own box.
+ *
+ * The danger that buys is real and these three cards are the mitigation: a
+ * bot that silently swallows your typing into an agent is worse than a card.
+ * Between them they have to keep three facts continuously visible — WHICH
+ * agent, that the NEXT message goes there, and HOW to stop.
+ */
+export const FOCUS_STOP_VERB = "traycer/stopReplying";
+
+/** Entering focus. The one card, because it is the moment the rule is set. */
+export function buildFocusStartedCard(
+  chat: ChatRef,
+  epicId: string,
+): Attachment {
+  return buildCard(
+    [
+      cardHeader({
+        eyebrow: "Now replying to",
+        title: chatLabel(chat),
+        subtitle:
+          "Type in the message box and it goes straight to this agent. Say “done” to stop.",
+      }),
+      metaLine([epicSegment(epicId)]),
+    ],
+    // A button as well as the word, because "say done" is a thing you have to
+    // remember and a button is a thing you can see. Both, deliberately: the
+    // button scrolls away and the word does not.
+    [
+      submitAction("Stop replying", FOCUS_STOP_VERB, {}, {
+        associateInputs: false,
+      }),
+    ],
+  );
+}
+
+/**
+ * Leaving focus. Names what you are leaving, not just that you left — "OK,
+ * stopped" leaves you unsure which of two agents you were talking to.
+ */
+export function buildFocusEndedCard(chat: ChatRef): Attachment {
+  return card([
+    cardHeader({
+      eyebrow: null,
+      title: `Stopped replying to ${chatLabel(chat)}`,
+      subtitle: "Your messages come back to me now.",
+    }),
+  ]);
+}
+
+/**
+ * The per-message echo, as TEXT rather than a card.
+ *
+ * Deliberately the lightest thing on this surface. It fires on every single
+ * message, so a card would turn a conversation into a wall of boxes — and its
+ * whole job is to be the running reminder of where the typing went, which
+ * needs to be readable at a glance rather than structured.
+ *
+ * It names the agent every time on purpose. That is the answer to "how do I
+ * know where my typing is going": the last thing in the conversation always
+ * says so, and if it does not, you are not focused.
+ */
+export function focusSentText(chat: ChatRef): string {
+  return `Sent to **${chatLabel(chat)}**.`;
+}
+
+/**
+ * A reserved word ran as a command instead of being sent.
+ *
+ * THE COST OF THE PRECEDENCE RULE, PAID WHERE IT IS INCURRED. Commands win
+ * while focused because a command misread as a message cannot be unsent,
+ * whereas a message misread as a command is free — but only if the user can
+ * SEE it happened. A rule you discover by noticing a message never arrived is
+ * not a rule, it is a trap.
+ *
+ * So it says what happened and how to override, in one line, at the moment it
+ * matters. See `focus-routing.ts` for the argument.
+ */
+export function focusInterceptedText(word: string, chat: ChatRef): string {
+  return `“${word}” ran as a command. To send it to **${chatLabel(chat)}** instead, say “send ${word}”.`;
+}
+
+/**
+ * Focus expired between messages — SAID, not silently swallowed.
+ *
+ * Expiry fails safe: the message is not sent. But safe and silent is still
+ * confusing, because the user's model is "I am talking to Foo" and nothing
+ * contradicted it. Without this they type a sentence, get a help card, and
+ * have to infer what happened.
+ *
+ * Names the agent when we still know it — the store's `expired` branch
+ * carries a title precisely so this line can, and carries no `chatId`
+ * precisely so nothing can route to it.
+ */
+export function focusExpiredText(title: string | null): string {
+  const who = title === null || title.trim().length === 0 ? "that agent" : `**${title}**`;
+  return `You'd stopped replying to ${who} — it had been quiet a while — so I did NOT send that on. Press Reply on the agent to start again.`;
+}
+
 export const ANSWER_VERB = "traycer/answer";
 /** No glyph, for the reason {@link SEND_TITLE} gives. */
 export const ANSWER_TITLE = "Send answers";

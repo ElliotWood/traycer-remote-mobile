@@ -29,6 +29,8 @@ import {
   OLDER_VERB,
   NEWER_VERB,
   FULL_HISTORY_VERB,
+  FOCUS_STOP_VERB,
+  buildFocusEndedCard,
   SUBMIT_INTAKE_VERB,
   STAGED_NAMES_KEY,
   TRANSCRIPT_PAGE_SIZE,
@@ -594,6 +596,9 @@ export const HANDLED_ACTION_VERBS: ReadonlySet<string> = new Set([
   OPEN_CHAT_VERB,
   CONFIRM_ROUTE_VERB,
   CLARIFY_OTHER_VERB,
+  // Stopping. Handled FIRST in `dispatchActionInvoke`, before identity and
+  // before the host, because an escape hatch that can fail is not one.
+  FOCUS_STOP_VERB,
   /*
    * Added when `autobuild/opportunity-intake` merged, 2026-08-09, and it is
    * the exact failure this set exists to make impossible.
@@ -614,6 +619,37 @@ export async function dispatchActionInvoke(
   request: ActionInvokeRequest,
   deps: DispatchDeps,
 ): Promise<ActionInvokeResult> {
+  /*
+   * FIRST, and it touches no host and needs no identity.
+   *
+   * Stopping is the escape hatch for a feature whose whole risk is a message
+   * going somewhere unintended. It must work when the bridge is down, when
+   * the principal cannot be resolved, and when the epic is unbound — every
+   * one of which would refuse a card further down this function. An escape
+   * hatch that can fail is not one.
+   *
+   * Clearing focus for a conversation is not a privileged act: it only ever
+   * removes this conversation's own routing preference, and the worst a
+   * forged payload achieves is stopping its own sender from replying.
+   */
+  if (request.verb === FOCUS_STOP_VERB) {
+    const previous = await deps.focusedChats.get(
+      request.conversationId,
+      deps.now(),
+    );
+    await deps.focusedChats.clear(request.conversationId);
+    return {
+      card: buildFocusEndedCard(
+        previous.kind === "focused"
+          ? previous.chat
+          : // Already stopped, or expired. Say the same thing rather than
+            // "you weren't replying to anything" — the user pressed Stop and
+            // the state they wanted is the state they now have.
+            { chatId: "", title: previous.kind === "expired" ? previous.title : null },
+      ),
+      acted: true,
+    };
+  }
   if (request.verb === CONFIRM_ROUTE_VERB) {
     return dispatchConfirmedRoute(request, deps);
   }

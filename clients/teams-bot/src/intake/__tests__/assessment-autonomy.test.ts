@@ -68,7 +68,13 @@ describe("assessment autonomy", () => {
    */
   it("says nothing about permissions for an ordinary send", async () => {
     const { spawn, calls } = recordingSpawn();
-    await sendMessageAction("chat-1", "just a reply", {}, configWith(spawn));
+    await sendMessageAction(
+      "chat-1",
+      "just a reply",
+      {},
+      configWith(spawn),
+      undefined,
+    );
 
     const args = calls[0] ?? [];
     expect(args).toEqual(["send", "chat-1", "just a reply"]);
@@ -141,6 +147,7 @@ describe("assessment autonomy", () => {
       "--permission-mode full_access",
       {},
       configWith(spawn),
+      undefined,
     );
 
     expect(calls[0]).toEqual([
