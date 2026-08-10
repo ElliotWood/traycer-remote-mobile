@@ -51956,23 +51956,231 @@ class DurableOrchestratorStore {
 // clients/teams-bot/src/read-surface/read-surface-handler.ts
 var import_agents_hosting2 = __toESM(require_src8(), 1);
 
+// clients/teams-bot/src/intake/attachment-staging.ts
+var import_node_crypto2 = require("node:crypto");
+var import_promises = require("node:fs/promises");
+var import_node_path2 = __toESM(require("node:path"));
+var STAGING_DIR_ENV = "TRAYCER_TEAMS_STAGING_DIR";
+var STATE_DIR_ENV = "TRAYCER_TEAMS_STATE_DIR";
+function stagingRootFromEnv(env2) {
+  const explicit = env2[STAGING_DIR_ENV]?.trim();
+  if (explicit !== undefined && explicit.length > 0)
+    return explicit;
+  const stateDir = env2[STATE_DIR_ENV]?.trim();
+  if (stateDir !== undefined && stateDir.length > 0) {
+    return import_node_path2.default.posix.join(stateDir, "intake");
+  }
+  return "/srv/traycer/teams-bot/state/intake";
+}
+var STAGING_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function isStagingId(value) {
+  return STAGING_ID_PATTERN.test(value);
+}
+function stagingDirectory(root, id) {
+  return isStagingId(id) ? import_node_path2.default.posix.join(root, id) : null;
+}
+var MAX_NAME_LENGTH = 200;
+function isSafeFileName(name) {
+  if (name.length === 0 || name.length > MAX_NAME_LENGTH)
+    return false;
+  if (name.includes("/") || name.includes("\\"))
+    return false;
+  if (/^\.+$/.test(name))
+    return false;
+  for (let i = 0;i < name.length; i++) {
+    const code = name.charCodeAt(i);
+    if (code < 32 || code === 127)
+      return false;
+  }
+  return true;
+}
+var MAX_FILE_BYTES = 100 * 1024 * 1024;
+var DOWNLOAD_INFO_CONTENT_TYPE = "application/vnd.microsoft.teams.file.download.info";
+function readField(record2, ...names) {
+  const lowered = new Map;
+  for (const [key, value] of Object.entries(record2)) {
+    lowered.set(key.toLowerCase(), value);
+  }
+  for (const name of names) {
+    const value = lowered.get(name.toLowerCase());
+    if (typeof value === "string" && value.length > 0)
+      return value;
+  }
+  return null;
+}
+function classifyAttachment(raw) {
+  if (raw === null || typeof raw !== "object")
+    return { kind: "not-a-file" };
+  const record2 = raw;
+  const contentType = (readField(record2, "contentType") ?? "").toLowerCase();
+  const name = readField(record2, "name", "fileName") ?? "";
+  if (contentType === DOWNLOAD_INFO_CONTENT_TYPE) {
+    const content = record2["content"];
+    const downloadUrl = content !== null && typeof content === "object" ? readField(content, "downloadUrl") : null;
+    if (downloadUrl === null || !/^https:\/\//i.test(downloadUrl)) {
+      return { kind: "unreadable", name };
+    }
+    return { kind: "file", name, downloadUrl };
+  }
+  const contentUrl = readField(record2, "contentUrl");
+  const isSharePoint = contentUrl !== null && /^https:\/\/[^/]*sharepoint\.com\//i.test(contentUrl);
+  if (contentType === "reference" || isSharePoint) {
+    return { kind: "needs-graph", name };
+  }
+  if (isMessageBodyPart(contentType))
+    return { kind: "not-a-file" };
+  return { kind: "unreadable", name };
+}
+function isMessageBodyPart(contentType) {
+  return contentType === "text/html" || contentType === "text/plain" || contentType === "text/markdown";
+}
+function carriesDocument(attachments) {
+  return (attachments ?? []).some((attachment) => classifyAttachment(attachment).kind !== "not-a-file");
+}
+async function stageAttachments(attachments, deps) {
+  const classified = (attachments ?? []).map(classifyAttachment);
+  const files = classified.filter((item) => item.kind === "file");
+  const needsGraph = classified.filter((item) => item.kind === "needs-graph");
+  const unreadable = classified.filter((item) => item.kind === "unreadable");
+  if (needsGraph.length > 0) {
+    logWarn("attachment in a scope this bot cannot fetch from", {
+      count: needsGraph.length,
+      scope: "sharepoint-reference"
+    });
+    return {
+      kind: "refused",
+      reason: "Files posted in a channel are stored in SharePoint, and I can't read those yet. Send them to me in a direct message instead."
+    };
+  }
+  if (unreadable.length > 0) {
+    return {
+      kind: "refused",
+      reason: "One of those attachments arrived without a way for me to download it. Try attaching it again."
+    };
+  }
+  if (files.length === 0)
+    return { kind: "none" };
+  for (const file2 of files) {
+    if (!isSafeFileName(file2.name)) {
+      return {
+        kind: "refused",
+        reason: "One of those file names has characters I can't write to disk. Rename it and attach it again."
+      };
+    }
+  }
+  const names = new Set;
+  for (const file2 of files) {
+    if (names.has(file2.name)) {
+      return {
+        kind: "refused",
+        reason: `Two of those files are both called “${file2.name}”. Rename one and attach them again — the bid pack can't hold two documents with the same name.`
+      };
+    }
+    names.add(file2.name);
+  }
+  const stagingId = (deps.newId ?? import_node_crypto2.randomUUID)();
+  const directory = stagingDirectory(deps.stagingRoot, stagingId);
+  if (directory === null) {
+    return { kind: "refused", reason: "I couldn't create a place to put them." };
+  }
+  const mkdirImpl = deps.mkdirImpl ?? defaultMkdir;
+  const writeFileImpl = deps.writeFileImpl ?? defaultWriteFile;
+  try {
+    await mkdirImpl(directory);
+  } catch {
+    logWarn("could not create staging directory", { directory });
+    return { kind: "refused", reason: "I couldn't create a place to put them." };
+  }
+  const staged = [];
+  for (const file2 of files) {
+    let bytes;
+    try {
+      const response = await deps.fetchImpl(file2.downloadUrl);
+      if (!response.ok) {
+        logWarn("attachment download rejected", { status: response.status });
+        return {
+          kind: "refused",
+          reason: "I couldn't download one of those files from Teams. Try attaching it again."
+        };
+      }
+      const declared = Number(response.headers.get("content-length") ?? "");
+      if (Number.isFinite(declared) && declared > MAX_FILE_BYTES) {
+        return { kind: "refused", reason: tooLarge(file2.name) };
+      }
+      bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength > MAX_FILE_BYTES) {
+        return { kind: "refused", reason: tooLarge(file2.name) };
+      }
+    } catch {
+      logWarn("attachment download failed", { staged: staged.length });
+      return {
+        kind: "refused",
+        reason: "I couldn't download one of those files from Teams. Try attaching it again."
+      };
+    }
+    try {
+      await writeFileImpl(import_node_path2.default.posix.join(directory, file2.name), bytes);
+    } catch {
+      logWarn("could not write staged attachment", { directory });
+      return {
+        kind: "refused",
+        reason: "I couldn't save one of those files. Nothing has been started."
+      };
+    }
+    staged.push({ name: file2.name, bytes: bytes.byteLength });
+  }
+  logInfo("attachments staged", {
+    count: staged.length,
+    totalBytes: staged.reduce((sum, file2) => sum + file2.bytes, 0),
+    directory
+  });
+  return { kind: "staged", stagingId, directory, files: staged };
+}
+function tooLarge(name) {
+  return `“${name}” is larger than ${String(MAX_FILE_BYTES / (1024 * 1024))} MB, which is more than I can stage.`;
+}
+async function defaultMkdir(dir) {
+  await import_promises.mkdir(dir, { recursive: true, mode: 448 });
+}
+async function defaultWriteFile(file2, data) {
+  await import_promises.writeFile(file2, data, { mode: 384, flag: "wx" });
+}
+function stagingUnavailable(attachments) {
+  const files = (attachments ?? []).filter((attachment) => classifyAttachment(attachment).kind !== "not-a-file");
+  if (files.length === 0)
+    return { kind: "none" };
+  return {
+    kind: "refused",
+    reason: "I can't take file attachments on this deployment yet, and an assessment without your documents would be worthless."
+  };
+}
+async function listStagedFiles(directory) {
+  try {
+    const entries = await import_promises.readdir(directory, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
+  } catch {
+    return null;
+  }
+}
+
 // clients/teams-bot/src/read-surface/message-routing.ts
 function routeMessage(message2) {
   if (message2.actionVerb !== null) {
     return { kind: "action", verb: message2.actionVerb };
   }
   const text = message2.text.trim();
-  if (text === "" && !message2.hasAttachments)
+  const hasDocument = carriesDocument(message2.attachments);
+  if (text === "" && !hasDocument)
     return { kind: "silent" };
   if (message2.conversationId === "")
     return { kind: "no_conversation" };
-  if (message2.hasAttachments)
+  if (hasDocument)
     return { kind: "intake", text: message2.text };
   return { kind: "orchestrator", text: message2.text };
 }
 
 // clients/teams-bot/src/read-surface/orchestrator.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 
 // clients/shared/identity-registry/tenant-environment.ts
 var DEFAULT_INHERITED_ENV_ALLOWLIST = Object.freeze([
@@ -52144,6 +52352,7 @@ var FAILURE_COPY = {
   NO_EPIC: "This deployment isn't pointed at a Traycer epic yet, so I've got nowhere to put an agent. Whoever set the bot up needs to set TRAYCER_TEAMS_DEFAULT_EPIC_ID.",
   NO_HOST: "You don't have a Traycer host I can see yet. A host is the machine Traycer runs on — open Traycer on your desktop and let it connect, then say hello here again.",
   NO_REPLY_TARGET: "I can't record where to send this agent's answers, so I haven't started one — it would have replied into nowhere.",
+  ATTACHMENT_UNRECOGNISED: "Traycer bot here, not your agent — I can't work out what that file is for, so I haven't sent it anywhere. Say what you'd like done with it and I'll pass that on.",
   NO_CONVERSATION: "Couldn't identify this conversation.",
   NO_TENANT: "I couldn't work out which Traycer host is yours, so I haven't started an agent.",
   FLEET_UNREADABLE: "I couldn't reach Traycer to see which machines are yours, so I haven't started an agent.",
@@ -52282,7 +52491,7 @@ async function ensureOrchestrator(conversationId, conversationReference, firstMe
       text: hostTieCopy(choice.candidates)
     };
   }
-  const chatId = import_node_crypto2.randomUUID();
+  const chatId = import_node_crypto3.randomUUID();
   const stored = toStoredReference(conversationReference, deps.now());
   if (stored === null) {
     return {
@@ -53774,205 +53983,6 @@ function describeAttachment(attachment) {
   return describeObject(attachment, 0);
 }
 
-// clients/teams-bot/src/intake/attachment-staging.ts
-var import_node_crypto3 = require("node:crypto");
-var import_promises = require("node:fs/promises");
-var import_node_path2 = __toESM(require("node:path"));
-var STAGING_DIR_ENV = "TRAYCER_TEAMS_STAGING_DIR";
-var STATE_DIR_ENV = "TRAYCER_TEAMS_STATE_DIR";
-function stagingRootFromEnv(env2) {
-  const explicit = env2[STAGING_DIR_ENV]?.trim();
-  if (explicit !== undefined && explicit.length > 0)
-    return explicit;
-  const stateDir = env2[STATE_DIR_ENV]?.trim();
-  if (stateDir !== undefined && stateDir.length > 0) {
-    return import_node_path2.default.posix.join(stateDir, "intake");
-  }
-  return "/srv/traycer/teams-bot/state/intake";
-}
-var STAGING_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-function isStagingId(value) {
-  return STAGING_ID_PATTERN.test(value);
-}
-function stagingDirectory(root, id) {
-  return isStagingId(id) ? import_node_path2.default.posix.join(root, id) : null;
-}
-var MAX_NAME_LENGTH = 200;
-function isSafeFileName(name) {
-  if (name.length === 0 || name.length > MAX_NAME_LENGTH)
-    return false;
-  if (name.includes("/") || name.includes("\\"))
-    return false;
-  if (/^\.+$/.test(name))
-    return false;
-  for (let i = 0;i < name.length; i++) {
-    const code = name.charCodeAt(i);
-    if (code < 32 || code === 127)
-      return false;
-  }
-  return true;
-}
-var MAX_FILE_BYTES = 100 * 1024 * 1024;
-var DOWNLOAD_INFO_CONTENT_TYPE = "application/vnd.microsoft.teams.file.download.info";
-function readField(record2, ...names) {
-  const lowered = new Map;
-  for (const [key, value] of Object.entries(record2)) {
-    lowered.set(key.toLowerCase(), value);
-  }
-  for (const name of names) {
-    const value = lowered.get(name.toLowerCase());
-    if (typeof value === "string" && value.length > 0)
-      return value;
-  }
-  return null;
-}
-function classifyAttachment(raw) {
-  if (raw === null || typeof raw !== "object")
-    return { kind: "not-a-file" };
-  const record2 = raw;
-  const contentType = (readField(record2, "contentType") ?? "").toLowerCase();
-  const name = readField(record2, "name", "fileName") ?? "";
-  if (contentType === DOWNLOAD_INFO_CONTENT_TYPE) {
-    const content = record2["content"];
-    const downloadUrl = content !== null && typeof content === "object" ? readField(content, "downloadUrl") : null;
-    if (downloadUrl === null || !/^https:\/\//i.test(downloadUrl)) {
-      return { kind: "unreadable", name };
-    }
-    return { kind: "file", name, downloadUrl };
-  }
-  const contentUrl = readField(record2, "contentUrl");
-  const isSharePoint = contentUrl !== null && /^https:\/\/[^/]*sharepoint\.com\//i.test(contentUrl);
-  if (contentType === "reference" || isSharePoint) {
-    return { kind: "needs-graph", name };
-  }
-  return { kind: "not-a-file" };
-}
-async function stageAttachments(attachments, deps) {
-  const classified = (attachments ?? []).map(classifyAttachment);
-  const files = classified.filter((item) => item.kind === "file");
-  const needsGraph = classified.filter((item) => item.kind === "needs-graph");
-  const unreadable = classified.filter((item) => item.kind === "unreadable");
-  if (needsGraph.length > 0) {
-    logWarn("attachment in a scope this bot cannot fetch from", {
-      count: needsGraph.length,
-      scope: "sharepoint-reference"
-    });
-    return {
-      kind: "refused",
-      reason: "Files posted in a channel are stored in SharePoint, and I can't read those yet. Send them to me in a direct message instead."
-    };
-  }
-  if (unreadable.length > 0) {
-    return {
-      kind: "refused",
-      reason: "One of those attachments arrived without a way for me to download it. Try attaching it again."
-    };
-  }
-  if (files.length === 0)
-    return { kind: "none" };
-  for (const file2 of files) {
-    if (!isSafeFileName(file2.name)) {
-      return {
-        kind: "refused",
-        reason: "One of those file names has characters I can't write to disk. Rename it and attach it again."
-      };
-    }
-  }
-  const names = new Set;
-  for (const file2 of files) {
-    if (names.has(file2.name)) {
-      return {
-        kind: "refused",
-        reason: `Two of those files are both called “${file2.name}”. Rename one and attach them again — the bid pack can't hold two documents with the same name.`
-      };
-    }
-    names.add(file2.name);
-  }
-  const stagingId = (deps.newId ?? import_node_crypto3.randomUUID)();
-  const directory = stagingDirectory(deps.stagingRoot, stagingId);
-  if (directory === null) {
-    return { kind: "refused", reason: "I couldn't create a place to put them." };
-  }
-  const mkdirImpl = deps.mkdirImpl ?? defaultMkdir;
-  const writeFileImpl = deps.writeFileImpl ?? defaultWriteFile;
-  try {
-    await mkdirImpl(directory);
-  } catch {
-    logWarn("could not create staging directory", { directory });
-    return { kind: "refused", reason: "I couldn't create a place to put them." };
-  }
-  const staged = [];
-  for (const file2 of files) {
-    let bytes;
-    try {
-      const response = await deps.fetchImpl(file2.downloadUrl);
-      if (!response.ok) {
-        logWarn("attachment download rejected", { status: response.status });
-        return {
-          kind: "refused",
-          reason: "I couldn't download one of those files from Teams. Try attaching it again."
-        };
-      }
-      const declared = Number(response.headers.get("content-length") ?? "");
-      if (Number.isFinite(declared) && declared > MAX_FILE_BYTES) {
-        return { kind: "refused", reason: tooLarge(file2.name) };
-      }
-      bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength > MAX_FILE_BYTES) {
-        return { kind: "refused", reason: tooLarge(file2.name) };
-      }
-    } catch {
-      logWarn("attachment download failed", { staged: staged.length });
-      return {
-        kind: "refused",
-        reason: "I couldn't download one of those files from Teams. Try attaching it again."
-      };
-    }
-    try {
-      await writeFileImpl(import_node_path2.default.posix.join(directory, file2.name), bytes);
-    } catch {
-      logWarn("could not write staged attachment", { directory });
-      return {
-        kind: "refused",
-        reason: "I couldn't save one of those files. Nothing has been started."
-      };
-    }
-    staged.push({ name: file2.name, bytes: bytes.byteLength });
-  }
-  logInfo("attachments staged", {
-    count: staged.length,
-    totalBytes: staged.reduce((sum, file2) => sum + file2.bytes, 0),
-    directory
-  });
-  return { kind: "staged", stagingId, directory, files: staged };
-}
-function tooLarge(name) {
-  return `“${name}” is larger than ${String(MAX_FILE_BYTES / (1024 * 1024))} MB, which is more than I can stage.`;
-}
-async function defaultMkdir(dir) {
-  await import_promises.mkdir(dir, { recursive: true, mode: 448 });
-}
-async function defaultWriteFile(file2, data) {
-  await import_promises.writeFile(file2, data, { mode: 384, flag: "wx" });
-}
-function stagingUnavailable(attachments) {
-  const files = (attachments ?? []).filter((attachment) => classifyAttachment(attachment).kind !== "not-a-file");
-  if (files.length === 0)
-    return { kind: "none" };
-  return {
-    kind: "refused",
-    reason: "I can't take file attachments on this deployment yet, and an assessment without your documents would be worthless."
-  };
-}
-async function listStagedFiles(directory) {
-  try {
-    const entries = await import_promises.readdir(directory, { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
-  } catch {
-    return null;
-  }
-}
-
 // clients/teams-bot/src/read-surface/read-surface-handler.ts
 class ReadSurfaceHandler extends import_agents_hosting2.ActivityHandler {
   deps;
@@ -53994,7 +54004,7 @@ class ReadSurfaceHandler extends import_agents_hosting2.ActivityHandler {
     const actionValue = context.activity.value;
     const route = routeMessage({
       text: spoken.text,
-      hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
+      attachments: context.activity.attachments,
       actionVerb: typeof actionValue?.["verb"] === "string" ? actionValue["verb"] : null,
       conversationId: context.activity.conversation?.id ?? ""
     });
@@ -54067,7 +54077,7 @@ class ReadSurfaceHandler extends import_agents_hosting2.ActivityHandler {
     const classified = classify({ text: text2, hasAttachments: true });
     const route = classified.kind === "routed" ? classified.route : classified.suggestion;
     if (route === null) {
-      await context.sendActivity(import_agents_hosting2.MessageFactory.text("I can't tell what that file is for, so I haven't done anything with it. Say what you'd like done with it and I'll pass that on."));
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text(FAILURE_COPY.ATTACHMENT_UNRECOGNISED));
       logInfo("attachment with no recognisable request", {});
       return;
     }
