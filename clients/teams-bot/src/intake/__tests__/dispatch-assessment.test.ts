@@ -13,7 +13,7 @@ import type { SkillRoute } from "../classify";
 const ROUTE: SkillRoute = {
   product: "sensormine",
   intent: "new-opportunity",
-  skill: "smv4-new-opportunity",
+  skill: "smv4-opportunity-pipeline",
 };
 
 const OPPORTUNITY = {
@@ -178,7 +178,7 @@ describe("buildInstruction", () => {
       OPPORTUNITY,
       DOCUMENTS,
     );
-    expect(text).toContain("smv4-new-opportunity");
+    expect(text).toContain("smv4-opportunity-pipeline");
     expect(text).toContain("does this fit SensorMine?");
   });
 

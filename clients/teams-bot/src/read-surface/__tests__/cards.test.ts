@@ -1186,7 +1186,7 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
   const INTAKE_FORM = {
     product: "sensormine",
     intent: "new-opportunity",
-    skill: "smv4-new-opportunity",
+    skill: "smv4-opportunity-pipeline",
     routeLabel: null,
     spokenText: "does this fit?",
     stagingId: "1f0a2b3c-4d5e-4f60-8a91-b2c3d4e5f607",
@@ -1251,7 +1251,7 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
           suggestionLabel: "a new opportunity",
           product: "sensormine",
           intent: "new-opportunity",
-          skill: "smv4-new-opportunity",
+          skill: "smv4-opportunity-pipeline",
         }).content,
     ],
     /*

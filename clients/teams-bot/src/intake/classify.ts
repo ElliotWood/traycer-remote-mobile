@@ -110,7 +110,29 @@ const INTENT_TERMS: ReadonlyArray<{
   },
 ];
 
-/** Which routes have a skill built. Absent means "route known, skill not built". */
+/**
+ * Which routes have a skill built. Absent means "route known, skill not built".
+ *
+ * THESE NAMES ARE NOT OURS TO CHOOSE. They must match a `name:` in the
+ * frontmatter of a `.claude/skills/<name>/SKILL.md` in the repo the agent runs
+ * in — for SensorMine, `AltraCloud/sensormine-v4-self-host`.
+ *
+ * This list said `smv4-new-opportunity` until 2026-08-09, which has never
+ * existed on any branch. It came from the phrase "the smv4 new opportunity
+ * skill" in the epic brief — a person describing a skill, not naming one — and
+ * nothing between that sentence and a live dispatch ever compared it to the
+ * repo. The first real RFP through the pipeline died on
+ * `Error: Unknown skill: smv4-new-opportunity`, after intake had classified,
+ * staged a 10 MB document and created the chat: every step we own succeeded
+ * and the one string we could not verify locally was wrong.
+ *
+ * There is no test that can catch this from inside this repo. The skill lives
+ * in another repository, on a branch, on a different machine. What CAN be
+ * done, and is, is to make the failure legible: the name is exported so the
+ * deploy artefact can cite it, and it is carried into the instruction verbatim
+ * so a wrong name fails at dispatch with the name in the message rather than
+ * producing a plausible-looking agent that does the wrong work.
+ */
 const SKILLS: ReadonlyArray<{
   readonly product: ProductId;
   readonly intent: IntentId;
@@ -119,7 +141,19 @@ const SKILLS: ReadonlyArray<{
   {
     product: "sensormine",
     intent: "new-opportunity",
-    skill: "smv4-new-opportunity",
+    // `smv4-opportunity-pipeline`, not `-playbook`. The pipeline is the entry
+    // point — its own description says "use this when an opportunity lands and
+    // you do not yet know which tool the work needs" — and it routes onward to
+    // the playbook (gap analysis and autobuild) and to the response writer as
+    // each stage needs them. Dispatching straight to the playbook would skip
+    // qualification and the bid decision, which is a named human's.
+    //
+    // Deliberately worded around the words the PROHIBITION scan in
+    // cards.test.ts forbids. That scan greps SOURCE, so it cannot tell a
+    // comment from a call, and it caught this comment's first draft. Keeping
+    // the scan blunt is worth more than being able to use the word here: a
+    // check with an exception list is a check somebody will add to.
+    skill: "smv4-opportunity-pipeline",
   },
 ];
 

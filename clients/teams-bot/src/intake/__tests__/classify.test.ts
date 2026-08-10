@@ -15,7 +15,7 @@ describe("classify — routes only on independent product AND intent evidence", 
       route: {
         product: "sensormine",
         intent: "new-opportunity",
-        skill: "smv4-new-opportunity",
+        skill: "smv4-opportunity-pipeline",
       },
     });
   });
@@ -27,7 +27,7 @@ describe("classify — routes only on independent product AND intent evidence", 
     });
     expect(result.kind).toBe("routed");
     if (result.kind !== "routed") return;
-    expect(result.route.skill).toBe("smv4-new-opportunity");
+    expect(result.route.skill).toBe("smv4-opportunity-pipeline");
   });
 });
 

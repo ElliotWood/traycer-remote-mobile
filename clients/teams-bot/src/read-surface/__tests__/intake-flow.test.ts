@@ -88,7 +88,7 @@ function deps(): DispatchDeps {
 const ROUTE_DATA = {
   product: "sensormine",
   intent: "new-opportunity",
-  skill: "smv4-new-opportunity",
+  skill: "smv4-opportunity-pipeline",
   text: "does this fit SensorMine?",
   stagingId: STAGING_ID,
   [STAGED_NAMES_KEY]: JSON.stringify(["Tender.pdf"]),
@@ -384,7 +384,7 @@ describe("intake — the clarify card feeds the form", () => {
         suggestionLabel: "a SensorMine opportunity",
         product: "sensormine",
         intent: "new-opportunity",
-        skill: "smv4-new-opportunity",
+        skill: "smv4-opportunity-pipeline",
         spokenText: "does this fit?",
         stagingId: STAGING_ID,
         stagedNames: ["Tender.pdf"],
