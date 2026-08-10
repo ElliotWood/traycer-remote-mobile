@@ -200,6 +200,7 @@
     "fast-uri": "^4.0.0",
     "follow-redirects": "^1.16.0",
     "prosemirror-model": "1.25.9",
+    "prosemirror-view": "1.42.2",
     "yaml": "^2.9.0",
     "ip-address": "^10.2.0",
     "axios": "^1.17.0",
