@@ -60,9 +60,8 @@ import {
   shouldDiscardReference,
   type SendOutcome,
 } from "./classify-send-failure";
-import type { ProactiveStore } from "./proactive-store";
-import type { AppearedEvent, WatchEvent } from "./watch-line";
-import type { StoredConversationReference } from "../state/conversation-reference-store";
+import type { ProactiveStore, ProactiveTarget } from "./proactive-store";
+import type { WatchEvent } from "./watch-line";
 
 /**
  * Performs the actual Bot Service call.
@@ -79,8 +78,8 @@ import type { StoredConversationReference } from "../state/conversation-referenc
  * failure mode is diagnosed in one place.
  */
 export type SendProactive = (
-  reference: StoredConversationReference,
-  event: AppearedEvent,
+  target: ProactiveTarget,
+  event: WatchEvent,
 ) => Promise<void>;
 
 export interface PushDeps {
@@ -96,8 +95,15 @@ export type PushResult =
   | { readonly kind: "sent"; readonly eventId: string }
   /** Already in the durable sent-set. No call made. */
   | { readonly kind: "duplicate"; readonly eventId: string }
-  /** A `resolved` event: bookkeeping cleared, nothing sent. */
+  /** A `resolved` event we never announced: bookkeeping cleared, nothing sent. */
   | { readonly kind: "forgotten"; readonly eventId: string }
+  /**
+   * A `resolved` event for something we DID announce. The stale card is
+   * corrected in the chat and the bookkeeping cleared. Distinct from
+   * `forgotten` because "we told them and then untold them" and "there was
+   * nothing to tell" are different facts about the conversation.
+   */
+  | { readonly kind: "corrected"; readonly eventId: string }
   /**
    * We hold no conversation reference for this epic, so there is nowhere to
    * send. Logged and dropped — NOT recorded as sent, so it will notify if a
@@ -120,9 +126,60 @@ export async function pushWatchEvent(
   event: WatchEvent,
 ): Promise<PushResult> {
   if (event.type === "resolved") {
-    // Clear the bookkeeping, send nothing. A resolved approval is not news.
+    /*
+     * CORRECTED, 2026-08-10. This used to clear the bookkeeping and send
+     * nothing, on the reasoning that "a resolved approval is not news".
+     *
+     * That is true in general and false in the one case that matters: WE
+     * ALREADY TOLD THEM IT WAS WAITING. Elliot rejected an approval from the
+     * CLI and Teams still showed a card saying it needed him — the card
+     * cannot refresh itself, because every action this bot emits is
+     * `Action.Submit` and Submit has no in-place refresh. So the last thing
+     * the user sees is a live-looking request for a decision that was made
+     * elsewhere ten minutes ago.
+     *
+     * A notification that becomes false and stays on screen is worse than no
+     * notification: it is the interface asserting something untrue, and the
+     * user has no way to tell it from a real one.
+     *
+     * THE RULE: correct only a claim we actually made. `hasSent` gates it, so
+     * a resolution for something we never announced stays silent — there is
+     * nothing to correct, and a message about an approval the user never saw
+     * is noise that trains them to ignore the channel.
+     *
+     * NO @-MENTION on this one, deliberately. A tag is a demand for
+     * attention; "you no longer need to do the thing" is the opposite of a
+     * demand. Tagging here is how a notification channel becomes one people
+     * mute — and a muted channel is the same outcome as the bug this whole
+     * ticket is fixing.
+     *
+     * The bookkeeping is cleared EITHER WAY, including when the correction
+     * fails to send. Keeping the entry would mean a re-raise of the same id
+     * never notifies, and a notification withheld by stale bookkeeping is
+     * indistinguishable, to the user, from an agent that never asked.
+     */
+    const announced = deps.store.hasSent(event.eventId);
     deps.store.forgetSent(event.eventId);
-    return { kind: "forgotten", eventId: event.eventId };
+    if (!announced) {
+      return { kind: "forgotten", eventId: event.eventId };
+    }
+    const target = deps.store.targetFor(event.epicId);
+    if (target === null) {
+      return { kind: "forgotten", eventId: event.eventId };
+    }
+    try {
+      await deps.send(target, event);
+    } catch (error) {
+      // NOT a `failed` result: nothing is owed to the user beyond a courtesy
+      // correction, and the entry is already cleared so a retry would have
+      // nothing to key on. Visible in the journal, and that is the right
+      // weight for it.
+      deps.onWarn(
+        "could not correct a notification that is now stale",
+        `epicId=${event.epicId} eventId=${event.eventId} error=${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return { kind: "corrected", eventId: event.eventId };
   }
 
   if (deps.store.hasSent(event.eventId)) {
@@ -143,7 +200,7 @@ export async function pushWatchEvent(
   }
 
   try {
-    await deps.send(target.reference, event);
+    await deps.send(target, event);
   } catch (error) {
     const outcome = outcomeOfSendError(error);
     const discard = shouldDiscardReference(outcome);
