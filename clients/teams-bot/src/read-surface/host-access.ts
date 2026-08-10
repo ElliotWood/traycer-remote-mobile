@@ -275,6 +275,9 @@ export async function submitChatMessage(
     text,
     env,
     deps.bridgeCliConfig,
+    // Deliberately no permission mode: an interactive reply wants the
+    // bridge's `supervised` default, where the agent stops and asks.
+    undefined,
   );
 
   if (result.kind === "failed") {

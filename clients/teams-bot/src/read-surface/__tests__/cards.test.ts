@@ -18,7 +18,10 @@ import {
   buildActionOutcomeCard,
   buildAssessmentStartedCard,
   buildAssessmentUnconfirmedCard,
+  buildFocusEndedCard,
+  buildFocusStartedCard,
   buildInterviewOutcomeCard,
+  buildInterviewWaitingCard,
   buildMessageOutcomeCard,
   OPEN_CHAT_VERB,
   speakerLabel,
@@ -1243,6 +1246,15 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
       () => buildContextStripCard(TRANSCRIPT_FIXTURE, 0).content,
     ],
     ["unknown chat", () => buildUnknownChatCard("hi").content],
+    // The 2026-08-10 focus work. Added HERE rather than tested separately —
+    // that is what a table is for, and the verb check had just lost its two
+    // most-pressed buttons to a card that was not in it.
+    ["focus started", () => buildFocusStartedCard(CHAT, "e1").content],
+    ["focus ended", () => buildFocusEndedCard(CHAT).content],
+    [
+      "interview waiting",
+      () => buildInterviewWaitingCard(CHAT, "e1", 0, 0).content,
+    ],
     ["usage", () => buildUsageCard("epic <id>").content],
     [
       "clarify",

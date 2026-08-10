@@ -18,6 +18,7 @@ import {
   InMemoryEpicBindingStore,
   type EpicBindingStore,
 } from "./read-surface/epic-binding-store";
+import { DurableFocusedChatStore } from "./read-surface/focused-chat-store";
 import { createReadSurfaceHandler } from "./read-surface/read-surface-handler";
 import { createStartAssessment } from "./intake/start-assessment";
 import {
@@ -204,9 +205,31 @@ async function main(): Promise<void> {
     });
   }
 
+  /**
+   * Where each conversation's next typed message goes.
+   *
+   * DURABLE, unlike `epicBindings` above, and the difference is what the user
+   * can tell. Losing an epic binding on restart costs one retyped command and
+   * the next `fleet` says so. Losing focus is silent: the bot has forgotten
+   * who you were talking to and nothing on screen changed, so the next thing
+   * you type lands on the command path and renders a help card.
+   *
+   * Same state dir and same fallback as the conversation references above,
+   * under its own filename so the two cannot collide.
+   */
+  const focusedChats = new DurableFocusedChatStore(
+    process.env.TRAYCER_TEAMS_STATE_DIR !== undefined
+      ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/focused-chats.json`
+      : "/srv/traycer/teams-bot/state/focused-chats.json",
+    (message: string, detail: string) => {
+      logWarn(message, { detail });
+    },
+  );
+
   const handler = createReadSurfaceHandler({
     registry,
     epicBindings,
+    focusedChats,
     bridgeCliConfig,
     senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
     parentEnv: process.env,
