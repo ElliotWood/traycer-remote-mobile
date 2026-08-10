@@ -70,15 +70,34 @@ step and no dependencies, deployed by `clients/teams-help/deploy/vm-install-help
 substitutes `{theme}` (the TeamsJS **v1** placeholder name — mobile Teams
 supports only the v1 names, so `{app.theme}` would silently fail there) with
 `default`, `dark`, `glass` or `contrast` before requesting the page. That
-gives the help page a correct theme on its very first paint without a
+gives the page a correct theme on its very first paint without a
 teams-js handshake, which matters because the page must render even when the
 handshake never completes. `websiteUrl` is the "open in a browser" target,
 where there is no Teams to ask, so it is left plain and the page falls back
 to the OS colour-scheme preference.
 
+**BOTH tabs carry it, and for a while only Help did.** That was an omission
+rather than a decision, and it pointed the mechanism at the smaller problem:
+`/help/` is a static explainer with no handshake at all, whereas `/next/` is
+the surface whose Teams shell *explicitly designs for the handshake never*
+*completing* — it races `app.initialize()` against a 4s timeout and fires it
+after the first render, deliberately, so that nothing user-visible waits on
+it. The paragraph above was therefore a stronger argument for the app tab than
+for the one it was written about, and `/next/` was the tab without it. A
+dark-Teams user got a light app first and watched it flip.
+
 `make-package.mjs` needed **no change** — its substitution loop already
 iterates every entry in `staticTabs`, and `validDomains` is derived from the
 same `tabHost`, so one host covers both tabs.
+
+⚠️ **The `/next/` half of this is inert without its counterpart in the**
+**bundle**, which reads the parameter at the top of `bootstrap()`
+(`clients/mobile/src/web/teams-theme-param.ts`, on the `/next/` build
+lineage — it is not on this branch, because the two live in two lineages).
+Neither half fails loudly alone: the manifest alone substitutes a theme that
+nothing reads, the bundle alone reads a parameter that never arrives, and both
+produce the original late flip with no error, no warning and no red test.
+`/help/` is not affected — it reads the parameter in its own inline script.
 
 ## The app tab points at `/next/`, and there is only one of it
 

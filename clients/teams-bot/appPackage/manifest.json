@@ -26,7 +26,7 @@
     {
       "entityId": "traycer.app",
       "name": "Traycer",
-      "contentUrl": "https://REPLACE_WITH_TAB_HOST/next/",
+      "contentUrl": "https://REPLACE_WITH_TAB_HOST/next/?theme={theme}",
       "websiteUrl": "https://REPLACE_WITH_TAB_HOST/next/",
       "scopes": ["personal"]
     },
