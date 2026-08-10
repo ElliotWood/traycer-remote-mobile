@@ -374,6 +374,12 @@ function sourceFiles(directory: string): string[] {
       return entry.name === "__tests__" ? [] : sourceFiles(absolutePath);
     }
     if (!/\.tsx?$/.test(entry.name)) return [];
-    return [path.relative(guiAppSrc, absolutePath)];
+    // Forward slashes always - the same normalisation `5224e8be` applied to
+    // the two sibling inventories. On Windows `path.relative` yields
+    // `hooks\worktree\…`, which no forward-slash inventory above can match, so
+    // the observer check fails without an observer moving. Normalise the
+    // produced side, not the expected one: the inventories are written the way
+    // the repo writes paths.
+    return [path.relative(guiAppSrc, absolutePath).split(path.sep).join("/")];
   });
 }
