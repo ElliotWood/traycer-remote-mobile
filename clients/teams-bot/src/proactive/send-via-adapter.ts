@@ -48,7 +48,7 @@ import type { StoredConversationReference } from "../state/conversation-referenc
 import type { AppearedEvent, WatchEvent } from "./watch-line";
 import type { SendProactive } from "./push-notifications";
 import type { ProactiveTarget } from "./proactive-store";
-import { buildMentionedText } from "../teams/mention";
+import { buildMentionedText, type MentionEntityOut } from "../teams/mention";
 
 /**
  * Our persisted shape → the SDK's shape.
@@ -95,6 +95,23 @@ export type RenderProactiveCard = (event: AppearedEvent) => Attachment;
  * place, so a new failure mode is diagnosed once — and a `try` here that
  * returned normally would report every failure as a successful send.
  */
+/**
+ * Our mention entity → the SDK's `Entity`.
+ *
+ * `Entity` types `type` as a plain string and carries arbitrary extra
+ * properties, so this is a widening rather than a reinterpretation — the same
+ * field-by-field discipline {@link toConversationReference} uses one function
+ * up, and for the same reason: a cast would compile through a renamed field
+ * and lose it silently, which is exactly what `bot` → `agent` did.
+ */
+function toActivityEntity(mention: MentionEntityOut): Entity {
+  return {
+    type: mention.type,
+    text: mention.text,
+    mentioned: { id: mention.mentioned.id, name: mention.mentioned.name },
+  };
+}
+
 /**
  * The lead-in sentence, which is also the LOCK SCREEN PREVIEW.
  *
@@ -175,7 +192,7 @@ export function createAdapterSend(
         // nobody; text with no entity renders `<at>…</at>` literally.
         activity.text = mentioned.text;
         if (mentioned.entities.length > 0) {
-          activity.entities = mentioned.entities as unknown as Entity[];
+          activity.entities = mentioned.entities.map(toActivityEntity);
         }
         await context.sendActivity(activity);
       },

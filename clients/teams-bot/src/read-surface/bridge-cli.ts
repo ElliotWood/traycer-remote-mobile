@@ -254,7 +254,17 @@ export function sendMessageAction(
    * caller whose user has been told "it's running, come back later" and is
    * therefore not there to answer. See `intake/start-assessment.ts`.
    */
-  permissionMode?: "supervised" | "auto_accept_edits" | "full_access",
+  /*
+   * `| undefined`, NOT `permissionMode?:`, and the difference is the project's
+   * standing rule rather than taste: an optional parameter and a parameter
+   * that may be undefined read identically at the call site and differ in what
+   * the compiler demands. The interactive callers now say `undefined` out
+   * loud, which is exactly the "omitted on purpose" the docblock above claims.
+   *
+   * Not a behaviour change. This was flagged by `no-restricted-syntax` and
+   * fixed in passing while the lint gate was red for everyone.
+   */
+  permissionMode: "supervised" | "auto_accept_edits" | "full_access" | undefined,
 ): Promise<BridgeCliResult<ActionOutcome>> {
   const args =
     permissionMode === undefined

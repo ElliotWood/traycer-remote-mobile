@@ -275,6 +275,10 @@ export async function submitChatMessage(
     text,
     env,
     deps.bridgeCliConfig,
+    // Omitted ON PURPOSE, and now said out loud: a person replying from the
+    // composer wants the bridge's `supervised` default, where the agent stops
+    // and asks them.
+    undefined,
   );
 
   if (result.kind === "failed") {
