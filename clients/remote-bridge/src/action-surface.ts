@@ -1,3 +1,4 @@
+import type { BridgePermissionMode } from "./bridge-client";
 import type { Transcript } from "./transcript-projection";
 import type {
   InterviewAnswer,
@@ -49,8 +50,31 @@ export interface RemoteBridgeActions {
     answers: readonly InterviewAnswer[],
   ): Promise<ActionOutcome>;
 
-  /** Sends a plain-text user message into a chat (starts or continues a turn). */
-  sendMessage(chatId: string, text: string): Promise<ActionOutcome>;
+  /**
+   * Sends a plain-text user message into a chat (starts or continues a turn).
+   *
+   * `permissionMode` applies ONLY to a chat that has no settings yet — the
+   * first send after `createChat`. Once the host has persisted a chat's
+   * settings it is never consulted again, which is the honest semantic: it is
+   * the mode the chat is brought to life in, not a per-message flag.
+   *
+   * ON THE INTERFACE rather than optional on the implementation, and that is
+   * a correction. This file's own header promises a channel adapter is
+   * "implementable against this file alone" — and an optional third parameter
+   * on the class is invisible here, so an adapter reading only this file
+   * could not discover the value that decides what a brand-new chat may do
+   * UNATTENDED. That is not a detail to hide: the Teams intake path has
+   * already had assessments strand silently on their first tool call because
+   * they were created `supervised` and nobody was there to tap.
+   *
+   * Pass `undefined` to accept the bridge's default. Explicitly — an adapter
+   * that never considered the question should say so.
+   */
+  sendMessage(
+    chatId: string,
+    text: string,
+    permissionMode: BridgePermissionMode | undefined,
+  ): Promise<ActionOutcome>;
 
   /**
    * Creates a new agent (chat) in the bridge's epic.
