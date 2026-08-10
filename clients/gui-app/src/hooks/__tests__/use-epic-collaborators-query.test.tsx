@@ -263,6 +263,10 @@ function sourceFiles(directory: string): string[] {
       return entry.name === "__tests__" ? [] : sourceFiles(absolutePath);
     }
     if (!/\.tsx?$/.test(entry.name)) return [];
-    return [path.relative(guiAppSrc, absolutePath)];
+    // Forward slashes always - see the note in
+    // src/lib/query/__tests__/host-rpc-producer-inventory.test.ts. On Windows
+    // `path.relative` yields `hooks\comments\…` and no forward-slash inventory
+    // can match it, so the call-site check fails without a call site moving.
+    return [path.relative(guiAppSrc, absolutePath).split(path.sep).join("/")];
   });
 }
