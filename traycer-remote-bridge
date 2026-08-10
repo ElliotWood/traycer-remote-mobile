@@ -39524,6 +39524,50 @@ class ActionTracker {
     entry.resolve(outcome);
   }
 }
+// clients/remote-bridge/src/proactive/reply-blocks.ts
+var MAX_OPEN_BLOCKS = 64;
+
+class ReplyBlockAccumulator {
+  open = new Map;
+  observe(event) {
+    if (event.type === "text.delta") {
+      if (isNested(event.parentBlockId))
+        return null;
+      const existing = this.open.get(event.blockId) ?? "";
+      if (existing === "")
+        this.evictIfFull();
+      this.open.set(event.blockId, existing + event.delta);
+      return null;
+    }
+    if (event.type !== "text.completed")
+      return null;
+    if (isNested(event.parentBlockId)) {
+      return null;
+    }
+    const text = this.open.get(event.blockId) ?? "";
+    this.open.delete(event.blockId);
+    if (text.trim() === "")
+      return null;
+    return { blockId: event.blockId, text, timestamp: event.timestamp };
+  }
+  reset() {
+    this.open.clear();
+  }
+  get openBlockCount() {
+    return this.open.size;
+  }
+  evictIfFull() {
+    if (this.open.size < MAX_OPEN_BLOCKS)
+      return;
+    const oldest = this.open.keys().next();
+    if (!oldest.done)
+      this.open.delete(oldest.value);
+  }
+}
+function isNested(parentBlockId) {
+  return typeof parentBlockId === "string" && parentBlockId.length > 0;
+}
+
 // protocol/src/common/json-content-serializer.ts
 function createContext(options) {
   return {
@@ -40224,6 +40268,8 @@ class ChatSession {
   pendingInterviews = [];
   runStatus = "idle";
   knownMessageIds = new Set;
+  replies = [];
+  replyBlocks = new ReplyBlockAccumulator;
   connected = false;
   firstSnapshotWaiters = [];
   terminated = null;
@@ -40371,6 +40417,11 @@ class ChatSession {
       offset,
       messages: selectWindow(messages2, offset, limit).map(projectMessage)
     };
+  }
+  drainReplies() {
+    if (this.replies.length === 0)
+      return [];
+    return this.replies.splice(0, this.replies.length);
   }
   async approve(approvalId) {
     return this.decide(approvalId, { approved: true, reason: null });
@@ -40546,6 +40597,7 @@ class ChatSession {
         this.pendingInterviews = [...frame.snapshot.pendingInterviews];
         this.runStatus = frame.snapshot.runStatus;
         this.knownMessageIds = new Set(frame.snapshot.chat.messages.map((m) => m.messageId));
+        this.replyBlocks.reset();
         this.connected = true;
         this.tracker.handleReconnectSnapshot(this.buildSnapshotView());
         if (this.firstSnapshotWaiters.length > 0) {
@@ -40567,6 +40619,12 @@ class ChatSession {
       }
       case "messageAccepted": {
         this.knownMessageIds.add(frame.message.messageId);
+        return;
+      }
+      case "blockDelta": {
+        const reply = this.replyBlocks.observe(frame.event);
+        if (reply !== null)
+          this.replies.push(reply);
         return;
       }
       case "approvalRequested": {
@@ -42703,16 +42761,16 @@ class BridgeClient {
     }));
   }
   async getStatus(chatId) {
-    return this.ensureChatSession(chatId).getStatus();
+    return this.ensureChatSession(chatId, undefined).getStatus();
   }
   async approve(chatId, approvalId) {
-    return this.ensureChatSession(chatId).approve(approvalId);
+    return this.ensureChatSession(chatId, undefined).approve(approvalId);
   }
   async reject(chatId, approvalId, reason) {
-    return this.ensureChatSession(chatId).reject(approvalId, reason);
+    return this.ensureChatSession(chatId, undefined).reject(approvalId, reason);
   }
   async answerInterview(chatId, blockId, answers) {
-    return this.ensureChatSession(chatId).answerInterview(blockId, answers);
+    return this.ensureChatSession(chatId, undefined).answerInterview(blockId, answers);
   }
   async sendMessage(chatId, text, permissionMode) {
     return this.ensureChatSession(chatId, permissionMode).sendMessage(text);
@@ -42753,7 +42811,7 @@ class BridgeClient {
     return { deleted: response.deleted };
   }
   async getTranscript(chatId, offset, limit) {
-    return this.ensureChatSession(chatId).getTranscript(offset, limit);
+    return this.ensureChatSession(chatId, undefined).getTranscript(offset, limit);
   }
   async findChatForApproval(approvalId) {
     const deadline = Date.now() + FIND_APPROVAL_TIMEOUT_MS;
@@ -42768,6 +42826,15 @@ class BridgeClient {
         return null;
       await sleep2(FIND_APPROVAL_POLL_MS);
     }
+  }
+  drainReplies() {
+    const drained = [];
+    for (const [chatId, session] of this.chatSessions) {
+      for (const reply of session.drainReplies()) {
+        drained.push({ ...reply, chatId });
+      }
+    }
+    return drained;
   }
   close() {
     if (this.disposed)
@@ -42798,7 +42865,8 @@ class BridgeClient {
     }
     return session;
   }
-  async resolveDefaultSettings(permissionMode = DEFAULT_PERMISSION_MODE) {
+  async resolveDefaultSettings(permissionMode) {
+    const mode = permissionMode ?? DEFAULT_PERMISSION_MODE;
     const endpoint = this.endpointPoller.get();
     if (endpoint === null)
       return null;
@@ -42822,7 +42890,7 @@ class BridgeClient {
     return {
       harnessId: DEFAULT_HARNESS,
       model,
-      permissionMode,
+      permissionMode: mode,
       reasoningEffort: null,
       serviceTier: null,
       agentMode: "regular",
@@ -42843,7 +42911,7 @@ class BridgeClient {
       const entries = frame.kind === "snapshot" ? [...frame.attention.entries, ...frame.recent.entries] : frame.kind === "upserted" ? [frame.entry] : frame.kind === "channelEmission" ? frame.rows : [];
       for (const entry of entries) {
         if ((entry.kind === "approval.requested" || entry.kind === "interview.requested") && entry.epicId === this.epicId && entry.chatId !== null) {
-          this.ensureChatSession(entry.chatId);
+          this.ensureChatSession(entry.chatId, undefined);
         }
       }
     });
@@ -42939,6 +43007,9 @@ function approvalEventId(chatId, approvalId) {
 function interviewEventId(chatId, blockId) {
   return `interview.requested:${chatId}:${blockId}`;
 }
+function replyEventId(chatId, blockId) {
+  return `text.completed:${chatId}:${blockId}`;
+}
 
 class WatchEventTracker {
   open = new Map;
@@ -43015,6 +43086,26 @@ class WatchEventTracker {
 
 // clients/remote-bridge/src/adapters/cli-adapter.ts
 var WATCH_POLL_MS = 4000;
+var WATCH_STATUS_CONCURRENCY = 8;
+async function readStatuses(bridge, agents, logger) {
+  const observed = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < agents.length) {
+      const agent = agents[next++];
+      try {
+        observed.push(await bridge.getStatus(agent.agentId));
+      } catch (err) {
+        logger.warn("watch: status unreadable, chat omitted this tick", {
+          chatId: agent.agentId,
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(WATCH_STATUS_CONCURRENCY, agents.length) }, worker));
+  return observed;
+}
 async function runList(bridge, logger) {
   const agents = await bridge.listAgents();
   process.stdout.write(`${JSON.stringify(agents, null, 2)}
@@ -43120,21 +43211,28 @@ function runWatch(bridge, epicId, logger) {
     };
     process.once("SIGINT", cleanup);
     process.once("SIGTERM", cleanup);
+    let running = false;
     const tick = async () => {
-      if (stopped)
+      if (stopped || running)
         return;
+      running = true;
       try {
         const agents = await bridge.listAgents();
-        const observed = [];
-        for (const agent of agents) {
-          try {
-            observed.push(await bridge.getStatus(agent.agentId));
-          } catch (err) {
-            logger.warn("watch: status unreadable, chat omitted this tick", {
-              chatId: agent.agentId,
-              error: err instanceof Error ? err.message : String(err)
-            });
-          }
+        const observed = await readStatuses(bridge, agents, logger);
+        for (const reply of bridge.drainReplies()) {
+          const event = {
+            type: "appeared",
+            eventId: replyEventId(reply.chatId, reply.blockId),
+            kind: "text.completed",
+            epicId,
+            chatId: reply.chatId,
+            chatTitle: observed.find((s) => s.chatId === reply.chatId)?.title ?? null,
+            blockId: reply.blockId,
+            text: reply.text,
+            requestedAt: reply.timestamp
+          };
+          process.stdout.write(`${JSON.stringify(event)}
+`);
         }
         for (const event of tracker.diff(epicId, observed)) {
           process.stdout.write(`${JSON.stringify(event)}
@@ -43144,6 +43242,8 @@ function runWatch(bridge, epicId, logger) {
         logger.warn("watch tick failed", {
           error: err instanceof Error ? err.message : String(err)
         });
+      } finally {
+        running = false;
       }
     };
     const timer = setInterval(() => {

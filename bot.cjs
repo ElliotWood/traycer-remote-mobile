@@ -23158,7 +23158,7 @@ var require_auth = __commonJS((exports2) => {
   __exportStar(require_sidecarAuthProvider(), exports2);
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/buffer_utils.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/buffer_utils.js
 function concat(...buffers) {
   const size = buffers.reduce((acc, { length }) => acc + length, 0);
   const buf = new Uint8Array(size);
@@ -23206,7 +23206,7 @@ var init_buffer_utils = __esm(() => {
   MAX_INT32 = 2 ** 32;
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/base64.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/base64.js
 function encodeBase64(input) {
   if (Uint8Array.prototype.toBase64) {
     return input.toBase64();
@@ -23230,7 +23230,7 @@ function decodeBase64(encoded) {
   return bytes;
 }
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/util/base64url.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/util/base64url.js
 var exports_base64url = {};
 __export(exports_base64url, {
   encode: () => encode2,
@@ -23267,7 +23267,7 @@ var init_base64url = __esm(() => {
   init_buffer_utils();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/crypto_key.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/crypto_key.js
 function getHashLength(hash) {
   return parseInt(hash.name.slice(4), 10);
 }
@@ -23404,7 +23404,7 @@ function checkEncCryptoKey(key, alg, usage) {
 }
 var unusable = (name, prop = "algorithm.name") => new TypeError(`CryptoKey does not support this operation, its ${prop} must be ${name}`), isAlgorithm = (algorithm, name) => algorithm.name === name;
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/invalid_key_input.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/invalid_key_input.js
 function message(msg, actual, ...types) {
   types = types.filter(Boolean);
   if (types.length > 2) {
@@ -23428,7 +23428,7 @@ function message(msg, actual, ...types) {
 }
 var invalidKeyInput = (actual, ...types) => message("Key must be ", actual, ...types), withAlg = (alg, actual, ...types) => message(`Key for the ${alg} algorithm must be `, actual, ...types);
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/util/errors.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/util/errors.js
 var exports_errors = {};
 __export(exports_errors, {
   JWTInvalid: () => JWTInvalid,
@@ -23550,7 +23550,7 @@ var init_errors = __esm(() => {
   };
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/is_key_like.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/is_key_like.js
 function assertCryptoKey(key) {
   if (!isCryptoKey(key)) {
     throw new Error("CryptoKey instance expected");
@@ -23566,7 +23566,7 @@ var isCryptoKey = (key) => {
   }
 }, isKeyObject = (key) => key?.[Symbol.toStringTag] === "KeyObject", isKeyLike = (key) => isCryptoKey(key) || isKeyObject(key);
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/content_encryption.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/content_encryption.js
 function cekLength(alg) {
   switch (alg) {
     case "A128GCM":
@@ -23774,7 +23774,7 @@ var init_content_encryption = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/helpers.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/helpers.js
 function assertNotSet(value, name) {
   if (value) {
     throw new TypeError(`${name} can only be called once`);
@@ -23797,7 +23797,7 @@ var init_helpers = __esm(() => {
   unprotected = Symbol();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/type_checks.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/type_checks.js
 function isObject(input) {
   if (!isObjectLike(input) || Object.prototype.toString.call(input) !== "[object Object]") {
     return false;
@@ -23834,7 +23834,7 @@ function isDisjoint(...headers) {
 }
 var isObjectLike = (value) => typeof value === "object" && value !== null, isJWK = (key) => isObject(key) && typeof key.kty === "string", isPrivateJWK = (key) => key.kty !== "oct" && (key.kty === "AKP" && typeof key.priv === "string" || typeof key.d === "string"), isPublicJWK = (key) => key.kty !== "oct" && key.d === undefined && key.priv === undefined, isSecretJWK = (key) => key.kty === "oct" && typeof key.k === "string";
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/aeskw.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/aeskw.js
 function checkKeySize(key, alg) {
   if (key.algorithm.length !== parseInt(alg.slice(1, 4), 10)) {
     throw new TypeError(`Invalid key size for alg: ${alg}`);
@@ -23861,7 +23861,7 @@ async function unwrap(alg, key, encryptedKey) {
 }
 var init_aeskw = () => {};
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/ecdhes.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/ecdhes.js
 function lengthAndInput(input) {
   return concat(uint32be(input.length), input);
 }
@@ -23916,7 +23916,7 @@ var init_ecdhes = __esm(() => {
   init_helpers();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/pbes2kw.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/pbes2kw.js
 function getCryptoKey2(key, alg) {
   if (key instanceof Uint8Array) {
     return crypto.subtle.importKey("raw", key, "PBKDF2", false, [
@@ -23961,7 +23961,7 @@ var init_pbes2kw = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/signing.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/signing.js
 function checkKeyLength(alg, key) {
   if (alg.startsWith("RS") || alg.startsWith("PS")) {
     const { modulusLength } = key.algorithm;
@@ -24030,7 +24030,7 @@ var init_signing = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/rsaes.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/rsaes.js
 async function encrypt2(alg, key, cek) {
   checkEncCryptoKey(key, alg, "encrypt");
   checkKeyLength(alg, key);
@@ -24057,7 +24057,7 @@ var init_rsaes = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/jwk_to_key.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/jwk_to_key.js
 function subtleMapping(jwk) {
   let algorithm;
   let keyUsages;
@@ -24168,7 +24168,7 @@ var init_jwk_to_key = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/normalize_key.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/normalize_key.js
 async function normalizeKey(key, alg) {
   if (key instanceof Uint8Array) {
     return key;
@@ -24330,7 +24330,7 @@ var init_normalize_key = __esm(() => {
   init_jwk_to_key();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/asn1.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/asn1.js
 function parsePKCS8Header(state) {
   expectTag(state, 48, "Invalid PKCS#8 structure");
   parseLength(state);
@@ -24558,7 +24558,7 @@ var init_asn1 = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/key/import.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/key/import.js
 async function importSPKI(spki, alg, options) {
   if (typeof spki !== "string" || spki.indexOf("-----BEGIN PUBLIC KEY-----") !== 0) {
     throw new TypeError('"spki" must be SPKI formatted string');
@@ -24618,10 +24618,7 @@ var init_import = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/key_to_jwk.js
-function omitUndefinedProperties(jwk) {
-  return Object.fromEntries(Object.entries(jwk).filter(([, value]) => value !== undefined));
-}
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/key_to_jwk.js
 async function keyToJWK(key) {
   if (isKeyObject(key)) {
     if (key.type === "secret") {
@@ -24642,7 +24639,7 @@ async function keyToJWK(key) {
   if (!key.extractable) {
     throw new TypeError("non-extractable CryptoKey cannot be exported as a JWK");
   }
-  const { ext, key_ops, alg, use, ...jwk } = omitUndefinedProperties(await crypto.subtle.exportKey("jwk", key));
+  const { ext, key_ops, alg, use, ...jwk } = await crypto.subtle.exportKey("jwk", key);
   if (jwk.kty === "AKP") {
     jwk.alg = alg;
   }
@@ -24652,7 +24649,7 @@ var init_key_to_jwk = __esm(() => {
   init_base64url();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/key/export.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/key/export.js
 async function exportSPKI(key) {
   return toSPKI(key);
 }
@@ -24667,7 +24664,7 @@ var init_export = __esm(() => {
   init_key_to_jwk();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/aesgcmkw.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/aesgcmkw.js
 async function wrap3(alg, key, cek, iv) {
   const jweAlgorithm = alg.slice(0, 7);
   const wrapped = await encrypt(jweAlgorithm, cek, key, iv, new Uint8Array);
@@ -24686,7 +24683,7 @@ var init_aesgcmkw = __esm(() => {
   init_base64url();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/key_management.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/key_management.js
 function assertEncryptedKey(encryptedKey) {
   if (encryptedKey === undefined)
     throw new JWEInvalid("JWE Encrypted Key missing");
@@ -24873,7 +24870,7 @@ var init_key_management = __esm(() => {
   init_aesgcmkw();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/validate_crit.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/validate_crit.js
 function validateCrit(Err, recognizedDefault, recognizedOption, protectedHeader, joseHeader) {
   if (joseHeader.crit !== undefined && protectedHeader?.crit === undefined) {
     throw new Err('"crit" (Critical) Header Parameter MUST be integrity protected');
@@ -24907,7 +24904,7 @@ var init_validate_crit = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/validate_algorithms.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/validate_algorithms.js
 function validateAlgorithms(option, algorithms) {
   if (algorithms !== undefined && (!Array.isArray(algorithms) || algorithms.some((s) => typeof s !== "string"))) {
     throw new TypeError(`"${option}" option must be an array of strings`);
@@ -24918,7 +24915,7 @@ function validateAlgorithms(option, algorithms) {
   return new Set(algorithms);
 }
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/check_key_type.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/check_key_type.js
 function checkKeyType(alg, key, usage) {
   switch (alg.substring(0, 2)) {
     case "A1":
@@ -25036,7 +25033,7 @@ var tag = (key) => key?.[Symbol.toStringTag], jwkMatchesOp = (alg, key, usage) =
 };
 var init_check_key_type = () => {};
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/deflate.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/deflate.js
 function supported(name) {
   if (typeof globalThis[name] === "undefined") {
     throw new JOSENotSupported(`JWE "zip" (Compression Algorithm) Header Parameter requires the ${name} API.`);
@@ -25084,7 +25081,7 @@ var init_deflate = __esm(() => {
   init_buffer_utils();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwe/flattened/decrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwe/flattened/decrypt.js
 async function flattenedDecrypt(jwe, key, options) {
   if (!isObject(jwe)) {
     throw new JWEInvalid("Flattened JWE must be an object");
@@ -25238,7 +25235,7 @@ var init_decrypt = __esm(() => {
   init_deflate();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwe/compact/decrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwe/compact/decrypt.js
 async function compactDecrypt(jwe, key, options) {
   if (jwe instanceof Uint8Array) {
     jwe = decoder.decode(jwe);
@@ -25269,7 +25266,7 @@ var init_decrypt2 = __esm(() => {
   init_buffer_utils();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwe/general/decrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwe/general/decrypt.js
 async function generalDecrypt(jwe, key, options) {
   if (!isObject(jwe)) {
     throw new JWEInvalid("General JWE must be an object");
@@ -25301,7 +25298,7 @@ var init_decrypt3 = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwe/flattened/encrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwe/flattened/encrypt.js
 class FlattenedEncrypt {
   #plaintext;
   #protectedHeader;
@@ -25466,7 +25463,7 @@ var init_encrypt = __esm(() => {
   init_deflate();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwe/general/encrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwe/general/encrypt.js
 class IndividualRecipient {
   #parent;
   unprotectedHeader;
@@ -25637,7 +25634,7 @@ var init_encrypt2 = __esm(() => {
   init_check_key_type();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jws/flattened/verify.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jws/flattened/verify.js
 async function flattenedVerify(jws, key, options) {
   if (!isObject(jws)) {
     throw new JWSInvalid("Flattened JWS must be an object");
@@ -25740,7 +25737,7 @@ var init_verify = __esm(() => {
   init_normalize_key();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jws/compact/verify.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jws/compact/verify.js
 async function compactVerify(jws, key, options) {
   if (jws instanceof Uint8Array) {
     jws = decoder.decode(jws);
@@ -25765,7 +25762,7 @@ var init_verify2 = __esm(() => {
   init_buffer_utils();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jws/general/verify.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jws/general/verify.js
 async function generalVerify(jws, key, options) {
   if (!isObject(jws)) {
     throw new JWSInvalid("General JWS must be an object");
@@ -25790,7 +25787,7 @@ var init_verify3 = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/lib/jwt_claims_set.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/lib/jwt_claims_set.js
 function secs(str) {
   const matched = REGEX.exec(str);
   if (!matched || matched[4] && matched[1]) {
@@ -26016,7 +26013,7 @@ var init_jwt_claims_set = __esm(() => {
   REGEX = /^(\+|\-)? ?(\d+|\d+\.\d+) ?(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)(?: (ago|from now))?$/i;
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwt/verify.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwt/verify.js
 async function jwtVerify(jwt, key, options) {
   const verified = await compactVerify(jwt, key, options);
   if (verified.protectedHeader.crit?.includes("b64") && verified.protectedHeader.b64 === false) {
@@ -26035,7 +26032,7 @@ var init_verify4 = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwt/decrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwt/decrypt.js
 async function jwtDecrypt(jwt, key, options) {
   const decrypted = await compactDecrypt(jwt, key, options);
   const payload = validateClaimsSet(decrypted.protectedHeader, decrypted.plaintext, options);
@@ -26061,7 +26058,7 @@ var init_decrypt4 = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwe/compact/encrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwe/compact/encrypt.js
 class CompactEncrypt {
   #flattened;
   constructor(plaintext) {
@@ -26092,7 +26089,7 @@ var init_encrypt3 = __esm(() => {
   init_encrypt();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jws/flattened/sign.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jws/flattened/sign.js
 class FlattenedSign {
   #payload;
   #protectedHeader;
@@ -26182,7 +26179,7 @@ var init_sign = __esm(() => {
   init_helpers();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jws/compact/sign.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jws/compact/sign.js
 class CompactSign {
   #flattened;
   constructor(payload) {
@@ -26204,7 +26201,7 @@ var init_sign2 = __esm(() => {
   init_sign();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jws/general/sign.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jws/general/sign.js
 class IndividualSignature {
   #parent;
   protectedHeader;
@@ -26278,7 +26275,7 @@ var init_sign3 = __esm(() => {
   init_helpers();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwt/sign.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwt/sign.js
 class SignJWT {
   #protectedHeader;
   #jwt;
@@ -26332,7 +26329,7 @@ var init_sign4 = __esm(() => {
   init_jwt_claims_set();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwt/encrypt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwt/encrypt.js
 class EncryptJWT {
   #cek;
   #iv;
@@ -26434,7 +26431,7 @@ var init_encrypt4 = __esm(() => {
   init_helpers();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwk/thumbprint.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwk/thumbprint.js
 async function calculateJwkThumbprint(key, digestAlgorithm) {
   let jwk;
   if (isJWK(key)) {
@@ -26499,7 +26496,7 @@ var init_thumbprint = __esm(() => {
   init_export();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwk/embedded.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwk/embedded.js
 async function EmbeddedJWK(protectedHeader, token) {
   const joseHeader = {
     ...protectedHeader,
@@ -26519,7 +26516,7 @@ var init_embedded = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwks/local.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwks/local.js
 function getKtyFromAlg(alg) {
   switch (typeof alg === "string" && alg.slice(0, 2)) {
     case "RS":
@@ -26638,7 +26635,7 @@ var init_local = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwks/remote.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwks/remote.js
 function isCloudflareWorkers() {
   return typeof WebSocketPair !== "undefined" || typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers" || typeof EdgeRuntime !== "undefined" && EdgeRuntime === "vercel";
 }
@@ -26799,14 +26796,14 @@ var init_remote = __esm(() => {
   init_local();
   if (typeof navigator === "undefined" || !navigator.userAgent?.startsWith?.("Mozilla/5.0 ")) {
     const NAME = "jose";
-    const VERSION = "v6.2.4";
+    const VERSION = "v6.2.3";
     USER_AGENT = `${NAME}/${VERSION}`;
   }
   customFetch = Symbol();
   jwksCache = Symbol();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/jwt/unsecured.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/jwt/unsecured.js
 class UnsecuredJWT {
   #jwt;
   constructor(payload = {}) {
@@ -26872,7 +26869,7 @@ var init_unsecured = __esm(() => {
   init_jwt_claims_set();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/util/decode_protected_header.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/util/decode_protected_header.js
 function decodeProtectedHeader(token) {
   let protectedB64u;
   if (typeof token === "string") {
@@ -26905,7 +26902,7 @@ var init_decode_protected_header = __esm(() => {
   init_buffer_utils();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/util/decode_jwt.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/util/decode_jwt.js
 function decodeJwt(jwt) {
   if (typeof jwt !== "string")
     throw new JWTInvalid("JWTs must use Compact JWS serialization, JWT must be a string");
@@ -26938,7 +26935,7 @@ var init_decode_jwt = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/key/generate_key_pair.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/key/generate_key_pair.js
 function getModulusLengthOption(options) {
   const modulusLength = options?.modulusLength ?? 2048;
   if (typeof modulusLength !== "number" || modulusLength < 2048) {
@@ -27039,7 +27036,7 @@ var init_generate_key_pair = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/key/generate_secret.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/key/generate_secret.js
 async function generateSecret(alg, options) {
   let length;
   let algorithm;
@@ -27083,7 +27080,7 @@ var init_generate_secret = __esm(() => {
   init_errors();
 });
 
-// node_modules/.bun/jose@6.2.4/node_modules/jose/dist/webapi/index.js
+// node_modules/.bun/jose@6.2.3/node_modules/jose/dist/webapi/index.js
 var exports_webapi = {};
 __export(exports_webapi, {
   jwtVerify: () => jwtVerify,
@@ -36666,7 +36663,7 @@ var require_src8 = __commonJS((exports2) => {
 });
 
 // clients/teams-bot/src/index.ts
-var import_agents_hosting3 = __toESM(require_src8(), 1);
+var import_agents_hosting4 = __toESM(require_src8(), 1);
 
 // clients/shared/identity-registry/registry.ts
 var import_node_fs = require("node:fs");
@@ -51719,19 +51716,6 @@ function listAgents(env2, config2) {
 function getChatStatus(chatId, env2, config2) {
   return runAndParse(["status", chatId], env2, config2, chatStatusSchema);
 }
-function getTranscript(chatId, offset, limit, env2, config2) {
-  return runAndParse([
-    "transcript",
-    chatId,
-    "--offset",
-    String(offset),
-    "--limit",
-    String(limit)
-  ], env2, config2, transcriptSchema);
-}
-function listEpics(env2, config2) {
-  return runAndParse(["epics"], env2, config2, epicListSchema);
-}
 async function runAction(args, env2, config2) {
   const result = await config2.spawnFn(config2.command, args, {
     env: env2,
@@ -51869,64 +51853,477 @@ class DefaultingEpicBindingStore {
   }
 }
 
+// clients/teams-bot/src/state/durable-json-store.ts
+var import_node_fs2 = require("node:fs");
+var import_node_path = require("node:path");
+var FILE_MODE = 384;
+
+class DurableJsonStore {
+  filePath;
+  onWarn;
+  cache;
+  constructor(options) {
+    this.filePath = options.filePath;
+    this.onWarn = options.onWarn ?? (() => {});
+    this.cache = this.load();
+  }
+  load() {
+    let raw;
+    try {
+      raw = import_node_fs2.readFileSync(this.filePath, "utf8");
+    } catch {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        this.onWarn("state file is not a JSON object — starting empty", this.filePath);
+        return {};
+      }
+      return parsed;
+    } catch (error51) {
+      this.onWarn("state file could not be parsed — starting empty", error51 instanceof Error ? error51.message : String(error51));
+      return {};
+    }
+  }
+  persist() {
+    import_node_fs2.mkdirSync(import_node_path.dirname(this.filePath), { recursive: true });
+    const temp = import_node_path.join(import_node_path.dirname(this.filePath), `.${String(process.pid)}.${String(this.writes)}.tmp`);
+    import_node_fs2.writeFileSync(temp, JSON.stringify(this.cache), { mode: FILE_MODE });
+    import_node_fs2.renameSync(temp, this.filePath);
+    this.writes += 1;
+  }
+  writes = 0;
+  get(key) {
+    return this.cache[key] ?? null;
+  }
+  set(key, value) {
+    this.cache = { ...this.cache, [key]: value };
+    this.persist();
+  }
+  delete(key) {
+    if (!(key in this.cache))
+      return;
+    const next = { ...this.cache };
+    delete next[key];
+    this.cache = next;
+    this.persist();
+  }
+  keys() {
+    return Object.keys(this.cache);
+  }
+}
+
+// clients/teams-bot/src/read-surface/orchestrator-store.ts
+class InMemoryOrchestratorStore {
+  bound = new Map;
+  async get(conversationId) {
+    return this.bound.get(conversationId) ?? null;
+  }
+  async set(conversationId, binding) {
+    this.bound.set(conversationId, binding);
+  }
+  async findByChatId(chatId) {
+    for (const binding of this.bound.values()) {
+      if (binding.chatId === chatId)
+        return binding;
+    }
+    return null;
+  }
+}
+
+class DurableOrchestratorStore {
+  store;
+  constructor(filePath, onWarn) {
+    this.store = new DurableJsonStore({ filePath, onWarn });
+  }
+  async get(conversationId) {
+    return this.store.get(conversationId);
+  }
+  async set(conversationId, binding) {
+    this.store.set(conversationId, binding);
+  }
+  async findByChatId(chatId) {
+    for (const conversationId of this.store.keys()) {
+      const binding = this.store.get(conversationId);
+      if (binding !== null && binding.chatId === chatId)
+        return binding;
+    }
+    return null;
+  }
+}
+
 // clients/teams-bot/src/read-surface/read-surface-handler.ts
 var import_agents_hosting2 = __toESM(require_src8(), 1);
 
-// clients/teams-bot/src/read-surface/commands.ts
-function parseCommand(rawText) {
-  const text = rawText.replace(/<at>.*?<\/at>/gi, " ").trim().replace(/\s+/g, " ");
-  const lower = text.toLowerCase();
-  if (lower === "" || lower === "help" || lower === "?") {
-    return { kind: "help" };
+// clients/teams-bot/src/read-surface/message-routing.ts
+function routeMessage(message2) {
+  if (message2.actionVerb !== null) {
+    return { kind: "action", verb: message2.actionVerb };
   }
-  if (lower === "fleet" || lower === "agents" || lower === "list") {
-    return { kind: "fleet" };
+  const text = message2.text.trim();
+  if (text === "" && !message2.hasAttachments)
+    return { kind: "silent" };
+  if (message2.conversationId === "")
+    return { kind: "no_conversation" };
+  if (message2.hasAttachments)
+    return { kind: "intake", text: message2.text };
+  return { kind: "orchestrator", text: message2.text };
+}
+
+// clients/teams-bot/src/read-surface/orchestrator.ts
+var import_node_crypto2 = require("node:crypto");
+
+// clients/shared/identity-registry/tenant-environment.ts
+var DEFAULT_INHERITED_ENV_ALLOWLIST = Object.freeze([
+  "PATH",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "ComSpec"
+]);
+function buildTenantEnvironment(options) {
+  const allowlist = options.allowlist ?? DEFAULT_INHERITED_ENV_ALLOWLIST;
+  const env2 = {};
+  for (const key of allowlist) {
+    const value = options.parentEnv[key];
+    if (value !== undefined) {
+      env2[key] = value;
+    }
   }
-  if (lower === "epics") {
-    return { kind: "epics" };
+  if (options.extra !== undefined) {
+    for (const [key, value] of Object.entries(options.extra)) {
+      env2[key] = value;
+    }
   }
-  const bindMatch = /^epic\s+(\S+)$/i.exec(text);
-  if (bindMatch) {
-    return { kind: "bind_epic", epicId: bindMatch[1] };
+  env2.HOME = options.tenant.home;
+  env2.USERPROFILE = options.tenant.home;
+  return env2;
+}
+
+// clients/teams-bot/src/read-surface/host-access.ts
+function buildBridgeEnv(tenant, epicId, deps) {
+  return buildTenantEnvironment({
+    tenant: { ...tenant, entraOid: null, traycerUserId: null },
+    parentEnv: deps.parentEnv,
+    extra: {
+      TRAYCER_EPIC_ID: epicId,
+      TRAYCER_AGENT_ID: deps.senderAgentId
+    }
+  });
+}
+function toReadSurfaceFailure(result) {
+  logWarn("bridge call failed", {
+    reason: result.reason,
+    detail: result.detail
+  });
+  return {
+    kind: "bridge_unavailable",
+    reason: result.reason,
+    detail: result.detail
+  };
+}
+async function fetchFleet(principal, conversationId, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
   }
-  if (lower === "epic") {
-    return { kind: "usage", usage: "epic <id> — select an epic for this chat" };
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
   }
-  const chatMatch = /^(?:chat|status)\s+(\S+)$/i.exec(text);
-  if (chatMatch) {
-    return { kind: "chat", chatId: chatMatch[1] };
+  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await listAgents(env2, deps.bridgeCliConfig);
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
   }
-  if (lower === "chat" || lower === "status") {
+  return { kind: "ok", agents: result.value };
+}
+async function fetchChatStatus(principal, conversationId, chatId, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await getChatStatus(chatId, env2, deps.bridgeCliConfig);
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", status: result.value, epicId };
+}
+async function submitApprovalDecision(principal, conversationId, approvalId, decision, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = decision.kind === "approve" ? await approveAction(approvalId, env2, deps.bridgeCliConfig) : await rejectAction(approvalId, decision.reason, env2, deps.bridgeCliConfig);
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", outcome: result.value };
+}
+async function submitChatMessage(principal, conversationId, chatId, text, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await sendMessageAction(chatId, text, env2, deps.bridgeCliConfig, undefined);
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", outcome: result.value };
+}
+async function submitInterviewAnswer(principal, conversationId, chatId, blockId, answers, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused") {
+    return { kind: "principal_refused", reason: resolution.reason };
+  }
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
+    return { kind: "epic_not_bound" };
+  }
+  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
+  const result = await answerInterviewAction(chatId, blockId, answers, env2, deps.bridgeCliConfig);
+  if (result.kind === "failed") {
+    return toReadSurfaceFailure(result);
+  }
+  return { kind: "ok", outcome: result.value };
+}
+function resolveTenantEnv(principal, epicId, deps) {
+  const resolution = deps.registry.resolveTenant(principal);
+  if (resolution.kind === "refused")
+    return null;
+  return buildBridgeEnv(resolution.tenant, epicId, deps);
+}
+
+// clients/teams-bot/src/read-surface/orchestrator-host.ts
+function chooseOrchestratorHost(agents, configuredHostId) {
+  const configured = configuredHostId?.trim() ?? "";
+  if (configured !== "")
+    return { kind: "one", hostId: configured };
+  const counts = new Map;
+  for (const agent of agents) {
+    if (!agent.capabilities.sendMessage)
+      continue;
+    if (agent.hostId.trim() === "")
+      continue;
+    counts.set(agent.hostId, (counts.get(agent.hostId) ?? 0) + 1);
+  }
+  if (counts.size === 0)
+    return { kind: "none" };
+  let best = 0;
+  for (const count of counts.values())
+    if (count > best)
+      best = count;
+  const leaders = [...counts.entries()].filter(([, count]) => count === best).map(([hostId]) => hostId).sort();
+  if (leaders.length === 1)
+    return { kind: "one", hostId: leaders[0] };
+  return { kind: "tie", candidates: leaders };
+}
+
+// clients/teams-bot/src/read-surface/failure-copy.ts
+var FAILURE_COPY = {
+  CREATE_TIMED_OUT: "I may have started an agent for this chat and I can't confirm it. Say anything and I'll pick up where it got to — I won't create a second one.",
+  CREATE_REFUSED: "I couldn't start an agent for this conversation.",
+  SEND_UNCONFIRMED: "I couldn't tell whether your message reached the agent, so I haven't sent it again — a message to an agent can't be unsent.",
+  SEND_REJECTED: "The host wouldn't take that message.",
+  NO_EPIC: "This deployment isn't pointed at a Traycer epic yet, so I've got nowhere to put an agent. Whoever set the bot up needs to set TRAYCER_TEAMS_DEFAULT_EPIC_ID.",
+  NO_HOST: "You don't have a Traycer host I can see yet. A host is the machine Traycer runs on — open Traycer on your desktop and let it connect, then say hello here again.",
+  NO_REPLY_TARGET: "I can't record where to send this agent's answers, so I haven't started one — it would have replied into nowhere.",
+  NO_CONVERSATION: "Couldn't identify this conversation.",
+  NO_TENANT: "I couldn't work out which Traycer host is yours, so I haven't started an agent.",
+  FLEET_UNREADABLE: "I couldn't reach Traycer to see which machines are yours, so I haven't started an agent.",
+  BRIEFING_FAILED: "I started an agent for this conversation but couldn't brief it, so I haven't pointed you at it yet. Try again in a moment."
+};
+function hostTieCopy(candidates) {
+  return `I can see more than one Traycer host and I can't tell which of them is yours. A host is the machine Traycer runs on. Whoever set the bot up needs to pick one — set TRAYCER_TEAMS_ORCHESTRATOR_HOST_ID to ${candidates.join(" or ")}.`;
+}
+function wrongHostCopy(hostId) {
+  return `I started an agent for this conversation but I can't send to it, so I've stopped rather than leave you talking to nothing. It's bound to host ${hostId}, which looks like the wrong machine.`;
+}
+function sendRejectedCopy(reason) {
+  return reason === null || reason.trim() === "" ? FAILURE_COPY.SEND_REJECTED : `${FAILURE_COPY.SEND_REJECTED} ${reason}`;
+}
+var MAY_INVITE_RETRY = [
+  FAILURE_COPY.CREATE_TIMED_OUT,
+  FAILURE_COPY.NO_HOST,
+  FAILURE_COPY.BRIEFING_FAILED
+];
+
+// clients/teams-bot/src/state/conversation-reference-store.ts
+class DurableConversationReferenceStore {
+  store;
+  constructor(filePath, onWarn) {
+    this.store = new DurableJsonStore({
+      filePath,
+      onWarn
+    });
+  }
+  remember(workId, reference) {
+    this.store.set(workId, reference);
+  }
+  recall(workId) {
+    return this.store.get(workId);
+  }
+  forget(workId) {
+    this.store.delete(workId);
+  }
+  outstanding() {
+    return this.store.keys();
+  }
+}
+function toStoredReference(reference, capturedAt) {
+  if (reference === null || typeof reference !== "object")
+    return null;
+  const r = reference;
+  const conversation = r["conversation"];
+  const bot = r["agent"] ?? r["bot"];
+  if (typeof r["channelId"] !== "string" || typeof r["serviceUrl"] !== "string" || conversation === null || typeof conversation !== "object" || typeof conversation["id"] !== "string" || bot === null || typeof bot !== "object" || typeof bot["id"] !== "string") {
+    return null;
+  }
+  const conv = conversation;
+  const botRef = bot;
+  const user = r["user"];
+  const userRef = user !== null && typeof user === "object" ? user : null;
+  return {
+    channelId: r["channelId"],
+    serviceUrl: r["serviceUrl"],
+    conversation: {
+      id: conv["id"],
+      ...typeof conv["conversationType"] === "string" ? { conversationType: conv["conversationType"] } : {}
+    },
+    bot: {
+      id: botRef["id"],
+      ...typeof botRef["name"] === "string" ? { name: botRef["name"] } : {}
+    },
+    ...userRef !== null && typeof userRef["id"] === "string" ? {
+      user: {
+        id: userRef["id"],
+        ...typeof userRef["aadObjectId"] === "string" ? { aadObjectId: userRef["aadObjectId"] } : {}
+      }
+    } : {},
+    ...typeof conv["tenantId"] === "string" ? { tenantId: conv["tenantId"] } : {},
+    capturedAt
+  };
+}
+
+// clients/teams-bot/src/read-surface/orchestrator.ts
+var ORCHESTRATOR_FRAMING = [
+  "You are the orchestrator for a Microsoft Teams conversation.",
+  "",
+  "The person on the other end is typing into a Teams chat window, often on a phone. Answer in the register of the question: a one-line question gets a one-line answer, not a report. Say the useful thing first.",
+  "",
+  "Only investigate when the question actually needs it. When something needs real work, spawn a worker and say so in a sentence rather than doing it inline — this chat should stay responsive while that runs.",
+  "",
+  "Everything you say lands in Teams as a chat message, so write prose, not headings and tables."
+].join(`
+`);
+var ORCHESTRATOR_PERMISSION_MODE = "full_access";
+function firstContactBody(firstMessage) {
+  const spoken = firstMessage.trim();
+  return spoken === "" ? ORCHESTRATOR_FRAMING : `${ORCHESTRATOR_FRAMING}
+
+${spoken}`;
+}
+async function ensureOrchestrator(conversationId, conversationReference, firstMessage, deps) {
+  const existing = await deps.orchestrators.get(conversationId);
+  if (existing !== null)
+    return { kind: "bound", binding: existing };
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) {
     return {
-      kind: "usage",
-      usage: `${lower} <id> — show one chat's status (get ids from "fleet")`
+      kind: "refused",
+      text: FAILURE_COPY.NO_EPIC
     };
   }
-  const logMatch = /^(?:log|history|transcript)\s+(\S+)$/i.exec(text);
-  if (logMatch) {
-    return { kind: "log", chatId: logMatch[1], offset: 0 };
+  const identity = await deps.resolvePrincipal();
+  if (identity.kind === "unavailable") {
+    return { kind: "refused", text: identity.reason };
   }
-  if (lower === "log" || lower === "history" || lower === "transcript") {
+  const { principal } = identity;
+  const env2 = resolveTenantEnv(principal, epicId, deps);
+  if (env2 === null) {
     return {
-      kind: "usage",
-      usage: `${lower} <chat-id> — read a chat's history (get ids from "fleet")`
+      kind: "refused",
+      text: FAILURE_COPY.NO_TENANT
     };
   }
-  const sayMatch = /^(?:say|reply|send)\s+(\S+)\s+([\s\S]+)$/i.exec(text);
-  if (sayMatch) {
-    return { kind: "say", chatId: sayMatch[1], text: sayMatch[2] };
-  }
-  const composeMatch = /^(?:say|reply|send)\s+(\S+)$/i.exec(text);
-  if (composeMatch) {
-    return { kind: "compose", chatId: composeMatch[1] };
-  }
-  if (lower === "say" || lower === "reply" || lower === "send") {
+  const fleet = await fetchFleet(principal, conversationId, deps);
+  if (fleet.kind !== "ok") {
     return {
-      kind: "usage",
-      usage: `${lower} <chat-id> [message] — message an agent (omit the message for a compose box)`
+      kind: "refused",
+      text: FAILURE_COPY.FLEET_UNREADABLE
     };
   }
-  return { kind: "help" };
+  const choice = chooseOrchestratorHost(fleet.agents, deps.configuredHostId);
+  if (choice.kind === "none") {
+    return {
+      kind: "refused",
+      text: FAILURE_COPY.NO_HOST
+    };
+  }
+  if (choice.kind === "tie") {
+    return {
+      kind: "refused",
+      text: hostTieCopy(choice.candidates)
+    };
+  }
+  const chatId = import_node_crypto2.randomUUID();
+  const stored = toStoredReference(conversationReference, deps.now());
+  if (stored === null) {
+    return {
+      kind: "refused",
+      text: FAILURE_COPY.NO_REPLY_TARGET
+    };
+  }
+  deps.references.remember(chatId, stored);
+  const created = await createChatAction({ chatId, title: orchestratorTitle(conversationId), hostId: choice.hostId }, env2, deps.bridgeCliConfig);
+  if (created.kind !== "ok") {
+    return {
+      kind: "refused",
+      text: created.reason === "spawn_timed_out" ? FAILURE_COPY.CREATE_TIMED_OUT : FAILURE_COPY.CREATE_REFUSED
+    };
+  }
+  const after = await fetchFleet(principal, conversationId, deps);
+  const row = after.kind === "ok" ? after.agents.find((a) => a.agentId === created.value.chatId) : undefined;
+  if (row === undefined || !row.capabilities.sendMessage) {
+    return {
+      kind: "refused",
+      text: wrongHostCopy(choice.hostId)
+    };
+  }
+  const framed = await sendMessageAction(created.value.chatId, firstContactBody(firstMessage), env2, deps.bridgeCliConfig, ORCHESTRATOR_PERMISSION_MODE);
+  if (framed.kind !== "ok" || framed.value.kind !== "applied") {
+    return {
+      kind: "refused",
+      text: FAILURE_COPY.BRIEFING_FAILED
+    };
+  }
+  const binding = {
+    chatId: created.value.chatId,
+    hostId: choice.hostId,
+    permissionMode: ORCHESTRATOR_PERMISSION_MODE,
+    boundAt: deps.now()
+  };
+  await deps.orchestrators.set(conversationId, binding);
+  return { kind: "created", binding };
+}
+function orchestratorTitle(conversationId) {
+  return `Teams · ${conversationId.slice(0, 8)}`;
 }
 
 // clients/teams-bot/src/read-surface/cards.ts
@@ -52161,21 +52558,6 @@ function humaniseToolName(raw) {
   const name = mcp?.[1] ?? raw;
   return name.replace(/_/g, " ").trim();
 }
-function shortenWorkspacePath(raw) {
-  const tenant = /^\/srv\/traycer\/tenants\/[^/]+\/(.+)$/.exec(raw);
-  if (tenant?.[1] !== undefined)
-    return tenant[1];
-  const home = /^\/(?:home|Users)\/[^/]+\/(.+)$/.exec(raw);
-  if (home?.[1] !== undefined)
-    return home[1];
-  return raw;
-}
-function speakerLabel(message2) {
-  if (message2.role === "assistant")
-    return "Agent";
-  const author = message2.author?.trim() ?? "";
-  return author.length > 0 ? author : "You";
-}
 
 // clients/teams-bot/src/read-surface/cards.ts
 var ADAPTIVE_CARD_SCHEMA = "http://adaptivecards.io/schemas/adaptive-card.json";
@@ -52183,18 +52565,11 @@ var ADAPTIVE_CARD_VERSION = "1.2";
 var APPROVE_VERB = "traycer/approve";
 var REJECT_VERB = "traycer/reject";
 var OPEN_CHAT_VERB = "traycer/openChat";
-var REPLY_VERB = "traycer/reply";
-var LOG_VERB = "traycer/log";
-var FLEET_VERB = "traycer/fleet";
 var CONFIRM_ROUTE_VERB = "traycer/confirmRoute";
 var CLARIFY_OTHER_VERB = "traycer/clarifyOther";
-var SEND_VERB = "traycer/send";
 var SUBMIT_INTAKE_VERB = "traycer/submitIntake";
 var APPROVE_TITLE = "✓ Approve";
 var REJECT_TITLE = "✕ Reject";
-var SEND_TITLE = "Send";
-var OLDER_TITLE = "↑ Older";
-var NEWER_TITLE = "↓ Newer";
 function submitAction(title, verb, data, options) {
   return {
     type: "Action.Submit",
@@ -52323,119 +52698,6 @@ function statusBadge(label, color, detail) {
 function shortId(id) {
   return id.length <= 12 ? id : `${id.slice(0, 8)}…`;
 }
-var FLEET_ROW_LIMIT = 8;
-function agentStatusPresentation(agent) {
-  const label = agentStatusLabel(agent);
-  const [badge, ...cause] = label.split(" — ");
-  const running = agent.isLocal && agent.active;
-  return {
-    label,
-    badge: badge === "Activity not visible from here" ? "Not visible" : badge,
-    detail: cause.length > 0 ? cause.join(" — ") : badge === "Activity not visible from here" ? "activity not visible from here" : null,
-    color: running ? "good" : "default"
-  };
-}
-function agentStatusLabel(agent) {
-  const reachable = agent.capabilities.sendMessage;
-  const observable = agent.isLocal;
-  if (!reachable) {
-    return observable ? "Read-only" : "Read-only — runs on another host";
-  }
-  if (!observable) {
-    return "Activity not visible from here";
-  }
-  return agent.active ? "Active" : "Idle";
-}
-function agentDisplayName(agent) {
-  if (agent.title !== null && agent.title.trim().length > 0) {
-    return agent.title;
-  }
-  const shortId2 = agent.agentId.slice(0, 8);
-  const kind = agent.harnessId ?? agent.surface;
-  return `Untitled ${kind} agent (${shortId2})`;
-}
-function buildFleetCard(agents) {
-  if (agents.length === 0) {
-    return card([
-      cardHeader({
-        eyebrow: null,
-        title: "Fleet",
-        subtitle: "No agents in this epic yet.",
-        tone: null
-      })
-    ]);
-  }
-  const observable = agents.filter((a) => a.isLocal).length;
-  const sorted = [...agents].sort((a, b) => Number(b.isLocal) - Number(a.isLocal) || Number(b.active) - Number(a.active));
-  const shown = sorted.slice(0, FLEET_ROW_LIMIT);
-  const header = [
-    cardHeader({
-      eyebrow: null,
-      title: "Fleet",
-      subtitle: observable === agents.length ? `${String(agents.length)} agent${agents.length === 1 ? "" : "s"}` : `${String(agents.length)} agent${agents.length === 1 ? "" : "s"} · ${String(observable)} visible from here`
-    })
-  ];
-  const rows = shown.map((agent) => {
-    const presentation = agentStatusPresentation(agent);
-    return container([
-      {
-        type: "ColumnSet",
-        spacing: "none",
-        columns: [
-          {
-            type: "Column",
-            width: "stretch",
-            verticalContentAlignment: "center",
-            items: [
-              text(agentDisplayName(agent), {
-                weight: "bolder",
-                spacing: "none"
-              }),
-              text([
-                agent.harnessId ?? "unknown",
-                agent.surface,
-                presentation.detail
-              ].filter((segment) => segment !== null).join(" · "), { isSubtle: true, size: "small", spacing: "none" })
-            ]
-          },
-          {
-            type: "Column",
-            width: "auto",
-            verticalContentAlignment: "center",
-            items: [
-              text(presentation.badge, {
-                size: "small",
-                weight: "bolder",
-                color: presentation.color,
-                isSubtle: presentation.color === "default",
-                spacing: "none",
-                wrap: false
-              })
-            ]
-          },
-          {
-            type: "Column",
-            width: "auto",
-            verticalContentAlignment: "center",
-            items: [
-              actionSet([
-                submitAction("Open", OPEN_CHAT_VERB, { chatId: agent.agentId }, { associateInputs: false })
-              ])
-            ]
-          }
-        ]
-      }
-    ], {
-      separator: true,
-      spacing: "small",
-      selectAction: submitAction(agentDisplayName(agent), OPEN_CHAT_VERB, { chatId: agent.agentId }, { associateInputs: false })
-    });
-  });
-  const overflow = agents.length > FLEET_ROW_LIMIT ? [
-    text(`+${String(agents.length - FLEET_ROW_LIMIT)} more not shown.`, { isSubtle: true, size: "small", separator: true })
-  ] : [];
-  return card([...header, ...rows, ...overflow]);
-}
 function runStatusColor(runStatus) {
   switch (runStatus) {
     case "running":
@@ -52446,7 +52708,7 @@ function runStatusColor(runStatus) {
       return "default";
   }
 }
-function buildChatCard(status, epicId, canSend) {
+function buildChatCard(status, epicId, deepLink) {
   if (!status.connected) {
     return card([
       cardHeader({
@@ -52496,17 +52758,7 @@ function buildChatCard(status, epicId, canSend) {
     }));
   }
   body.push(metaLine([epicSegment(epicId), `Chat ${shortId(status.chatId)}`]));
-  const actions = [
-    ...canSend ? [
-      submitAction("Reply", REPLY_VERB, { chatId: status.chatId }, {
-        associateInputs: false
-      })
-    ] : [],
-    submitAction("History", LOG_VERB, { chatId: status.chatId }, {
-      associateInputs: false
-    })
-  ];
-  return buildCard(body, actions);
+  return buildCard(body, deepLink === null ? [] : [{ type: "Action.OpenUrl", title: "Open in Traycer", url: deepLink }]);
 }
 var CODE_LINE_LIMIT = 42;
 var CODE_BLOCK_MAX_LINES = 14;
@@ -52632,165 +52884,13 @@ function chatLabel(chat) {
   const title = chat.title?.trim() ?? "";
   return title.length > 0 ? title : shortId(chat.chatId);
 }
-var OLDER_VERB = "traycer/older";
-var NEWER_VERB = "traycer/newer";
-var TRANSCRIPT_TEXT_LIMIT = 220;
-var CONTEXT_STRIP_TEXT_LIMIT = 100;
-function humaniseToolName2(raw) {
-  return humaniseToolName(raw);
-}
-function speakerLabel2(message2) {
-  return speakerLabel(message2);
-}
-function modelMarker(message2) {
-  if (message2.role !== "assistant")
-    return null;
-  const model = message2.author?.trim() ?? "";
-  return model.length > 0 ? model : null;
-}
-function shortenWorkspacePath2(raw) {
-  return shortenWorkspacePath(raw);
-}
-var PART_NOUN = {
-  file_change: "Edited",
-  file: "Edited",
-  code: "Code",
-  table: "Table",
-  command: "Ran",
-  tool: "Used",
-  error: "Error",
-  other: "Content"
-};
-var PART_IS_VERB = new Set(["file_change", "file", "command", "tool"]);
-function partMarker(part) {
-  const noun = PART_NOUN[part.kind] ?? "Content";
-  const rawLabel = part.label.trim();
-  const label = part.kind === "tool" ? humaniseToolName2(rawLabel) : part.kind === "file_change" ? shortenWorkspacePath2(rawLabel) : rawLabel;
-  const head = label.length === 0 ? noun : PART_IS_VERB.has(part.kind) ? `${noun} ${label}` : `${noun}: ${label}`;
-  return part.lines > 0 ? `${head} · ${String(part.lines)} line${part.lines === 1 ? "" : "s"}` : head;
-}
-function transcriptPreview(message2, compact) {
-  const limit = compact ? CONTEXT_STRIP_TEXT_LIMIT : TRANSCRIPT_TEXT_LIMIT;
-  const prose = describeApproval(message2.text).map((block) => {
-    const b = block;
-    return b.type === "TextBlock" && typeof b.text === "string" ? b.text : "";
-  }).filter((line) => line.length > 0 && line !== "(no description provided)").join(" ").replace(/\s+/g, " ").trim();
-  return prose.length > limit ? `${prose.slice(0, limit - 1)}…` : prose;
-}
-function transcriptRow(message2, now, compact) {
-  const preview = transcriptPreview(message2, compact);
-  const items = [
-    text(`${speakerLabel2(message2)} · ${approvalAgeLabel(message2.timestamp, now)}`, {
-      weight: "bolder",
-      size: "small",
-      color: message2.role === "user" ? "accent" : "default",
-      isSubtle: message2.role !== "user",
-      spacing: "none"
-    })
-  ];
-  if (preview.length > 0) {
-    items.push(text(preview, { spacing: "small" }));
-  }
-  const markers = [
-    ...message2.parts.map(partMarker),
-    ...modelMarker(message2) === null ? [] : [modelMarker(message2)]
-  ];
-  if (markers.length > 0) {
-    items.push(text(markers.join("  ·  "), {
-      isSubtle: true,
-      size: "small",
-      spacing: preview.length > 0 ? "small" : "none"
-    }));
-  }
-  if (preview.length === 0 && message2.parts.length === 0) {
-    items.push(text("(no content)", { isSubtle: true, size: "small" }));
-  }
-  return container(items, {
-    style: message2.role === "user" ? "emphasis" : undefined,
-    separator: true,
-    spacing: "small"
-  });
-}
-function newestFirst(messages) {
-  return [...messages].reverse();
-}
-function transcriptHeader(transcript, shown) {
-  const { totalCount, offset } = transcript;
-  const from = totalCount - offset - shown + 1;
-  const to = totalCount - offset;
-  return cardHeader({
-    eyebrow: "History",
-    title: chatLabel({ chatId: transcript.chatId, title: transcript.title }),
-    subtitle: totalCount <= shown ? `${String(totalCount)} messages` : `${String(Math.max(1, from))}–${String(to)} of ${String(totalCount)}`
-  });
-}
-function buildTranscriptCard(transcript, now) {
-  const shown = newestFirst(transcript.messages);
-  const hasOlder = transcript.totalCount > transcript.messages.length + transcript.offset;
-  const hasNewer = transcript.offset > 0;
-  const actions = [];
-  if (hasNewer) {
-    actions.push(submitAction(NEWER_TITLE, NEWER_VERB, {
-      chatId: transcript.chatId,
-      offset: String(Math.max(0, transcript.offset - transcript.messages.length))
-    }, { associateInputs: false }));
-  }
-  if (hasOlder) {
-    actions.push(submitAction(OLDER_TITLE, OLDER_VERB, {
-      chatId: transcript.chatId,
-      offset: String(transcript.offset + transcript.messages.length)
-    }, { associateInputs: false }));
-  }
-  return buildCard([
-    transcriptHeader(transcript, shown.length),
-    ...shown.map((m) => transcriptRow(m, now, false))
-  ], actions);
-}
-var CONTEXT_STRIP_SIZE = 3;
-var TRANSCRIPT_PAGE_SIZE = 5;
-var FULL_HISTORY_VERB = "traycer/history";
-function buildContextStripCard(transcript, now) {
-  const shown = newestFirst(transcript.messages).slice(0, CONTEXT_STRIP_SIZE);
-  const remaining = Math.max(0, transcript.totalCount - shown.length);
-  return buildCard([
-    text("Recently", {
-      weight: "bolder",
-      size: "small",
-      isSubtle: true,
-      spacing: "none"
-    }),
-    ...shown.map((m) => transcriptRow(m, now, true))
-  ], remaining > 0 ? [
-    submitAction(`↑ Full history (${String(remaining)} more)`, FULL_HISTORY_VERB, { chatId: transcript.chatId, offset: "0" }, { associateInputs: false })
-  ] : []);
-}
-var MAX_MESSAGE_LENGTH = 4000;
-var MESSAGE_INPUT_ID = "messageText";
-function buildComposeCard(chat, epicId) {
-  return buildCard([
-    cardHeader({
-      eyebrow: "Reply to",
-      title: chatLabel(chat),
-      subtitle: epicSegment(epicId)
-    }),
-    {
-      type: "Input.Text",
-      id: MESSAGE_INPUT_ID,
-      placeholder: "Send a message to this agent…",
-      isMultiline: true,
-      maxLength: MAX_MESSAGE_LENGTH
-    }
-  ], [
-    submitAction(SEND_TITLE, SEND_VERB, { chatId: chat.chatId, chatTitle: chat.title ?? "" }, { associateInputs: true, style: "positive" })
-  ]);
-}
 function buildApprovalCard(chat, epicId, approval, now) {
   const chatId = chat.chatId;
   return buildCard([
     cardHeader({
       eyebrow: "Agent action · approval needed",
       eyebrowColor: "attention",
-      title: humaniseToolName2(approval.toolName),
+      title: humaniseToolName(approval.toolName),
       subtitle: chatLabel(chat)
     }),
     ...describeApproval(approval.description),
@@ -52815,7 +52915,6 @@ function buildApprovalCard(chat, epicId, approval, now) {
   ]);
 }
 var ANSWER_VERB = "traycer/answer";
-var ANSWER_TITLE = "Send answers";
 function interviewInputId(index) {
   return `answer_${String(index)}`;
 }
@@ -52823,88 +52922,6 @@ var INTERVIEW_QUESTIONS_KEY = "interviewQuestions";
 var INTERVIEW_BLOCK_KEY = "interviewBlockId";
 var CHOICE_VALUE_SEPARATOR = ",";
 var MAX_ANSWER_LENGTH = 2000;
-function buildInterviewCard(chat, epicId, interview, now) {
-  const header = cardHeader({
-    eyebrow: "Needs your answer",
-    eyebrowColor: "attention",
-    title: interview.title ?? chatLabel(chat),
-    subtitle: interview.title === null ? null : chatLabel(chat)
-  });
-  const identity = metaLine([
-    `Asked ${approvalAgeLabel(interview.requestedAt, now)}`,
-    epicSegment(epicId)
-  ]);
-  const questions = interview.questions;
-  if (questions === null || questions.length === 0) {
-    return card([
-      header,
-      text("The agent is waiting on an answer to continue.", {
-        spacing: "medium"
-      }),
-      identity,
-      text(questions === null ? "This one can't be answered from here — its questions didn't reach the bot. Answer it on the desktop." : "This interview arrived with no questions, so there is nothing to answer here.", { isSubtle: true, size: "small", separator: true, wrap: true })
-    ]);
-  }
-  return buildCard([
-    header,
-    ...interview.description === null ? [] : [text(interview.description, { spacing: "medium", wrap: true })],
-    identity,
-    ...questions.flatMap((question, index) => interviewQuestionElements(question, index))
-  ], [
-    submitAction(ANSWER_TITLE, ANSWER_VERB, {
-      chatId: chat.chatId,
-      chatTitle: chat.title ?? "",
-      [INTERVIEW_BLOCK_KEY]: interview.blockId,
-      [INTERVIEW_QUESTIONS_KEY]: JSON.stringify(questions.map((question, index) => ({
-        index,
-        questionId: question.questionId,
-        question: question.question,
-        multiSelect: question.multiSelect
-      })))
-    }, { associateInputs: true, style: "positive" })
-  ]);
-}
-function interviewQuestionElements(question, index) {
-  const heading = [
-    ...question.header === null ? [] : [
-      text(question.header, {
-        isSubtle: true,
-        size: "small",
-        spacing: "medium"
-      })
-    ],
-    text(question.question, {
-      weight: "bolder",
-      wrap: true,
-      spacing: question.header === null ? "medium" : "none"
-    })
-  ];
-  if (question.options.length === 0) {
-    return [
-      ...heading,
-      {
-        type: "Input.Text",
-        id: interviewInputId(index),
-        placeholder: "Type your answer…",
-        isMultiline: true,
-        maxLength: MAX_ANSWER_LENGTH
-      }
-    ];
-  }
-  return [
-    ...heading,
-    {
-      type: "Input.ChoiceSet",
-      id: interviewInputId(index),
-      style: "expanded",
-      isMultiSelect: question.multiSelect,
-      choices: question.options.map((option) => ({
-        title: option.description === null ? option.label : `${option.label} — ${option.description}`,
-        value: option.label
-      }))
-    }
-  ];
-}
 function outcomeCard(tone, title, body, extras, actions) {
   return buildCard([
     cardHeader({
@@ -52939,18 +52956,6 @@ function buildActionOutcomeCard(outcome, decision, chat) {
       ], openChatAction(chat.chatId));
   }
 }
-function buildMessageOutcomeCard(outcome, chat) {
-  switch (outcome.kind) {
-    case "applied":
-      return outcomeCard("good", "Message sent", `Delivered to ${chatLabel(chat)}.`, [], []);
-    case "rejected":
-      return outcomeCard("warning", "The host declined this message", outcome.reason ?? "No reason given.", codeFacts(outcome.code), []);
-    case "failed":
-      return outcomeCard("attention", "Couldn't confirm this message", outcome.reason, [
-        text("It may already have reached the agent. Open the chat and check before sending again — a duplicate is a second message the agent will act on, not a no-op.", { isSubtle: true, size: "small", spacing: "medium" })
-      ], openChatAction(chat.chatId));
-  }
-}
 function buildInterviewOutcomeCard(outcome, chat) {
   switch (outcome.kind) {
     case "applied":
@@ -52962,23 +52967,6 @@ function buildInterviewOutcomeCard(outcome, chat) {
         text("They may already have reached the agent. Open the chat first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.", { isSubtle: true, size: "small", spacing: "medium", wrap: true })
       ], openChatAction(chat.chatId));
   }
-}
-function buildHelpCard() {
-  return card([
-    cardHeader({
-      eyebrow: null,
-      title: "Traycer",
-      subtitle: "Ask in your own words, or pick one of these.",
-      tone: null
-    }),
-    actionSet([
-      submitAction("My agents", FLEET_VERB, {}, { associateInputs: false })
-    ]),
-    container([
-      text("Assess a document", { weight: "bolder", spacing: "none" }),
-      text("Attach an RFI or RFP and ask whether it fits — for example, “does this work with SensorMine?”", { isSubtle: true, size: "small", spacing: "none" })
-    ], { style: "emphasis", separator: true })
-  ]);
 }
 function buildClarifyCard(options) {
   const canSuggest = options.suggestionLabel !== null && options.product !== null && options.intent !== null;
@@ -53144,10 +53132,10 @@ function buildAssessmentStartedCard(options) {
       eyebrow: "Assessment started",
       eyebrowColor: "good",
       title: options.title,
-      subtitle: options.deepLink === null ? "It's running. Press My agents to check on it — I won't ping you when it finishes." : "It's running. Open it to watch progress — I won't ping you when it finishes."
+      subtitle: options.deepLink === null ? "It's running. Ask me how it's going whenever you like — I won't ping you when it finishes." : "It's running. Open it to watch progress — I won't ping you when it finishes."
     })
-  ], [
-    options.deepLink === null ? submitAction("My agents", FLEET_VERB, {}, { associateInputs: false }) : {
+  ], options.deepLink === null ? [] : [
+    {
       type: "Action.OpenUrl",
       title: "Watch progress",
       url: options.deepLink
@@ -53166,50 +53154,13 @@ function buildAssessmentUnconfirmedCard(reason, options) {
     metaLine([reason])
   ]);
 }
-function buildEpicPickerCard(epics) {
-  if (epics.length === 0) {
-    return card([
-      cardHeader({
-        eyebrow: null,
-        title: "No epics",
-        subtitle: "Nothing found for your account.",
-        tone: null
-      })
-    ]);
-  }
-  return card([
-    cardHeader({ eyebrow: null, title: "Pick an epic", tone: null }),
-    ...epics.map((epic) => container([
-      text(epic.title ?? "Untitled epic", {
-        weight: "bolder",
-        spacing: "none"
-      }),
-      text(`epic ${epic.epicId}`, {
-        isSubtle: true,
-        size: "small",
-        spacing: "none"
-      })
-    ], { separator: true, spacing: "small" }))
-  ]);
-}
 function buildEpicNotBoundCard() {
   return card([
     cardHeader({
       eyebrow: null,
       title: "No epic selected",
-      subtitle: 'Use "epic <id>" to choose one, then "fleet" to see its agents.'
+      subtitle: FAILURE_COPY.NO_EPIC
     })
-  ]);
-}
-function buildEpicBoundCard(epicId) {
-  return card([
-    cardHeader({
-      eyebrow: null,
-      title: "Epic selected",
-      subtitle: 'Reply "fleet" to see its agents.',
-      tone: "good"
-    }),
-    metaLine([epicId])
   ]);
 }
 function buildPrincipalRefusedCard(reason) {
@@ -53276,26 +53227,7 @@ function buildBridgeUnavailableCard(reason, detail) {
     })
   ]);
 }
-function buildReadOnlyChatCard(chat) {
-  return card([
-    cardHeader({
-      eyebrow: null,
-      title: "Read-only from here",
-      subtitle: `You can read ${chatLabel(chat)}, but sending needs the host it runs on.`
-    })
-  ]);
-}
-function buildUnknownChatCard(chatId) {
-  return buildCard([
-    cardHeader({
-      eyebrow: null,
-      title: "That doesn't look like a chat",
-      subtitle: `No reachable chat matched “${shortId(chatId)}”.`,
-      tone: "warning"
-    })
-  ], [submitAction("My agents", FLEET_VERB, {}, { associateInputs: false })]);
-}
-function buildUsageCard(usage) {
+function buildActionProblemCard(usage) {
   return card([
     cardHeader({ eyebrow: null, title: "Not quite", subtitle: usage }),
     text("Ask me in your own words and I'll try again.", {
@@ -53315,312 +53247,14 @@ function buildIdentityUnavailableCard(reason) {
   ]);
 }
 
-// clients/shared/identity-registry/tenant-environment.ts
-var DEFAULT_INHERITED_ENV_ALLOWLIST = Object.freeze([
-  "PATH",
-  "SystemRoot",
-  "TEMP",
-  "TMP",
-  "ComSpec"
-]);
-function buildTenantEnvironment(options) {
-  const allowlist = options.allowlist ?? DEFAULT_INHERITED_ENV_ALLOWLIST;
-  const env2 = {};
-  for (const key of allowlist) {
-    const value = options.parentEnv[key];
-    if (value !== undefined) {
-      env2[key] = value;
-    }
-  }
-  if (options.extra !== undefined) {
-    for (const [key, value] of Object.entries(options.extra)) {
-      env2[key] = value;
-    }
-  }
-  env2.HOME = options.tenant.home;
-  env2.USERPROFILE = options.tenant.home;
-  return env2;
-}
-
-// clients/teams-bot/src/read-surface/host-access.ts
-function buildBridgeEnv(tenant, epicId, deps) {
-  return buildTenantEnvironment({
-    tenant: { ...tenant, entraOid: null, traycerUserId: null },
-    parentEnv: deps.parentEnv,
-    extra: {
-      TRAYCER_EPIC_ID: epicId,
-      TRAYCER_AGENT_ID: deps.senderAgentId
-    }
-  });
-}
-function toReadSurfaceFailure(result) {
-  logWarn("bridge call failed", {
-    reason: result.reason,
-    detail: result.detail
-  });
-  return {
-    kind: "bridge_unavailable",
-    reason: result.reason,
-    detail: result.detail
-  };
-}
-async function fetchFleet(principal, conversationId, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null) {
-    return { kind: "epic_not_bound" };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = await listAgents(env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", agents: result.value };
-}
-async function fetchChatStatus(principal, conversationId, chatId, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null) {
-    return { kind: "epic_not_bound" };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = await getChatStatus(chatId, env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", status: result.value, epicId };
-}
-async function submitApprovalDecision(principal, conversationId, approvalId, decision, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null) {
-    return { kind: "epic_not_bound" };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = decision.kind === "approve" ? await approveAction(approvalId, env2, deps.bridgeCliConfig) : await rejectAction(approvalId, decision.reason, env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", outcome: result.value };
-}
-async function submitChatMessage(principal, conversationId, chatId, text2, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null) {
-    return { kind: "epic_not_bound" };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = await sendMessageAction(chatId, text2, env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", outcome: result.value };
-}
-async function submitInterviewAnswer(principal, conversationId, chatId, blockId, answers, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null) {
-    return { kind: "epic_not_bound" };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = await answerInterviewAction(chatId, blockId, answers, env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", outcome: result.value };
-}
-async function fetchChatCapabilities(principal, conversationId, chatId, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null)
-    return { kind: "epic_not_bound" };
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = await listAgents(env2, deps.bridgeCliConfig);
-  if (result.kind === "failed")
-    return toReadSurfaceFailure(result);
-  const agent = result.value.find((a) => a.agentId === chatId);
-  return {
-    kind: "ok",
-    capabilities: agent?.capabilities ?? {
-      readTranscript: false,
-      sendMessage: false
-    }
-  };
-}
-async function fetchTranscript(principal, conversationId, chatId, offset, limit, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const epicId = await deps.epicBindings.get(conversationId);
-  if (epicId === null) {
-    return { kind: "epic_not_bound" };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, epicId, deps);
-  const result = await getTranscript(chatId, offset, limit, env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", transcript: result.value };
-}
-async function fetchEpicList(principal, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused") {
-    return { kind: "principal_refused", reason: resolution.reason };
-  }
-  const env2 = buildBridgeEnv(resolution.tenant, "unused", deps);
-  const result = await listEpics(env2, deps.bridgeCliConfig);
-  if (result.kind === "failed") {
-    return toReadSurfaceFailure(result);
-  }
-  return { kind: "ok", epics: result.value };
-}
-function resolveTenantEnv(principal, epicId, deps) {
-  const resolution = deps.registry.resolveTenant(principal);
-  if (resolution.kind === "refused")
+// clients/teams-bot/src/intake/deep-link.ts
+function chatDeepLink(config2, epicId, chatId) {
+  const base = config2.tabBaseUrl.trim().replace(/\/+$/, "");
+  if (base === "")
     return null;
-  return buildBridgeEnv(resolution.tenant, epicId, deps);
-}
-
-// clients/teams-bot/src/read-surface/dispatch.ts
-function failureCard(failure) {
-  switch (failure.kind) {
-    case "principal_refused":
-      return buildPrincipalRefusedCard(failure.reason);
-    case "epic_not_bound":
-      return buildEpicNotBoundCard();
-    case "bridge_unavailable":
-      return buildBridgeUnavailableCard(failure.reason, failure.detail);
-  }
-}
-async function dispatchCommand(command, conversationId, deps) {
-  if (command.kind === "help") {
-    return [buildHelpCard()];
-  }
-  if (command.kind === "usage") {
-    return [buildUsageCard(command.usage)];
-  }
-  const identity = await deps.resolvePrincipal();
-  if (identity.kind === "unavailable") {
-    return [buildIdentityUnavailableCard(identity.reason)];
-  }
-  const { principal } = identity;
-  switch (command.kind) {
-    case "epics": {
-      const result = await fetchEpicList(principal, deps);
-      return [
-        result.kind === "ok" ? buildEpicPickerCard(result.epics) : failureCard(result)
-      ];
-    }
-    case "bind_epic": {
-      const resolution = deps.registry.resolveTenant(principal);
-      if (resolution.kind === "refused") {
-        return [buildPrincipalRefusedCard(resolution.reason)];
-      }
-      await deps.epicBindings.set(conversationId, command.epicId);
-      return [buildEpicBoundCard(command.epicId)];
-    }
-    case "fleet": {
-      const result = await fetchFleet(principal, conversationId, deps);
-      return [
-        result.kind === "ok" ? buildFleetCard(result.agents) : failureCard(result)
-      ];
-    }
-    case "chat": {
-      const result = await fetchChatStatus(principal, conversationId, command.chatId, deps);
-      if (result.kind !== "ok") {
-        return [failureCard(result)];
-      }
-      const { epicId } = result;
-      const caps = result.status.connected ? await fetchChatCapabilities(principal, conversationId, command.chatId, deps) : null;
-      const canSend = caps !== null && caps.kind === "ok" && caps.capabilities.sendMessage;
-      const cards = [
-        buildChatCard(result.status, epicId, canSend)
-      ];
-      if (result.status.connected) {
-        const now = deps.now();
-        const chat = {
-          chatId: result.status.chatId,
-          title: result.status.title
-        };
-        for (const approval of result.status.pendingApprovals) {
-          cards.push(buildApprovalCard(chat, epicId, approval, now));
-        }
-        for (const interview of result.status.pendingInterviews) {
-          cards.push(buildInterviewCard(chat, epicId, interview, now));
-        }
-        const transcript = await fetchTranscript(principal, conversationId, command.chatId, 0, CONTEXT_STRIP_SIZE, deps);
-        if (transcript.kind === "ok") {
-          cards.push(buildContextStripCard(transcript.transcript, now));
-        }
-        cards.push(canSend ? buildComposeCard(chat, epicId) : buildReadOnlyChatCard(chat));
-      }
-      return cards;
-    }
-    case "log": {
-      const target = await fetchChatStatus(principal, conversationId, command.chatId, deps);
-      if (target.kind !== "ok") {
-        return [failureCard(target)];
-      }
-      if (!target.status.connected) {
-        return [buildUnknownChatCard(command.chatId)];
-      }
-      const result = await fetchTranscript(principal, conversationId, command.chatId, command.offset, TRANSCRIPT_PAGE_SIZE, deps);
-      if (result.kind !== "ok") {
-        return [failureCard(result)];
-      }
-      return [buildTranscriptCard(result.transcript, deps.now())];
-    }
-    case "compose": {
-      const result = await fetchChatStatus(principal, conversationId, command.chatId, deps);
-      if (result.kind !== "ok") {
-        return [failureCard(result)];
-      }
-      if (!result.status.connected) {
-        return [buildUnknownChatCard(command.chatId)];
-      }
-      return [
-        buildComposeCard({ chatId: result.status.chatId, title: result.status.title }, result.epicId)
-      ];
-    }
-    case "say": {
-      const target = await fetchChatStatus(principal, conversationId, command.chatId, deps);
-      if (target.kind !== "ok") {
-        return [failureCard(target)];
-      }
-      if (!target.status.connected) {
-        return [buildUnknownChatCard(command.chatId)];
-      }
-      const result = await submitChatMessage(principal, conversationId, command.chatId, command.text, deps);
-      if (result.kind !== "ok") {
-        return [failureCard(result)];
-      }
-      return [
-        buildMessageOutcomeCard(result.outcome, {
-          chatId: command.chatId,
-          title: target.status.title
-        })
-      ];
-    }
-  }
+  if (epicId.trim() === "" || chatId.trim() === "")
+    return null;
+  return `${base}/epics/${encodeURIComponent(epicId)}/chats/${encodeURIComponent(chatId)}`;
 }
 
 // clients/teams-bot/src/read-surface/dispatch-action.ts
@@ -53639,14 +53273,14 @@ async function dispatchAnswerInterview(request, deps) {
   const blockId = readString(request.data, INTERVIEW_BLOCK_KEY);
   if (chatId === null || blockId === null) {
     return {
-      card: buildUsageCard("That interview card was missing its ids."),
+      card: buildActionProblemCard("That interview card was missing its ids."),
       acted: false
     };
   }
   const rawQuestions = readString(request.data, INTERVIEW_QUESTIONS_KEY);
   if (rawQuestions === null) {
     return {
-      card: buildUsageCard("That interview card was missing its questions."),
+      card: buildActionProblemCard("That interview card was missing its questions."),
       acted: false
     };
   }
@@ -53655,14 +53289,14 @@ async function dispatchAnswerInterview(request, deps) {
     parsedJson = JSON.parse(rawQuestions);
   } catch {
     return {
-      card: buildUsageCard("That interview card's questions were unreadable."),
+      card: buildActionProblemCard("That interview card's questions were unreadable."),
       acted: false
     };
   }
   const questions = interviewQuestionRefsSchema.safeParse(parsedJson);
   if (!questions.success || questions.data.length === 0) {
     return {
-      card: buildUsageCard("That interview card's questions were unreadable."),
+      card: buildActionProblemCard("That interview card's questions were unreadable."),
       acted: false
     };
   }
@@ -53672,13 +53306,13 @@ async function dispatchAnswerInterview(request, deps) {
     const values = ref.multiSelect ? raw.split(CHOICE_VALUE_SEPARATOR).map((value) => value.trim()).filter((value) => value.length > 0) : raw.length === 0 ? [] : [raw];
     if (values.length === 0) {
       return {
-        card: buildUsageCard(`Answer every question before sending — "${ref.question}" is still blank.`),
+        card: buildActionProblemCard(`Answer every question before sending — "${ref.question}" is still blank.`),
         acted: false
       };
     }
     if (raw.length > MAX_ANSWER_LENGTH) {
       return {
-        card: buildUsageCard(`That answer is ${String(raw.length)} characters; the limit is ${String(MAX_ANSWER_LENGTH)}.`),
+        card: buildActionProblemCard(`That answer is ${String(raw.length)} characters; the limit is ${String(MAX_ANSWER_LENGTH)}.`),
         acted: false
       };
     }
@@ -53718,91 +53352,6 @@ async function dispatchAnswerInterview(request, deps) {
       };
   }
 }
-async function dispatchSend(request, deps) {
-  const chatId = readString(request.data, "chatId");
-  if (chatId === null) {
-    return {
-      card: buildUsageCard("That composer was missing its chat id."),
-      acted: false
-    };
-  }
-  const text2 = (readString(request.data, MESSAGE_INPUT_ID) ?? "").trim();
-  if (text2.length === 0) {
-    return {
-      card: buildUsageCard("Nothing to send — type a message before pressing Send."),
-      acted: false
-    };
-  }
-  if (text2.length > MAX_MESSAGE_LENGTH) {
-    return {
-      card: buildUsageCard(`That message is ${String(text2.length)} characters; the limit is ${String(MAX_MESSAGE_LENGTH)}.`),
-      acted: false
-    };
-  }
-  const identity = await deps.resolvePrincipal();
-  if (identity.kind === "unavailable") {
-    return {
-      card: buildIdentityUnavailableCard(identity.reason),
-      acted: false
-    };
-  }
-  const chat = {
-    chatId,
-    title: readString(request.data, "chatTitle")
-  };
-  const result = await submitChatMessage(identity.principal, request.conversationId, chatId, text2, deps);
-  switch (result.kind) {
-    case "ok":
-      return {
-        card: buildMessageOutcomeCard(result.outcome, chat),
-        acted: true
-      };
-    case "principal_refused":
-      return { card: buildPrincipalRefusedCard(result.reason), acted: false };
-    case "epic_not_bound":
-      return { card: buildEpicNotBoundCard(), acted: false };
-    case "bridge_unavailable":
-      return {
-        card: buildBridgeUnavailableCard(result.reason, result.detail),
-        acted: false
-      };
-  }
-}
-async function dispatchPage(request, deps) {
-  const chatId = readString(request.data, "chatId");
-  if (chatId === null) {
-    return {
-      card: buildUsageCard("That button was missing its chat id."),
-      acted: false
-    };
-  }
-  const rawOffset = Number.parseInt(readString(request.data, "offset") ?? "", 10);
-  const offset = Number.isInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
-  const identity = await deps.resolvePrincipal();
-  if (identity.kind === "unavailable") {
-    return {
-      card: buildIdentityUnavailableCard(identity.reason),
-      acted: false
-    };
-  }
-  const result = await fetchTranscript(identity.principal, request.conversationId, chatId, offset, TRANSCRIPT_PAGE_SIZE, deps);
-  switch (result.kind) {
-    case "ok":
-      return {
-        card: buildTranscriptCard(result.transcript, deps.now()),
-        acted: false
-      };
-    case "principal_refused":
-      return { card: buildPrincipalRefusedCard(result.reason), acted: false };
-    case "epic_not_bound":
-      return { card: buildEpicNotBoundCard(), acted: false };
-    case "bridge_unavailable":
-      return {
-        card: buildBridgeUnavailableCard(result.reason, result.detail),
-        acted: false
-      };
-  }
-}
 function readStagedNames(data) {
   const raw = readString(data, STAGED_NAMES_KEY);
   if (raw === null)
@@ -53818,13 +53367,13 @@ function dispatchConfirmedRoute(request, deps) {
   const skill = readString(request.data, "skill");
   if (skill === null) {
     return {
-      card: buildUsageCard("There's no assessment skill configured for that yet, so I haven't started one."),
+      card: buildActionProblemCard("There's no assessment skill configured for that yet, so I haven't started one."),
       acted: false
     };
   }
   if (deps.startAssessment === undefined) {
     return {
-      card: buildUsageCard("This deployment can't start assessments yet."),
+      card: buildActionProblemCard("This deployment can't start assessments yet."),
       acted: false
     };
   }
@@ -53856,13 +53405,13 @@ async function dispatchSubmitIntake(request, deps) {
   const skill = readString(request.data, "skill");
   if (skill === null) {
     return {
-      card: buildUsageCard("That form was missing which assessment to run."),
+      card: buildActionProblemCard("That form was missing which assessment to run."),
       acted: false
     };
   }
   if (deps.startAssessment === undefined) {
     return {
-      card: buildUsageCard("This deployment can't start assessments yet."),
+      card: buildActionProblemCard("This deployment can't start assessments yet."),
       acted: false
     };
   }
@@ -53897,17 +53446,40 @@ async function dispatchSubmitIntake(request, deps) {
   });
   return outcome.kind === "started" ? { card: outcome.card, acted: true } : { card: outcome.card, acted: false };
 }
+async function dispatchOpenChat(request, deps) {
+  const chatId = readString(request.data, "chatId");
+  if (chatId === null) {
+    return {
+      card: buildActionProblemCard("That button was missing its chat id."),
+      acted: false
+    };
+  }
+  const identity = await deps.resolvePrincipal();
+  if (identity.kind === "unavailable") {
+    return { card: buildIdentityUnavailableCard(identity.reason), acted: false };
+  }
+  const result = await fetchChatStatus(identity.principal, request.conversationId, chatId, deps);
+  switch (result.kind) {
+    case "ok":
+      return {
+        card: buildChatCard(result.status, result.epicId, chatDeepLink({ tabBaseUrl: deps.tabBaseUrl ?? "" }, result.epicId, result.status.chatId)),
+        acted: true
+      };
+    case "principal_refused":
+      return { card: buildPrincipalRefusedCard(result.reason), acted: false };
+    case "epic_not_bound":
+      return { card: buildEpicNotBoundCard(), acted: false };
+    case "bridge_unavailable":
+      return {
+        card: buildBridgeUnavailableCard(result.reason, result.detail),
+        acted: false
+      };
+  }
+}
 var HANDLED_ACTION_VERBS = new Set([
   APPROVE_VERB,
   REJECT_VERB,
-  SEND_VERB,
   ANSWER_VERB,
-  OLDER_VERB,
-  NEWER_VERB,
-  FULL_HISTORY_VERB,
-  FLEET_VERB,
-  REPLY_VERB,
-  LOG_VERB,
   OPEN_CHAT_VERB,
   CONFIRM_ROUTE_VERB,
   CLARIFY_OTHER_VERB,
@@ -53922,59 +53494,26 @@ async function dispatchActionInvoke(request, deps) {
   }
   if (request.verb === CLARIFY_OTHER_VERB) {
     return {
-      card: buildUsageCard("No problem — tell me what you'd like me to do with it."),
+      card: buildActionProblemCard("No problem — tell me what you'd like me to do with it."),
       acted: true
     };
-  }
-  if (request.verb === SEND_VERB) {
-    return dispatchSend(request, deps);
   }
   if (request.verb === ANSWER_VERB) {
     return dispatchAnswerInterview(request, deps);
   }
-  if (request.verb === OLDER_VERB || request.verb === NEWER_VERB || request.verb === FULL_HISTORY_VERB) {
-    return dispatchPage(request, deps);
-  }
-  if (request.verb === FLEET_VERB || request.verb === REPLY_VERB || request.verb === LOG_VERB || request.verb === OPEN_CHAT_VERB) {
-    let command;
-    if (request.verb === FLEET_VERB) {
-      command = { kind: "fleet" };
-    } else {
-      const chatId = readString(request.data, "chatId");
-      if (chatId === null) {
-        return {
-          card: buildUsageCard("That button was missing its chat id."),
-          acted: false
-        };
-      }
-      if (request.verb === REPLY_VERB) {
-        command = { kind: "compose", chatId };
-      } else if (request.verb === OPEN_CHAT_VERB) {
-        command = { kind: "chat", chatId };
-      } else {
-        command = { kind: "log", chatId, offset: 0 };
-      }
-    }
-    const cards = await dispatchCommand(command, request.conversationId, deps);
-    const card2 = cards[0];
-    if (card2 === undefined) {
-      return {
-        card: buildUsageCard("That didn't return anything to show."),
-        acted: false
-      };
-    }
-    return { card: card2, acted: true };
+  if (request.verb === OPEN_CHAT_VERB) {
+    return dispatchOpenChat(request, deps);
   }
   if (request.verb !== APPROVE_VERB && request.verb !== REJECT_VERB) {
     return {
-      card: buildUsageCard(`Unknown card action "${request.verb}".`),
+      card: buildActionProblemCard(`Unknown card action "${request.verb}".`),
       acted: false
     };
   }
   const approvalId = readString(request.data, "approvalId");
   if (approvalId === null) {
     return {
-      card: buildUsageCard("That button was missing its approval id."),
+      card: buildActionProblemCard("That button was missing its approval id."),
       acted: false
     };
   }
@@ -54035,8 +53574,9 @@ function stripMentions(rawText, entities, botId) {
     text2 = text2.replace(/<at>[^<]*<\/at>/gi, " ");
     usedFallback = text2 !== beforeFallback;
   }
+  const removedSomething = strippedByEntity || usedFallback;
   return {
-    text: text2.trim().replace(/\s+/g, " "),
+    text: removedSomething ? text2.replace(/[ \t]{2,}/g, " ").trim() : rawText,
     strippedByEntity,
     usedFallback
   };
@@ -54235,9 +53775,9 @@ function describeAttachment(attachment) {
 }
 
 // clients/teams-bot/src/intake/attachment-staging.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 var import_promises = require("node:fs/promises");
-var import_node_path = __toESM(require("node:path"));
+var import_node_path2 = __toESM(require("node:path"));
 var STAGING_DIR_ENV = "TRAYCER_TEAMS_STAGING_DIR";
 var STATE_DIR_ENV = "TRAYCER_TEAMS_STATE_DIR";
 function stagingRootFromEnv(env2) {
@@ -54246,7 +53786,7 @@ function stagingRootFromEnv(env2) {
     return explicit;
   const stateDir = env2[STATE_DIR_ENV]?.trim();
   if (stateDir !== undefined && stateDir.length > 0) {
-    return import_node_path.default.posix.join(stateDir, "intake");
+    return import_node_path2.default.posix.join(stateDir, "intake");
   }
   return "/srv/traycer/teams-bot/state/intake";
 }
@@ -54255,7 +53795,7 @@ function isStagingId(value) {
   return STAGING_ID_PATTERN.test(value);
 }
 function stagingDirectory(root, id) {
-  return isStagingId(id) ? import_node_path.default.posix.join(root, id) : null;
+  return isStagingId(id) ? import_node_path2.default.posix.join(root, id) : null;
 }
 var MAX_NAME_LENGTH = 200;
 function isSafeFileName(name) {
@@ -54348,7 +53888,7 @@ async function stageAttachments(attachments, deps) {
     }
     names.add(file2.name);
   }
-  const stagingId = (deps.newId ?? import_node_crypto2.randomUUID)();
+  const stagingId = (deps.newId ?? import_node_crypto3.randomUUID)();
   const directory = stagingDirectory(deps.stagingRoot, stagingId);
   if (directory === null) {
     return { kind: "refused", reason: "I couldn't create a place to put them." };
@@ -54389,7 +53929,7 @@ async function stageAttachments(attachments, deps) {
       };
     }
     try {
-      await writeFileImpl(import_node_path.default.posix.join(directory, file2.name), bytes);
+      await writeFileImpl(import_node_path2.default.posix.join(directory, file2.name), bytes);
     } catch {
       logWarn("could not write staged attachment", { directory });
       return {
@@ -54450,70 +53990,108 @@ class ReadSurfaceHandler extends import_agents_hosting2.ActivityHandler {
       conversationType: context.activity.conversation?.conversationType,
       enabled: process.env[RAW_ATTACHMENT_LOG_FLAG] === "1"
     });
-    const actionValue = context.activity.value;
-    const actionVerb = typeof actionValue?.["verb"] === "string" ? actionValue["verb"] : null;
-    if (actionVerb !== null) {
-      const convId = context.activity.conversation?.id ?? "";
-      const result = await dispatchActionInvoke({
-        verb: actionVerb,
-        conversationId: convId,
-        data: actionValue ?? {},
-        conversationReference: context.activity.getConversationReference()
-      }, this.deps);
-      if (!result.acted) {
-        logWarn("card action did not complete", { verb: actionVerb });
-      }
-      logInfo("card action", { verb: actionVerb, acted: result.acted });
-      await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(result.card));
-      return;
-    }
     const spoken = stripMentions(context.activity.text ?? "", context.activity.entities, context.activity.recipient?.id);
-    const command = parseCommand(spoken.text);
-    const conversationId = context.activity.conversation?.id ?? "";
-    if (command.kind === "help" && spoken.text.trim().length > 0) {
-      const classified = classify({
-        text: spoken.text,
-        hasAttachments: (context.activity.attachments?.length ?? 0) > 0
-      });
-      const route = classified.kind === "routed" ? classified.route : classified.suggestion;
-      if (route !== null) {
-        const staging = await this.stage(context);
-        if (staging.kind === "refused") {
-          await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(buildIntakeRefusedCard(staging.reason)));
-          logWarn("intake refused before it started", { reason: "staging" });
-          return;
-        }
-        const staged = staging.kind === "staged" ? { id: staging.stagingId, names: staging.files.map((f) => f.name) } : { id: "", names: [] };
-        await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(buildClarifyCard({
-          suggestionLabel: describeRoute(route),
-          product: route.product,
-          intent: route.intent,
-          skill: route.skill,
-          spokenText: spoken.text,
-          stagingId: staged.id,
-          stagedNames: staged.names,
-          requesterName: context.activity.from?.name ?? ""
-        })));
-        logInfo("offered an assessment", {
-          confident: classified.kind === "routed",
-          staged: staged.names.length
-        });
+    const actionValue = context.activity.value;
+    const route = routeMessage({
+      text: spoken.text,
+      hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
+      actionVerb: typeof actionValue?.["verb"] === "string" ? actionValue["verb"] : null,
+      conversationId: context.activity.conversation?.id ?? ""
+    });
+    switch (route.kind) {
+      case "action":
+        await this.handleAction(context, route.verb, actionValue ?? {});
         return;
-      }
+      case "silent":
+        logInfo("empty message, nothing to route", {});
+        return;
+      case "no_conversation":
+        logWarn("activity has no conversation id", {});
+        await context.sendActivity(import_agents_hosting2.MessageFactory.text(FAILURE_COPY.NO_CONVERSATION));
+        return;
+      case "intake":
+        await this.handleIntake(context, route.text);
+        return;
+      case "orchestrator":
+        await this.handleSentence(context, route.text);
+        return;
     }
-    if (conversationId === "") {
-      logWarn("activity has no conversation id", { command: command.kind });
-      await context.sendActivity(import_agents_hosting2.MessageFactory.text("Couldn't identify this conversation."));
+  }
+  async handleAction(context, verb, data) {
+    const result = await dispatchActionInvoke({
+      verb,
+      conversationId: context.activity.conversation?.id ?? "",
+      data,
+      conversationReference: context.activity.getConversationReference()
+    }, this.deps);
+    if (!result.acted) {
+      logWarn("card action did not complete", { verb });
+    }
+    logInfo("card action", { verb, acted: result.acted });
+    await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(result.card));
+  }
+  async handleSentence(context, text2) {
+    const conversationId = context.activity.conversation?.id ?? "";
+    const outcome = await ensureOrchestrator(conversationId, context.activity.getConversationReference(), text2, this.deps);
+    if (outcome.kind === "refused") {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text(outcome.text));
+      logWarn("no orchestrator for this conversation", {});
       return;
     }
-    const cards = await dispatchCommand(command, conversationId, this.deps);
-    logInfo("dispatched command", {
-      command: command.kind,
-      cards: cards.length
-    });
-    for (const card2 of cards) {
-      await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(card2));
+    if (outcome.kind === "created") {
+      logInfo("bound this conversation to an agent", {});
+      return;
     }
+    const identity = await this.deps.resolvePrincipal();
+    if (identity.kind === "unavailable") {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text(identity.reason));
+      return;
+    }
+    const sent = await submitChatMessage(identity.principal, conversationId, outcome.binding.chatId, text2, this.deps);
+    if (sent.kind !== "ok") {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text(FAILURE_COPY.SEND_UNCONFIRMED));
+      logWarn("send to the orchestrator failed", { kind: sent.kind });
+      return;
+    }
+    if (sent.outcome.kind === "rejected") {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text(sendRejectedCopy(sent.outcome.reason)));
+      return;
+    }
+    if (sent.outcome.kind === "failed") {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text(FAILURE_COPY.SEND_UNCONFIRMED));
+      return;
+    }
+    logInfo("delivered to the orchestrator", {});
+  }
+  async handleIntake(context, text2) {
+    const classified = classify({ text: text2, hasAttachments: true });
+    const route = classified.kind === "routed" ? classified.route : classified.suggestion;
+    if (route === null) {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.text("I can't tell what that file is for, so I haven't done anything with it. Say what you'd like done with it and I'll pass that on."));
+      logInfo("attachment with no recognisable request", {});
+      return;
+    }
+    const staging = await this.stage(context);
+    if (staging.kind === "refused") {
+      await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(buildIntakeRefusedCard(staging.reason)));
+      logWarn("intake refused before it started", { reason: "staging" });
+      return;
+    }
+    const staged = staging.kind === "staged" ? { id: staging.stagingId, names: staging.files.map((f) => f.name) } : { id: "", names: [] };
+    await context.sendActivity(import_agents_hosting2.MessageFactory.attachment(buildClarifyCard({
+      suggestionLabel: describeRoute(route),
+      product: route.product,
+      intent: route.intent,
+      skill: route.skill,
+      spokenText: text2,
+      stagingId: staged.id,
+      stagedNames: staged.names,
+      requesterName: context.activity.from?.name ?? ""
+    })));
+    logInfo("offered an assessment", {
+      confident: classified.kind === "routed",
+      staged: staged.names.length
+    });
   }
   async stage(context) {
     const attachments = context.activity.attachments;
@@ -54545,135 +54123,7 @@ function createReadSurfaceHandler(deps) {
 }
 
 // clients/teams-bot/src/intake/start-assessment.ts
-var import_node_crypto3 = require("node:crypto");
-
-// clients/teams-bot/src/intake/deep-link.ts
-function chatDeepLink(config2, epicId, chatId) {
-  const base = config2.tabBaseUrl.trim().replace(/\/+$/, "");
-  if (base === "")
-    return null;
-  if (epicId.trim() === "" || chatId.trim() === "")
-    return null;
-  return `${base}/epics/${encodeURIComponent(epicId)}/chats/${encodeURIComponent(chatId)}`;
-}
-
-// clients/teams-bot/src/state/durable-json-store.ts
-var import_node_fs2 = require("node:fs");
-var import_node_path2 = require("node:path");
-var FILE_MODE = 384;
-
-class DurableJsonStore {
-  filePath;
-  onWarn;
-  cache;
-  constructor(options) {
-    this.filePath = options.filePath;
-    this.onWarn = options.onWarn ?? (() => {});
-    this.cache = this.load();
-  }
-  load() {
-    let raw;
-    try {
-      raw = import_node_fs2.readFileSync(this.filePath, "utf8");
-    } catch {
-      return {};
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        this.onWarn("state file is not a JSON object — starting empty", this.filePath);
-        return {};
-      }
-      return parsed;
-    } catch (error51) {
-      this.onWarn("state file could not be parsed — starting empty", error51 instanceof Error ? error51.message : String(error51));
-      return {};
-    }
-  }
-  persist() {
-    import_node_fs2.mkdirSync(import_node_path2.dirname(this.filePath), { recursive: true });
-    const temp = import_node_path2.join(import_node_path2.dirname(this.filePath), `.${String(process.pid)}.${String(this.writes)}.tmp`);
-    import_node_fs2.writeFileSync(temp, JSON.stringify(this.cache), { mode: FILE_MODE });
-    import_node_fs2.renameSync(temp, this.filePath);
-    this.writes += 1;
-  }
-  writes = 0;
-  get(key) {
-    return this.cache[key] ?? null;
-  }
-  set(key, value) {
-    this.cache = { ...this.cache, [key]: value };
-    this.persist();
-  }
-  delete(key) {
-    if (!(key in this.cache))
-      return;
-    const next = { ...this.cache };
-    delete next[key];
-    this.cache = next;
-    this.persist();
-  }
-  keys() {
-    return Object.keys(this.cache);
-  }
-}
-
-// clients/teams-bot/src/state/conversation-reference-store.ts
-class DurableConversationReferenceStore {
-  store;
-  constructor(filePath, onWarn) {
-    this.store = new DurableJsonStore({
-      filePath,
-      onWarn
-    });
-  }
-  remember(workId, reference) {
-    this.store.set(workId, reference);
-  }
-  recall(workId) {
-    return this.store.get(workId);
-  }
-  forget(workId) {
-    this.store.delete(workId);
-  }
-  outstanding() {
-    return this.store.keys();
-  }
-}
-function toStoredReference(reference, capturedAt) {
-  if (reference === null || typeof reference !== "object")
-    return null;
-  const r = reference;
-  const conversation = r["conversation"];
-  const bot = r["agent"] ?? r["bot"];
-  if (typeof r["channelId"] !== "string" || typeof r["serviceUrl"] !== "string" || conversation === null || typeof conversation !== "object" || typeof conversation["id"] !== "string" || bot === null || typeof bot !== "object" || typeof bot["id"] !== "string") {
-    return null;
-  }
-  const conv = conversation;
-  const botRef = bot;
-  const user = r["user"];
-  const userRef = user !== null && typeof user === "object" ? user : null;
-  return {
-    channelId: r["channelId"],
-    serviceUrl: r["serviceUrl"],
-    conversation: {
-      id: conv["id"],
-      ...typeof conv["conversationType"] === "string" ? { conversationType: conv["conversationType"] } : {}
-    },
-    bot: {
-      id: botRef["id"],
-      ...typeof botRef["name"] === "string" ? { name: botRef["name"] } : {}
-    },
-    ...userRef !== null && typeof userRef["id"] === "string" ? {
-      user: {
-        id: userRef["id"],
-        ...typeof userRef["aadObjectId"] === "string" ? { aadObjectId: userRef["aadObjectId"] } : {}
-      }
-    } : {},
-    ...typeof conv["tenantId"] === "string" ? { tenantId: conv["tenantId"] } : {},
-    capturedAt
-  };
-}
+var import_node_crypto4 = require("node:crypto");
 
 // clients/teams-bot/src/intake/dispatch-assessment.ts
 function buildInstruction(route, spokenText, opportunity, documents) {
@@ -54709,9 +54159,47 @@ ${documents.directory}`,
   ].join(`
 `);
 }
+var TITLE_QUOTE_PAIRS = [
+  ['"', '"'],
+  ["“", "”"],
+  ["'", "'"],
+  ["‘", "’"]
+];
+function tidyTitleQuotes(input) {
+  let out = input;
+  for (let pass = 0;pass < 4; pass += 1) {
+    const before = out;
+    for (const [open, close] of TITLE_QUOTE_PAIRS) {
+      if (out.length >= 2 && out.startsWith(open) && out.endsWith(close)) {
+        out = out.slice(open.length, -close.length).trim();
+      }
+    }
+    for (const [open, close] of TITLE_QUOTE_PAIRS) {
+      const opens = out.split(open).length - 1;
+      const closes = open === close ? opens : out.split(close).length - 1;
+      const unbalanced = open === close ? opens % 2 === 1 : closes > opens;
+      if (unbalanced && out.endsWith(close)) {
+        out = out.slice(0, -close.length).trimEnd();
+      }
+    }
+    for (const [open, close] of TITLE_QUOTE_PAIRS) {
+      if (open === "'" || open === "‘")
+        continue;
+      const opens = out.split(open).length - 1;
+      const closes = open === close ? opens : out.split(close).length - 1;
+      const unbalanced = open === close ? opens % 2 === 1 : opens > closes;
+      if (unbalanced && out.startsWith(open)) {
+        out = out.slice(open.length).trimStart();
+      }
+    }
+    if (out === before)
+      break;
+  }
+  return out;
+}
 function buildChatTitle(route, spokenText) {
-  const first = spokenText.split(`
-`)[0]?.trim() ?? "";
+  const first = tidyTitleQuotes(spokenText.split(`
+`)[0]?.trim() ?? "");
   const trimmed = first.length > 60 ? `${first.slice(0, 59).trimEnd()}…` : first;
   if (trimmed.length > 0)
     return trimmed;
@@ -54721,7 +54209,7 @@ function buildChatTitle(route, spokenText) {
 // clients/teams-bot/src/intake/start-assessment.ts
 function createStartAssessment(config2) {
   return async (input) => {
-    const chatId = import_node_crypto3.randomUUID();
+    const chatId = import_node_crypto4.randomUUID();
     const stored = toStoredReference(input.conversationReference, config2.now());
     if (stored === null) {
       return {
@@ -54781,6 +54269,490 @@ function createStartAssessment(config2) {
   };
 }
 
+// clients/teams-bot/src/proactive/proactive-store.ts
+class DurableProactiveStore {
+  targets;
+  sent;
+  constructor(targetsFilePath, sentFilePath, onWarn) {
+    this.targets = new DurableJsonStore({
+      filePath: targetsFilePath,
+      onWarn
+    });
+    this.sent = new DurableJsonStore({
+      filePath: sentFilePath,
+      onWarn
+    });
+  }
+  targetFor(epicId) {
+    return this.targets.get(epicId);
+  }
+  bindTarget(epicId, target) {
+    this.targets.set(epicId, target);
+  }
+  discardTarget(epicId) {
+    this.targets.delete(epicId);
+  }
+  boundEpics() {
+    return this.targets.keys();
+  }
+  hasSent(eventId) {
+    return this.sent.get(eventId) !== null;
+  }
+  recordSent(eventId, sentAt) {
+    this.sent.set(eventId, { sentAt });
+  }
+  forgetSent(eventId) {
+    this.sent.delete(eventId);
+  }
+  sentEventIds() {
+    return this.sent.keys();
+  }
+}
+
+// clients/teams-bot/src/proactive/remember-target.ts
+function sameDestination(a, b) {
+  return a.channelId === b.channelId && a.serviceUrl === b.serviceUrl && a.conversation.id === b.conversation.id && a.bot.id === b.bot.id && a.user?.id === b.user?.id && a.tenantId === b.tenantId;
+}
+function sameMention(a, b) {
+  return a?.id === b?.id && a?.name === b?.name;
+}
+function rememberProactiveTarget(store, epicId, rawReference, user, now) {
+  const reference = toStoredReference(rawReference, now);
+  if (reference === null)
+    return { kind: "unusable" };
+  const mention = user !== null && user.id.length > 0 && user.name.trim().length > 0 ? { id: user.id, name: user.name.trim() } : undefined;
+  const existing = store.targetFor(epicId);
+  if (existing !== null && sameDestination(existing.reference, reference) && sameMention(existing.mention, mention)) {
+    return { kind: "unchanged" };
+  }
+  store.bindTarget(epicId, {
+    reference,
+    boundAt: existing !== null && sameDestination(existing.reference, reference) ? existing.boundAt : now,
+    ...mention === undefined ? {} : { mention }
+  });
+  return { kind: "bound" };
+}
+
+// clients/teams-bot/src/proactive/classify-send-failure.ts
+function shouldDiscardReference(outcome) {
+  return outcome.kind === "gone";
+}
+function outcomeOfSendError(error51) {
+  const detail = error51 instanceof Error ? error51.message : String(error51);
+  if (error51 !== null && typeof error51 === "object" && "status" in error51) {
+    const { status } = error51;
+    if (typeof status === "number" && Number.isInteger(status)) {
+      return classifySendFailure(status);
+    }
+  }
+  return { kind: "unreachable", detail };
+}
+function classifySendFailure(status) {
+  switch (status) {
+    case 200:
+    case 201:
+    case 202:
+      return { kind: "queued" };
+    case 401:
+      return { kind: "auth" };
+    case 403:
+      return { kind: "gone", reason: "uninstalled" };
+    case 404:
+      return { kind: "gone", reason: "not-found" };
+    case 429:
+      return { kind: "throttled" };
+    default:
+      return { kind: "unknown", status };
+  }
+}
+
+// clients/teams-bot/src/proactive/push-notifications.ts
+function targetOf(deps, event) {
+  return deps.resolveTarget === undefined ? deps.store.targetFor(event.epicId) : deps.resolveTarget(event);
+}
+async function pushWatchEvent(deps, event) {
+  if (event.type === "resolved") {
+    const announced = deps.store.hasSent(event.eventId);
+    deps.store.forgetSent(event.eventId);
+    if (!announced) {
+      return { kind: "forgotten", eventId: event.eventId };
+    }
+    const target2 = targetOf(deps, event);
+    if (target2 === null) {
+      return { kind: "forgotten", eventId: event.eventId };
+    }
+    try {
+      await deps.send(target2, event);
+    } catch (error51) {
+      deps.onWarn("could not correct a notification that is now stale", `epicId=${event.epicId} eventId=${event.eventId} error=${error51 instanceof Error ? error51.message : String(error51)}`);
+    }
+    return { kind: "corrected", eventId: event.eventId };
+  }
+  if (deps.store.hasSent(event.eventId)) {
+    return { kind: "duplicate", eventId: event.eventId };
+  }
+  if (event.kind === "text.completed") {
+    const replyTarget = await deps.resolveReplyTarget(event.chatId);
+    if (replyTarget === null) {
+      return { kind: "not-ours", chatId: event.chatId };
+    }
+    try {
+      await deps.send(replyTarget, event);
+    } catch (error51) {
+      const outcome = outcomeOfSendError(error51);
+      deps.onWarn("reply send failed", `chatId=${event.chatId} eventId=${event.eventId} outcome=${outcome.kind}`);
+      return {
+        kind: "failed",
+        eventId: event.eventId,
+        outcome,
+        referenceDiscarded: false
+      };
+    }
+    deps.store.recordSent(event.eventId, deps.now());
+    return { kind: "sent", eventId: event.eventId };
+  }
+  const target = targetOf(deps, event);
+  if (target === null) {
+    deps.onWarn("no Teams conversation bound to this epic — proactive notification dropped", `epicId=${event.epicId} eventId=${event.eventId}`);
+    return { kind: "no-route", epicId: event.epicId };
+  }
+  try {
+    await deps.send(target, event);
+  } catch (error51) {
+    const outcome = outcomeOfSendError(error51);
+    const discard = shouldDiscardReference(outcome);
+    if (discard) {
+      deps.store.discardTarget(event.epicId);
+    }
+    deps.onWarn("proactive send failed", `epicId=${event.epicId} eventId=${event.eventId} outcome=${outcome.kind} referenceDiscarded=${String(discard)}`);
+    return {
+      kind: "failed",
+      eventId: event.eventId,
+      outcome,
+      referenceDiscarded: discard
+    };
+  }
+  deps.store.recordSent(event.eventId, deps.now());
+  return { kind: "sent", eventId: event.eventId };
+}
+
+// clients/teams-bot/src/proactive/send-via-adapter.ts
+var import_agents_hosting3 = __toESM(require_src8(), 1);
+
+// clients/teams-bot/src/teams/mention.ts
+function safeDisplayName(name) {
+  return name.replace(/[<>]/g, "").trim();
+}
+function buildMentionedText(target, lead, trail) {
+  const name = target === null ? "" : safeDisplayName(target.name);
+  const id = target?.id ?? "";
+  if (id.length === 0 || name.length === 0) {
+    return { text: `${lead}${trail}`.trim(), entities: [] };
+  }
+  const markup = `<at>${name}</at>`;
+  return {
+    text: `${lead}${markup}${trail}`,
+    entities: [
+      { type: "mention", text: markup, mentioned: { id, name } }
+    ]
+  };
+}
+
+// clients/teams-bot/src/proactive/send-via-adapter.ts
+function toConversationReference(stored) {
+  return {
+    channelId: stored.channelId,
+    serviceUrl: stored.serviceUrl,
+    conversation: {
+      id: stored.conversation.id,
+      conversationType: stored.conversation.conversationType,
+      tenantId: stored.tenantId
+    },
+    agent: { id: stored.bot.id, name: stored.bot.name },
+    user: stored.user === undefined ? undefined : { id: stored.user.id }
+  };
+}
+function toActivityEntity(mention) {
+  return {
+    type: mention.type,
+    text: mention.text,
+    mentioned: { id: mention.mentioned.id, name: mention.mentioned.name }
+  };
+}
+function appearedLead(event) {
+  const where = event.chatTitle === null ? "an agent" : event.chatTitle;
+  return event.kind === "approval.requested" ? { lead: "", trail: ` — ${where} needs your approval to continue.` } : { lead: "", trail: ` — ${where} is waiting on your answer.` };
+}
+function resolvedText(event) {
+  return event.kind === "approval.requested" ? "That approval has been handled — nothing needed from you now." : "That interview has been answered — nothing needed from you now.";
+}
+function createAdapterSend(adapter, agentAppId, renderCard) {
+  return async (target, event) => {
+    await adapter.continueConversation(agentAppId, toConversationReference(target.reference), async (context) => {
+      if (event.type === "resolved") {
+        await context.sendActivity(import_agents_hosting3.MessageFactory.text(resolvedText(event)));
+        return;
+      }
+      if (event.kind === "text.completed") {
+        await context.sendActivity(import_agents_hosting3.MessageFactory.text(event.text));
+        return;
+      }
+      const { lead, trail } = appearedLead(event);
+      const mentioned = buildMentionedText(target.mention ?? null, lead, trail);
+      const activity = import_agents_hosting3.MessageFactory.attachment(renderCard(event));
+      activity.text = mentioned.text;
+      if (mentioned.entities.length > 0) {
+        activity.entities = mentioned.entities.map(toActivityEntity);
+      }
+      await context.sendActivity(activity);
+    });
+  };
+}
+
+// clients/teams-bot/src/proactive/watch-line.ts
+var watchEventKindSchema = exports_external.union([
+  exports_external.literal("approval.requested"),
+  exports_external.literal("interview.requested")
+]);
+var eventCommon = {
+  eventId: exports_external.string().min(1),
+  epicId: exports_external.string().min(1),
+  chatId: exports_external.string().min(1)
+};
+var approvalAppearedSchema = exports_external.object({
+  ...eventCommon,
+  type: exports_external.literal("appeared"),
+  kind: exports_external.literal("approval.requested"),
+  chatTitle: exports_external.string().nullable(),
+  approvalId: exports_external.string().min(1),
+  toolName: exports_external.string(),
+  description: exports_external.string(),
+  requestedAt: exports_external.number()
+});
+var interviewAppearedSchema = exports_external.object({
+  ...eventCommon,
+  type: exports_external.literal("appeared"),
+  kind: exports_external.literal("interview.requested"),
+  chatTitle: exports_external.string().nullable(),
+  blockId: exports_external.string().min(1),
+  title: exports_external.string().nullable(),
+  description: exports_external.string().nullable(),
+  requestedAt: exports_external.number()
+});
+var resolvedSchema = exports_external.object({
+  ...eventCommon,
+  type: exports_external.literal("resolved"),
+  kind: watchEventKindSchema
+});
+var replyAppearedSchema = exports_external.object({
+  ...eventCommon,
+  type: exports_external.literal("appeared"),
+  kind: exports_external.literal("text.completed"),
+  chatTitle: exports_external.string().nullable(),
+  blockId: exports_external.string().min(1),
+  text: exports_external.string().min(1),
+  requestedAt: exports_external.number()
+});
+var watchEventSchema = exports_external.union([
+  approvalAppearedSchema,
+  interviewAppearedSchema,
+  replyAppearedSchema,
+  resolvedSchema
+]);
+function parseWatchLine(line) {
+  if (line.trim() === "")
+    return { kind: "blank" };
+  let json2;
+  try {
+    json2 = JSON.parse(line);
+  } catch (error51) {
+    return {
+      kind: "malformed",
+      detail: error51 instanceof Error ? error51.message : String(error51)
+    };
+  }
+  const parsed = watchEventSchema.safeParse(json2);
+  if (!parsed.success) {
+    return { kind: "malformed", detail: parsed.error.message };
+  }
+  return { kind: "event", event: parsed.data };
+}
+
+// clients/teams-bot/src/proactive/watch-runner.ts
+var RESTART_DELAYS_MS = [
+  1000,
+  5000,
+  15000,
+  60000,
+  300000
+];
+var HEALTHY_RUN_MS = 60000;
+function createWatchRunner(deps) {
+  let stopped = true;
+  let child = null;
+  let pendingRestart = null;
+  let failureCount = 0;
+  let startedAt = 0;
+  let phase = "stopped";
+  let queue = Promise.resolve();
+  const enqueue = (event) => {
+    queue = queue.then(async () => {
+      try {
+        await deps.onEvent(event);
+      } catch (error51) {
+        deps.onWarn("proactive event handler threw — notification lost", `eventId=${event.eventId} error=${error51 instanceof Error ? error51.message : String(error51)}`);
+      }
+    });
+  };
+  const handleLine = (line) => {
+    const parsed = parseWatchLine(line);
+    switch (parsed.kind) {
+      case "blank":
+        return;
+      case "malformed":
+        deps.onWarn("unreadable line from bridge watch — a notification may be lost", parsed.detail);
+        return;
+      case "event":
+        enqueue(parsed.event);
+        return;
+    }
+  };
+  const scheduleRestart = (reason) => {
+    if (stopped)
+      return;
+    const ranFor = deps.now() - startedAt;
+    if (ranFor >= HEALTHY_RUN_MS)
+      failureCount = 0;
+    const delay = RESTART_DELAYS_MS[Math.min(failureCount, RESTART_DELAYS_MS.length - 1)];
+    failureCount += 1;
+    phase = "waiting";
+    deps.onWarn("bridge watch stopped — restarting", `reason=${reason} ranForMs=${String(ranFor)} delayMs=${String(delay)} attempt=${String(failureCount)}`);
+    pendingRestart = deps.schedule(() => {
+      pendingRestart = null;
+      launch();
+    }, delay);
+  };
+  const launch = async () => {
+    if (stopped)
+      return;
+    phase = "starting";
+    const env2 = await deps.buildEnv();
+    if (env2 === null) {
+      scheduleRestart("no tenant environment — identity unresolved");
+      return;
+    }
+    if (stopped)
+      return;
+    startedAt = deps.now();
+    phase = "running";
+    deps.onInfo("watching for approvals", `epicId=${deps.epicId}`);
+    child = deps.spawnWatch(deps.command, ["watch", "--epic-id", deps.epicId], { env: env2 }, {
+      onLine: handleLine,
+      onStderr: (chunk) => {
+        const trimmed = chunk.trim();
+        if (trimmed.length > 0) {
+          deps.onInfo("bridge watch stderr", trimmed.slice(0, 500));
+        }
+      },
+      onExit: (code) => {
+        child = null;
+        scheduleRestart(`exit code ${code === null ? "null" : String(code)}`);
+      }
+    });
+  };
+  return {
+    start() {
+      if (!stopped)
+        return;
+      stopped = false;
+      failureCount = 0;
+      launch();
+    },
+    stop() {
+      stopped = true;
+      phase = "stopped";
+      pendingRestart?.cancel();
+      pendingRestart = null;
+      child?.kill();
+      child = null;
+    },
+    state: () => phase
+  };
+}
+
+// clients/teams-bot/src/proactive/spawn-watch.ts
+var import_node_child_process2 = require("node:child_process");
+
+class LineBuffer {
+  buffered = "";
+  push(chunk) {
+    this.buffered += chunk;
+    const parts = this.buffered.split(`
+`);
+    this.buffered = parts.pop() ?? "";
+    return parts.map((line) => line.replace(/\r$/, ""));
+  }
+  remainder() {
+    return this.buffered;
+  }
+}
+var nodeSpawnWatchFn = (command, args, options, handlers) => {
+  const child = import_node_child_process2.spawn(command, args, {
+    env: options.env,
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  const buffer = new LineBuffer;
+  let exited = false;
+  child.stdout?.on("data", (chunk) => {
+    for (const line of buffer.push(chunk.toString("utf8"))) {
+      handlers.onLine(line);
+    }
+  });
+  child.stderr?.on("data", (chunk) => {
+    handlers.onStderr(chunk.toString("utf8"));
+  });
+  const finish = (code) => {
+    if (exited)
+      return;
+    exited = true;
+    const tail = buffer.remainder().trim();
+    if (tail.length > 0) {
+      handlers.onStderr(`bridge watch exited holding an incomplete line (${String(tail.length)} chars)`);
+    }
+    handlers.onExit(code);
+  };
+  child.on("error", () => {
+    finish(null);
+  });
+  child.on("exit", (code) => {
+    finish(code);
+  });
+  return {
+    kill() {
+      child.kill("SIGTERM");
+    }
+  };
+};
+
+// clients/teams-bot/src/proactive/render-card.ts
+class InterviewNotificationUnsupported extends Error {
+  constructor(eventId) {
+    super(`no proactive card exists for an interview yet (${eventId}) — buildInterviewCard would tell the user to go to a desktop, which is wrong here`);
+    this.name = "InterviewNotificationUnsupported";
+  }
+}
+function proactiveCardFor(event, now) {
+  if (event.kind === "interview.requested") {
+    throw new InterviewNotificationUnsupported(event.eventId);
+  }
+  return buildApprovalCard({ chatId: event.chatId, title: event.chatTitle }, event.epicId, {
+    approvalId: event.approvalId,
+    toolName: event.toolName,
+    description: event.description,
+    requestedAt: event.requestedAt
+  }, now);
+}
+
 // clients/teams-bot/src/index.ts
 var refuseUntilSsoLands = async () => ({
   kind: "unavailable",
@@ -54807,9 +54779,9 @@ function requireEnv(name) {
 }
 async function main() {
   const inboundAuthConfig = loadBotFrameworkAuthConfigFromEnv(process.env);
-  const outboundAuthConfig = import_agents_hosting3.loadPrevAuthConfigFromEnv();
+  const outboundAuthConfig = import_agents_hosting4.loadPrevAuthConfigFromEnv();
   const serverConfig = loadServerConfigFromEnv(process.env);
-  const adapter = new import_agents_hosting3.CloudAdapter(outboundAuthConfig);
+  const adapter = new import_agents_hosting4.CloudAdapter(outboundAuthConfig);
   const registry2 = IdentityRegistry.fromFile(requireEnv("TRAYCER_IDENTITY_REGISTRY"), defaultAuditSink);
   const defaultEpicId = process.env.TRAYCER_TEAMS_DEFAULT_EPIC_ID?.trim();
   let epicBindings = new InMemoryEpicBindingStore;
@@ -54831,11 +54803,13 @@ async function main() {
       consequence: "the intake form will open with no zone selected"
     });
   }
+  const stateDir = process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ?? "/srv/traycer/teams-bot/state";
+  const assessmentReferences = new DurableConversationReferenceStore(`${stateDir}/conversation-refs.json`, (message2, detail) => {
+    logWarn(message2, { detail });
+  });
   const assessmentHostId = process.env.TRAYCER_TEAMS_HOST_ID?.trim() ?? "";
   const startAssessment = assessmentHostId.length > 0 && defaultEpicId !== undefined && defaultEpicId.length > 0 ? createStartAssessment({
-    references: new DurableConversationReferenceStore(process.env.TRAYCER_TEAMS_STATE_DIR !== undefined ? `${process.env.TRAYCER_TEAMS_STATE_DIR}/conversation-refs.json` : "/srv/traycer/teams-bot/state/conversation-refs.json", (message2, detail) => {
-      logWarn(message2, { detail });
-    }),
+    references: assessmentReferences,
     hostId: assessmentHostId,
     epicId: defaultEpicId,
     tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
@@ -54860,14 +54834,35 @@ async function main() {
       hasEpic: defaultEpicId !== undefined
     });
   }
+  const orchestrators = new DurableOrchestratorStore(`${stateDir}/orchestrators.json`, (message2, detail) => {
+    logWarn(message2, { detail });
+  });
+  const proactiveStore = new DurableProactiveStore(`${stateDir}/proactive-targets.json`, `${stateDir}/proactive-sent.json`, (message2, detail) => {
+    logWarn(message2, { detail });
+  });
   const handler = createReadSurfaceHandler({
     registry: registry2,
     epicBindings,
+    orchestrators,
+    references: assessmentReferences,
+    configuredHostId: process.env.TRAYCER_TEAMS_ORCHESTRATOR_HOST_ID?.trim(),
+    tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
     bridgeCliConfig,
     senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
     parentEnv: process.env,
     resolvePrincipal,
     startAssessment,
+    rememberProactiveTarget: (epicId, reference, user) => {
+      const outcome = rememberProactiveTarget(proactiveStore, epicId, reference, user, Date.now());
+      if (outcome.kind === "bound") {
+        logInfo("proactive route bound", { epicId, tagged: user !== null });
+      } else if (outcome.kind === "unusable") {
+        logWarn("could not record where to send notifications for this epic", {
+          epicId,
+          consequence: "approvals in this epic will not reach Teams"
+        });
+      }
+    },
     stageAttachments: (attachments) => stageAttachments(attachments, {
       stagingRoot,
       fetchImpl: globalThis.fetch
@@ -54875,6 +54870,74 @@ async function main() {
     defaultTimeZone,
     now: Date.now
   });
+  const watcher = defaultEpicId !== undefined && defaultEpicId.length > 0 ? createWatchRunner({
+    command: requireEnv("TRAYCER_REMOTE_BRIDGE_BIN"),
+    epicId: defaultEpicId,
+    buildEnv: async () => {
+      const identity = await resolvePrincipal();
+      if (identity.kind === "unavailable")
+        return null;
+      return resolveTenantEnv(identity.principal, defaultEpicId, {
+        registry: registry2,
+        epicBindings,
+        bridgeCliConfig,
+        senderAgentId: requireEnv("TRAYCER_AGENT_ID"),
+        parentEnv: process.env
+      });
+    },
+    spawnWatch: nodeSpawnWatchFn,
+    onEvent: (event) => pushWatchEvent({
+      store: proactiveStore,
+      resolveTarget: (event2) => {
+        const fromChat = assessmentReferences.recall(event2.chatId);
+        if (fromChat !== null) {
+          return { reference: fromChat, boundAt: fromChat.capturedAt };
+        }
+        return proactiveStore.targetFor(event2.epicId);
+      },
+      resolveReplyTarget: async (chatId) => {
+        const binding = await orchestrators.findByChatId(chatId);
+        if (binding === null)
+          return null;
+        const reference = assessmentReferences.recall(chatId);
+        return reference === null ? null : { reference, boundAt: reference.capturedAt };
+      },
+      send: createAdapterSend(adapter, inboundAuthConfig.audience, (appeared) => proactiveCardFor(appeared, Date.now())),
+      now: Date.now,
+      onWarn: (message2, detail) => {
+        logWarn(message2, { detail });
+      }
+    }, event).then((result) => {
+      logInfo("proactive event", {
+        kind: result.kind,
+        type: event.type
+      });
+    }),
+    onInfo: (message2, detail) => {
+      logInfo(message2, { detail });
+    },
+    onWarn: (message2, detail) => {
+      logWarn(message2, { detail });
+    },
+    schedule: (fn, ms) => {
+      const timer = setTimeout(fn, ms);
+      timer.unref();
+      return {
+        cancel: () => {
+          clearTimeout(timer);
+        }
+      };
+    },
+    now: Date.now
+  }) : null;
+  if (watcher === null) {
+    logWarn("proactive notifications disabled — no epic configured", {
+      variable: "TRAYCER_TEAMS_DEFAULT_EPIC_ID",
+      consequence: "approvals will never reach Teams"
+    });
+  } else {
+    watcher.start();
+  }
   const server = createHttpServer({
     adapter,
     handler,
