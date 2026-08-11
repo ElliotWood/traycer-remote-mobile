@@ -36,6 +36,11 @@ export interface StartAssessmentConfig {
   readonly hostId: string;
   readonly epicId: string;
   readonly tabBaseUrl: string;
+  /**
+   * Optional. Empty keeps the plain web link; a real one makes the button open
+   * the installed Teams tab instead of a browser. See `deep-link.ts`.
+   */
+  readonly teamsAppId?: string;
   readonly bridgeCliConfig: BridgeCliConfig;
   /** The tenant env for the acting principal — built by the caller. */
   readonly buildEnv: () => Promise<NodeJS.ProcessEnv | null>;
@@ -201,7 +206,7 @@ export function createStartAssessment(config: StartAssessmentConfig) {
       card: buildAssessmentStartedCard({
         title,
         deepLink: chatDeepLink(
-          { tabBaseUrl: config.tabBaseUrl },
+          { tabBaseUrl: config.tabBaseUrl, teamsAppId: config.teamsAppId },
           config.epicId,
           created.value.chatId,
         ),

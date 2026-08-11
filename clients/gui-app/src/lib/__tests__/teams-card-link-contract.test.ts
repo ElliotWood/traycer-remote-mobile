@@ -92,6 +92,57 @@ describe("Teams card 'Watch progress' link", () => {
   });
 
   /**
+   * The Teams-native form of the same button. A web link opens OUTSIDE the
+   * tab, in a top-level context at our origin — a different storage partition
+   * from the third-party frame Teams installs, so the device-auth tokens are
+   * not there and the user lands on sign-in. An entity link opens the
+   * installed tab and hands it the route as `subEntityId`, which arrives here
+   * as `app.getContext().page.subPageId`.
+   *
+   * This app is therefore the consumer of TWO strings from the same card, and
+   * they must agree. Asserting only the web link would leave the one that
+   * actually runs inside Teams checked by nobody.
+   */
+  describe("the Teams entity deep link", () => {
+    const entity = new URL(WIRE.teamsEntity.link);
+
+    function subEntityId(): string {
+      const context = JSON.parse(
+        entity.searchParams.get("context") ?? "{}",
+      ) as { subEntityId?: string };
+      return context.subEntityId ?? "";
+    }
+
+    it("hands the tab a route these parsers resolve to the epic and the chat", () => {
+      // Parsed as a route directly: `subEntityId` is app-internal, so it has
+      // no origin and no fragment — it is what the tab must navigate to.
+      const raw = subEntityId();
+      const boundary = raw.indexOf("?");
+      const pathname = boundary === -1 ? raw : raw.slice(0, boundary);
+      const search = boundary === -1 ? "" : raw.slice(boundary);
+
+      expect(readActiveEpicIdFromPath(pathname)).toBe(WIRE.teamsEntity.epicId);
+      expect(readActiveEpicTabIdFromPath(pathname)).not.toBeNull();
+      expect(normalizeEpicFocusSearch(searchObject(search))).toEqual({
+        focusedAt: undefined,
+        focusArtifactId: WIRE.teamsEntity.chatId,
+        focusThreadId: undefined,
+        migrationSource: undefined,
+        focusPaneId: undefined,
+        focusTileInstanceId: undefined,
+      });
+    });
+
+    it("agrees with its own `webUrl` fallback, route for route", () => {
+      // The two ends of one button. If they ever disagree, pressing it means
+      // one thing in Teams and another in a browser — and both would look
+      // correct in isolation.
+      const web = routeFromLink(entity.searchParams.get("webUrl") ?? "");
+      expect(`${web.pathname}${web.search}`).toBe(subEntityId());
+    });
+  });
+
+  /**
    * THE CONTROL. Without it, both assertions above could pass because these
    * parsers accept anything. They do not: the shape the bot actually shipped
    * is rejected, and rejected specifically by the epic-id reader, which is the

@@ -14,6 +14,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { APP_TAB_ENTITY_ID } from "../../intake/deep-link";
 
 interface StaticTab {
   readonly entityId: string;
@@ -101,6 +102,15 @@ describe("appPackage/manifest static tabs", () => {
       if (hash === -1) continue;
       expect(tab.contentUrl.indexOf("?")).toBeLessThan(hash);
     }
+  });
+
+  it("is the tab the bot's deep links address, by the same id", () => {
+    // `APP_TAB_ENTITY_ID` is Teams' `pageId` in
+    // `https://teams.microsoft.com/l/entity/<appId>/<pageId>`. Manifest and
+    // link are separately deployed — the bot can be redeployed against an
+    // older installed package — so a rename here would resolve to the app with
+    // NO page: the tab opens on its landing screen and nothing reports it.
+    expect(tabs.map((t) => t.entityId)).toContain(APP_TAB_ENTITY_ID);
   });
 
   it("points the app tab at /next/ and the help tab at /help/", () => {
