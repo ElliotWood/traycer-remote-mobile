@@ -3005,6 +3005,14 @@ export function buildIntakeRefusedCard(reason: string): Attachment {
  * is the worst of the three states and the one the VM deploy actually ships,
  * because `TRAYCER_TEAMS_TAB_URL` is unset there.
  *
+ * ⚠️ THE REASON IT IS UNSET CHANGED ON 2026-08-11 and the card is unaffected.
+ * It was unset because `chatDeepLink` built a link that could not resolve;
+ * that is fixed and pinned from both sides of the seam. It is still unset
+ * because nobody has clicked the fixed link in a real Teams client, which no
+ * unattended run can do. So this branch is still the live one, and it is now
+ * one env var and one human click away from not being — see the
+ * "TO ENABLE IT" block in `deploy/vm-deploy.sh`.
+ *
  * When R7 is wired — keyed on `assemble-bundle` exiting 0 against an
  * authorised bid, NOT on chat completion, per the epic's
  * `opportunity-skill-handoff` — put the sentence back. The test guarding

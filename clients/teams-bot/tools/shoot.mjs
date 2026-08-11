@@ -154,7 +154,10 @@ add("05c-clarify-nothing", () =>
 add("05d-started", () =>
   C.buildAssessmentStartedCard({
     title: "Assess the Acme water-network RFI",
-    deepLink: "https://example.invalid/tab/epics/e1/chats/c1",
+    // The shape `chatDeepLink` actually emits for a subpath tab. The old
+    // `/tab/epics/e1/chats/c1` here was the dead one, and a screenshot tool is
+    // exactly where a dead shape gets copied from.
+    deepLink: "https://example.invalid/next/#/epics/e1/e1?focusArtifactId=c1",
   }),
 );
 add("05e-started-nolink", () =>

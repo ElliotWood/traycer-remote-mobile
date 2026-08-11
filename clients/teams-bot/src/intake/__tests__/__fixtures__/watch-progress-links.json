@@ -1,0 +1,32 @@
+{
+  "_comment": [
+    "GOLDEN OUTPUT of `chatDeepLink`, asserted from BOTH sides of the seam.",
+    "Producer: clients/teams-bot/src/intake/__tests__/deep-link.test.ts",
+    "Consumer: clients/gui-app/src/lib/__tests__/teams-card-link-contract.test.ts",
+    "A JSON file rather than a cross-package import because the bot is a Node",
+    "process that cannot import gui-app modules, and gui-app has no business",
+    "depending on the bot. Same reasoning, and the same idiom, as",
+    "clients/mobile-push-service/src/__tests__/__fixtures__/push-activation-envelopes.json.",
+    "`retiredTabShape` is the CONTROL: it is what this builder emitted before",
+    "2026-08-11, and the consumer side asserts the app rejects it. Without it a",
+    "green consumer test could mean the parsers accept anything."
+  ],
+  "subpath": {
+    "why": "The real deploy. `/next/` is a vite subpath build, so gui-app uses hash history and the route must live in the fragment.",
+    "tabBaseUrl": "https://example.invalid/next/",
+    "epicId": "epic-1",
+    "chatId": "chat-1",
+    "link": "https://example.invalid/next/#/epics/epic-1/epic-1?focusArtifactId=chat-1"
+  },
+  "root": {
+    "why": "A tab served from the origin root keeps browser history, so the route is a plain path.",
+    "tabBaseUrl": "https://example.invalid",
+    "epicId": "epic-1",
+    "chatId": "chat-1",
+    "link": "https://example.invalid/epics/epic-1/epic-1?focusArtifactId=chat-1"
+  },
+  "retiredTabShape": {
+    "why": "What this builder emitted until 2026-08-11, mirroring the deleted clients/teams-tab. Three path segments, no fragment: gui-app matches neither.",
+    "link": "https://example.invalid/tab/epics/epic-1/chats/chat-1"
+  }
+}

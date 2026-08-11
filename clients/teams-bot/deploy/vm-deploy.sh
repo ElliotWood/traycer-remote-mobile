@@ -165,23 +165,27 @@ RestartSec=3
 WantedBy=multi-user.target
 UNIT
 
-# --- why TRAYCER_TEAMS_TAB_URL is not set -------------------------------
+# --- why TRAYCER_TEAMS_TAB_URL is STILL not set -------------------------
 #
-# It would produce a "Watch progress" button that opens the WRONG PAGE, and
-# the card is better off without one.
+# THE REASON RECORDED HERE HAS BEEN FIXED. This note used to say the link
+# builder emitted `${BASE}/epics/<epicId>/chats/<chatId>`, a shape mirroring
+# the deleted `clients/teams-tab`, which gui-app's `/^\/epics\/([^/]+)\/([^/]+)
+# \/?$/` cannot match — three segments where it wants two. That was true, and
+# it was only HALF the defect: `/next/` is a subpath deploy, so gui-app runs on
+# HASH history, and a path-shaped link addresses no route there whatever its
+# segments. Fixing the segments alone would have produced a second dead button.
 #
-# `intake/deep-link.ts` builds:
+# Both halves are fixed (2026-08-11, autobuild check-in). `chatDeepLink` now
+# builds `${BASE}/#/epics/<epicId>/<epicId>?focusArtifactId=<chatId>`, and the
+# link is asserted from BOTH sides of the seam — the bot pins the exact bytes,
+# and a test inside gui-app parses those same bytes with the app's own route
+# readers, with the retired shape as a control that must be rejected.
 #
-#     ${TRAYCER_TEAMS_TAB_URL}/epics/<epicId>/chats/<chatId>
-#
-# and its own docblock says that shape MIRRORS `clients/teams-tab`, which was
-# deleted in cb1edae3. The tab now served is upstream's gui-app at /next/,
-# whose route is `/epics/$epicId/$tabId` — no `/chats/` segment at all, and
-# `$tabId` is a CANVAS TAB id resolved from a client-side store, not a chat
-# id. `/epics/<id>/chats/<id>` is one segment too long to match, so the link
-# does not resolve to the chat; it falls into the SPA fallback and renders
-# something else. The user sees "the wrong page", not an error — precisely
-# the liability deep-link.ts warned about, now realised.
+# WHAT IS STILL MISSING IS THE OTHER HALF OF THE OLD INSTRUCTION: "verify a
+# built link actually lands on the chat". That needs a signed-in tab in a real
+# Teams client, clicked by a human, and no unattended run can do it. Two
+# passing parser suites are a necessary condition, not the gate. See
+# `epic-status-for-elliot`.
 #
 # deep-link.ts returns null on an empty base and the card then renders with
 # no OpenUrl button, which is the correct outcome by its own reasoning: "a
@@ -189,9 +193,14 @@ UNIT
 # no-link variant carries a working `My agents` button instead, so leaving
 # this unset is a complete card, not a degraded one.
 #
-# TO ENABLE IT: fix `chatDeepLink` to gui-app's real route first, verify a
-# built link actually lands on the chat, THEN set this to the tab origin. Do
-# not set it because the variable exists.
+# TO ENABLE IT — now genuinely one line plus one check:
+#   1. set this to the tab origin INCLUDING the subpath, e.g.
+#      Environment=TRAYCER_TEAMS_TAB_URL=https://<host>/next/
+#      The subpath is not cosmetic: the builder reads it to decide hash vs
+#      path history, exactly as gui-app reads its own vite base.
+#   2. start an assessment, press "Watch progress", confirm the chat opens.
+#      If it lands on the app's landing page instead, UNSET THIS AGAIN — that
+#      is the old failure and the card is better off with `My agents`.
 
 
 # Everything the bot reads must be owned by the user it runs as. `secret.env`
