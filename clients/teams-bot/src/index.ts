@@ -197,6 +197,24 @@ async function main(): Promise<void> {
           hostId: assessmentHostId,
           epicId: defaultEpicId,
           tabBaseUrl: process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
+          /*
+           * `appPackage/manifest.json`'s `id`, NOT `MicrosoftAppId` — they are
+           * different registrations and pasting the bot id here would build a
+           * link to an app that does not exist.
+           *
+           * Set it and "Watch progress" opens the INSTALLED TAB instead of
+           * leaving Teams for a browser, where the tab's partitioned tokens do
+           * not exist and the user meets a sign-in screen. Unset (the default,
+           * and the current deployment) keeps the plain web link.
+           *
+           * DO NOT SET THIS UNTIL THE TAB BUNDLE READS `subPageId`. The route
+           * rides on `context.subEntityId`, which reaches the tab only as
+           * `app.getContext().page.subPageId`; a bundle that ignores it opens
+           * the app's landing page. Nothing anywhere reports that — the link
+           * resolves, the tab loads, and it is simply the wrong page. See
+           * `intake/deep-link.ts`.
+           */
+          teamsAppId: process.env.TRAYCER_TEAMS_APP_ID?.trim() ?? "",
           bridgeCliConfig,
           // Identity resolved per press, never cached — the same ordering
           // every other action uses: resolve, then act.

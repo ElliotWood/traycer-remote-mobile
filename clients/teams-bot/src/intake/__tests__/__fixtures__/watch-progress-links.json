@@ -9,7 +9,12 @@
     "clients/mobile-push-service/src/__tests__/__fixtures__/push-activation-envelopes.json.",
     "`retiredTabShape` is the CONTROL: it is what this builder emitted before",
     "2026-08-11, and the consumer side asserts the app rejects it. Without it a",
-    "green consumer test could mean the parsers accept anything."
+    "green consumer test could mean the parsers accept anything.",
+    "`teamsEntity` is the same link addressed to the INSTALLED TAB rather than",
+    "to the web. Its `context.subEntityId` is the route the tab must apply, and",
+    "the consumer side parses it with the same readers it uses on the web link:",
+    "the two must resolve to the same epic and the same chat or the button means",
+    "one thing in Teams and another in a browser."
   ],
   "subpath": {
     "why": "The real deploy. `/next/` is a vite subpath build, so gui-app uses hash history and the route must live in the fragment.",
@@ -24,6 +29,23 @@
     "epicId": "epic-1",
     "chatId": "chat-1",
     "link": "https://example.invalid/epics/epic-1/epic-1?focusArtifactId=chat-1"
+  },
+  "teamsEntity": {
+    "why": "The Teams-native form, emitted whenever a real app id is configured. Opens the installed tab instead of leaving Teams for a browser, where the tab's partitioned device-auth tokens do not exist.",
+    "tabBaseUrl": "https://example.invalid/next/",
+    "teamsAppId": "2f1e9a44-6c3b-4d7e-9a10-8b5c2d3e4f60",
+    "epicId": "epic-1",
+    "chatId": "chat-1",
+    "subEntityId": "/epics/epic-1/epic-1?focusArtifactId=chat-1",
+    "link": "https://teams.microsoft.com/l/entity/2f1e9a44-6c3b-4d7e-9a10-8b5c2d3e4f60/traycer.app?webUrl=https%3A%2F%2Fexample.invalid%2Fnext%2F%23%2Fepics%2Fepic-1%2Fepic-1%3FfocusArtifactId%3Dchat-1&context=%7B%22subEntityId%22%3A%22%2Fepics%2Fepic-1%2Fepic-1%3FfocusArtifactId%3Dchat-1%22%7D"
+  },
+  "unsubstitutedAppId": {
+    "why": "CONTROL. The nil uuid is what appPackage/manifest.json carries in the repo, so an operator copying the manifest's own id gets this. It must fall back to the web link, not build a link to app 00000000-….",
+    "tabBaseUrl": "https://example.invalid/next/",
+    "teamsAppId": "00000000-0000-0000-0000-000000000000",
+    "epicId": "epic-1",
+    "chatId": "chat-1",
+    "link": "https://example.invalid/next/#/epics/epic-1/epic-1?focusArtifactId=chat-1"
   },
   "retiredTabShape": {
     "why": "What this builder emitted until 2026-08-11, mirroring the deleted clients/teams-tab. Three path segments, no fragment: gui-app matches neither.",

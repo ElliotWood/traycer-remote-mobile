@@ -201,6 +201,26 @@ UNIT
 #   2. start an assessment, press "Watch progress", confirm the chat opens.
 #      If it lands on the app's landing page instead, UNSET THIS AGAIN — that
 #      is the old failure and the card is better off with `My agents`.
+#
+# --- and why TRAYCER_TEAMS_APP_ID is not set either --------------------------
+#
+# A correct web link is still a WEB link. `Action.OpenUrl` on an ordinary
+# https URL hands it to the platform, which opens it outside the tab — and even
+# in an embedded view that is a top-level context at our origin, while the
+# installed tab is a third-party frame under Teams. Different storage
+# partitions, so the tab's device-auth tokens are not there: press a button
+# inside Teams, arrive outside Teams at a sign-in screen.
+#
+# Setting this to `appPackage/manifest.json`'s `id` — NOT MicrosoftAppId, they
+# are different registrations — makes the builder emit the Teams-native form
+# instead, opening the installed tab.
+#
+# DO NOT SET IT YET. The route rides on `context.subEntityId`, which reaches
+# the tab only as `app.getContext().page.subPageId`, and the deployed `/next/`
+# bundle does not read that field. A bundle that ignores it opens the app's
+# LANDING PAGE — inside Teams and signed in, but not the chat, and nothing
+# anywhere reports it. Set this only once a `/next/` bundle that applies
+# `subPageId` is deployed, then re-run check 2 above.
 
 
 # Everything the bot reads must be owned by the user it runs as. `secret.env`
