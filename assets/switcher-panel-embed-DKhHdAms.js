@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-Ciaf_P-h.js";import{c as t,r as n}from"./epic-sidebar-L8oIiPTW.js";var r=e();function i(e){let{category:i,epicId:a,tabId:o}=e;return(0,r.jsx)(`div`,{className:`min-h-0 flex-1 pb-[env(safe-area-inset-bottom)]`,children:i===`file-tree`?(0,r.jsx)(n,{epicId:a,tabId:o}):(0,r.jsx)(t,{epicId:a,tabId:o})})}export{i as SwitcherPanelEmbed};

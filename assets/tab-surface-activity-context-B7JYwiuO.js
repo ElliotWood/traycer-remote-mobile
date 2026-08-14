@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-B0Z9INg1.js";import{n as t}from"./jsx-runtime-Ciaf_P-h.js";import{pc as n}from"./host-D7-F3wmP.js";var r=e(t(),1),i=n(e=>({rightActions:null,setRightActions:t=>{e({rightActions:t})}})),a=(0,r.createContext)({visible:!0,focused:!0});export{i as n,a as t};
