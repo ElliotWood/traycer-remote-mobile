@@ -157,11 +157,66 @@ Do not wait for human input. Decide, act, and document what you decided.
 # Nothing alerted and 32 hours of unattended build time was lost silently.
 $Before = if (Test-Path $Log) { (Get-Content $Log).Count } else { 0 }
 
+# Wait for the network before launching, and retry a run that dies on it.
+#
+# WHY: eleven consecutive runs (2026-08-15 00:15 → 2026-08-18 12:15) died on the
+# first token with "API Error: Unable to connect to API (ENOTFOUND)", ~44 hours
+# of unattended build time. The box was AWAKE for every one of them - host.log
+# logged continuously through each of those minutes - so this was not a sleeping
+# machine, it was name resolution. The root cause is no longer recoverable (the
+# System event log only reaches back to 2026-08-18 04:04), and this fix
+# deliberately does not depend on knowing it: whatever takes DNS away, a
+# check-in that waits for it to come back loses minutes instead of days.
+#
+# The probe is a TCP CONNECT, not a name lookup. ENOTFOUND is a resolver
+# failure and `Resolve-DnsName` can answer out of cache while the connection
+# that matters still fails, which would hand back a green reading for the exact
+# condition being tested for. Test-NetConnection does resolution AND reach.
+function Test-ApiReachable {
+    try {
+        Test-NetConnection -ComputerName 'api.anthropic.com' -Port 443 `
+            -InformationLevel Quiet -WarningAction SilentlyContinue
+    } catch { $false }
+}
+
+$Waited = 0
+while (-not (Test-ApiReachable) -and $Waited -lt 1800) {
+    Start-Sleep -Seconds 120
+    $Waited += 120
+}
+if ($Waited -gt 0) {
+    "[$Stamp] api unreachable at start; waited $([math]::Round($Waited/60))m before launching" |
+        Out-File -FilePath $Log -Append
+}
+
 try {
     Push-Location $WorkDir
-    & $Claude -p $Prompt --permission-mode bypassPermissions 2>&1 |
-        Out-File -FilePath $Log -Append
-    $Code = $LASTEXITCODE
+
+    # Up to three attempts, but ONLY for a run that died on the network. The
+    # discriminator is the same one the rate-limit verdict below already had to
+    # get right: size first, marker second. A productive run that merely QUOTES
+    # a connection error - this entry does, at length - must not be retried, and
+    # matching the phrase anywhere in the body would retry it three times.
+    # A genuine no-op dies on the first token, so its whole body IS the marker.
+    $Attempt = 0
+    do {
+        $Attempt++
+        $Mark = @(Get-Content $Log -ErrorAction SilentlyContinue).Count
+
+        & $Claude -p $Prompt --permission-mode bypassPermissions 2>&1 |
+            Out-File -FilePath $Log -Append
+        $Code = $LASTEXITCODE
+
+        $Attempted = @(Get-Content $Log -ErrorAction SilentlyContinue | Select-Object -Skip $Mark)
+        $DiedOnNetwork = ($Attempted.Count -lt 5) -and
+            (($Attempted -join "`n") -match '(?i)ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|Unable to connect to API')
+
+        if ($DiedOnNetwork -and $Attempt -lt 3) {
+            "[$Stamp] attempt $Attempt died on the network; retrying in 10m" |
+                Out-File -FilePath $Log -Append
+            Start-Sleep -Seconds 600
+        }
+    } while ($DiedOnNetwork -and $Attempt -lt 3)
 
     # Read back what the run itself emitted. Streaming above is kept so a hung
     # run is still inspectable while it hangs; this only re-reads the tail.
@@ -183,8 +238,18 @@ try {
     # producing; here it would have inverted the original bug rather than
     # fixing it. A genuine no-op dies on the first token, so its entire body
     # IS the marker line.
+    #
+    # The network branch MUST come first, and not because it is more important.
+    # $Body is measured from $Before, so it now spans all the attempts and the
+    # retry notices between them: three dead attempts plus two "retrying in 10m"
+    # lines is FIVE lines, which the size rule would report as "ran, 5 lines of
+    # output" - a no-op described as a working run, the original 2026-07-31 bug
+    # reintroduced by the fix for it. $DiedOnNetwork is read off the last
+    # attempt alone, so it is the only term here that still means anything once
+    # retries can pad the body.
     $Verdict =
-        if ($Body.Count -ge 5) { "ran, $($Body.Count) lines of output" }
+        if ($DiedOnNetwork) { "NO-OP: NO NETWORK - api.anthropic.com unreachable, $Attempt attempts" }
+        elseif ($Body.Count -ge 5) { "ran, $($Body.Count) lines of output" }
         elseif ($Limit.Success) { "NO-OP: RATE LIMITED - $($Limit.Value.Trim())" }
         else { "SUSPECT: only $($Body.Count) lines of output" }
 
