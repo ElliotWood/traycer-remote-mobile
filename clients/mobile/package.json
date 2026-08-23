@@ -13,7 +13,7 @@
     "sync:ios": "bun run build:web && bun x cap sync ios",
     "open:ios": "bun x cap open ios",
     "build:ios": "bun run sync:ios && bun x cap build ios",
-    "lint": "eslint . --cache --fix --max-warnings 0",
+    "lint": "eslint . --cache --max-warnings 0",
     "format": "bun x prettier --write .",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts"

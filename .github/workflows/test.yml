@@ -111,6 +111,15 @@ jobs:
           - project: "@traycer-clients/remote"
             name: "test (@traycer-clients/remote)"
             test_args: ""
+          # The browser/Teams shell. It arrived on main carrying 22 test files
+          # that had run in no CI on any branch — the package lived only on the
+          # `/next/` stack, whose own workflow both omitted it AND triggers on
+          # nothing but `main` and pull requests, so it had never even had the
+          # chance. The gate below caught its absence here on the first commit
+          # that added it, which is the whole reason that gate exists.
+          - project: "@traycer-clients/mobile"
+            name: "test (@traycer-clients/mobile)"
+            test_args: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2

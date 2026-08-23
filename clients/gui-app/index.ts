@@ -10,7 +10,4 @@ export {
   installTitleBarOverlayThemeSync,
   type TitleBarOverlaySink,
 } from "@/lib/title-bar-overlay-theme";
-export {
-  setHostThemeOverride,
-  type ResolvedTheme,
-} from "@/lib/theme-applier";
+export { setHostThemeOverride, type ResolvedTheme } from "@/lib/theme-applier";
