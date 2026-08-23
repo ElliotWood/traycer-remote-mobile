@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { getHostPickerExtra } from "@/components/layout/header/host-picker-extra";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -84,6 +85,7 @@ export function HostPicker() {
             runnerHost.hostPicker.requestClose();
           }}
         />
+        {getHostPickerExtra()}
         <DialogFooter>
           <Button
             type="button"

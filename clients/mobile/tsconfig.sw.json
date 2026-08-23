@@ -1,0 +1,28 @@
+{
+  // The service worker ALONE, against the WebWorker lib.
+  //
+  // It cannot share `tsconfig.json`: that config carries `DOM` + `DOM.Iterable`,
+  // and DOM and WebWorker declare mutually incompatible ambient globals
+  // (`self`, `caches`, `fetch`, `location` all differ). Compiling `sw.ts` under
+  // the DOM lib type-checks against the wrong `self` and would accept code the
+  // browser rejects at runtime - so `tsconfig.json` excludes it and this
+  // config is the only thing that checks it.
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "WebWorker"],
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // `sw.ts` is deliberately a SCRIPT, not a module - see its docblock. Under
+    // `isolatedModules` TypeScript demands every file be a module, which would
+    // force an `export {}` into the emitted worker and break it in a classic
+    // registration.
+    "isolatedModules": false,
+    "noEmit": true,
+    "types": []
+  },
+  "files": ["src/web/sw.ts"]
+}

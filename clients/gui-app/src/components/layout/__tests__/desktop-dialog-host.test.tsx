@@ -342,6 +342,7 @@ function createBaseRunnerHost(): IRunnerHost {
       onChange: () => ({ dispose: () => undefined }),
     },
     workspaceFolders: {
+      canPickNatively: true,
       pickFolders: () => Promise.resolve([]),
     },
     fileDrops: {
