@@ -78,6 +78,16 @@ jobs:
           # removed 2026-08-05 when both packages were archived
           # (archive/clients-mobile, archive/clients-teams-tab) and deleted
           # from main.
+          #
+          # It drifted a third time: `@traycer-clients/remote` arrived on main
+          # owning a `test` script with no job here, so its tests had never run
+          # in CI either. Re-syncing by hand again would only queue up a fourth
+          # time, so the derivation the comment above asks for now runs as a
+          # test — `protocol/__tests__/ci-test-matrix-coverage.test.ts` fails
+          # when this list and the set of test-owning nx projects disagree in
+          # either direction. Keep adding entries by hand (the jobs carry
+          # per-project config a generated matrix could not supply); that gate
+          # is what makes forgetting one loud instead of silent.
           - project: "@traycer-clients/mobile-push-service"
             name: "test (@traycer-clients/mobile-push-service)"
             test_args: ""
@@ -86,6 +96,9 @@ jobs:
             test_args: ""
           - project: "@traycer-clients/teams-bot"
             name: "test (@traycer-clients/teams-bot)"
+            test_args: ""
+          - project: "@traycer-clients/remote"
+            name: "test (@traycer-clients/remote)"
             test_args: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
