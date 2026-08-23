@@ -112,6 +112,29 @@ function findForbiddenImports(
   return matches;
 }
 
+/**
+ * This scan reads every `.ts`/`.tsx` file in the monorepo - ~4,300 files and
+ * ~39 MB - so its cost is filesystem IO, and on Windows that IO contends with
+ * the rest of the suite's workers. Measured on `main`: ~2.0s when this file
+ * runs alone, but **7.9-8.2s inside a full `vitest run`**, against the 5s
+ * default. So the gate was red on every full-suite run on Windows.
+ *
+ * It was still red for the *right* reason when a violation existed - the throw
+ * beat the timeout to the reporter and named the file - but on a clean tree the
+ * only available outcome was `Test timed out in 5000ms`. A gate that can report
+ * "violation" but never "clean" cannot be read as a signal.
+ *
+ * The budget is raised rather than the work reduced, because the work is not
+ * reducible without narrowing what is scanned. Two candidate speedups were
+ * measured and both were rejected: testing the whole file before splitting it
+ * into lines (7% faster) and a `Buffer.includes` prefilter before the utf8
+ * decode (6% faster). Neither closes a 4x gap - the syscalls are the cost.
+ *
+ * 60s is ~7x the measured worst case, so a genuine hang in the walk still
+ * fails rather than passing slowly.
+ */
+const BOUNDARY_SCAN_TIMEOUT_MS = 60_000;
+
 describe("@traycer/protocol _internal/ privacy boundary", () => {
   it("only registries and _internal/ files import from a protocol _internal/ path", () => {
     const violations: string[] = [];
@@ -140,5 +163,5 @@ describe("@traycer/protocol _internal/ privacy boundary", () => {
     }
 
     expect(violations).toEqual([]);
-  });
+  }, BOUNDARY_SCAN_TIMEOUT_MS);
 });
