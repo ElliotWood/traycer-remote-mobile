@@ -20,11 +20,22 @@ concurrency:
 jobs:
   test:
     name: ${{ matrix.name }}
-    runs-on: ${{ matrix.project == 'traycer-clients-gui-app' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     # The GUI suite deliberately runs isolated two-worker forks: disabling
     # isolation makes tests leak state. The organization caps every job at ten
     # minutes, so run its deterministic Vitest shards as four parallel matrix
     # jobs.
+    #
+    # The larger runner is named by a repository/organization variable, not by a
+    # literal label, because a private label is not portable. A repository with
+    # no runner answering `ubuntu-latest-8-cores` does not fail these jobs — it
+    # never schedules them: all four sat in the queue for GitHub's 24-hour
+    # scheduling limit and were killed "while awaiting a runner", while every
+    # other job in the same run, all on `ubuntu-latest`, finished in under
+    # ninety seconds. That reads as a red suite and is not one; it is 1,055 test
+    # files that never ran. Set GUI_APP_RUNNER wherever the larger runner
+    # exists; anywhere else the fallback keeps the shards scheduling. Guarded by
+    # `protocol/__tests__/ci-runner-labels.test.ts`.
+    runs-on: ${{ matrix.project == 'traycer-clients-gui-app' && (vars.GUI_APP_RUNNER || 'ubuntu-latest') || 'ubuntu-latest' }}
     strategy:
       # Run every project even if one fails, so a single red project doesn't
       # mask the others.
@@ -138,9 +149,20 @@ jobs:
       # A shallow single-tag fetch is enough — the tag's commit arrives with a
       # complete tree, so the blobs the oracle reads are all present (~2s, ~6MB;
       # a full `fetch-depth: 0` clone would buy nothing here).
+      #
+      # `origin` carries the tag only in the repository that publishes it. A
+      # fork inherits no tags, so there this step exited 128 — "couldn't find
+      # remote ref refs/tags/host-v1.1.5" — and took the whole
+      # `@traycer/protocol` job down before its Test step ran: 126 files that
+      # never executed, reported as one red job. Falling back to the public
+      # upstream supplies the oracle without weakening it. If neither remote
+      # has the tag this still fails, which is the point: the paragraph above
+      # exists because an oracle that quietly skips itself is the failure mode.
       - name: Fetch the host-v1.1.5 tag the schema oracle regenerates from
         if: matrix.project == '@traycer/protocol'
-        run: git fetch --depth=1 origin tag host-v1.1.5
+        run: |
+          git fetch --depth=1 origin tag host-v1.1.5 \
+            || git fetch --depth=1 https://github.com/traycerai/traycer.git tag host-v1.1.5
       - name: Test
         run: bunx nx run-many --target=test --projects="${{ matrix.project }}" --tui=false ${{ matrix.test_args }}
 
