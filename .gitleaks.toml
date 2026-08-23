@@ -54,14 +54,27 @@ regexes = [
 ]
 
 [[allowlists]]
-description = "RFC 6455's public sample client nonce in the historic loopback handshake probe. Require both the exact nonce and its source path so unrelated findings remain reportable."
+description = "RFC 6455's public sample client nonce - base64 of the literal string 'the sample nonce', published in the RFC - in the loopback handshake probe and in the remote tunnel/proxy handshake fixtures. A Sec-WebSocket-Key is a per-connection nonce every client sends in cleartext, never a credential. Require both the exact nonce and one of these source paths so unrelated findings remain reportable."
 condition = "AND"
 regexTarget = "secret"
 paths = [
   '''^clients/desktop/src/electron-main/host/host-lifecycle\.ts$''',
+  '''^clients/remote/src/agent/__tests__/tunnel-server\.test\.ts$''',
+  '''^clients/remote/src/gateway/__tests__/proxy\.test\.ts$''',
 ]
 regexes = [
   '''^dGhlIHNhbXBsZSBub25jZQ==$''',
+]
+
+[[allowlists]]
+description = "Minified CommonJS export boilerplate in the vendored xterm chunk of a built /next/ bundle. The matched secret is the literal source fragment `t.TwoKeyMap=void` - generic-api-key fires on its entropy, not on any credential. `gitleaks git .` walks every ref, so the dist branches carrying built bundles (demo/upstream-mobile-next-dist) are in scope even though no such commit is an ancestor of main. Scoped to that exact fragment and to that chunk's filename, so a real key baked into a bundle is still reported."
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''^assets/terminal-tile-xterm-[A-Za-z0-9_-]+\.js$''',
+]
+regexes = [
+  '''^t\.TwoKeyMap=void$''',
 ]
 
 [[allowlists]]
