@@ -4,7 +4,10 @@ import {
   createArtifactExport,
   type ArtifactExportFormat,
 } from "@/lib/artifacts/artifact-export";
-import { saveBlobToDisk } from "@/lib/files/save-blob-to-disk";
+import {
+  saveBlobToDisk,
+  type SaveBlobOutcome,
+} from "@/lib/files/save-blob-to-disk";
 import { appLogger } from "@/lib/logger";
 import { epicMutationKeys } from "@/lib/query-keys";
 import { toastFromRunnerError } from "@/lib/runner-error-toast";
@@ -26,7 +29,7 @@ export interface EpicExportArtifactsInput {
 export function useEpicExportArtifacts() {
   const epicHandle = useOpenEpicHandle();
 
-  return useMutation<string | null, Error, EpicExportArtifactsInput>({
+  return useMutation<SaveBlobOutcome, Error, EpicExportArtifactsInput>({
     mutationKey: epicMutationKeys.exportArtifacts(),
     mutationFn: async (input) => {
       const firstArtifact = input.artifacts.at(0);
@@ -66,13 +69,22 @@ export function useEpicExportArtifacts() {
         releases.forEach((release) => release());
       }
     },
-    onSuccess: (saved, input) => {
-      if (saved !== null) {
-        Analytics.getInstance().track(AnalyticsEvent.ArtifactExported, {
-          format: input.format,
-          artifact_count: input.artifacts.length,
+    onSuccess: (outcome, input) => {
+      if (outcome.status === "cancelled") return;
+      // The event records that the user exported, which is true on both
+      // remaining outcomes — the export was built and handed over either way.
+      // Only the claim made to the user differs.
+      Analytics.getInstance().track(AnalyticsEvent.ArtifactExported, {
+        format: input.format,
+        artifact_count: input.artifacts.length,
+      });
+      if (outcome.status === "saved") {
+        toast.success(`Saved ${outcome.name}`);
+      } else {
+        // Handed to the browser, unobserved from here. See `SaveBlobOutcome`.
+        toast.info(`Downloading ${outcome.name}`, {
+          description: "Check your browser downloads if it doesn't appear.",
         });
-        toast.success(`Saved ${saved}`);
       }
     },
     onError: (error, input) => {
