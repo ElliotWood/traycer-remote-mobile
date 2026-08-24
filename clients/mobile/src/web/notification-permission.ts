@@ -72,8 +72,7 @@ export const NOTIFICATION_PROMPT_DISMISSED_KEY =
 export const EMBEDDED_NOTE_DISMISSED_KEY =
   "traycer.next.embeddedNotificationNoteDismissed";
 
-export const NOTIFICATION_BANNER_TEXT =
-  "Get notified when an agent needs you.";
+export const NOTIFICATION_BANNER_TEXT = "Get notified when an agent needs you.";
 export const NOTIFICATION_BANNER_ACTION = "Enable";
 export const NOTIFICATION_BANNER_DISMISS = "Not now";
 export const NOTIFICATION_BANNER_TESTID = "notification-permission-offer";
@@ -116,7 +115,8 @@ export interface OfferOptions {
   readonly read?: ((key: string) => string | null) | undefined;
   readonly write?: ((key: string, value: string) => void) | undefined;
   /** Reports the outcome. Defaults to stamping `<html data-notifications>`. */
-  readonly report?: ((outcome: NotificationPermissionOutcome) => void) | undefined;
+  readonly report?:
+    ((outcome: NotificationPermissionOutcome) => void) | undefined;
   /**
    * Defaults to the real cross-origin test. Injected so a test can hold the
    * surface fixed while varying the permission, which is the only way to show
@@ -189,8 +189,7 @@ export function offerNotificationPermission(
   report("default");
   return renderBanner(options.container, {
     onEnable: () => {
-      const request =
-        options.requestPermission ?? defaultRequestPermission;
+      const request = options.requestPermission ?? defaultRequestPermission;
       void request()
         .then((result) => {
           report(

@@ -110,54 +110,60 @@ printf '%s\\n' "$@" > ${JSON.stringify(recordTo)}
 }
 
 describe("systemd unit ExecStart — executed, not grepped", () => {
-  it.skipIf(NO_POSIX_SHELL)("parses as a shell program (`sh -n` on exactly what systemd hands /bin/sh)", async () => {
-    const unit = buildSystemdUnit({
-      label: labelFor("ai.traycer.host.dev"),
-      cli: { command: "/home/test/.traycer/cli/bin/traycer", args: [] },
-    });
-    const [shell, dashC, script] = execStartOf(unit);
-    expect(shell).toBe("/bin/sh");
-    expect(dashC).toBe("-c");
-    expect(script).toBeTypeOf("string");
+  it.skipIf(NO_POSIX_SHELL)(
+    "parses as a shell program (`sh -n` on exactly what systemd hands /bin/sh)",
+    async () => {
+      const unit = buildSystemdUnit({
+        label: labelFor("ai.traycer.host.dev"),
+        cli: { command: "/home/test/.traycer/cli/bin/traycer", args: [] },
+      });
+      const [shell, dashC, script] = execStartOf(unit);
+      expect(shell).toBe("/bin/sh");
+      expect(dashC).toBe("-c");
+      expect(script).toBeTypeOf("string");
 
-    // `sh -n` parses without executing. This is the check that caught the
-    // dropped closing quote every substring assertion sailed past.
-    await expect(
-      execFileAsync(posixShell() ?? "/bin/sh", ["-n", "-c", script ?? ""]),
-    ).resolves.toMatchObject({ stderr: "" });
-  });
+      // `sh -n` parses without executing. This is the check that caught the
+      // dropped closing quote every substring assertion sailed past.
+      await expect(
+        execFileAsync(posixShell() ?? "/bin/sh", ["-n", "-c", script ?? ""]),
+      ).resolves.toMatchObject({ stderr: "" });
+    },
+  );
 
-  it.skipIf(NO_POSIX_SHELL)("starts an N-1 CLI unlabelled and a current CLI with its label, preserving leading invocation args", async () => {
-    const legacyArgs = join(work, "legacy-args.txt");
-    const currentArgs = join(work, "current-args.txt");
-    const legacyCli = await writeLegacyCliStub(legacyArgs);
-    const currentCli = await writeCurrentCliStub(currentArgs, [
-      "--entry=cli-entry.js",
-    ]);
+  it.skipIf(NO_POSIX_SHELL)(
+    "starts an N-1 CLI unlabelled and a current CLI with its label, preserving leading invocation args",
+    async () => {
+      const legacyArgs = join(work, "legacy-args.txt");
+      const currentArgs = join(work, "current-args.txt");
+      const legacyCli = await writeLegacyCliStub(legacyArgs);
+      const currentCli = await writeCurrentCliStub(currentArgs, [
+        "--entry=cli-entry.js",
+      ]);
 
-    const unit = buildSystemdUnit({
-      label: labelFor("ai.traycer.host.dev"),
-      cli: { command: currentCli, args: ["--entry=cli-entry.js"] },
-    });
-    const tokens = execStartOf(unit);
-    const script = tokens[2] ?? "";
+      const unit = buildSystemdUnit({
+        label: labelFor("ai.traycer.host.dev"),
+        cli: { command: currentCli, args: ["--entry=cli-entry.js"] },
+      });
+      const tokens = execStartOf(unit);
+      const script = tokens[2] ?? "";
 
-    // systemd execs `/bin/sh -c <script> <cli> <args...>`, which is what
-    // makes `"$0"`/`"$@"` inside the script resolve to the CLI invocation.
-    const sh = posixShell() ?? "/bin/sh";
-    await execFileAsync(sh, ["-c", script, legacyCli]);
-    await execFileAsync(sh, [
-      "-c",
-      script,
-      currentCli,
-      "--entry=cli-entry.js",
-    ]);
+      // systemd execs `/bin/sh -c <script> <cli> <args...>`, which is what
+      // makes `"$0"`/`"$@"` inside the script resolve to the CLI invocation.
+      const sh = posixShell() ?? "/bin/sh";
+      await execFileAsync(sh, ["-c", script, legacyCli]);
+      await execFileAsync(sh, [
+        "-c",
+        script,
+        currentCli,
+        "--entry=cli-entry.js",
+      ]);
 
-    expect(await readFile(legacyArgs, "utf8")).toBe("host\nstart\n");
-    expect(await readFile(currentArgs, "utf8")).toBe(
-      "--entry=cli-entry.js\nhost\nstart\n--service-label\nai.traycer.host.dev\n",
-    );
-  });
+      expect(await readFile(legacyArgs, "utf8")).toBe("host\nstart\n");
+      expect(await readFile(currentArgs, "utf8")).toBe(
+        "--entry=cli-entry.js\nhost\nstart\n--service-label\nai.traycer.host.dev\n",
+      );
+    },
+  );
 
   it("the emitted ExecStart token vector round-trips the CLI path and args through systemd's quoting", () => {
     const unit = buildSystemdUnit({
@@ -177,29 +183,32 @@ describe("systemd unit ExecStart — executed, not grepped", () => {
     expect(tokens).toHaveLength(5);
   });
 
-  it.skipIf(NO_POSIX_SHELL)("a label containing a single quote still emits parseable shell and reaches the CLI verbatim", async () => {
-    // F7: `shellQuote` used to emit `'ab'\"'\"'cd'`, which is neither the
-    // POSIX `'\''` form nor the `'"'"'` one it was reaching for - `sh` died
-    // with "unexpected EOF". Unreachable through today's label alphabet, but
-    // it is the guard the emitters lean on, so it has to actually hold.
-    const currentArgs = join(work, "quoted-args.txt");
-    const currentCli = await writeCurrentCliStub(currentArgs, []);
-    const unit = buildSystemdUnit({
-      label: labelFor("ai.traycer.host.ab'cd"),
-      cli: { command: currentCli, args: [] },
-    });
-    const script = execStartOf(unit)[2] ?? "";
+  it.skipIf(NO_POSIX_SHELL)(
+    "a label containing a single quote still emits parseable shell and reaches the CLI verbatim",
+    async () => {
+      // F7: `shellQuote` used to emit `'ab'\"'\"'cd'`, which is neither the
+      // POSIX `'\''` form nor the `'"'"'` one it was reaching for - `sh` died
+      // with "unexpected EOF". Unreachable through today's label alphabet, but
+      // it is the guard the emitters lean on, so it has to actually hold.
+      const currentArgs = join(work, "quoted-args.txt");
+      const currentCli = await writeCurrentCliStub(currentArgs, []);
+      const unit = buildSystemdUnit({
+        label: labelFor("ai.traycer.host.ab'cd"),
+        cli: { command: currentCli, args: [] },
+      });
+      const script = execStartOf(unit)[2] ?? "";
 
-    const sh = posixShell() ?? "/bin/sh";
-    await expect(
-      execFileAsync(sh, ["-n", "-c", script]),
-    ).resolves.toMatchObject({ stderr: "" });
-    await execFileAsync(sh, ["-c", script, currentCli]);
+      const sh = posixShell() ?? "/bin/sh";
+      await expect(
+        execFileAsync(sh, ["-n", "-c", script]),
+      ).resolves.toMatchObject({ stderr: "" });
+      await execFileAsync(sh, ["-c", script, currentCli]);
 
-    expect(await readFile(currentArgs, "utf8")).toBe(
-      "host\nstart\n--service-label\nai.traycer.host.ab'cd\n",
-    );
-  });
+      expect(await readFile(currentArgs, "utf8")).toBe(
+        "host\nstart\n--service-label\nai.traycer.host.ab'cd\n",
+      );
+    },
+  );
 
   it("probes the capability contract, never help text or grep", () => {
     const unit = buildSystemdUnit({

@@ -52,8 +52,12 @@ async function serveStaticFile(
     const stats = await stat(filePath);
     if (!stats.isFile()) return false;
     const body = await readFile(filePath);
-    const contentType = MIME_TYPES[extname(filePath)] ?? "application/octet-stream";
-    res.writeHead(200, { "Content-Type": contentType, "Content-Length": body.length });
+    const contentType =
+      MIME_TYPES[extname(filePath)] ?? "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": body.length,
+    });
     res.end(body);
     return true;
   } catch {
@@ -72,7 +76,10 @@ export function createStaticAppHandler(params: {
   readonly staticDir: string | null;
 }): (req: IncomingMessage, res: ServerResponse) => void {
   if (params.devUpstream !== null) {
-    return createPassthroughHandler({ prefix: "", upstreamBaseUrl: params.devUpstream });
+    return createPassthroughHandler({
+      prefix: "",
+      upstreamBaseUrl: params.devUpstream,
+    });
   }
   const staticDir = params.staticDir;
   if (staticDir === null) {

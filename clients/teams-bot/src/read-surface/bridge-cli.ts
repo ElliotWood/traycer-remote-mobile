@@ -264,7 +264,8 @@ export function sendMessageAction(
    * Not a behaviour change. This was flagged by `no-restricted-syntax` and
    * fixed in passing while the lint gate was red for everyone.
    */
-  permissionMode: "supervised" | "auto_accept_edits" | "full_access" | undefined,
+  permissionMode:
+    "supervised" | "auto_accept_edits" | "full_access" | undefined,
 ): Promise<BridgeCliResult<ActionOutcome>> {
   const args =
     permissionMode === undefined

@@ -42,7 +42,10 @@ function okResponse(body: string): Response {
   return okResponseWith(body, {});
 }
 
-function okResponseWith(body: string, headers: Record<string, string>): Response {
+function okResponseWith(
+  body: string,
+  headers: Record<string, string>,
+): Response {
   return new Response(new TextEncoder().encode(body), { status: 200, headers });
 }
 
@@ -92,9 +95,9 @@ describe("classifyAttachment — which scope is this", () => {
   it("a download.info with no usable URL is unreadable, NOT 'not a file'", () => {
     // The user attached something. Silently dropping it from the count is how
     // an assessment runs against nothing and reads as complete.
-    expect(classifyAttachment({ ...personalFile("x.pdf"), content: {} }).kind).toBe(
-      "unreadable",
-    );
+    expect(
+      classifyAttachment({ ...personalFile("x.pdf"), content: {} }).kind,
+    ).toBe("unreadable");
     expect(
       classifyAttachment({
         ...personalFile("x.pdf"),
@@ -104,9 +107,9 @@ describe("classifyAttachment — which scope is this", () => {
   });
 
   it("the message's own HTML body is not a document", () => {
-    expect(classifyAttachment({ contentType: "text/html", content: "<p>hi</p>" })).toEqual(
-      { kind: "not-a-file" },
-    );
+    expect(
+      classifyAttachment({ contentType: "text/html", content: "<p>hi</p>" }),
+    ).toEqual({ kind: "not-a-file" });
     expect(classifyAttachment(null).kind).toBe("not-a-file");
     expect(classifyAttachment("nonsense").kind).toBe("not-a-file");
   });
@@ -137,9 +140,9 @@ describe("staging paths — the id is checked before it is joined", () => {
   });
 
   it("takes the explicit variable, then the state dir, then a documented default", () => {
-    expect(stagingRootFromEnv({ TRAYCER_TEAMS_STAGING_DIR: "/data/intake" })).toBe(
-      "/data/intake",
-    );
+    expect(
+      stagingRootFromEnv({ TRAYCER_TEAMS_STAGING_DIR: "/data/intake" }),
+    ).toBe("/data/intake");
     expect(stagingRootFromEnv({ TRAYCER_TEAMS_STATE_DIR: "/var/bot" })).toBe(
       "/var/bot/intake",
     );
@@ -223,7 +226,9 @@ describe("stageAttachments — bytes on disk, or a loud refusal", () => {
     if (outcome.kind !== "staged") return;
     if (process.platform === "win32") return; // POSIX modes only.
     expect(statSync(outcome.directory).mode & 0o077).toBe(0);
-    expect(statSync(join(outcome.directory, "Tender.pdf")).mode & 0o077).toBe(0);
+    expect(statSync(join(outcome.directory, "Tender.pdf")).mode & 0o077).toBe(
+      0,
+    );
   });
 
   it("CONTRACT: a channel post REFUSES rather than staging zero files", async () => {
@@ -311,10 +316,13 @@ describe("stageAttachments — bytes on disk, or a loud refusal", () => {
     expect(outcome.kind).toBe("none");
     expect(
       (
-        await stageAttachments([{ contentType: "text/html", content: "<p/>" }], {
-          stagingRoot: tempRoot(),
-          fetchImpl: async () => okResponse("x"),
-        })
+        await stageAttachments(
+          [{ contentType: "text/html", content: "<p/>" }],
+          {
+            stagingRoot: tempRoot(),
+            fetchImpl: async () => okResponse("x"),
+          },
+        )
       ).kind,
     ).toBe("none");
   });
@@ -324,7 +332,12 @@ describe("stageAttachments — bytes on disk, or a loud refusal", () => {
     // is a credential, and the whole outcome object is what the caller — and
     // through it a card payload — can see.
     const outcome = await stageAttachments(
-      [personalFileFrom("Tender.pdf", "https://files.invalid/d?token=SUPERSECRET")],
+      [
+        personalFileFrom(
+          "Tender.pdf",
+          "https://files.invalid/d?token=SUPERSECRET",
+        ),
+      ],
       {
         stagingRoot: tempRoot(),
         fetchImpl: async () => okResponse("x"),
@@ -358,7 +371,9 @@ describe("stageAttachments — bytes on disk, or a loud refusal", () => {
     expect(
       stagingUnavailable([{ contentType: "text/html", content: "<p/>" }]).kind,
     ).toBe("none");
-    expect(stagingUnavailable([personalFile("Tender.pdf")]).kind).toBe("refused");
+    expect(stagingUnavailable([personalFile("Tender.pdf")]).kind).toBe(
+      "refused",
+    );
     // A channel reference too: it is still a document the user attached.
     expect(stagingUnavailable([CHANNEL_FILE]).kind).toBe("refused");
   });

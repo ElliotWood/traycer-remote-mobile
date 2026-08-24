@@ -197,7 +197,8 @@ function tidyTitleQuotes(input: string): string {
 /** A short, human title. The chat is a thing someone will scan in a list. */
 export function buildChatTitle(route: SkillRoute, spokenText: string): string {
   const first = tidyTitleQuotes(spokenText.split("\n")[0]?.trim() ?? "");
-  const trimmed = first.length > 60 ? `${first.slice(0, 59).trimEnd()}…` : first;
+  const trimmed =
+    first.length > 60 ? `${first.slice(0, 59).trimEnd()}…` : first;
   if (trimmed.length > 0) return trimmed;
   // Never an empty title: the host accepts one and the agent stays unnamed
   // for life. Also reached when a message was nothing but quote characters,

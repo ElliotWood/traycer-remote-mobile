@@ -173,10 +173,7 @@ export function createAdapterSend(
   agentAppId: string,
   renderCard: RenderProactiveCard,
 ): SendProactive {
-  return async (
-    target: ProactiveTarget,
-    event: WatchEvent,
-  ): Promise<void> => {
+  return async (target: ProactiveTarget, event: WatchEvent): Promise<void> => {
     await adapter.continueConversation(
       agentAppId,
       toConversationReference(target.reference),
@@ -186,7 +183,11 @@ export function createAdapterSend(
           return;
         }
         const { lead, trail } = appearedLead(event);
-        const mentioned = buildMentionedText(target.mention ?? null, lead, trail);
+        const mentioned = buildMentionedText(
+          target.mention ?? null,
+          lead,
+          trail,
+        );
         const activity = MessageFactory.attachment(renderCard(event));
         // Both halves on the SAME activity. A card with no text notifies
         // nobody; text with no entity renders `<at>…</at>` literally.

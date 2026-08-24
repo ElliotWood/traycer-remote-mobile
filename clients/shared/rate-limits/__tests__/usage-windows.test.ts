@@ -140,18 +140,32 @@ describe("extractUsageWindows — the null/empty distinction", () => {
 describe("extractUsageWindows — codex", () => {
   it("labels primary and secondary from their own durations", () => {
     const result = extractUsageWindows(
-      codex({ primary: window(10, 300, null), secondary: window(20, 10080, null) }),
+      codex({
+        primary: window(10, 300, null),
+        secondary: window(20, 10080, null),
+      }),
     );
     expect(result).toEqual([
-      { label: "Current session", window: { usedPercent: 10, durationMinutes: 300, resetsAt: null } },
-      { label: "Weekly", window: { usedPercent: 20, durationMinutes: 10080, resetsAt: null } },
+      {
+        label: "Current session",
+        window: { usedPercent: 10, durationMinutes: 300, resetsAt: null },
+      },
+      {
+        label: "Weekly",
+        window: { usedPercent: 20, durationMinutes: 10080, resetsAt: null },
+      },
     ]);
   });
 
   it("skips a null primary without shifting the secondary into its place", () => {
-    const result = extractUsageWindows(codex({ secondary: window(20, 10080, null) }));
+    const result = extractUsageWindows(
+      codex({ secondary: window(20, 10080, null) }),
+    );
     expect(result).toEqual([
-      { label: "Weekly", window: { usedPercent: 20, durationMinutes: 10080, resetsAt: null } },
+      {
+        label: "Weekly",
+        window: { usedPercent: 20, durationMinutes: 10080, resetsAt: null },
+      },
     ]);
   });
 
@@ -162,12 +176,20 @@ describe("extractUsageWindows — codex", () => {
     const result = extractUsageWindows(
       codex({
         extraWindows: [
-          { limitId: "l1", limitName: "Code review", primary: window(30, 60, null), secondary: null },
+          {
+            limitId: "l1",
+            limitName: "Code review",
+            primary: window(30, 60, null),
+            secondary: null,
+          },
         ],
       }),
     );
     expect(result).toEqual([
-      { label: "Code review", window: { usedPercent: 30, durationMinutes: 60, resetsAt: null } },
+      {
+        label: "Code review",
+        window: { usedPercent: 30, durationMinutes: 60, resetsAt: null },
+      },
     ]);
   });
 
@@ -175,12 +197,20 @@ describe("extractUsageWindows — codex", () => {
     const result = extractUsageWindows(
       codex({
         extraWindows: [
-          { limitId: "l1", limitName: null, primary: window(30, 300, null), secondary: null },
+          {
+            limitId: "l1",
+            limitName: null,
+            primary: window(30, 300, null),
+            secondary: null,
+          },
         ],
       }),
     );
     expect(result).toEqual([
-      { label: "Current session", window: { usedPercent: 30, durationMinutes: 300, resetsAt: null } },
+      {
+        label: "Current session",
+        window: { usedPercent: 30, durationMinutes: 300, resetsAt: null },
+      },
     ]);
   });
 
@@ -188,7 +218,12 @@ describe("extractUsageWindows — codex", () => {
     const result = extractUsageWindows(
       codex({
         extraWindows: [
-          { limitId: "l1", limitName: "Code review", primary: null, secondary: window(5, 60, null) },
+          {
+            limitId: "l1",
+            limitName: "Code review",
+            primary: null,
+            secondary: window(5, 60, null),
+          },
         ],
       }),
     );
@@ -206,12 +241,25 @@ describe("extractUsageWindows — claude-code", () => {
         sevenDay: window(22, 10080, null),
         sevenDayOpus: window(33, 10080, null),
         sevenDaySonnet: window(44, 10080, null),
-        modelScoped: [{ displayName: "Haiku", usedPercent: 55, durationMinutes: 10080, resetsAt: null }],
+        modelScoped: [
+          {
+            displayName: "Haiku",
+            usedPercent: 55,
+            durationMinutes: 10080,
+            resetsAt: null,
+          },
+        ],
       }),
     );
     expect(result).toEqual([
-      { label: "Current session", window: { usedPercent: 11, durationMinutes: 300, resetsAt: null } },
-      { label: "Weekly", window: { usedPercent: 22, durationMinutes: 10080, resetsAt: null } },
+      {
+        label: "Current session",
+        window: { usedPercent: 11, durationMinutes: 300, resetsAt: null },
+      },
+      {
+        label: "Weekly",
+        window: { usedPercent: 22, durationMinutes: 10080, resetsAt: null },
+      },
       {
         label: "Opus (weekly)",
         window: { usedPercent: 33, durationMinutes: 10080, resetsAt: null },
@@ -222,7 +270,12 @@ describe("extractUsageWindows — claude-code", () => {
       },
       {
         label: "Haiku",
-        window: { displayName: "Haiku", usedPercent: 55, durationMinutes: 10080, resetsAt: null },
+        window: {
+          displayName: "Haiku",
+          usedPercent: 55,
+          durationMinutes: 10080,
+          resetsAt: null,
+        },
       },
     ]);
   });
@@ -232,7 +285,10 @@ describe("extractUsageWindows — claude-code", () => {
     // would render "Weekly" three times with no way to tell which account-wide
     // limit is which.
     const result = extractUsageWindows(
-      claudeCode({ sevenDayOpus: window(33, 10080, null), sevenDaySonnet: window(44, 10080, null) }),
+      claudeCode({
+        sevenDayOpus: window(33, 10080, null),
+        sevenDaySonnet: window(44, 10080, null),
+      }),
     );
     expect(result?.map((row) => row.label)).toEqual([
       "Opus (weekly)",
@@ -263,12 +319,19 @@ describe("extractUsageWindows — grok", () => {
     // `periodEnd` must equal `period.resetsAt` — the arm's own superRefine
     // enforces it, so this fixture could not be written any other way.
     const result = extractUsageWindows(
-      grok({ period: window(60, 10080, 1_700_000_000_000), periodEnd: 1_700_000_000_000 }),
+      grok({
+        period: window(60, 10080, 1_700_000_000_000),
+        periodEnd: 1_700_000_000_000,
+      }),
     );
     expect(result).toEqual([
       {
         label: "Weekly",
-        window: { usedPercent: 60, durationMinutes: 10080, resetsAt: 1_700_000_000_000 },
+        window: {
+          usedPercent: 60,
+          durationMinutes: 10080,
+          resetsAt: 1_700_000_000_000,
+        },
       },
     ]);
   });
@@ -278,7 +341,9 @@ describe("extractUsageWindows — grok", () => {
     // get wrong: grok reports tier and dates with no usage to meter. That is an
     // arm WITH a window concept reporting none, so `[]`, not the `null` that
     // means "credits provider".
-    expect(extractUsageWindows(grok({ subscriptionTier: "premium" }))).toEqual([]);
+    expect(extractUsageWindows(grok({ subscriptionTier: "premium" }))).toEqual(
+      [],
+    );
   });
 });
 

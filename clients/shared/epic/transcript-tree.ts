@@ -107,7 +107,9 @@ function computeSuppressed(
  * excluded; everything else nests under its subagent parent when eligible,
  * otherwise renders top-level.
  */
-export function buildBlockTree(blocks: readonly ContentBlock[]): readonly RenderableBlock[] {
+export function buildBlockTree(
+  blocks: readonly ContentBlock[],
+): readonly RenderableBlock[] {
   const suppressed = computeSuppressed(blocks);
   const byId = new Map(blocks.map((b) => [b.blockId, b] as const));
 
@@ -129,7 +131,10 @@ export function buildBlockTree(blocks: readonly ContentBlock[]): readonly Render
   };
 
   return blocks
-    .filter((b) => b.type !== "steer" && !suppressed.has(b.blockId) && !isEligibleChild(b))
+    .filter(
+      (b) =>
+        b.type !== "steer" && !suppressed.has(b.blockId) && !isEligibleChild(b),
+    )
     .map(buildNode);
 }
 
@@ -146,7 +151,9 @@ export interface PartitionResult {
  * suppressed} — anything left over is a genuine drop. `dropped` must be
  * empty for the transcript to be considered faithful (rubric §4).
  */
-export function partitionBlocks(blocks: readonly ContentBlock[]): PartitionResult {
+export function partitionBlocks(
+  blocks: readonly ContentBlock[],
+): PartitionResult {
   const suppressedMap = computeSuppressed(blocks);
   const rendered: string[] = [];
   const alternatePath: string[] = [];

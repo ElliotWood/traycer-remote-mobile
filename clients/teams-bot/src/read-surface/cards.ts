@@ -729,7 +729,8 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
   // that varies.
   const sorted = [...agents].sort(
     (a, b) =>
-      Number(b.isLocal) - Number(a.isLocal) || Number(b.active) - Number(a.active),
+      Number(b.isLocal) - Number(a.isLocal) ||
+      Number(b.active) - Number(a.active),
   );
   const shown = sorted.slice(0, FLEET_ROW_LIMIT);
 
@@ -738,27 +739,27 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
       eyebrow: null,
       title: "Fleet",
       subtitle:
-      /*
-       * NO "N active". The count was structurally incapable of being right.
-       *
-       * `active` is local-only — the host's activity tracker does not
-       * replicate — so it is false for every agent running anywhere else.
-       * With a fleet spread across hosts the header read "58 agents · 0
-       * active" while more than twenty were running. Not wrong on the day:
-       * unable to be right on any day.
-       *
-       * This is the `active: false → "Idle"` finding again. We fixed it in
-       * the ROWS, which now say "Activity not visible from here" rather than
-       * claiming idle, and left the identical inference in the summary line
-       * directly above them.
-       *
-       * The replacement counts what we can actually observe: how many agents
-       * this host can see the activity of. That is a real property, it is
-       * derived from the same `isLocal` the rows use, and it degrades
-       * honestly — if none are local it says so instead of implying a dead
-       * fleet.
-       */
-      observable === agents.length
+        /*
+         * NO "N active". The count was structurally incapable of being right.
+         *
+         * `active` is local-only — the host's activity tracker does not
+         * replicate — so it is false for every agent running anywhere else.
+         * With a fleet spread across hosts the header read "58 agents · 0
+         * active" while more than twenty were running. Not wrong on the day:
+         * unable to be right on any day.
+         *
+         * This is the `active: false → "Idle"` finding again. We fixed it in
+         * the ROWS, which now say "Activity not visible from here" rather than
+         * claiming idle, and left the identical inference in the summary line
+         * directly above them.
+         *
+         * The replacement counts what we can actually observe: how many agents
+         * this host can see the activity of. That is a real property, it is
+         * derived from the same `isLocal` the rows use, and it degrades
+         * honestly — if none are local it says so instead of implying a dead
+         * fleet.
+         */
+        observable === agents.length
           ? `${String(agents.length)} agent${agents.length === 1 ? "" : "s"}`
           : `${String(agents.length)} agent${agents.length === 1 ? "" : "s"} · ${String(observable)} visible from here`,
     }),
@@ -922,10 +923,11 @@ export function buildFleetCard(agents: readonly AgentSummary[]): Attachment {
   const overflow =
     agents.length > FLEET_ROW_LIMIT
       ? [
-          text(
-            `+${String(agents.length - FLEET_ROW_LIMIT)} more not shown.`,
-            { isSubtle: true, size: "small", separator: true },
-          ),
+          text(`+${String(agents.length - FLEET_ROW_LIMIT)} more not shown.`, {
+            isSubtle: true,
+            size: "small",
+            separator: true,
+          }),
         ]
       : [];
 
@@ -1093,14 +1095,24 @@ export function buildChatCard(
   const actions = [
     ...(canSend
       ? [
-          submitAction("Reply", REPLY_VERB, { chatId: status.chatId }, {
-            associateInputs: false,
-          }),
+          submitAction(
+            "Reply",
+            REPLY_VERB,
+            { chatId: status.chatId },
+            {
+              associateInputs: false,
+            },
+          ),
         ]
       : []),
-    submitAction("History", LOG_VERB, { chatId: status.chatId }, {
-      associateInputs: false,
-    }),
+    submitAction(
+      "History",
+      LOG_VERB,
+      { chatId: status.chatId },
+      {
+        associateInputs: false,
+      },
+    ),
   ];
   return buildCard(body, actions);
 }
@@ -1950,14 +1962,22 @@ export function buildInterviewWaitingCard(
         title: chatLabel(chat),
         subtitle: "This agent has stopped to ask you something.",
       }),
-      metaLine([`Asked ${approvalAgeLabel(requestedAt, now)}`, epicSegment(epicId)]),
+      metaLine([
+        `Asked ${approvalAgeLabel(requestedAt, now)}`,
+        epicSegment(epicId),
+      ]),
     ],
     // "Open and answer", not "Open the chat": it says what happens next, and
     // the questions are one tap away rather than on another machine.
     [
-      submitAction("Open and answer", OPEN_CHAT_VERB, { chatId: chat.chatId }, {
-        associateInputs: false,
-      }),
+      submitAction(
+        "Open and answer",
+        OPEN_CHAT_VERB,
+        { chatId: chat.chatId },
+        {
+          associateInputs: false,
+        },
+      ),
     ],
   );
 }
@@ -1996,9 +2016,14 @@ export function buildFocusStartedCard(
     // remember and a button is a thing you can see. Both, deliberately: the
     // button scrolls away and the word does not.
     [
-      submitAction("Stop replying", FOCUS_STOP_VERB, {}, {
-        associateInputs: false,
-      }),
+      submitAction(
+        "Stop replying",
+        FOCUS_STOP_VERB,
+        {},
+        {
+          associateInputs: false,
+        },
+      ),
     ],
   );
 }
@@ -2062,7 +2087,8 @@ export function focusInterceptedText(word: string, chat: ChatRef): string {
  * precisely so nothing can route to it.
  */
 export function focusExpiredText(title: string | null): string {
-  const who = title === null || title.trim().length === 0 ? "that agent" : `**${title}**`;
+  const who =
+    title === null || title.trim().length === 0 ? "that agent" : `**${title}**`;
   return `You'd stopped replying to ${who} — it had been quiet a while — so I did NOT send that on. Press Reply on the agent to start again.`;
 }
 
@@ -2325,9 +2351,14 @@ function openChatAction(chatId: string): readonly unknown[] {
   return chatId.length === 0
     ? []
     : [
-        submitAction("Open the chat", OPEN_CHAT_VERB, { chatId }, {
-          associateInputs: false,
-        }),
+        submitAction(
+          "Open the chat",
+          OPEN_CHAT_VERB,
+          { chatId },
+          {
+            associateInputs: false,
+          },
+        ),
       ];
 }
 
@@ -2365,12 +2396,18 @@ export function buildActionOutcomeCard(
         [],
       );
     case "failed":
-      return outcomeCard("attention", "Couldn't confirm this decision", outcome.reason, [
-        text(
-          "It may or may not have been applied. Open the chat and check before deciding again rather than pressing again.",
-          { isSubtle: true, size: "small", spacing: "medium" },
-        ),
-      ], openChatAction(chat.chatId));
+      return outcomeCard(
+        "attention",
+        "Couldn't confirm this decision",
+        outcome.reason,
+        [
+          text(
+            "It may or may not have been applied. Open the chat and check before deciding again rather than pressing again.",
+            { isSubtle: true, size: "small", spacing: "medium" },
+          ),
+        ],
+        openChatAction(chat.chatId),
+      );
   }
 }
 
@@ -2404,12 +2441,18 @@ export function buildMessageOutcomeCard(
         [],
       );
     case "failed":
-      return outcomeCard("attention", "Couldn't confirm this message", outcome.reason, [
-        text(
-          "It may already have reached the agent. Open the chat and check before sending again — a duplicate is a second message the agent will act on, not a no-op.",
-          { isSubtle: true, size: "small", spacing: "medium" },
-        ),
-      ], openChatAction(chat.chatId));
+      return outcomeCard(
+        "attention",
+        "Couldn't confirm this message",
+        outcome.reason,
+        [
+          text(
+            "It may already have reached the agent. Open the chat and check before sending again — a duplicate is a second message the agent will act on, not a no-op.",
+            { isSubtle: true, size: "small", spacing: "medium" },
+          ),
+        ],
+        openChatAction(chat.chatId),
+      );
   }
 }
 
@@ -2445,12 +2488,18 @@ export function buildInterviewOutcomeCard(
         [],
       );
     case "failed":
-      return outcomeCard("attention", "Couldn't confirm these answers", outcome.reason, [
-        text(
-          "They may already have reached the agent. Open the chat first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.",
-          { isSubtle: true, size: "small", spacing: "medium", wrap: true },
-        ),
-      ], openChatAction(chat.chatId));
+      return outcomeCard(
+        "attention",
+        "Couldn't confirm these answers",
+        outcome.reason,
+        [
+          text(
+            "They may already have reached the agent. Open the chat first — if the interview is gone from the list it landed. Do NOT answer again on the assumption it did not.",
+            { isSubtle: true, size: "small", spacing: "medium", wrap: true },
+          ),
+        ],
+        openChatAction(chat.chatId),
+      );
   }
 }
 
@@ -2604,9 +2653,14 @@ export function buildClarifyCard(options: {
             ),
           ]
         : []),
-      submitAction("Something else", CLARIFY_OTHER_VERB, {}, {
-        associateInputs: false,
-      }),
+      submitAction(
+        "Something else",
+        CLARIFY_OTHER_VERB,
+        {},
+        {
+          associateInputs: false,
+        },
+      ),
     ]),
   ]);
 }
@@ -2812,19 +2866,30 @@ export function buildIntakeFormCard(
     ...fieldError(errors, "buyer"),
 
     fieldLabel("Deadline — date"),
-    { type: "Input.Date", id: DEADLINE_DATE_INPUT_ID, value: values.deadlineDate },
+    {
+      type: "Input.Date",
+      id: DEADLINE_DATE_INPUT_ID,
+      value: values.deadlineDate,
+    },
     ...fieldError(errors, "deadlineDate"),
 
     fieldLabel("Deadline — time"),
-    { type: "Input.Time", id: DEADLINE_TIME_INPUT_ID, value: values.deadlineTime },
+    {
+      type: "Input.Time",
+      id: DEADLINE_TIME_INPUT_ID,
+      value: values.deadlineTime,
+    },
     ...fieldError(errors, "deadlineTime"),
 
     fieldLabel("Deadline — time zone"),
-    text("A tender closing at 5pm closes at a different moment in each of these.", {
-      isSubtle: true,
-      size: "small",
-      spacing: "none",
-    }),
+    text(
+      "A tender closing at 5pm closes at a different moment in each of these.",
+      {
+        isSubtle: true,
+        size: "small",
+        spacing: "none",
+      },
+    ),
     {
       type: "Input.ChoiceSet",
       id: TIME_ZONE_INPUT_ID,
@@ -3136,7 +3201,8 @@ export function buildEpicNotBoundCard(): Attachment {
     cardHeader({
       eyebrow: null,
       title: "No epic selected",
-      subtitle: 'Use "epic <id>" to choose one, then "fleet" to see its agents.',
+      subtitle:
+        'Use "epic <id>" to choose one, then "fleet" to see its agents.',
     }),
   ]);
 }
@@ -3344,4 +3410,3 @@ export function buildIdentityUnavailableCard(reason: string): Attachment {
     }),
   ]);
 }
-

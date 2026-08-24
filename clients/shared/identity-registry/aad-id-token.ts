@@ -119,7 +119,10 @@ interface CacheEntry<T> {
 
 /** Module-level, keyed by URL so distinct configs (tests pointing at a local JWKS) never collide. Holds fetched keys only — never a verification verdict. */
 const metadataCache = new Map<string, CacheEntry<{ jwksUri: string }>>();
-const jwksCache = new Map<string, CacheEntry<readonly Record<string, unknown>[]>>();
+const jwksCache = new Map<
+  string,
+  CacheEntry<readonly Record<string, unknown>[]>
+>();
 
 /** Test-only: clears both caches so fixtures don't leak between test files/cases. */
 export function resetAadIdTokenCachesForTests(): void {
@@ -130,12 +133,17 @@ export function resetAadIdTokenCachesForTests(): void {
 async function fetchJson(url: string, timeoutMs: number): Promise<unknown> {
   const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) {
-    throw new Error(`unexpected HTTP status ${response.status} fetching ${url}`);
+    throw new Error(
+      `unexpected HTTP status ${response.status} fetching ${url}`,
+    );
   }
   return await response.json();
 }
 
-async function getJwksUri(config: AadIdTokenConfig, now: number): Promise<string> {
+async function getJwksUri(
+  config: AadIdTokenConfig,
+  now: number,
+): Promise<string> {
   const cached = metadataCache.get(config.openIdMetadataUrl);
   if (cached && cached.expiresAt > now) {
     return cached.value.jwksUri;
@@ -194,7 +202,10 @@ async function getSigningKey(
         ? ((doc as Record<string, unknown>).keys as Record<string, unknown>[])
         : undefined;
     if (!keys) {
-      throw new AadIdTokenError("jwks_fetch_failed", "JWKS response is missing a keys array");
+      throw new AadIdTokenError(
+        "jwks_fetch_failed",
+        "JWKS response is missing a keys array",
+      );
     }
     cached = { value: keys, expiresAt: now + config.jwksCacheMaxAgeMs };
     jwksCache.set(jwksUri, cached);
@@ -202,10 +213,15 @@ async function getSigningKey(
 
   const jwk = cached.value.find((k) => k.kid === kid);
   if (!jwk) {
-    throw new AadIdTokenError("unknown_signing_key", `no JWKS entry found for kid "${kid}"`);
+    throw new AadIdTokenError(
+      "unknown_signing_key",
+      `no JWKS entry found for kid "${kid}"`,
+    );
   }
   try {
-    return createPublicKey({ key: jwk, format: "jwk" } as Parameters<typeof createPublicKey>[0]);
+    return createPublicKey({ key: jwk, format: "jwk" } as Parameters<
+      typeof createPublicKey
+    >[0]);
   } catch (err) {
     throw new AadIdTokenError(
       "unknown_signing_key",
@@ -251,7 +267,10 @@ export async function validateAadIdToken(
 
   const decoded = jwt.decode(token, { complete: true });
   if (!decoded || typeof decoded !== "object") {
-    throw new AadIdTokenError("malformed_token", "token is not a well-formed JWT");
+    throw new AadIdTokenError(
+      "malformed_token",
+      "token is not a well-formed JWT",
+    );
   }
 
   const alg = decoded.header.alg;
@@ -278,7 +297,10 @@ export async function validateAadIdToken(
       clockTolerance: config.clockSkewSeconds,
     });
     if (typeof verified !== "object" || verified === null) {
-      throw new AadIdTokenError("invalid_token", "token payload is not an object");
+      throw new AadIdTokenError(
+        "invalid_token",
+        "token payload is not an object",
+      );
     }
     payload = verified;
   } catch (err) {
@@ -287,7 +309,10 @@ export async function validateAadIdToken(
       throw new AadIdTokenError("expired", "token is expired");
     }
     if (err instanceof jwt.NotBeforeError) {
-      throw new AadIdTokenError("not_yet_valid", "token is not yet valid (nbf)");
+      throw new AadIdTokenError(
+        "not_yet_valid",
+        "token is not yet valid (nbf)",
+      );
     }
     if (err instanceof jwt.JsonWebTokenError) {
       const message = err.message;

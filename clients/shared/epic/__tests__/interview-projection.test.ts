@@ -68,7 +68,11 @@ describe("interview questions survive the label projection", () => {
         header: "Validation",
         multiSelect: true,
         options: [
-          { label: "Keep it failing", description: "Always a mistake.", preview: null },
+          {
+            label: "Keep it failing",
+            description: "Always a mistake.",
+            preview: null,
+          },
           { label: "Warn and continue", description: null, preview: null },
         ],
       },
@@ -125,7 +129,12 @@ describe("interview questions survive the label projection", () => {
     // Sanitize-on-read: a question whose `options` is not an array must not
     // throw and must not become a choice with zero choosable answers.
     const [q] = projectQuestions([
-      { questionId: "q1", question: "Which one?", options: "A, B", multiSelect: "yes" },
+      {
+        questionId: "q1",
+        question: "Which one?",
+        options: "A, B",
+        multiSelect: "yes",
+      },
     ]);
 
     expect(q.options).toEqual([]);

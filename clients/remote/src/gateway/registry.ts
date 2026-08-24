@@ -75,7 +75,8 @@ export class Registry {
 
   private statusOf(entry: RegistryEntry): HostAvailability {
     if (entry.unavailableReason !== null) return "unavailable";
-    const lapsed = Date.now() - entry.lastHeartbeatAt >= this.heartbeatTimeoutMs;
+    const lapsed =
+      Date.now() - entry.lastHeartbeatAt >= this.heartbeatTimeoutMs;
     return lapsed ? "unavailable" : "available";
   }
 
@@ -93,7 +94,10 @@ export class Registry {
         entry.unavailableReason === null &&
         now - entry.lastHeartbeatAt >= this.heartbeatTimeoutMs
       ) {
-        this.entries.set(agentId, { ...entry, unavailableReason: "heartbeat_lapsed" });
+        this.entries.set(agentId, {
+          ...entry,
+          unavailableReason: "heartbeat_lapsed",
+        });
       }
     }
   }

@@ -99,9 +99,7 @@ export function buildMentionedText(
   const markup = `<at>${name}</at>`;
   return {
     text: `${lead}${markup}${trail}`,
-    entities: [
-      { type: "mention", text: markup, mentioned: { id, name } },
-    ],
+    entities: [{ type: "mention", text: markup, mentioned: { id, name } }],
   };
 }
 

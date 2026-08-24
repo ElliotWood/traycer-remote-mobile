@@ -45,7 +45,12 @@ const PARAM = resolve(packageRoot, "src/web/teams-theme-param.ts");
 const SUITES = {
   applier: {
     cwd: guiAppRoot,
-    args: ["run", "--config", "vitest.config.ts", "src/lib/__tests__/theme-applier.test.ts"],
+    args: [
+      "run",
+      "--config",
+      "vitest.config.ts",
+      "src/lib/__tests__/theme-applier.test.ts",
+    ],
   },
   teams: {
     cwd: packageRoot,
@@ -104,7 +109,8 @@ const MUTATIONS = [
     what: "an OS change re-applies and wakes every subscriber for a resolved theme the override has already fixed",
     find: `      if (hostThemeOverride !== null) return;\n`,
     replace: ``,
-    mustRedden: "does not wake subscribers for an OS change the override outranks",
+    mustRedden:
+      "does not wake subscribers for an OS change the override outranks",
   },
   {
     id: "MUT-4",
@@ -141,7 +147,8 @@ const MUTATIONS = [
     what: "high contrast resolves light, putting a light app inside Teams' black high-contrast client",
     find: `  return theme === "dark" || theme === "contrast" ? "dark" : "light";`,
     replace: `  return theme === "dark" ? "dark" : "light";`,
-    mustRedden: "maps the high-contrast theme to dark, because it is black-backed",
+    mustRedden:
+      "maps the high-contrast theme to dark, because it is black-backed",
   },
   {
     id: "MUT-8",
@@ -215,12 +222,18 @@ function runSuite(name) {
     });
     return { failed: false, output: stdout };
   } catch (error) {
-    return { failed: true, output: `${error.stdout ?? ""}${error.stderr ?? ""}` };
+    return {
+      failed: true,
+      output: `${error.stdout ?? ""}${error.stderr ?? ""}`,
+    };
   }
 }
 
 const pristine = new Map(
-  [APPLIER, HOST, MAIN, PARAM].map((file) => [file, readFileSync(file, "utf8")]),
+  [APPLIER, HOST, MAIN, PARAM].map((file) => [
+    file,
+    readFileSync(file, "utf8"),
+  ]),
 );
 
 function restoreAll() {

@@ -66,7 +66,10 @@ export class ArtifactRoomRegistry {
    * this room must see the state flip on the same tick via `subscribe`, not
    * keep rendering now-stale content as if it were still live.
    */
-  applyState(artifactRoomId: string, state: EpicArtifactRoomAvailability): void {
+  applyState(
+    artifactRoomId: string,
+    state: EpicArtifactRoomAvailability,
+  ): void {
     const entry = this.getOrCreate(artifactRoomId);
     const previous = entry.state;
     entry.state = state;

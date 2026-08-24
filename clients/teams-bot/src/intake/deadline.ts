@@ -182,10 +182,18 @@ export function resolveDeadline(input: DeadlineInput): DeadlineResult {
   const second = time[3] === undefined ? 0 : Number(time[3]);
 
   if (month < 1 || month > 12 || day < 1 || day > 31) {
-    return { kind: "invalid", field: "date", message: "That isn't a real date." };
+    return {
+      kind: "invalid",
+      field: "date",
+      message: "That isn't a real date.",
+    };
   }
   if (hour > 23 || minute > 59 || second > 59) {
-    return { kind: "invalid", field: "time", message: "That isn't a real time." };
+    return {
+      kind: "invalid",
+      field: "time",
+      message: "That isn't a real time.",
+    };
   }
 
   const naive = Date.UTC(year, month - 1, day, hour, minute, second);
@@ -198,7 +206,11 @@ export function resolveDeadline(input: DeadlineInput): DeadlineResult {
     roundTrip.getUTCMonth() !== month - 1 ||
     roundTrip.getUTCDate() !== day
   ) {
-    return { kind: "invalid", field: "date", message: "That isn't a real date." };
+    return {
+      kind: "invalid",
+      field: "date",
+      message: "That isn't a real date.",
+    };
   }
 
   /*

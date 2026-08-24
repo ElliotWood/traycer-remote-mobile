@@ -53,7 +53,10 @@ export function applyFeedFrame(
   switch (frame.kind) {
     case "snapshot": {
       const merged: Record<string, HostNotificationEntry> = {};
-      for (const entry of [...frame.attention.entries, ...frame.recent.entries]) {
+      for (const entry of [
+        ...frame.attention.entries,
+        ...frame.recent.entries,
+      ]) {
         merged[entry.id] = entry;
       }
       return { entriesById: merged, summary: frame.summary };
@@ -76,7 +79,11 @@ export function applyFeedFrame(
         // their kind does not have.
         next[id] =
           "resolvedAt" in existing
-            ? { ...existing, readAt: frame.readAt, resolvedAt: frame.resolvedAt }
+            ? {
+                ...existing,
+                readAt: frame.readAt,
+                resolvedAt: frame.resolvedAt,
+              }
             : { ...existing, readAt: frame.readAt };
       }
       return { entriesById: next, summary: frame.summary };

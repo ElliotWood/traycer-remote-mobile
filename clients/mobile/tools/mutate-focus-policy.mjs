@@ -116,7 +116,9 @@ let survivors = 0;
 // The baseline. A suite that is already red scores every mutant as caught, and
 // this epic has read a red gate as a finding about a change twice.
 if (runSuite() !== "PASSED") {
-  process.stdout.write("BASELINE IS RED - no mutation result would mean anything\n");
+  process.stdout.write(
+    "BASELINE IS RED - no mutation result would mean anything\n",
+  );
   process.exit(1);
 }
 

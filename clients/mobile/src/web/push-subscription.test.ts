@@ -34,7 +34,10 @@ function fakeSubscription(options: {
   key?: Uint8Array | null;
   keys?: Record<string, string> | undefined;
 }): FakeSubscription {
-  const key = options.key === undefined ? base64UrlToBytes(REAL_VAPID_PUBLIC_KEY) : options.key;
+  const key =
+    options.key === undefined
+      ? base64UrlToBytes(REAL_VAPID_PUBLIC_KEY)
+      : options.key;
   return {
     endpoint: options.endpoint ?? "https://push.example/endpoint/abc",
     options: {
@@ -162,7 +165,9 @@ function harness(options: HarnessOptions): Harness {
         // about a top-level surface. The embedded arms opt in explicitly.
         isEmbedded: () => options.isEmbedded ?? false,
         getBearer: () =>
-          Promise.resolve(options.bearer === undefined ? BEARER : options.bearer),
+          Promise.resolve(
+            options.bearer === undefined ? BEARER : options.bearer,
+          ),
         fetch: doFetch,
         report: (outcome) => outcomes.push(outcome),
       }),
@@ -213,7 +218,9 @@ describe("ensurePushSubscription", () => {
   });
 
   it("reuses a subscription whose key matches, and still upserts it", async () => {
-    const existing = fakeSubscription({ endpoint: "https://push.example/kept" });
+    const existing = fakeSubscription({
+      endpoint: "https://push.example/kept",
+    });
     const h = harness({ existing });
 
     await expect(h.run()).resolves.toBe("subscribed");
@@ -367,7 +374,9 @@ describe("ensurePushSubscription", () => {
 
     const posts = h.calls.filter((call) => call.url.endsWith("/subscribe"));
     expect(posts).toHaveLength(2);
-    expect(posts.every((call) => call.init?.body?.toString().includes("rotated"))).toBe(true);
+    expect(
+      posts.every((call) => call.init?.body?.toString().includes("rotated")),
+    ).toBe(true);
   });
 });
 

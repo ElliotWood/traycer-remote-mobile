@@ -145,29 +145,35 @@ describe("`traycer host capabilities` as a subprocess", () => {
    * Only the probe prefix is executed, never the `exec … host start` arms -
    * those would spawn a supervisor against the developer's own data dir.
    */
-  it.skipIf(NO_POSIX_SHELL)("the probe the emitters actually embed returns 0 against the real CLI", async () => {
-    await expect(
-      execFileAsync(posixShell() ?? "/bin/sh", [
-        "-c",
-        `${COMPATIBLE_HOST_START_SCRIPT_PREFIX} >/dev/null 2>&1`,
-        "bun",
-        CLI_ENTRY,
-      ]),
-    ).resolves.toBeDefined();
-  });
+  it.skipIf(NO_POSIX_SHELL)(
+    "the probe the emitters actually embed returns 0 against the real CLI",
+    async () => {
+      await expect(
+        execFileAsync(posixShell() ?? "/bin/sh", [
+          "-c",
+          `${COMPATIBLE_HOST_START_SCRIPT_PREFIX} >/dev/null 2>&1`,
+          "bun",
+          CLI_ENTRY,
+        ]),
+      ).resolves.toBeDefined();
+    },
+  );
 
-  it.skipIf(NO_POSIX_SHELL)("that same probe returns non-zero when the token is not advertised", async () => {
-    const wrongToken = COMPATIBLE_HOST_START_SCRIPT_PREFIX.replace(
-      HOST_CAPABILITY_SERVICE_LABEL,
-      "not-a-capability",
-    );
-    await expect(
-      execFileAsync(posixShell() ?? "/bin/sh", [
-        "-c",
-        `${wrongToken} >/dev/null 2>&1`,
-        "bun",
-        CLI_ENTRY,
-      ]),
-    ).rejects.toMatchObject({ code: 1 });
-  });
+  it.skipIf(NO_POSIX_SHELL)(
+    "that same probe returns non-zero when the token is not advertised",
+    async () => {
+      const wrongToken = COMPATIBLE_HOST_START_SCRIPT_PREFIX.replace(
+        HOST_CAPABILITY_SERVICE_LABEL,
+        "not-a-capability",
+      );
+      await expect(
+        execFileAsync(posixShell() ?? "/bin/sh", [
+          "-c",
+          `${wrongToken} >/dev/null 2>&1`,
+          "bun",
+          CLI_ENTRY,
+        ]),
+      ).rejects.toMatchObject({ code: 1 });
+    },
+  );
 }, 60_000);

@@ -145,7 +145,9 @@ function bearerExpirySeconds(token: string): number | null {
   }
 }
 
-export async function resolveHostAuth(): Promise<HostAuth | HostAuthUnavailable> {
+export async function resolveHostAuth(): Promise<
+  HostAuth | HostAuthUnavailable
+> {
   const home = requireHomeEnv();
   const credentialsPath = cliCredentialsPath("production");
   const stored = await readCredentialsFile(credentialsPath);

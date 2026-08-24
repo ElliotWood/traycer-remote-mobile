@@ -18,7 +18,11 @@ describe("loadRegistryConfig", () => {
   it("loads a well-formed three-tenant registry", () => {
     const result = loadRegistryConfig({
       tenants: [
-        { home: "/srv/traycer/alice", hostId: "host-alice", entraOid: ALICE_OID },
+        {
+          home: "/srv/traycer/alice",
+          hostId: "host-alice",
+          entraOid: ALICE_OID,
+        },
         { home: "/srv/traycer/bob", hostId: "host-bob", entraOid: BOB_OID },
         {
           home: "/srv/traycer/carol",
@@ -139,18 +143,34 @@ describe("loadRegistryConfig", () => {
     expect(result.kind).toBe("refused");
   });
 
-  for (const field of ["home", "hostId", "entraOid", "traycerUserId"] as const) {
+  for (const field of [
+    "home",
+    "hostId",
+    "entraOid",
+    "traycerUserId",
+  ] as const) {
     it(`refuses leading/trailing whitespace on ${field}, without trimming`, () => {
       const base = validEntry({ traycerUserId: "traycer-user-alice" });
-      const padded = { ...base, [field]: ` ${(base as Record<string, string>)[field]} ` };
+      const padded = {
+        ...base,
+        [field]: ` ${(base as Record<string, string>)[field]} `,
+      };
       const result = loadRegistryConfig({ tenants: [padded] });
       expect(result.kind).toBe("refused");
     });
   }
 
   it("refuses a hostId outside A4's branch-name-safe character class", () => {
-    for (const bad of ["Host-Alice", "host_alice", "host alice", "-host", "host/alice"]) {
-      const result = loadRegistryConfig({ tenants: [validEntry({ hostId: bad })] });
+    for (const bad of [
+      "Host-Alice",
+      "host_alice",
+      "host alice",
+      "-host",
+      "host/alice",
+    ]) {
+      const result = loadRegistryConfig({
+        tenants: [validEntry({ hostId: bad })],
+      });
       expect(result.kind).toBe("refused");
     }
   });

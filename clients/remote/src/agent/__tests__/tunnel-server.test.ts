@@ -97,7 +97,8 @@ describe("tunnel-server: no bytes dropped across the async pid.json-read gap", (
     // event-driven, so there is no race between the connection happening
     // and a listener being attached in time to observe it.
     const rewrittenHead = rewriteHeadForLoopback(head, fakeHostPort);
-    const expectedBytes = Buffer.byteLength(rewrittenHead, "utf8") + body.length;
+    const expectedBytes =
+      Buffer.byteLength(rewrittenHead, "utf8") + body.length;
     await new Promise<void>((resolve, reject) => {
       const start = Date.now();
       const interval = setInterval(() => {
@@ -122,11 +123,15 @@ describe("tunnel-server: no bytes dropped across the async pid.json-read gap", (
     expect(all.length).toBe(expectedBytes);
 
     // Head arrives rewritten to loopback; body arrives byte-identical.
-    const forwardedHead = all.subarray(0, all.indexOf("\r\n\r\n") + 4).toString("utf8");
+    const forwardedHead = all
+      .subarray(0, all.indexOf("\r\n\r\n") + 4)
+      .toString("utf8");
     expect(forwardedHead).toContain(`Host: 127.0.0.1:${fakeHostPort}`);
     expect(forwardedHead).toContain(`Origin: http://127.0.0.1:${fakeHostPort}`);
     // The WS handshake fields survive untouched end-to-end...
-    expect(forwardedHead).toContain("Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==");
+    expect(forwardedHead).toContain(
+      "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+    );
     // ...but the internal hop-auth token is stripped - the loopback host has
     // no business ever seeing it.
     expect(forwardedHead).not.toContain("X-Traycer-Agent-Token");
@@ -135,7 +140,9 @@ describe("tunnel-server: no bytes dropped across the async pid.json-read gap", (
     const forwardedBody = all.subarray(all.indexOf("\r\n\r\n") + 4);
     expect(forwardedBody.equals(body)).toBe(true);
 
-    expect(events.some((e) => (e as { kind: string }).kind === "forwarded")).toBe(true);
+    expect(
+      events.some((e) => (e as { kind: string }).kind === "forwarded"),
+    ).toBe(true);
   });
 
   it("rejects a missing/wrong bearer before any bytes reach the loopback host", async () => {

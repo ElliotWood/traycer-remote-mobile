@@ -83,7 +83,14 @@ describe("createWebNotificationHost", () => {
         getPermission: GRANTED,
       });
 
-      await host.show("Agent blocked", "Needs approval", ENVELOPE, null, null, null);
+      await host.show(
+        "Agent blocked",
+        "Needs approval",
+        ENVELOPE,
+        null,
+        null,
+        null,
+      );
 
       expect(sw.shown).toEqual([
         {
@@ -153,9 +160,9 @@ describe("createWebNotificationHost", () => {
         getPermission: () => "default",
       });
 
-      await expect(
-        host.show("t", "b", null, null, null, null),
-      ).rejects.toThrow(/permission is "default"/);
+      await expect(host.show("t", "b", null, null, null, null)).rejects.toThrow(
+        /permission is "default"/,
+      );
       expect(sw.shown).toEqual([]);
     });
 
@@ -164,9 +171,9 @@ describe("createWebNotificationHost", () => {
         serviceWorker: undefined,
         getPermission: GRANTED,
       });
-      await expect(
-        host.show("t", "b", null, null, null, null),
-      ).rejects.toThrow(/no service worker/);
+      await expect(host.show("t", "b", null, null, null, null)).rejects.toThrow(
+        /no service worker/,
+      );
     });
   });
 
@@ -234,9 +241,9 @@ describe("createWebNotificationHost", () => {
         report: (outcome) => outcomes.push(outcome),
       });
 
-      await expect(
-        host.show("t", "b", null, null, null, null),
-      ).rejects.toThrow(/permission is "denied"/);
+      await expect(host.show("t", "b", null, null, null, null)).rejects.toThrow(
+        /permission is "denied"/,
+      );
       expect(outcomes).toEqual(["idle", "permission"]);
     });
 
@@ -264,9 +271,9 @@ describe("createWebNotificationHost", () => {
         report: (outcome) => outcomes.push(outcome),
       });
       // jsdom is top level, so the default must read NOT blocked here.
-      await expect(
-        host.show("t", "b", null, null, null, null),
-      ).rejects.toThrow(/permission is "denied"/);
+      await expect(host.show("t", "b", null, null, null, null)).rejects.toThrow(
+        /permission is "denied"/,
+      );
       expect(outcomes).toEqual(["idle", "permission"]);
     });
   });
@@ -281,7 +288,11 @@ describe("createWebNotificationHost", () => {
       const handler = vi.fn();
       host.onClick(handler);
 
-      sw.emit({ type: NOTIFICATION_CLICK_MESSAGE, id: "click-1", payload: ENVELOPE });
+      sw.emit({
+        type: NOTIFICATION_CLICK_MESSAGE,
+        id: "click-1",
+        payload: ENVELOPE,
+      });
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(ENVELOPE);
@@ -335,9 +346,21 @@ describe("createWebNotificationHost", () => {
       const handler = vi.fn();
       host.onClick(handler);
 
-      sw.emit({ type: NOTIFICATION_CLICK_MESSAGE, id: "click-1", payload: ENVELOPE });
-      sw.emit({ type: NOTIFICATION_CLICK_MESSAGE, id: "click-1", payload: ENVELOPE });
-      sw.emit({ type: NOTIFICATION_CLICK_MESSAGE, id: "click-2", payload: ENVELOPE });
+      sw.emit({
+        type: NOTIFICATION_CLICK_MESSAGE,
+        id: "click-1",
+        payload: ENVELOPE,
+      });
+      sw.emit({
+        type: NOTIFICATION_CLICK_MESSAGE,
+        id: "click-1",
+        payload: ENVELOPE,
+      });
+      sw.emit({
+        type: NOTIFICATION_CLICK_MESSAGE,
+        id: "click-2",
+        payload: ENVELOPE,
+      });
 
       expect(handler).toHaveBeenCalledTimes(2);
     });

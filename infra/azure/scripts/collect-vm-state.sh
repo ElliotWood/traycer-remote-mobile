@@ -100,6 +100,7 @@ done < <(ss -ltnpH 2>/dev/null | sed -n 's/^.*LISTEN[[:space:]]\+[0-9]\+[[:space
 # --------------------------------------------------------------- emit ------
 # node, not jq: jq is not guaranteed present on this box, node is (the host
 # and the router both require it). Same reasoning as traycer-registry-generate.sh.
+# shellcheck disable=SC2016 # the $ below is JavaScript, never shell expansion
 node -e '
 const fs = require("fs");
 const dir = process.argv[1];

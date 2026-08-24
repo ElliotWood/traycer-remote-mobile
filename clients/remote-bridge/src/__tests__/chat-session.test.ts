@@ -185,7 +185,8 @@ function snapshotFrame(overrides: {
       chat: {
         ...chatFixture,
         messages: overrides.messages ?? [],
-        settings: "settings" in overrides ? overrides.settings : chatFixture.settings,
+        settings:
+          "settings" in overrides ? overrides.settings : chatFixture.settings,
       },
       access: { role: "owner", ownerUserId: "user-1", canAct: true },
       queue: { status: "idle", items: [] },
@@ -245,7 +246,10 @@ async function flush(): Promise<void> {
 describe("ChatSession.getStatus", () => {
   it("does not answer 'not connected' before the first snapshot - it waits and then reports the real state", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
 
     // getStatus() is called BEFORE any snapshot has arrived - it must not
     // resolve to a stale/false "connected: false" answer immediately. It
@@ -294,7 +298,10 @@ describe("ChatSession.getStatus", () => {
 
   it("surfaces both approval kinds - tool-call and file-edit - in the same pendingApprovals list", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
     await flush();
     completeHandshake(sockets[0]);
 
@@ -334,7 +341,10 @@ describe("ChatSession.getStatus", () => {
 
   it("fails with a clear reason rather than guessing when acting on an approval id that isn't currently pending", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
     await flush();
     completeHandshake(sockets[0]);
     sockets[0].fireText(snapshotFrame({}));
@@ -351,7 +361,10 @@ describe("ChatSession.getStatus", () => {
 
   it("fails fast on a non-UNAUTHORIZED fatal close instead of waiting out a timeout for a session that will never recover", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
     await flush();
     completeHandshake(sockets[0]);
     sockets[0].fireText(
@@ -416,7 +429,10 @@ describe("ChatSession.getStatus", () => {
 describe("ChatSession.getStatus - interview questions", () => {
   it("resolves a pending interview's title, description and questions from the snapshot's own messages", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
 
     const statusPromise = session.getStatus();
     await flush();
@@ -463,7 +479,10 @@ describe("ChatSession.getStatus - interview questions", () => {
 
   it("reports questions as NULL - not [] - when the pending interview's block is absent from the snapshot", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
 
     const statusPromise = session.getStatus();
     await flush();
@@ -500,7 +519,10 @@ describe("ChatSession.getStatus - interview questions", () => {
 
   it("reports questions as [] when the block IS present and genuinely asks nothing", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
 
     const statusPromise = session.getStatus();
     await flush();
@@ -531,7 +553,10 @@ describe("ChatSession.getStatus - interview questions", () => {
 
   it("does not read questions off a NON-interview block that happens to carry the same id", async () => {
     const { factory, sockets } = makeFactory();
-    const { session, client } = makeSession(factory, unusedResolveDefaultSettings);
+    const { session, client } = makeSession(
+      factory,
+      unusedResolveDefaultSettings,
+    );
 
     const statusPromise = session.getStatus();
     await flush();
@@ -591,10 +616,7 @@ describe("ChatSession.sendMessage - settings resolution", () => {
     profileId: null,
   };
 
-  function ackFor(
-    socket: StubStreamWebSocket,
-    clientActionId: string,
-  ): void {
+  function ackFor(socket: StubStreamWebSocket, clientActionId: string): void {
     socket.fireText({
       kind: "actionAck",
       hasBinaryPayload: false,

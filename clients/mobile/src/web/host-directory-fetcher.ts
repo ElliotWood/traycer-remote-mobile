@@ -61,7 +61,11 @@ function publishProbe(hostId: string, result: HostProbeResult): void {
  * a registry-published public key this deployment has no way to obtain.
  */
 function toDirectoryEntry(
-  host: { readonly hostId: string; readonly label: string; readonly websocketUrl: string },
+  host: {
+    readonly hostId: string;
+    readonly label: string;
+    readonly websocketUrl: string;
+  },
   probe: HostProbeResult,
 ): HostDirectoryEntry {
   return {
@@ -87,9 +91,7 @@ let inFlight: Promise<RemoteHostFetchOutcome> | null = null;
  * baked entry plus whatever the user added" - never an error, and never a
  * fabricated entry.
  */
-async function fetchDefaultHosts(
-  path: string,
-): Promise<readonly StoredHost[]> {
+async function fetchDefaultHosts(path: string): Promise<readonly StoredHost[]> {
   try {
     const response = await fetch(path);
     if (!response.ok) return [];

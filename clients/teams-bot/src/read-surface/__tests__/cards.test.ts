@@ -106,7 +106,9 @@ describe("read-surface/cards", () => {
       connected: false,
     };
 
-    const body = cardBody(buildChatCard(disconnectedButPopulated, "epic-1", false));
+    const body = cardBody(
+      buildChatCard(disconnectedButPopulated, "epic-1", false),
+    );
 
     expect(body).toContain("Host unreachable");
     // The stale approval/interview text must NOT leak into the disconnected card —
@@ -338,8 +340,11 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
   it("shows which epic the decision belongs to — ambiguous with several epics in play", () => {
     const visible = JSON.stringify(
       collectTextBlocks(
-        buildChatCard(withApproval, "e0000000-0000-4000-8000-0000000000e1", false)
-          .content,
+        buildChatCard(
+          withApproval,
+          "e0000000-0000-4000-8000-0000000000e1",
+          false,
+        ).content,
       ),
     );
     expect(visible).toContain("Epic");
@@ -350,7 +355,8 @@ describe("read-surface/cards — the chat card names WHAT is pending", () => {
     const longChat = "a1000000-0000-4000-8000-000000000004";
     const visible = JSON.stringify(
       collectTextBlocks(
-        buildChatCard({ ...withApproval, chatId: longChat }, "epic-1", false).content,
+        buildChatCard({ ...withApproval, chatId: longChat }, "epic-1", false)
+          .content,
       ),
     );
     expect(visible).not.toContain(longChat);
@@ -1301,7 +1307,10 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
           errors: [{ field: "slug", message: "Give the bid a short name." }],
         }).content,
     ],
-    ["intake refused", () => buildIntakeRefusedCard("Two files share a name.").content],
+    [
+      "intake refused",
+      () => buildIntakeRefusedCard("Two files share a name.").content,
+    ],
   ];
 
   it.each(EVERY_CARD)("%s emits only handled verbs", (_name, build) => {
@@ -1336,7 +1345,8 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
    * floor, not a proof. The floor is worth having: the obvious spelling of
    * the mistake is the one somebody makes.
    */
-  const FORBIDDEN = /authoris|authoriz|closeout|close-out|lodge|lodgement|submit-?tender|go-?no-?go/i;
+  const FORBIDDEN =
+    /authoris|authoriz|closeout|close-out|lodge|lodgement|submit-?tender|go-?no-?go/i;
 
   it("CONTRACT: no card offers to authorise, lodge, or decide go/no-go", () => {
     for (const [name, build] of EVERY_CARD) {
@@ -1414,15 +1424,18 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
     return found;
   }
 
-  it.each(EVERY_CARD)("%s emits nothing above Adaptive Cards 1.2", (_name, build) => {
-    const present = propertiesIn(build());
-    for (const [property, why] of ABOVE_1_2) {
-      expect(
-        present.has(property),
-        `emits "${property}" (${why}) while ADAPTIVE_CARD_VERSION is 1.2. Teams drops what it does not know, silently, and our local renderer will not show you.`,
-      ).toBe(false);
-    }
-  });
+  it.each(EVERY_CARD)(
+    "%s emits nothing above Adaptive Cards 1.2",
+    (_name, build) => {
+      const present = propertiesIn(build());
+      for (const [property, why] of ABOVE_1_2) {
+        expect(
+          present.has(property),
+          `emits "${property}" (${why}) while ADAPTIVE_CARD_VERSION is 1.2. Teams drops what it does not know, silently, and our local renderer will not show you.`,
+        ).toBe(false);
+      }
+    },
+  );
 
   it("COVERAGE: the card set actually reaches the ChoiceSet branch", () => {
     // The deny-list is only as good as what the fixtures reach. `Input.Text`
@@ -1572,7 +1585,11 @@ describe("CONTRACT: every verb a card emits has a handler", () => {
           continue;
         }
         if (!entry.name.endsWith(".ts")) continue;
-        if ((await readFile(full, "utf8")).includes("export function buildInstruction")) {
+        if (
+          (await readFile(full, "utf8")).includes(
+            "export function buildInstruction",
+          )
+        ) {
           found = true;
         }
       }
@@ -1701,7 +1718,9 @@ describe("CONTRACT: no card promises a later reply while nothing delivers one", 
     expect(PROMISES.some((re) => re.test(shipped))).toBe(true);
     expect(
       PROMISES.some((re) =>
-        re.test("It's running. Open it to watch progress — I won't ping you when it finishes."),
+        re.test(
+          "It's running. Open it to watch progress — I won't ping you when it finishes.",
+        ),
       ),
     ).toBe(false);
 
@@ -1793,8 +1812,10 @@ describe("CONTRACT: no card promises a later reply while nothing delivers one", 
     // and no instruction, which is the state the VM deploy actually ships
     // because TRAYCER_TEAMS_TAB_URL is unset there.
     for (const deepLink of [null, "https://example.invalid/tab"]) {
-      const content = buildAssessmentStartedCard({ title: "An assessment", deepLink })
-        .content as { actions?: readonly unknown[] };
+      const content = buildAssessmentStartedCard({
+        title: "An assessment",
+        deepLink,
+      }).content as { actions?: readonly unknown[] };
       expect(content.actions, `deepLink=${String(deepLink)}`).toHaveLength(1);
     }
   });
@@ -1860,9 +1881,9 @@ describe("transcript rendering — facts in the slot that means them", () => {
     const one = partMarker({ kind: "other", label: "reasoning", lines: 1 });
     expect(one).toContain("1 line");
     expect(one).not.toContain("1 lines");
-    expect(partMarker({ kind: "other", label: "reasoning", lines: 3 })).toContain(
-      "3 lines",
-    );
+    expect(
+      partMarker({ kind: "other", label: "reasoning", lines: 3 }),
+    ).toContain("3 lines");
   });
 
   it("CONTRACT: strips the tenant prefix from a file path", () => {
@@ -1894,7 +1915,9 @@ describe("CONTRACT: the assessment failure card must not report a certain outcom
   });
 
   it("keeps 'couldn’t confirm' for the case that genuinely does not know", () => {
-    const body = cardBody(buildAssessmentUnconfirmedCard("socket closed", undefined));
+    const body = cardBody(
+      buildAssessmentUnconfirmedCard("socket closed", undefined),
+    );
     expect(body).toContain("Couldn’t confirm");
   });
 

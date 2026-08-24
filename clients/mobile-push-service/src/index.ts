@@ -7,7 +7,11 @@ import { buildPushPayload } from "./push-payload";
 import { createPushSender } from "./push-sender";
 import { PushedStateStore } from "./pushed-state-store";
 import { SubscriptionStore } from "./subscription-store";
-import { pushedStatePath, subscriptionsPath, vapidKeysPath } from "./storage/paths";
+import {
+  pushedStatePath,
+  subscriptionsPath,
+  vapidKeysPath,
+} from "./storage/paths";
 import { loadOrCreateVapidKeys } from "./vapid-keys";
 
 /** `127.0.0.1` only — `tailscale serve` fronts it on the tailnet at `/push`; this process never binds a public interface itself. */

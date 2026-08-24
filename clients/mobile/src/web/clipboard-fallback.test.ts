@@ -212,7 +212,9 @@ describe("installClipboardFallback - the wrapper", () => {
     // wrapped `policy-blocked` surfaces leaves this one broken, and every
     // assertion written against a refusing NAVIGATOR plus a blocked DOCUMENT
     // passes while it does.
-    const { nav } = refusingNavigator(new DOMException("no", "NotAllowedError"));
+    const { nav } = refusingNavigator(
+      new DOMException("no", "NotAllowedError"),
+    );
     const copied: string[] = [];
     installClipboardFallback({
       navigator: nav,
@@ -257,7 +259,9 @@ describe("installClipboardFallback - the wrapper", () => {
       },
       report: () => {},
     });
-    await expect(nav.clipboard?.writeText("command --flag")).resolves.toBeUndefined();
+    await expect(
+      nav.clipboard?.writeText("command --flag"),
+    ).resolves.toBeUndefined();
     // The native call is still tried first - this is a fallback, not a bypass.
     expect(attempts).toEqual(["command --flag"]);
     // And the fallback gets the SAME text. A wrapper that copied the wrong

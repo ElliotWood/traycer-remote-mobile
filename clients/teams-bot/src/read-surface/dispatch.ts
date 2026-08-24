@@ -69,7 +69,10 @@ export interface DispatchDeps extends HostAccessDeps {
     readonly opportunity: OpportunityDetails;
     /** Handle for the staged documents; `""` when nothing was attached. */
     readonly stagingId?: string;
-  }) => Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }>;
+  }) => Promise<{
+    readonly kind: "started" | "unconfirmed";
+    readonly card: Attachment;
+  }>;
   /**
    * Downloads the documents on an arriving message. OPTIONAL for the same
    * reason `startAssessment` is: a deployment with nowhere to put them says

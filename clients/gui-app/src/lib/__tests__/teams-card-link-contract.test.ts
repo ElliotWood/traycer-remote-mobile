@@ -74,22 +74,25 @@ describe("Teams card 'Watch progress' link", () => {
     expect(readActiveEpicTabIdFromPath(pathname)).not.toBeNull();
   });
 
-  it.each(ARMS)("carries the chat as the focused artifact on a %s", (_label, arm) => {
-    const { search } = routeFromLink(arm.link);
-    // A chat IS an artifact in the canvas store; `focusArtifactId` is what this
-    // app's own push routing passes a chat id as (`notifications/payload.ts` →
-    // `routeEpicChatNotification`). `resolveExternalEpic` copies this straight
-    // onto the intent it builds for a tab id it does not recognise, which is
-    // always the case for a tab opened by this link.
-    expect(normalizeEpicFocusSearch(searchObject(search))).toEqual({
-      focusedAt: undefined,
-      focusArtifactId: arm.chatId,
-      focusThreadId: undefined,
-      migrationSource: undefined,
-      focusPaneId: undefined,
-      focusTileInstanceId: undefined,
-    });
-  });
+  it.each(ARMS)(
+    "carries the chat as the focused artifact on a %s",
+    (_label, arm) => {
+      const { search } = routeFromLink(arm.link);
+      // A chat IS an artifact in the canvas store; `focusArtifactId` is what this
+      // app's own push routing passes a chat id as (`notifications/payload.ts` →
+      // `routeEpicChatNotification`). `resolveExternalEpic` copies this straight
+      // onto the intent it builds for a tab id it does not recognise, which is
+      // always the case for a tab opened by this link.
+      expect(normalizeEpicFocusSearch(searchObject(search))).toEqual({
+        focusedAt: undefined,
+        focusArtifactId: arm.chatId,
+        focusThreadId: undefined,
+        migrationSource: undefined,
+        focusPaneId: undefined,
+        focusTileInstanceId: undefined,
+      });
+    },
+  );
 
   /**
    * The Teams-native form of the same button. A web link opens OUTSIDE the

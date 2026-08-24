@@ -168,8 +168,9 @@ function defaultObserveOnScreen(
   element: Element,
   onChange: (onScreen: boolean) => void,
 ): boolean {
-  const ctor = (globalThis as { IntersectionObserver?: typeof IntersectionObserver })
-    .IntersectionObserver;
+  const ctor = (
+    globalThis as { IntersectionObserver?: typeof IntersectionObserver }
+  ).IntersectionObserver;
   if (ctor === undefined) return false;
   try {
     // Implicit root. For a frame Chromium computes this against the TOP-LEVEL

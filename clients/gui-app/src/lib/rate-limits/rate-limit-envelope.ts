@@ -219,5 +219,3 @@ export function mapResponseToProviderRateLimitEnvelope(args: {
   invalidateProvidersListForConvergence(args.queryClient, args.response);
   return buildProviderRateLimitEnvelope(previous, args.response, Date.now());
 }
-
-

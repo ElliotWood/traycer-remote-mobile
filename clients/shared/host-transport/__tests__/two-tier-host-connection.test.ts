@@ -273,8 +273,14 @@ function fakeWatchingFactory(): {
   return { createWatching, byHostId };
 }
 
-const ENTRY_A: MachineEndpoint = { hostId: "machine-a", websocketUrl: "ws://a/rpc" };
-const ENTRY_C: MachineEndpoint = { hostId: "machine-c", websocketUrl: "ws://c/rpc" };
+const ENTRY_A: MachineEndpoint = {
+  hostId: "machine-a",
+  websocketUrl: "ws://a/rpc",
+};
+const ENTRY_C: MachineEndpoint = {
+  hostId: "machine-c",
+  websocketUrl: "ws://c/rpc",
+};
 
 describe("TwoTierHostConnectionManager — setKnownMachines degradation", () => {
   it("starts with zero watching connections when given none (today's shape)", () => {
@@ -298,10 +304,25 @@ describe("TwoTierHostConnectionManager — setKnownMachines degradation", () => 
     });
 
     manager.setKnownMachines([
-      { ...ENTRY_B, label: "B", kind: "remote", version: null, status: "available" },
-      { ...ENTRY_C, label: "C", kind: "remote", version: null, status: "available" },
+      {
+        ...ENTRY_B,
+        label: "B",
+        kind: "remote",
+        version: null,
+        status: "available",
+      },
+      {
+        ...ENTRY_C,
+        label: "C",
+        kind: "remote",
+        version: null,
+        status: "available",
+      },
     ]);
-    expect([...manager.watchingHostIds()].sort()).toEqual(["machine-b", "machine-c"]);
+    expect([...manager.watchingHostIds()].sort()).toEqual([
+      "machine-b",
+      "machine-c",
+    ]);
 
     const closeB = byHostId.get("machine-b")!.closeSpy;
     const closeC = byHostId.get("machine-c")!.closeSpy;
@@ -330,8 +351,20 @@ describe("TwoTierHostConnectionManager — setKnownMachines degradation", () => 
     });
 
     manager.setKnownMachines([
-      { ...ENTRY_A, label: "A", kind: "remote", version: null, status: "available" },
-      { ...ENTRY_B, label: "B", kind: "remote", version: null, status: "available" },
+      {
+        ...ENTRY_A,
+        label: "A",
+        kind: "remote",
+        version: null,
+        status: "available",
+      },
+      {
+        ...ENTRY_B,
+        label: "B",
+        kind: "remote",
+        version: null,
+        status: "available",
+      },
     ]);
 
     expect(manager.watchingHostIds()).toEqual(["machine-b"]);
@@ -395,7 +428,8 @@ describe("TwoTierHostConnectionManager — promote()", () => {
   it("closes the demoted machine's full-registry client and re-creates it as watching — the actual 'at most one driving' invariant", async () => {
     const auth = makeAuth("t");
     const { createDriving, byHostId: drivingByHostId } = fakeDrivingFactory();
-    const { createWatching, byHostId: watchingByHostId } = fakeWatchingFactory();
+    const { createWatching, byHostId: watchingByHostId } =
+      fakeWatchingFactory();
     const manager = new TwoTierHostConnectionManager(auth, ENTRY_A, {
       createDriving,
       createWatching,

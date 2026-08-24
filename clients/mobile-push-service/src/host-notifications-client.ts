@@ -11,7 +11,10 @@ import {
   hostNotificationsSubscribeServerFrameSchema,
   type HostNotificationsSubscribeServerFrame,
 } from "@traycer/protocol/host/notifications/contracts";
-import { hostStreamRpcRegistry, type HostStreamRpcRegistry } from "@traycer/protocol/host/registry";
+import {
+  hostStreamRpcRegistry,
+  type HostStreamRpcRegistry,
+} from "@traycer/protocol/host/registry";
 import { MutableBearerLease } from "@traycer-clients/shared/auth/bearer-source";
 import { createWhatwgStreamWebSocketFactory } from "@traycer-clients/shared/host-transport/whatwg-stream-ws-factory";
 import type {
@@ -30,7 +33,10 @@ import {
   resolveHostAuth,
   type BearerRevalidator,
 } from "./host-auth";
-import { isValidLocalHostWebsocketUrl, readHostPidMetadata } from "./pid-metadata";
+import {
+  isValidLocalHostWebsocketUrl,
+  readHostPidMetadata,
+} from "./pid-metadata";
 import { logError, logInfo, logWarn } from "./logger";
 
 const SUBSCRIBE_METHOD = "host.notifications.feed.subscribe" as const;
@@ -142,7 +148,9 @@ function runSubscriptionLoop(
     const fail = (error: Error): void => {
       if (settled) return;
       settled = true;
-      logError("host notifications subscription failed", { message: error.message });
+      logError("host notifications subscription failed", {
+        message: error.message,
+      });
       clearHealthTimer();
       clearRetryTimer();
       session?.close();
@@ -179,11 +187,19 @@ function runSubscriptionLoop(
         healthTimer = setTimeout(markHealthy, HEALTHY_OPEN_MS);
         return;
       }
-      if (status !== "closed" || reason === null || reason.kind !== "fatalError") {
+      if (
+        status !== "closed" ||
+        reason === null ||
+        reason.kind !== "fatalError"
+      ) {
         return;
       }
       if (reason.details.code !== "UNAUTHORIZED") {
-        fail(new Error(`host closed the notifications stream: ${reason.details.reason}`));
+        fail(
+          new Error(
+            `host closed the notifications stream: ${reason.details.reason}`,
+          ),
+        );
         return;
       }
       const outcome = await revalidator.revalidateCurrentContext();
@@ -203,11 +219,17 @@ function runSubscriptionLoop(
         return;
       }
       if (outcome === "network-error") {
-        logWarn("auth refresh unavailable, retrying", { retryDelayMs: AUTH_RETRY_DELAY_MS });
+        logWarn("auth refresh unavailable, retrying", {
+          retryDelayMs: AUTH_RETRY_DELAY_MS,
+        });
         retryTimer = setTimeout(subscribe, AUTH_RETRY_DELAY_MS);
         return;
       }
-      fail(new Error("notifications subscription session expired — re-authenticate"));
+      fail(
+        new Error(
+          "notifications subscription session expired — re-authenticate",
+        ),
+      );
     };
 
     subscribe();
@@ -218,9 +240,12 @@ async function handleServerFrame(
   envelope: StreamFrameEnvelope,
   detector: ActionableDetector,
 ): Promise<void> {
-  const parsed = hostNotificationsSubscribeServerFrameSchema.safeParse(envelope);
+  const parsed =
+    hostNotificationsSubscribeServerFrameSchema.safeParse(envelope);
   if (!parsed.success) {
-    logWarn("dropped unrecognized notifications frame", { frameKind: String((envelope as { kind?: unknown }).kind) });
+    logWarn("dropped unrecognized notifications frame", {
+      frameKind: String((envelope as { kind?: unknown }).kind),
+    });
     return;
   }
   await routeFrame(parsed.data, detector);

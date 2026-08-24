@@ -1,4 +1,9 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import { z } from "zod";
 import { validateAuthTokenIdentityAccessOnly } from "@traycer-clients/shared/auth/auth-validation";
 import type { PushSubscriptionKeys } from "./subscription-store";
@@ -30,7 +35,10 @@ const unsubscribeBodySchema = z.object({
 export type ValidateBearerFn = (token: string) => Promise<boolean>;
 
 const defaultValidateBearer: ValidateBearerFn = async (token) => {
-  const result = await validateAuthTokenIdentityAccessOnly(AUTHN_BASE_URL, token);
+  const result = await validateAuthTokenIdentityAccessOnly(
+    AUTHN_BASE_URL,
+    token,
+  );
   return result.kind === "valid";
 };
 
@@ -106,7 +114,9 @@ async function handleRequest(
     }
     sendJson(res, 404, { error: "not found" });
   } catch (err) {
-    logWarn("http-api request failed", { message: err instanceof Error ? err.message : "unknown" });
+    logWarn("http-api request failed", {
+      message: err instanceof Error ? err.message : "unknown",
+    });
     sendJson(res, 400, { error: "malformed request" });
   }
 }
@@ -131,7 +141,9 @@ async function authorize(
   return true;
 }
 
-function extractBearerToken(header: string | string[] | undefined): string | null {
+function extractBearerToken(
+  header: string | string[] | undefined,
+): string | null {
   const value = Array.isArray(header) ? header[0] : header;
   if (value === undefined) return null;
   const match = /^Bearer (.+)$/.exec(value);
@@ -148,7 +160,11 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(raw);
 }
 
-function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
+function sendJson(
+  res: ServerResponse,
+  statusCode: number,
+  body: unknown,
+): void {
   const payload = JSON.stringify(body);
   res.writeHead(statusCode, { "Content-Type": "application/json" });
   res.end(payload);

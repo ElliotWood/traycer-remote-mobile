@@ -31,7 +31,10 @@ cd "$(git rev-parse --show-toplevel)"
 # not a leak. Add here only when the name cannot identify a real person.
 # `\.\.\.` covers prose that elides the username entirely (`C:\Users\...\file`),
 # which is how docs and comments legitimately refer to a path shape.
-PLACEHOLDER_USERS='me|them|dev|test|user|users|example|foo|bar|baz|u|alice|bob|someone|youruser|<user>|USERNAME|\.\.\.'
+# `[0-9]+` and `tenant-…` are shapes, not names: a purely numeric "username"
+# (docs showing `HOME=/fake/home/1`) and the multi-tenant fixtures' tenant-a /
+# tenant-b cannot identify a person.
+PLACEHOLDER_USERS='me|them|dev|test|user|users|example|foo|bar|baz|u|alice|bob|someone|youruser|<user>|USERNAME|tenant-[a-z0-9]+|[0-9]+|\.\.\.'
 
 # description | extended-regex
 PATTERNS=(
@@ -62,7 +65,13 @@ PATTERNS=(
   # ticket A5 - ownership consolidated here so there is one gate instead of
   # two that could flag each other).
   "Windows home path with a real username|[A-Za-z]:\\\\Users\\\\(?!($PLACEHOLDER_USERS)(\\\\|\\s|$))[A-Za-z0-9._-]+"
-  "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)/)[A-Za-z0-9._-]+"
+  #
+  # The placeholder terminator is "anything outside the username charset, or
+  # end of line" rather than only `/` — the Windows pattern above already
+  # learned this (`\s|$`): a fixture path ends at a quote (`"/home/tenant-a"`)
+  # or at EOL (`home/1`) as legitimately as at a slash, and requiring the
+  # slash re-flags exactly the placeholders the list is for.
+  "POSIX home path with a real username|/(home|Users)/(?!($PLACEHOLDER_USERS)([^A-Za-z0-9._-]|$))[A-Za-z0-9._-]+"
 
   # Any RFC-4122 GUID. Narrowed by the synthetic-fixture filter below, and
   # scoped to shipping source only — see the scope note.
@@ -98,7 +107,12 @@ PATTERNS=(
   # traycer.ai pass; a real personal address at the same domain
   # (elliot.wood@traycer.ai) and a generic personal address elsewhere are
   # both still flagged.
-  "email address|\b(?!(push|support|release|noreply)@traycer\.ai\b)[A-Za-z0-9._%+-]+@(?!([A-Za-z0-9.-]*\.)?(example)\.(com|org|net|test)\b)[A-Za-z0-9.-]+\.[a-z]{2,}"
+  #
+  # The second domain lookahead rejects "domains" that are file names: Apple
+  # asset catalogs name scaled images `AppIcon-512@2x.png`, whose shape is
+  # local@domain with a real TLD-length extension. An address cannot end in
+  # an image/file extension, so this excludes a shape, not a value.
+  "email address|\b(?!(push|support|release|noreply)@traycer\.ai\b)[A-Za-z0-9._%+-]+@(?!([A-Za-z0-9.-]*\.)?(example)\.(com|org|net|test)\b)(?![A-Za-z0-9.-]*\.(png|jpe?g|gif|webp|avif|svg|ico|pdf)\b)[A-Za-z0-9.-]+\.[a-z]{2,}"
 )
 
 # A GUID that is not one of our fixtures.

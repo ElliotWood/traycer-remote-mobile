@@ -210,7 +210,11 @@ function labelFor(blockType: string): string {
  */
 function readText(block: Record<string, unknown>): string {
   const content = block["content"];
-  if (content !== null && content !== undefined && typeof content === "object") {
+  if (
+    content !== null &&
+    content !== undefined &&
+    typeof content === "object"
+  ) {
     try {
       return jsonContentToMarkdown(content as never, {
         mentionFormat: "user",
@@ -400,7 +404,11 @@ function blockDetail(
     // chip. "3 items" is what a reader can act on at a glance.
     return Array.isArray(items) ? `${String(items.length)} items` : null;
   }
-  if (type === "plan" || type === "artifact_operation" || type === "interview") {
+  if (
+    type === "plan" ||
+    type === "artifact_operation" ||
+    type === "interview"
+  ) {
     const title = block["title"];
     return typeof title === "string" && title.trim().length > 0
       ? title.trim()

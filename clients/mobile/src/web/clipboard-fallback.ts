@@ -186,7 +186,8 @@ export function installClipboardFallback(
       document.documentElement.dataset.clipboard = surface;
     });
   const copy =
-    options.copy ?? ((text: string) => execCommandCopy(globalThis.document, text));
+    options.copy ??
+    ((text: string) => execCommandCopy(globalThis.document, text));
 
   const allowed = readClipboardWritePolicy(doc);
   // Reading the PROPERTY is what throws in some contexts, not calling a method

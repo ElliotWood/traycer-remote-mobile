@@ -63,8 +63,9 @@ let resolved: string | null | undefined;
 export function posixShell(): string | null {
   if (resolved === undefined) {
     resolved =
-      candidates().find((candidate) => existsSync(candidate) && probe(candidate)) ??
-      null;
+      candidates().find(
+        (candidate) => existsSync(candidate) && probe(candidate),
+      ) ?? null;
   }
   return resolved;
 }

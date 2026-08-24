@@ -68,7 +68,10 @@ export function bufferHttpHead(
 
   client.on("data", (chunk: Buffer | string) => {
     if (handled) return;
-    buf = Buffer.concat([buf, typeof chunk === "string" ? Buffer.from(chunk) : chunk]);
+    buf = Buffer.concat([
+      buf,
+      typeof chunk === "string" ? Buffer.from(chunk) : chunk,
+    ]);
     const idx = buf.indexOf("\r\n\r\n");
     if (idx === -1) {
       if (buf.length > HEAD_MAX_BYTES) {

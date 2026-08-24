@@ -18,6 +18,11 @@ repos:
       - id: mixed-line-ending
       - id: check-yaml
       - id: check-json
+        # tsconfig is JSONC by spec — TypeScript itself parses comments and
+        # trailing commas there, and several of ours carry load-bearing
+        # comments (e.g. why "dom" must not join lib). A strict-JSON check
+        # on a JSONC file reports the format, not a defect.
+        exclude: (^|/)tsconfig(\..+)?\.json$
       - id: check-merge-conflict
 
   - repo: https://github.com/gruntwork-io/pre-commit

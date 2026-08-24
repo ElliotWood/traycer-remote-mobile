@@ -137,7 +137,9 @@ export function showUpdateBanner(
   container: HTMLElement,
   onRefresh: () => void,
 ): HTMLElement | null {
-  if (document.querySelector(`[data-testid="${UPDATE_BANNER_TESTID}"]`) !== null) {
+  if (
+    document.querySelector(`[data-testid="${UPDATE_BANNER_TESTID}"]`) !== null
+  ) {
     return null;
   }
 

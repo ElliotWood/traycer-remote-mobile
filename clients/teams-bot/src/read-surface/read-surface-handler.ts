@@ -92,8 +92,7 @@ class ReadSurfaceHandler extends ActivityHandler {
     //
     // This is the ingress the buttons actually use.
     const actionValue = context.activity.value as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const actionVerb =
       typeof actionValue?.["verb"] === "string" ? actionValue["verb"] : null;
     if (actionVerb !== null) {
@@ -147,14 +146,22 @@ class ReadSurfaceHandler extends ActivityHandler {
      * one that has to be testable without standing up a turn.
      * ══════════════════════════════════════════════════════════════════
      */
-    const focus = await this.deps.focusedChats.get(conversationId, this.deps.now());
+    const focus = await this.deps.focusedChats.get(
+      conversationId,
+      this.deps.now(),
+    );
     if (focus.kind === "focused") {
       const routing = routeWhileFocused({
         text: spoken.text,
         hasAttachments: (context.activity.attachments?.length ?? 0) > 0,
       });
       if (routing.kind === "send") {
-        await this.sendWhileFocused(context, conversationId, focus.chat, routing.text);
+        await this.sendWhileFocused(
+          context,
+          conversationId,
+          focus.chat,
+          routing.text,
+        );
         return;
       }
       if (routing.kind === "exit") {
@@ -171,7 +178,9 @@ class ReadSurfaceHandler extends ActivityHandler {
       // message, neither of which the user typed as a command.
       if (routing.intercepted.length > 0) {
         await context.sendActivity(
-          MessageFactory.text(focusInterceptedText(routing.intercepted, focus.chat)),
+          MessageFactory.text(
+            focusInterceptedText(routing.intercepted, focus.chat),
+          ),
         );
       }
     } else if (focus.kind === "expired" && spoken.text.trim().length > 0) {

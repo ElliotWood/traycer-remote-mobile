@@ -17,17 +17,17 @@ filesystem), not an oversight this spec is trying to paper over.
 **The filesystem enforces nothing between tenants.** Every credentials file
 under `~/.traycer/cli/credentials` is written `0600` (owner-read-only) — but
 "owner" is the one shared OS user every tenant process runs as, so that mode
-bit protects the account from *other machine users*, not tenant processes from
-*each other*. Two bridge processes on this VM can read every other tenant's
+bit protects the account from _other machine users_, not tenant processes from
+_each other_. Two bridge processes on this VM can read every other tenant's
 credentials file if they resolve `$HOME` to it. Nothing at the OS level stops
 that. The only thing that does is item 1 below being followed correctly.
 
 ## 1. Required environment, set before spawn, never mutated after
 
-| Variable | Required | Why |
-|---|---|---|
-| `HOME` | **Yes**, on every platform this runs on (Linux is the target; also required if ever run on a POSIX-like shell on any other OS) | The single root every path in this contract derives from. See "Why `HOME` alone decides identity" below. |
-| `USERPROFILE` | Only if this ever runs on native Windows (not applicable to the Linux Azure VM target, listed for completeness) | Node's `os.homedir()` reads `USERPROFILE` first on Windows, `HOME` on POSIX. Set both if the platform is ever ambiguous; on Linux only `HOME` matters. |
+| Variable      | Required                                                                                                                       | Why                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `HOME`        | **Yes**, on every platform this runs on (Linux is the target; also required if ever run on a POSIX-like shell on any other OS) | The single root every path in this contract derives from. See "Why `HOME` alone decides identity" below.                                               |
+| `USERPROFILE` | Only if this ever runs on native Windows (not applicable to the Linux Azure VM target, listed for completeness)                | Node's `os.homedir()` reads `USERPROFILE` first on Windows, `HOME` on POSIX. Set both if the platform is ever ambiguous; on Linux only `HOME` matters. |
 
 **Set before the process starts. Never mutated while it runs.** This is not
 a style preference — it's a proven runtime property. `os.homedir()` re-reads
@@ -62,7 +62,7 @@ Every path the bridge touches is `join(homedir(), ".traycer", ...)`:
 There is no second identity signal anywhere in the bridge or the underlying
 `@traycer/protocol/config` primitives it depends on — no OS-user check, no
 container/namespace read, no separate "tenant id" config value. `HOME` is not
-*a* factor; it is the *only* factor.
+_a_ factor; it is the _only_ factor.
 
 ## 2. What must never be shared between tenants — the invariant
 
@@ -78,7 +78,7 @@ This was verified directly against the code for this contract, not assumed:
   call `os.homedir()` inline on every invocation — no module-level constant,
   no memoization, nothing resolved at import time that a later `HOME` change
   wouldn't pick up (moot once you follow "set before spawn," but confirms
-  there's no *additional* bug hiding behind that rule).
+  there's no _additional_ bug hiding behind that rule).
 - The credentials **lock path** is `${credentialsPath}.lock` — always
   colocated with that process's own resolved credentials file
   (`clients/shared/auth/host-credentials-store.ts`). The underlying lock
@@ -104,7 +104,7 @@ path helpers should re-verify this invariant by hand.
 **Traycer has no built-in way to detect or prevent two processes started
 against the same `HOME`.** If a spawner mistake launches two bridge processes
 (or a bridge and a `traycer` CLI invocation) under the identical `HOME`, they
-will contend for the same credentials lock file — which will *work*
+will contend for the same credentials lock file — which will _work_
 (`credentials-lock.ts`'s lock serializes correctly; this was proven under real
 concurrent contention as part of T0b, two real processes racing one real file,
 exactly one refresh spent, both converge) — but it will silently mean two
@@ -131,9 +131,11 @@ that would let it self-detect this.
 to, without reading source.** The bridge now provides this directly: every
 successful startup logs a single greppable line to stderr, before any RPC or
 host connection is attempted —
+
 ```
 {"level":"info","message":"identity resolved","fields":"{\"userId\":\"<resolved user.id>\",\"home\":\"<resolved HOME>\"}"}
 ```
+
 (`clients/remote-bridge/src/bridge-client.ts`'s `BridgeClient.start()`,
 sourced from `HostAuth.userId`/`HostAuth.home` in `host-auth.ts`). This is
 the process's own attestation, self-reported and live-verified against the
@@ -143,16 +145,16 @@ resolved"` and gets the exact `user.id` and `HOME` it started with, no
 process that crashed before logging, or whose logs were not retained, but is
 no longer the primary mechanism. The spawner's own launch configuration
 (systemd unit naming, process manager metadata) is still the authoritative
-record of *intended* tenant mapping — the identity-resolved log line is what
-confirms the process's *actual* resolved identity matched that intent.
+record of _intended_ tenant mapping — the identity-resolved log line is what
+confirms the process's _actual_ resolved identity matched that intent.
 
 ## 4. Failure modes — what actually happens, checked against the real runtime, not described as intended
 
-| Condition | What actually happens | How it looks to an operator |
-|---|---|---|
-| `HOME` unset entirely | **Fails cleanly, by design — fixed and live-verified, no longer a risk left to the spawner.** The underlying danger is real and stays documented below for context: per Node's own `os.homedir()` contract ("On POSIX, it uses the `$HOME` environment variable if defined. Otherwise it uses the effective UID to look up the user's home directory" — nodejs.org/api/os.html#oshomedir), an unset `HOME` would otherwise fall back to the password-database entry (`getpwuid`) for the **current OS user** — and since every tenant on this VM shares that one OS user, that fallback would silently collapse every misconfigured tenant onto the SAME real identity, with no error. `clients/remote-bridge/src/host-auth.ts`'s `requireHomeEnv()` closes this by reading `process.env.HOME` (`USERPROFILE` on Windows) directly and refusing to proceed if it is unset or empty — it never calls `os.homedir()` at all, so the dangerous fallback is never reached. Called at the very start of `resolveHostAuth()`, before any credentials file is read. Live-verified against the real host with `HOME`/`USERPROFILE` unset: process exits immediately, code 1, `[bridge] fatal: remote-bridge: HOME is not set in the environment...` — no credentials file touched, no network call made. Strict, no escape hatch: there is no legitimate case in this deployment model where falling back to the OS user's home is the intended behavior. |
-| `HOME` set to a path that does not exist | **Fails cleanly, verified.** `readCredentialsFile` (`protocol/src/config/credentials.ts`) maps `ENOENT` to `null` ("no session") rather than throwing; `resolveHostAuth()` (`clients/remote-bridge/src/host-auth.ts`) returns `null` on a `null`/empty-token read, and `BridgeClient.start()` throws `"remote-bridge: not signed in - run \`traycer login\` to authenticate."` The process exits with a clear, attributable error. This is the SAFE failure — loud, unambiguous, and it cannot be mistaken for a different tenant's identity. |
-| `HOME` set to **another real tenant's** home directory (a spawner mix-up, not a typo) | **Does NOT fail. Silently succeeds as the wrong identity.** Verified directly: a process whose `HOME` was set to a different (real, valid) tenant's home directory reads that tenant's actual credentials file and proceeds as that tenant with no error, no warning, and no code-level distinction from correct operation. Demonstrated: <br>`Process resolved identity: TENANT-B-USERID` (while intending to run as tenant A). <br>**This is the failure this whole contract exists to prevent**, and the bridge code has no way to catch it — it has no independent notion of "who it is supposed to be" to compare against. The ONLY defense is the spawner never producing this condition: `HOME` values must be generated deterministically per tenant (never copy-pasted, never derived from a shared/mutable source two tenants could momentarily both read) and the spawner should log the resolved `HOME` value alongside the tenant identifier it intended at every launch, so a mismatch is at least auditable after the fact even though it is not detectable in-process. |
+| Condition                                                                             | What actually happens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | How it looks to an operator |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `HOME` unset entirely                                                                 | **Fails cleanly, by design — fixed and live-verified, no longer a risk left to the spawner.** The underlying danger is real and stays documented below for context: per Node's own `os.homedir()` contract ("On POSIX, it uses the `$HOME` environment variable if defined. Otherwise it uses the effective UID to look up the user's home directory" — nodejs.org/api/os.html#oshomedir), an unset `HOME` would otherwise fall back to the password-database entry (`getpwuid`) for the **current OS user** — and since every tenant on this VM shares that one OS user, that fallback would silently collapse every misconfigured tenant onto the SAME real identity, with no error. `clients/remote-bridge/src/host-auth.ts`'s `requireHomeEnv()` closes this by reading `process.env.HOME` (`USERPROFILE` on Windows) directly and refusing to proceed if it is unset or empty — it never calls `os.homedir()` at all, so the dangerous fallback is never reached. Called at the very start of `resolveHostAuth()`, before any credentials file is read. Live-verified against the real host with `HOME`/`USERPROFILE` unset: process exits immediately, code 1, `[bridge] fatal: remote-bridge: HOME is not set in the environment...` — no credentials file touched, no network call made. Strict, no escape hatch: there is no legitimate case in this deployment model where falling back to the OS user's home is the intended behavior. |
+| `HOME` set to a path that does not exist                                              | **Fails cleanly, verified.** `readCredentialsFile` (`protocol/src/config/credentials.ts`) maps `ENOENT` to `null` ("no session") rather than throwing; `resolveHostAuth()` (`clients/remote-bridge/src/host-auth.ts`) returns `null` on a `null`/empty-token read, and `BridgeClient.start()` throws `"remote-bridge: not signed in - run \`traycer login\` to authenticate."` The process exits with a clear, attributable error. This is the SAFE failure — loud, unambiguous, and it cannot be mistaken for a different tenant's identity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `HOME` set to **another real tenant's** home directory (a spawner mix-up, not a typo) | **Does NOT fail. Silently succeeds as the wrong identity.** Verified directly: a process whose `HOME` was set to a different (real, valid) tenant's home directory reads that tenant's actual credentials file and proceeds as that tenant with no error, no warning, and no code-level distinction from correct operation. Demonstrated: <br>`Process resolved identity: TENANT-B-USERID` (while intending to run as tenant A). <br>**This is the failure this whole contract exists to prevent**, and the bridge code has no way to catch it — it has no independent notion of "who it is supposed to be" to compare against. The ONLY defense is the spawner never producing this condition: `HOME` values must be generated deterministically per tenant (never copy-pasted, never derived from a shared/mutable source two tenants could momentarily both read) and the spawner should log the resolved `HOME` value alongside the tenant identifier it intended at every launch, so a mismatch is at least auditable after the fact even though it is not detectable in-process.                                                                                                                                                                                                                                                                                                                                                            |
 
 ## What changed since this spec was first written
 

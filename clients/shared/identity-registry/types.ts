@@ -81,9 +81,7 @@ export interface TenantMapping {
 }
 
 export type RefusalReason =
-  | "unmapped_principal"
-  | "unmapped_host_id"
-  | "malformed_principal";
+  "unmapped_principal" | "unmapped_host_id" | "malformed_principal";
 
 export type TenantResolution =
   | { readonly kind: "resolved"; readonly tenant: TenantMapping }

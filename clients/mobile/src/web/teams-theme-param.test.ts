@@ -130,9 +130,7 @@ describe("the entry point applies the URL theme before it paints", () => {
   });
 
   it("resolves the theme from the URL and feeds it to the applier seam", () => {
-    expect(mainSource).toMatch(
-      /setHostThemeOverride\(\s*urlTheme\s*\)/,
-    );
+    expect(mainSource).toMatch(/setHostThemeOverride\(\s*urlTheme\s*\)/);
     expect(mainSource).toMatch(
       /resolveTeamsThemeParam\(\s*window\.location\.search\s*\)/,
     );

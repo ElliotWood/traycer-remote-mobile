@@ -85,7 +85,10 @@ describe("host store", () => {
 
   it("trims surrounding whitespace instead of storing it", () => {
     addStoredHost(
-      validInput({ label: "  Tonberry  ", websocketUrl: " wss://h.example/rpc " }),
+      validInput({
+        label: "  Tonberry  ",
+        websocketUrl: " wss://h.example/rpc ",
+      }),
       [BAKED_ID],
     );
     expect(readStoredHosts()[0].label).toBe("Tonberry");
@@ -124,9 +127,9 @@ describe("host store", () => {
       [BAKED_ID],
     );
     expect(result.kind).toBe("rejected");
-    expect(
-      result.kind === "rejected" ? result.reason : "",
-    ).toContain("cannot dial a ws:// host");
+    expect(result.kind === "rejected" ? result.reason : "").toContain(
+      "cannot dial a ws:// host",
+    );
     expect(readStoredHosts()).toEqual([]);
   });
 

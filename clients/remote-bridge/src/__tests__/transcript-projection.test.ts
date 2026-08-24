@@ -30,7 +30,9 @@ function userMessage(id: string): UserMessage {
 }
 
 /** Fills the four fields every content block carries, so tests stay readable. */
-function block(partial: Partial<ContentBlock> & { type: string }): ContentBlock {
+function block(
+  partial: Partial<ContentBlock> & { type: string },
+): ContentBlock {
   return {
     blockId: `b-${partial.type}`,
     status: "completed",

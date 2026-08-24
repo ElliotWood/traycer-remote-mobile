@@ -30,7 +30,7 @@
  *   node tools/push-envelope-probe.mjs <docroot|https://origin> [label]
  *
  * `<docroot>` is a built `/next/` bundle — e.g. the dist worktree at
- * `C:/Users/gigaf/.traycer/scratch/next-dist`. A value starting with `http` is
+ * `C:/Users/<user>/.traycer/scratch/next-dist`. A value starting with `http` is
  * fetched from the live deployment instead, which is a different claim and
  * worth making separately: a green local build and a green deployment have
  * already disagreed once in this epic.
@@ -42,9 +42,9 @@ import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const REPO = "C:/repo/traycer-remote-mobile";
+const REPO = fileURLToPath(new URL("../../..", import.meta.url));
 const { chromium } = await import(
   pathToFileURL(`${REPO}/node_modules/playwright-core/index.mjs`).href
 );
@@ -56,9 +56,12 @@ if (docrootArg === undefined) {
 const live = docrootArg.startsWith("http");
 const DOCROOT = live ? docrootArg : resolve(docrootArg);
 const BASE = "/next/";
+// LOCALAPPDATA keeps this machine-portable without naming a user; the
+// chromium build number is still a local fact — override with
+// TRAYCER_PROBE_CHROME when the playwright cache differs.
 const CHROME =
   process.env.TRAYCER_PROBE_CHROME ??
-  "C:/Users/gigaf/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
+  `${(process.env.LOCALAPPDATA ?? "").replaceAll("\\", "/")}/ms-playwright/chromium-1228/chrome-win64/chrome.exe`;
 
 /**
  * The two arms. `envelope` is READ FROM THE GOLDEN FIXTURE rather than

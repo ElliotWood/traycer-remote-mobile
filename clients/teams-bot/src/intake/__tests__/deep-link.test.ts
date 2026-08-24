@@ -49,14 +49,20 @@ describe("chatDeepLink", () => {
   });
 
   it("keeps a root-served tab on a plain path — no fragment", () => {
-    const link = chatDeepLink({ tabBaseUrl: "https://example.invalid" }, "e", "c");
+    const link = chatDeepLink(
+      { tabBaseUrl: "https://example.invalid" },
+      "e",
+      "c",
+    );
     expect(link).not.toContain("#");
   });
 
   it("tolerates a trailing slash on the configured base", () => {
     expect(
       chatDeepLink({ tabBaseUrl: "https://example.invalid/next///" }, "e", "c"),
-    ).toBe(chatDeepLink({ tabBaseUrl: "https://example.invalid/next" }, "e", "c"));
+    ).toBe(
+      chatDeepLink({ tabBaseUrl: "https://example.invalid/next" }, "e", "c"),
+    );
   });
 
   it("CONTRACT: returns null when no base URL is configured", () => {
@@ -141,8 +147,9 @@ describe("chatDeepLink", () => {
       expect(context.subEntityId).toBe(arm.subEntityId);
       // And it is the SAME route the web link puts in its fragment. One route
       // shape in the builder; the tab applies it verbatim.
-      expect(`${WIRE.subpath.tabBaseUrl.replace(/\/+$/, "")}/#${context.subEntityId ?? ""}`)
-        .toBe(WIRE.subpath.link);
+      expect(
+        `${WIRE.subpath.tabBaseUrl.replace(/\/+$/, "")}/#${context.subEntityId ?? ""}`,
+      ).toBe(WIRE.subpath.link);
     });
 
     it("addresses the manifest's own static tab", () => {
@@ -196,7 +203,11 @@ describe("chatDeepLink", () => {
     // route into three segments and stops matching. Real ids are uuids, which
     // makes this a guard rather than a live case.
     expect(
-      chatDeepLink({ tabBaseUrl: "https://example.invalid/next" }, "a/b", "c d"),
+      chatDeepLink(
+        { tabBaseUrl: "https://example.invalid/next" },
+        "a/b",
+        "c d",
+      ),
     ).toBe(
       "https://example.invalid/next/#/epics/a%2Fb/a%2Fb?focusArtifactId=c%20d",
     );

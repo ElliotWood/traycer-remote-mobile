@@ -25,7 +25,10 @@ const originalUserProfile = process.env.USERPROFILE;
 const originalPlatform = process.platform;
 
 function setPlatform(platform: NodeJS.Platform): void {
-  Object.defineProperty(process, "platform", { value: platform, configurable: true });
+  Object.defineProperty(process, "platform", {
+    value: platform,
+    configurable: true,
+  });
 }
 
 afterEach(() => {

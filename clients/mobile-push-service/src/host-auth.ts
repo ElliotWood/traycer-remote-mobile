@@ -1,5 +1,8 @@
 import { readCredentialsFile } from "@traycer/protocol/config/credentials";
-import { cliCredentialsPath, type Environment } from "@traycer/protocol/config/paths";
+import {
+  cliCredentialsPath,
+  type Environment,
+} from "@traycer/protocol/config/paths";
 import {
   createCredentialsMutationStore,
   type CredentialsMutationStore,

@@ -30,7 +30,9 @@ export class SubscriptionStore {
   }
 
   async load(): Promise<void> {
-    const stored = await readJsonFileOrNull<StoredPushSubscription[]>(this.path);
+    const stored = await readJsonFileOrNull<StoredPushSubscription[]>(
+      this.path,
+    );
     this.subscriptions = Array.isArray(stored) ? stored : [];
     this.loaded = true;
   }

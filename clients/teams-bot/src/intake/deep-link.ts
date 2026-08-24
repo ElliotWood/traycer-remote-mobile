@@ -200,11 +200,7 @@ function teamsAppId(config: DeepLinkConfig): string | null {
  * `subEntityId` carries the SAME route string that the web link puts in its
  * fragment. One route shape in this file, and the tab applies it verbatim.
  */
-function entityDeepLink(
-  appId: string,
-  route: string,
-  webUrl: string,
-): string {
+function entityDeepLink(appId: string, route: string, webUrl: string): string {
   const url = new URL(
     `https://teams.microsoft.com/l/entity/${encodeURIComponent(appId)}/${encodeURIComponent(APP_TAB_ENTITY_ID)}`,
   );

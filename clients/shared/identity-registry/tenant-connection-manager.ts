@@ -99,7 +99,9 @@ export class TenantConnectionManager {
   private readonly registry: IdentityRegistry;
   private readonly command: string;
   private readonly args: readonly string[];
-  private readonly buildExtraEnv: (tenant: TenantMapping) => Record<string, string>;
+  private readonly buildExtraEnv: (
+    tenant: TenantMapping,
+  ) => Record<string, string>;
   private readonly parentEnv: NodeJS.ProcessEnv;
   private readonly spawnFn: SpawnFn;
   private readonly setTimer: (handler: () => void, ms: number) => TimerHandle;
@@ -117,11 +119,15 @@ export class TenantConnectionManager {
     this.buildExtraEnv = options.buildExtraEnv ?? (() => ({}));
     this.parentEnv = options.parentEnv ?? process.env;
     this.spawnFn = options.spawnFn ?? nodeSpawnFn;
-    this.setTimer = options.setTimer ?? ((handler, ms) => setTimeout(handler, ms));
-    this.clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as NodeJS.Timeout));
+    this.setTimer =
+      options.setTimer ?? ((handler, ms) => setTimeout(handler, ms));
+    this.clearTimer =
+      options.clearTimer ??
+      ((handle) => clearTimeout(handle as NodeJS.Timeout));
     this.maxConsecutiveFailures =
       options.maxConsecutiveFailures ?? DEFAULT_MAX_CONSECUTIVE_FAILURES;
-    this.initialBackoffMs = options.initialBackoffMs ?? DEFAULT_INITIAL_BACKOFF_MS;
+    this.initialBackoffMs =
+      options.initialBackoffMs ?? DEFAULT_INITIAL_BACKOFF_MS;
     this.maxBackoffMs = options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
     this.onTerminal = options.onTerminal ?? (() => {});
   }

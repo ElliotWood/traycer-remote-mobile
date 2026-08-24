@@ -58,8 +58,7 @@ export const NOTIFICATION_CLIENT_READY_MESSAGE =
  * shape of a cold open. Without the ack the worker would have to choose between
  * losing that tap and redelivering every tap forever.
  */
-export const NOTIFICATION_CLICK_ACK_MESSAGE =
-  "traycer:notification-click-ack";
+export const NOTIFICATION_CLICK_ACK_MESSAGE = "traycer:notification-click-ack";
 
 /**
  * The service-worker surface this module uses, named as the narrowest shape
@@ -110,11 +109,7 @@ export interface NotificationServiceWorkerHost {
  * is.
  */
 export type NativeNotifyOutcome =
-  | "idle"
-  | "shown"
-  | "surface-blocked"
-  | "permission"
-  | "no-worker";
+  "idle" | "shown" | "surface-blocked" | "permission" | "no-worker";
 
 export interface WebNotificationHostOptions {
   /** Defaults to `navigator.serviceWorker`. Injected in tests. */

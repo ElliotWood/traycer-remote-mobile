@@ -44,13 +44,20 @@ function entry(over: Record<string, unknown>): HostNotificationEntry {
 
 describe("isAttentionEntry", () => {
   it("is true for an unread blocking row", () => {
-    expect(isAttentionEntry(entry({ severity: "needs_action", readAt: null }))).toBe(true);
+    expect(
+      isAttentionEntry(entry({ severity: "needs_action", readAt: null })),
+    ).toBe(true);
   });
 
   it("is true for an unread failure", () => {
     expect(
       isAttentionEntry(
-        entry({ kind: "agent.stalled", outcome: "errored", severity: "failure", readAt: null }),
+        entry({
+          kind: "agent.stalled",
+          outcome: "errored",
+          severity: "failure",
+          readAt: null,
+        }),
       ),
     ).toBe(true);
   });
@@ -61,11 +68,15 @@ describe("isAttentionEntry", () => {
    * answering an approval elsewhere would leave it pinned at the top forever.
    */
   it("is false once the row has been read, even though it is blocking", () => {
-    expect(isAttentionEntry(entry({ severity: "needs_action", readAt: 2_000 }))).toBe(false);
+    expect(
+      isAttentionEntry(entry({ severity: "needs_action", readAt: 2_000 })),
+    ).toBe(false);
   });
 
   it("is false for an unread informational row", () => {
-    expect(isAttentionEntry(entry({ severity: "info", readAt: null }))).toBe(false);
+    expect(isAttentionEntry(entry({ severity: "info", readAt: null }))).toBe(
+      false,
+    );
   });
 });
 

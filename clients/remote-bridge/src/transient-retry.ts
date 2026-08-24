@@ -35,7 +35,8 @@ export async function withTransientRetry<T>(opts: {
   readonly sleep?: (ms: number) => Promise<void>;
 }): Promise<T> {
   const sleep =
-    opts.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    opts.sleep ??
+    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   try {
     return await opts.call();
   } catch (error) {

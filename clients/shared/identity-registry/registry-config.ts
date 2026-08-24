@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { isCanonicalGuid } from "./guid";
-import type { MappedAadObjectId, MappedTraycerUserId, TenantMapping } from "./types";
+import type {
+  MappedAadObjectId,
+  MappedTraycerUserId,
+  TenantMapping,
+} from "./types";
 
 /**
  * `hostId` is this registry's stable, opaque public identifier for a
@@ -163,7 +167,10 @@ export function loadRegistryConfig(raw: unknown): RegistryLoadResult {
       };
     }
     if (seenHostId.has(hostId)) {
-      return { kind: "refused", reason: `duplicate hostId at tenant[${index}]` };
+      return {
+        kind: "refused",
+        reason: `duplicate hostId at tenant[${index}]`,
+      };
     }
     if (entraOid !== null && seenEntraOid.has(entraOid)) {
       return {

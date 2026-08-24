@@ -10,15 +10,11 @@ describe("isCanonicalGuid", () => {
   });
 
   it("rejects uppercase", () => {
-    expect(isCanonicalGuid("0B8F1C2E-8F3A-4A1B-9C2D-1E2F3A4B5C6D")).toBe(
-      false,
-    );
+    expect(isCanonicalGuid("0B8F1C2E-8F3A-4A1B-9C2D-1E2F3A4B5C6D")).toBe(false);
   });
 
   it("rejects mixed case", () => {
-    expect(isCanonicalGuid("0b8f1c2E-8f3a-4a1b-9c2d-1e2f3a4b5c6d")).toBe(
-      false,
-    );
+    expect(isCanonicalGuid("0b8f1c2E-8f3a-4a1b-9c2d-1e2f3a4b5c6d")).toBe(false);
   });
 
   it("rejects missing hyphens", () => {

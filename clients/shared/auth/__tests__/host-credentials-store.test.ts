@@ -10,7 +10,10 @@ import {
 } from "@traycer/protocol/config/credentials-mutation";
 import type { StoredCredentials } from "@traycer/protocol/config/credentials";
 import { MutableBearerLease } from "../bearer-source";
-import { createStoreBackedRevalidator, withCommitRetry } from "../host-credentials-store";
+import {
+  createStoreBackedRevalidator,
+  withCommitRetry,
+} from "../host-credentials-store";
 
 /**
  * Concurrency proof for the T0b extraction (`createStoreBackedRevalidator` /
@@ -75,7 +78,11 @@ describe("createStoreBackedRevalidator - real concurrent contention", () => {
         // "a refresh landing while another holds it," not just two calls
         // that happen not to overlap.
         await new Promise((resolve) => setTimeout(resolve, 30));
-        return { kind: "refreshed", token: `${token}::r`, refreshToken: `rt::${token}` };
+        return {
+          kind: "refreshed",
+          token: `${token}::r`,
+          refreshToken: `rt::${token}`,
+        };
       },
       calls: () => count,
     };
@@ -106,8 +113,14 @@ describe("createStoreBackedRevalidator - real concurrent contention", () => {
     // their own in-memory lease over the same on-disk file.
     const leaseA = new MutableBearerLease(CREDS.token, CREDS.user.id);
     const leaseB = new MutableBearerLease(CREDS.token, CREDS.user.id);
-    const revalidatorA = createStoreBackedRevalidator({ store: storeA, lease: leaseA });
-    const revalidatorB = createStoreBackedRevalidator({ store: storeB, lease: leaseB });
+    const revalidatorA = createStoreBackedRevalidator({
+      store: storeA,
+      lease: leaseA,
+    });
+    const revalidatorB = createStoreBackedRevalidator({
+      store: storeB,
+      lease: leaseB,
+    });
 
     const [outcomeA, outcomeB] = await Promise.all([
       revalidatorA.revalidateCurrentContext(),
@@ -134,11 +147,17 @@ describe("createStoreBackedRevalidator - real concurrent contention", () => {
     await storeA.signIn(CREDS, false, null);
 
     const leaseA = new MutableBearerLease(CREDS.token, CREDS.user.id);
-    const revalidatorA = createStoreBackedRevalidator({ store: storeA, lease: leaseA });
+    const revalidatorA = createStoreBackedRevalidator({
+      store: storeA,
+      lease: leaseA,
+    });
 
     // Process B rotates first and lands its commit before A ever starts.
     const leaseB = new MutableBearerLease(CREDS.token, CREDS.user.id);
-    const revalidatorB = createStoreBackedRevalidator({ store: storeB, lease: leaseB });
+    const revalidatorB = createStoreBackedRevalidator({
+      store: storeB,
+      lease: leaseB,
+    });
     expect(await revalidatorB.revalidateCurrentContext()).toBe("rotated");
     expect(shared.calls()).toBe(1);
 

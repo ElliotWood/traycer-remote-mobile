@@ -45,8 +45,8 @@ ROUTER_PID=""
 DUMB_PID=""
 
 cleanup() {
-  [ -n "$ROUTER_PID" ] && kill "$ROUTER_PID" 2>/dev/null || true
-  [ -n "$DUMB_PID" ] && kill "$DUMB_PID" 2>/dev/null || true
+  if [ -n "$ROUTER_PID" ]; then kill "$ROUTER_PID" 2>/dev/null || true; fi
+  if [ -n "$DUMB_PID" ]; then kill "$DUMB_PID" 2>/dev/null || true; fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT

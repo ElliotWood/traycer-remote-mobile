@@ -15,11 +15,16 @@ const LEGACY_PATHS: Record<string, "rpc" | "stream"> = {
 export type ProxyEvent =
   | {
       readonly kind: "rejected";
-      readonly reason: "bad-path" | "host-unknown" | "host-offline" | "host-unreachable";
+      readonly reason:
+        "bad-path" | "host-unknown" | "host-offline" | "host-unreachable";
       readonly path: string;
       readonly hostId: string | null;
     }
-  | { readonly kind: "forwarded"; readonly path: string; readonly hostId: string };
+  | {
+      readonly kind: "forwarded";
+      readonly path: string;
+      readonly hostId: string;
+    };
 
 export interface ProxyOptions {
   readonly registry: Registry;
@@ -52,10 +57,16 @@ function resolveHostIdAndAllowedPath(
   path: string,
   config: GatewayConfig,
   registry: Registry,
-): { readonly hostId: string | null; readonly agentPath: "rpc" | "stream" } | null {
+): {
+  readonly hostId: string | null;
+  readonly agentPath: "rpc" | "stream";
+} | null {
   const hostedMatch = HOSTED_PATH_RE.exec(path);
   if (hostedMatch !== null) {
-    return { hostId: hostedMatch[1], agentPath: hostedMatch[2] as "rpc" | "stream" };
+    return {
+      hostId: hostedMatch[1],
+      agentPath: hostedMatch[2] as "rpc" | "stream",
+    };
   }
   const legacyPath = LEGACY_PATHS[path];
   if (legacyPath !== undefined) {
@@ -65,7 +76,12 @@ function resolveHostIdAndAllowedPath(
   return null;
 }
 
-function rejectUpgrade(socket: Duplex, status: number, statusText: string, json: unknown): void {
+function rejectUpgrade(
+  socket: Duplex,
+  status: number,
+  statusText: string,
+  json: unknown,
+): void {
   const payload = Buffer.from(JSON.stringify(json), "utf8");
   socket.end(
     Buffer.concat([
@@ -115,7 +131,9 @@ function handleProxyUpgrade(
     // Legacy alias with the primary's own agent never registered yet -
     // reads as offline, not "unknown route".
     onEvent?.({ kind: "rejected", reason: "host-offline", path, hostId: null });
-    rejectUpgrade(socket, 503, "Service Unavailable", { error: "HOST_OFFLINE" });
+    rejectUpgrade(socket, 503, "Service Unavailable", {
+      error: "HOST_OFFLINE",
+    });
     return;
   }
 
@@ -129,11 +147,23 @@ function handleProxyUpgrade(
   const status = registry.statusFor(hostId);
   if (status !== "available") {
     onEvent?.({ kind: "rejected", reason: "host-offline", path, hostId });
-    rejectUpgrade(socket, 503, "Service Unavailable", { error: "HOST_OFFLINE", hostId });
+    rejectUpgrade(socket, 503, "Service Unavailable", {
+      error: "HOST_OFFLINE",
+      hostId,
+    });
     return;
   }
 
-  dialAgentAndSplice({ req, socket, head, entry, agentPath, hostId, path, options });
+  dialAgentAndSplice({
+    req,
+    socket,
+    head,
+    entry,
+    agentPath,
+    hostId,
+    path,
+    options,
+  });
 }
 
 function dialAgentAndSplice(params: {
@@ -157,7 +187,10 @@ function dialAgentAndSplice(params: {
     // rather than dialing with no auth (the agent's tunnel listener would
     // just reject it anyway; failing fast here is honest sooner).
     onEvent?.({ kind: "rejected", reason: "host-unreachable", path, hostId });
-    rejectUpgrade(socket, 503, "Service Unavailable", { error: "HOST_UNREACHABLE", hostId });
+    rejectUpgrade(socket, 503, "Service Unavailable", {
+      error: "HOST_UNREACHABLE",
+      hostId,
+    });
     return;
   }
 
@@ -170,7 +203,10 @@ function dialAgentAndSplice(params: {
     clearTimeout(timeout);
     upstream.destroy();
     onEvent?.({ kind: "rejected", reason: "host-unreachable", path, hostId });
-    rejectUpgrade(socket, 503, "Service Unavailable", { error: "HOST_UNREACHABLE", hostId });
+    rejectUpgrade(socket, 503, "Service Unavailable", {
+      error: "HOST_UNREACHABLE",
+      hostId,
+    });
   };
 
   // Bounded dial timeout (B6 / check 13): "available" per the registry's

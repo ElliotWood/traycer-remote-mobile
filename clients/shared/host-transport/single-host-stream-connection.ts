@@ -225,9 +225,7 @@ export interface StreamConnectionAuth {
    */
   current(): RequestContext | null;
   onBearerRotated(listener: () => void): () => void;
-  revalidateCurrentContext(): Promise<
-    { readonly kind: string } | null
-  >;
+  revalidateCurrentContext(): Promise<{ readonly kind: string } | null>;
 }
 
 /**

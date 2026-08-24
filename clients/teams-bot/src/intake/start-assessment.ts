@@ -48,7 +48,9 @@ export interface StartAssessmentConfig {
   /** Where staged intake documents live — see `./attachment-staging`. */
   readonly stagingRoot: string;
   /** Injected so tests can answer without a filesystem. */
-  readonly listStaged?: (directory: string) => Promise<readonly string[] | null>;
+  readonly listStaged?: (
+    directory: string,
+  ) => Promise<readonly string[] | null>;
 }
 
 export function createStartAssessment(config: StartAssessmentConfig) {
@@ -64,7 +66,10 @@ export function createStartAssessment(config: StartAssessmentConfig) {
     readonly opportunity: OpportunityDetails;
     /** Handle for the staged documents, or `""` when nothing was attached. */
     readonly stagingId?: string;
-  }): Promise<{ readonly kind: "started" | "unconfirmed"; readonly card: Attachment }> => {
+  }): Promise<{
+    readonly kind: "started" | "unconfirmed";
+    readonly card: Attachment;
+  }> => {
     // STEP 1 — minted ONCE, before anything can fail, and reused on retry.
     // `epic.createChat` is idempotent on it, so a repeat cannot make a second
     // agent. Minting per attempt would look identical here and would.
@@ -91,10 +96,9 @@ export function createStartAssessment(config: StartAssessmentConfig) {
     if (env === null) {
       return {
         kind: "unconfirmed",
-        card: buildAssessmentUnconfirmedCard(
-          "I couldn't verify who you are.",
-          { certain: true },
-        ),
+        card: buildAssessmentUnconfirmedCard("I couldn't verify who you are.", {
+          certain: true,
+        }),
       };
     }
 

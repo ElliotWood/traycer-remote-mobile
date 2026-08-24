@@ -31,9 +31,7 @@ interface StoredVapidKeys {
  * Callers pass `vapidKeysPath()` for the real file; tests inject a temp path
  * so a test run never generates/reads the operator's actual VAPID identity.
  */
-export async function loadOrCreateVapidKeys(
-  path: string,
-): Promise<VapidKeys> {
+export async function loadOrCreateVapidKeys(path: string): Promise<VapidKeys> {
   const stored = await readJsonFileOrNull<StoredVapidKeys>(path);
   if (
     stored !== null &&

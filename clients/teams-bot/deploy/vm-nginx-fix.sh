@@ -24,13 +24,13 @@ echo "=== diagnosis ==="
 echo "api/messages occurrences: $(grep -c 'api/messages' "$SITE" 2>/dev/null || echo 0)"
 echo "server_name occurrences:  $(grep -c 'server_name' "$SITE" 2>/dev/null || echo 0)"
 echo "total lines:              $(wc -l < "$SITE")"
-echo "backups: $(ls -1 "$SITE".bak.* 2>/dev/null | wc -l)"
+echo "backups: $(find "$(dirname "$SITE")" -maxdepth 1 -name "$(basename "$SITE").bak.*" | wc -l)"
 
 # If the location got inserted more than once, restore the OLDEST backup
 # (pre-any-insert) and redo the insert exactly once.
 COUNT=$(grep -c 'location /api/messages' "$SITE" 2>/dev/null || echo 0)
 if [ "$COUNT" -gt 1 ]; then
-  OLDEST=$(ls -1tr "$SITE".bak.* 2>/dev/null | head -1)
+  OLDEST=$(find "$(dirname "$SITE")" -maxdepth 1 -name "$(basename "$SITE").bak.*" -printf '%T@ %p\n' | sort -n | head -1 | cut -d' ' -f2-)
   echo "duplicate location blocks ($COUNT) — restoring $OLDEST and reinserting once"
   cat "$OLDEST" > "$SITE"
   cat > /tmp/botloc.conf <<'LOC'
@@ -75,6 +75,6 @@ echo "=== probes ==="
 curl -s -m 8 -o /dev/null -w "loopback  /healthz          : %{http_code}\n" http://127.0.0.1:3978/healthz
 curl -s -m 10 -X POST -o /dev/null -w "public    /api/messages (403=good, means bot reached and rejected unauth): %{http_code}\n" \
   -H 'content-type: application/json' -d '{"type":"message"}' \
-  https://${PUBLIC_HOSTNAME}/api/messages
+  "https://${PUBLIC_HOSTNAME}/api/messages"
 curl -s -m 10 -o /dev/null -w "public    /rpc (must still be reachable): %{http_code}\n" \
-  https://${PUBLIC_HOSTNAME}/rpc
+  "https://${PUBLIC_HOSTNAME}/rpc"

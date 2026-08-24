@@ -64,7 +64,7 @@ fi
 
 echo "=== public probes through real TLS ==="
 curl -s -m 10 -o /dev/null -w "GET /healthz (expect 404 — deliberately NOT public): %{http_code}\n" \
-  https://${PUBLIC_HOSTNAME}/healthz || true
+  "https://${PUBLIC_HOSTNAME}/healthz" || true
 curl -s -m 10 -X POST -o /dev/null -w "POST /api/messages unauthenticated (expect 403): %{http_code}\n" \
   -H "content-type: application/json" -d '{"type":"message"}' \
-  https://${PUBLIC_HOSTNAME}/api/messages || true
+  "https://${PUBLIC_HOSTNAME}/api/messages" || true

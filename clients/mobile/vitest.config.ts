@@ -15,7 +15,10 @@ export default defineConfig({
       // as `(0 test)` - a suite that looks skipped rather than broken.
       // `/utils` must come FIRST: aliases match by prefix, in order, and
       // `utils/` lives beside `src/` rather than under it.
-      "@traycer/protocol/utils": path.resolve(__dirname, "../../protocol/utils"),
+      "@traycer/protocol/utils": path.resolve(
+        __dirname,
+        "../../protocol/utils",
+      ),
       "@traycer/protocol": path.resolve(__dirname, "../../protocol/src"),
       // `sonner` is declared by `gui-app` alone and bun does not hoist it, so a
       // gui-app module imported from a test in THIS package resolves it out of

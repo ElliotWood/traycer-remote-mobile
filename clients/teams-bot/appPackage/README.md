@@ -54,7 +54,6 @@ A manifest change with no repackage-and-reinstall is a no-op that reads like
 a fix in the git history. Same trap as the flag itself: the thing that would
 falsify it is not in the repo.
 
-
 ## Two tabs: the app at `/next/`, and Help at `/help/`
 
 The section below argues for exactly one tab, and that argument still holds
@@ -79,8 +78,8 @@ to the OS colour-scheme preference.
 **BOTH tabs carry it, and for a while only Help did.** That was an omission
 rather than a decision, and it pointed the mechanism at the smaller problem:
 `/help/` is a static explainer with no handshake at all, whereas `/next/` is
-the surface whose Teams shell *explicitly designs for the handshake never*
-*completing* — it races `app.initialize()` against a 4s timeout and fires it
+the surface whose Teams shell _explicitly designs for the handshake never_
+_completing_ — it races `app.initialize()` against a 4s timeout and fires it
 after the first render, deliberately, so that nothing user-visible waits on
 it. The paragraph above was therefore a stronger argument for the app tab than
 for the one it was written about, and `/next/` was the tab without it. A
@@ -122,7 +121,6 @@ subscriber set into a feedback loop that never converges. So a future
 epic-specific tab is `…/next/#/epics/<id>`, never `…/next/epics/<id>`.
 
 ## T1 skeleton notes
-
 
 Schema `manifestVersion` **1.25** (required for channel-enabled apps from July
 2026 — see the epic brief). This is the manifest shape for the bot skeleton

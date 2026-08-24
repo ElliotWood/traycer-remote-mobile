@@ -64,19 +64,20 @@ function harness(options: HarnessOptions): Harness {
   const request = options.request ?? defaultRequest;
 
   const listeners = new Set<() => void>();
-  const doc: { visibilityState: DocumentVisibilityState } & VisibilityDocument = {
-    visibilityState: options.visibility ?? "visible",
-    featurePolicy:
-      options.allowsFeature === undefined
-        ? undefined
-        : { allowsFeature: () => options.allowsFeature === true },
-    addEventListener(_type: "visibilitychange", fn: () => void): void {
-      listeners.add(fn);
-    },
-    removeEventListener(_type: "visibilitychange", fn: () => void): void {
-      listeners.delete(fn);
-    },
-  };
+  const doc: { visibilityState: DocumentVisibilityState } & VisibilityDocument =
+    {
+      visibilityState: options.visibility ?? "visible",
+      featurePolicy:
+        options.allowsFeature === undefined
+          ? undefined
+          : { allowsFeature: () => options.allowsFeature === true },
+      addEventListener(_type: "visibilitychange", fn: () => void): void {
+        listeners.add(fn);
+      },
+      removeEventListener(_type: "visibilitychange", fn: () => void): void {
+        listeners.delete(fn);
+      },
+    };
 
   const navigator: WakeLockNavigator =
     options.noWakeLock === true ? {} : { wakeLock: { request } };
@@ -160,7 +161,9 @@ describe("startScreenWakeLock", () => {
     await settle();
     expect(missing.outcomes).toEqual(["unsupported"]);
 
-    const refused = harness({ request: () => Promise.reject(new Error("nope")) });
+    const refused = harness({
+      request: () => Promise.reject(new Error("nope")),
+    });
     await settle();
     expect(refused.outcomes).toEqual(["unavailable"]);
   });
@@ -290,8 +293,12 @@ describe("isWakeLockPolicyBlocked", () => {
   });
 
   it("is blocked exactly when the policy refuses the feature", () => {
-    expect(isWakeLockPolicyBlocked(doc({ allowsFeature: () => false }))).toBe(true);
-    expect(isWakeLockPolicyBlocked(doc({ allowsFeature: () => true }))).toBe(false);
+    expect(isWakeLockPolicyBlocked(doc({ allowsFeature: () => false }))).toBe(
+      true,
+    );
+    expect(isWakeLockPolicyBlocked(doc({ allowsFeature: () => true }))).toBe(
+      false,
+    );
   });
 
   it("asks about screen-wake-lock and nothing else", () => {
@@ -313,7 +320,9 @@ describe("isWakeLockPolicyBlocked", () => {
     // Chromium ships `featurePolicy`; the spec renamed it. Reading only the
     // Chromium name would silently stop discriminating after a rename - and
     // silently, because the fallback is "not blocked", which looks like health.
-    expect(isWakeLockPolicyBlocked(renamedDoc({ allowsFeature: () => false }))).toBe(true);
+    expect(
+      isWakeLockPolicyBlocked(renamedDoc({ allowsFeature: () => false })),
+    ).toBe(true);
   });
 
   it("is not blocked when the policy read throws", () => {

@@ -152,7 +152,9 @@ describe("parseExtraHosts", () => {
   it("marks entries kind:local so the WS clients dial the url as given", () => {
     // Not cosmetic: `kind` selects the dial strategy. Were these "remote", a
     // build carrying a relay path would route them through it instead.
-    const entries = parseExtraHosts(json([{ hostId: "a", websocketUrl: REMOTE }]));
+    const entries = parseExtraHosts(
+      json([{ hostId: "a", websocketUrl: REMOTE }]),
+    );
     expect(entries.every((e) => e.kind === "local")).toBe(true);
   });
 });

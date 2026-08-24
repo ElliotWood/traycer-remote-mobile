@@ -49,9 +49,7 @@ const MUTATIONS = [
   {
     id: "MUT-3",
     why: "reports correctly, then falls through: a guaranteed-failing request on every tab switch for the life of the tab",
-    from:
-      '    report("policy-blocked");\n' +
-      "    return () => {};",
+    from: '    report("policy-blocked");\n' + "    return () => {};",
     to: '    report("policy-blocked");',
     catcher: "does not retry on visibility, because the policy cannot change",
   },
@@ -108,7 +106,8 @@ const MUTATIONS = [
       "    return () => {};\n" +
       "  }",
     to: "",
-    catcher: "answers 'off' ahead of the policy, because the user's choice outranks it",
+    catcher:
+      "answers 'off' ahead of the policy, because the user's choice outranks it",
   },
 ];
 
@@ -140,7 +139,12 @@ function runSuite() {
         "--reporter=json",
         "--outputFile=.mutate-wake-lock.json",
       ],
-      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: true },
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: true,
+      },
     );
   } catch (error) {
     // A red suite exits non-zero, which is the expected case here - but so does
@@ -168,7 +172,9 @@ function runSuite() {
 console.log("control: the suite must be GREEN before any mutation is believed");
 const controlFailures = runSuite();
 if (controlFailures.length > 0) {
-  console.log(`ABORT - control is already red:\n  ${controlFailures.join("\n  ")}`);
+  console.log(
+    `ABORT - control is already red:\n  ${controlFailures.join("\n  ")}`,
+  );
   process.exit(1);
 }
 console.log("control: green\n");

@@ -84,7 +84,8 @@ describe("IdentityRegistry.resolveTenant — forward resolution", () => {
     const registry = threeTenantRegistry();
     const a = registry.resolveTenant(entraPrincipal(ALICE_OID));
     const b = registry.resolveTenant(entraPrincipal(BOB_OID));
-    if (a.kind !== "resolved" || b.kind !== "resolved") throw new Error("expected resolved");
+    if (a.kind !== "resolved" || b.kind !== "resolved")
+      throw new Error("expected resolved");
     expect(a.tenant.home).not.toBe(b.tenant.home);
     expect(a.tenant.hostId).not.toBe(b.tenant.hostId);
   });
@@ -132,7 +133,8 @@ describe("IdentityRegistry.resolveTenant — kind: traycer (browser/PWA routing 
     const registry = threeTenantRegistry();
     const a = registry.resolveTenant(traycerPrincipal("traycer-user-alice"));
     const b = registry.resolveTenant(traycerPrincipal("traycer-user-bob"));
-    if (a.kind !== "resolved" || b.kind !== "resolved") throw new Error("expected resolved");
+    if (a.kind !== "resolved" || b.kind !== "resolved")
+      throw new Error("expected resolved");
     expect(a.tenant.home).not.toBe(b.tenant.home);
     expect(a.tenant.hostId).not.toBe(b.tenant.hostId);
   });
@@ -160,7 +162,9 @@ describe("IdentityRegistry.resolveTenant — kind: traycer (browser/PWA routing 
   it("an entra oid presented as a traycer userId does not resolve — the two alias namespaces are separate", () => {
     // Cross-namespace confusion probe: alice's entra oid must not resolve
     // through the traycer lookup, or the two alias tables are effectively one.
-    const result = threeTenantRegistry().resolveTenant(traycerPrincipal(ALICE_OID));
+    const result = threeTenantRegistry().resolveTenant(
+      traycerPrincipal(ALICE_OID),
+    );
     expect(result).toEqual({ kind: "refused", reason: "unmapped_principal" });
   });
 });
@@ -181,7 +185,10 @@ describe("IdentityRegistry.resolveTenant — forgery / structural probes", () =>
     const registry = threeTenantRegistry();
     for (const shape of ["__proto__", "constructor", "toString"]) {
       const result = registry.resolveTenant(entraPrincipal(shape));
-      expect(result).toEqual({ kind: "refused", reason: "malformed_principal" });
+      expect(result).toEqual({
+        kind: "refused",
+        reason: "malformed_principal",
+      });
     }
   });
 
@@ -224,7 +231,8 @@ describe("IdentityRegistry.resolveIdentity — reverse resolution", () => {
     expect(a.kind).toBe("resolved");
     expect(b.kind).toBe("resolved");
     expect(c.kind).toBe("resolved");
-    if (a.kind !== "resolved" || b.kind !== "resolved" || c.kind !== "resolved") return;
+    if (a.kind !== "resolved" || b.kind !== "resolved" || c.kind !== "resolved")
+      return;
     expect(a.tenant.home).toBe("/srv/traycer/alice");
     expect(b.tenant.home).toBe("/srv/traycer/bob");
     expect(c.tenant.home).toBe("/srv/traycer/carol");
@@ -280,7 +288,8 @@ describe("IdentityRegistry — correlation-id independence", () => {
     const registry = threeTenantRegistry();
     const alice = registry.resolveTenant(entraPrincipal(ALICE_OID));
     const bob = registry.resolveTenant(entraPrincipal(BOB_OID));
-    if (alice.kind !== "resolved" || bob.kind !== "resolved") throw new Error("expected resolved");
+    if (alice.kind !== "resolved" || bob.kind !== "resolved")
+      throw new Error("expected resolved");
     expect(alice.tenant.hostId).not.toBe(bob.tenant.hostId);
   });
 });
@@ -289,12 +298,24 @@ describe("IdentityRegistry — audit logging", () => {
   it("emits one resolved line per successful forward resolution, with the validated oid raw", () => {
     const lines: string[] = [];
     const registry = IdentityRegistry.fromConfig(
-      { tenants: [{ home: "/srv/traycer/alice", hostId: "host-alice", entraOid: ALICE_OID }] },
+      {
+        tenants: [
+          {
+            home: "/srv/traycer/alice",
+            hostId: "host-alice",
+            entraOid: ALICE_OID,
+          },
+        ],
+      },
       (line) => lines.push(line),
     );
     registry.resolveTenant(entraPrincipal(ALICE_OID));
     expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0]) as { outcome: string; input: string; direction: string };
+    const parsed = JSON.parse(lines[0]) as {
+      outcome: string;
+      input: string;
+      direction: string;
+    };
     expect(parsed.outcome).toBe("resolved");
     expect(parsed.direction).toBe("forward");
     expect(parsed.input).toBe(ALICE_OID);
@@ -303,7 +324,15 @@ describe("IdentityRegistry — audit logging", () => {
   it("sanitizes an attacker-shaped refusal input before logging it", () => {
     const lines: string[] = [];
     const registry = IdentityRegistry.fromConfig(
-      { tenants: [{ home: "/srv/traycer/alice", hostId: "host-alice", entraOid: ALICE_OID }] },
+      {
+        tenants: [
+          {
+            home: "/srv/traycer/alice",
+            hostId: "host-alice",
+            entraOid: ALICE_OID,
+          },
+        ],
+      },
       (line) => lines.push(line),
     );
     const attackerInput = `${"x".repeat(200)}\nFORGED_LINE\r`;
@@ -318,7 +347,15 @@ describe("IdentityRegistry — audit logging", () => {
   it("emits a reverse-direction line for resolveIdentity", () => {
     const lines: string[] = [];
     const registry = IdentityRegistry.fromConfig(
-      { tenants: [{ home: "/srv/traycer/alice", hostId: "host-alice", entraOid: ALICE_OID }] },
+      {
+        tenants: [
+          {
+            home: "/srv/traycer/alice",
+            hostId: "host-alice",
+            entraOid: ALICE_OID,
+          },
+        ],
+      },
       (line) => lines.push(line),
     );
     registry.resolveIdentity("host-alice");

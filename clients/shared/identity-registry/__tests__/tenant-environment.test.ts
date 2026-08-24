@@ -66,7 +66,10 @@ describe("buildTenantEnvironment — isolation", () => {
   it("never mutates the parentEnv object passed in", () => {
     const parentEnv = { PATH: "/usr/bin" };
     const snapshot = { ...parentEnv };
-    buildTenantEnvironment({ tenant: tenant("/srv/traycer/alice", "host-alice"), parentEnv });
+    buildTenantEnvironment({
+      tenant: tenant("/srv/traycer/alice", "host-alice"),
+      parentEnv,
+    });
     expect(parentEnv).toEqual(snapshot);
   });
 });
@@ -91,7 +94,9 @@ describe("buildTenantEnvironment — allowlist, not a process.env spread", () =>
       tenant: tenant("/srv/traycer/alice", "host-alice"),
       parentEnv,
     });
-    expect(Object.keys(env).sort()).toEqual(["HOME", "PATH", "USERPROFILE"].sort());
+    expect(Object.keys(env).sort()).toEqual(
+      ["HOME", "PATH", "USERPROFILE"].sort(),
+    );
   });
 
   it("uses the REAL shipped default allowlist, not an injected one, when `allowlist` is omitted", () => {

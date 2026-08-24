@@ -26,7 +26,11 @@ describe("SubscriptionStore", () => {
   it("persists across a fresh load against the same path (simulated restart)", async () => {
     const first = new SubscriptionStore(path);
     await first.load();
-    await first.upsert("https://fcm.example/a", { p256dh: "p", auth: "a" }, 1_000);
+    await first.upsert(
+      "https://fcm.example/a",
+      { p256dh: "p", auth: "a" },
+      1_000,
+    );
 
     const second = new SubscriptionStore(path);
     await second.load();
@@ -36,8 +40,16 @@ describe("SubscriptionStore", () => {
   it("upsert refreshes subscribedAt without duplicating", async () => {
     const store = new SubscriptionStore(path);
     await store.load();
-    await store.upsert("https://fcm.example/a", { p256dh: "p", auth: "a" }, 1_000);
-    await store.upsert("https://fcm.example/a", { p256dh: "p2", auth: "a2" }, 2_000);
+    await store.upsert(
+      "https://fcm.example/a",
+      { p256dh: "p", auth: "a" },
+      1_000,
+    );
+    await store.upsert(
+      "https://fcm.example/a",
+      { p256dh: "p2", auth: "a2" },
+      2_000,
+    );
     expect(store.list()).toHaveLength(1);
     expect(store.list()[0]).toEqual({
       endpoint: "https://fcm.example/a",

@@ -1,6 +1,9 @@
 import net from "node:net";
 import { timingSafeEqual } from "node:crypto";
-import { readHostPidMetadata, isValidLocalHostWebsocketUrl } from "./pid-metadata";
+import {
+  readHostPidMetadata,
+  isValidLocalHostWebsocketUrl,
+} from "./pid-metadata";
 import { forwardToLoopback } from "./loopback-forward";
 import {
   bufferHttpHead,
@@ -29,8 +32,16 @@ export interface TunnelServerOptions {
 }
 
 export type TunnelServerEvent =
-  | { readonly kind: "rejected"; readonly reason: "bad-path" | "bad-auth" | "host-not-running"; readonly path: string }
-  | { readonly kind: "forwarded"; readonly path: string; readonly loopbackPort: number };
+  | {
+      readonly kind: "rejected";
+      readonly reason: "bad-path" | "bad-auth" | "host-not-running";
+      readonly path: string;
+    }
+  | {
+      readonly kind: "forwarded";
+      readonly path: string;
+      readonly loopbackPort: number;
+    };
 
 function timingSafeTokenEquals(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf8");
@@ -51,7 +62,13 @@ function timingSafeTokenEquals(a: string, b: string): boolean {
 export function startTunnelServer(options: TunnelServerOptions): net.Server {
   const server = net.createServer((client) => {
     bufferHttpHead(client, ({ headBuffered, headEndIdx, bodyAfterHead }) => {
-      void handleRequestHead(client, headBuffered, headEndIdx, bodyAfterHead, options);
+      void handleRequestHead(
+        client,
+        headBuffered,
+        headEndIdx,
+        bodyAfterHead,
+        options,
+      );
     });
   });
   server.listen(options.port, options.host);
@@ -85,7 +102,10 @@ async function handleRequestHead(
   // Fresh per-connection read - the host picks a new random port on every
   // restart, so this must never be cached beyond this connection's lifetime.
   const metadata = await readHostPidMetadata(options.pidJsonPath());
-  if (metadata === null || !isValidLocalHostWebsocketUrl(metadata.websocketUrl)) {
+  if (
+    metadata === null ||
+    !isValidLocalHostWebsocketUrl(metadata.websocketUrl)
+  ) {
     options.onEvent?.({ kind: "rejected", reason: "host-not-running", path });
     writeRawResponse(client, 503, "Service Unavailable", null);
     return;

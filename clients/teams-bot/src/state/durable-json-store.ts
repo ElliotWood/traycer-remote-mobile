@@ -69,7 +69,11 @@ export class DurableJsonStore<T> {
     }
     try {
       const parsed: unknown = JSON.parse(raw);
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed)
+      ) {
         this.onWarn(
           "state file is not a JSON object — starting empty",
           this.filePath,

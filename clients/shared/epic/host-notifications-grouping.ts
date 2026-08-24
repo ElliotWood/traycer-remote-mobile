@@ -84,6 +84,7 @@ export function groupByDay(
     yesterday: [],
     earlier: [],
   };
-  for (const entry of entries) groups[dayBucket(entry.updatedAt, now)].push(entry);
+  for (const entry of entries)
+    groups[dayBucket(entry.updatedAt, now)].push(entry);
   return groups;
 }

@@ -86,7 +86,9 @@ export interface CreateChatInput {
 }
 
 /** The request, built in one place so the retry sends a byte-identical one. */
-export function buildCreateChatRequest(input: CreateChatInput): CreateChatRequest {
+export function buildCreateChatRequest(
+  input: CreateChatInput,
+): CreateChatRequest {
   return {
     epicId: input.epicId,
     parentId: input.parentId ?? null,

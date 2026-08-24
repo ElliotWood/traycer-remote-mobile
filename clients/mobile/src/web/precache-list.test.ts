@@ -100,6 +100,8 @@ describe("collectEntryCriticalUrls", () => {
     // outcome rather than the thing every other test would also produce if
     // the regexes silently stopped matching. `build-sw.mjs` refuses to write
     // a worker on a list this short, which is the other half of this guard.
-    expect(collectEntryCriticalUrls("<html><body>hi</body></html>", PAGE)).toEqual([]);
+    expect(
+      collectEntryCriticalUrls("<html><body>hi</body></html>", PAGE),
+    ).toEqual([]);
   });
 });

@@ -46,12 +46,16 @@ describe("GET /vapid-public-key", () => {
   });
 
   it("401s with an invalid bearer", async () => {
-    const res = await fetch(`${baseUrl}/vapid-public-key`, { headers: authHeader("garbage") });
+    const res = await fetch(`${baseUrl}/vapid-public-key`, {
+      headers: authHeader("garbage"),
+    });
     expect(res.status).toBe(401);
   });
 
   it("200s with the public key only — never the private key — for a valid bearer", async () => {
-    const res = await fetch(`${baseUrl}/vapid-public-key`, { headers: authHeader(VALID_TOKEN) });
+    const res = await fetch(`${baseUrl}/vapid-public-key`, {
+      headers: authHeader(VALID_TOKEN),
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toEqual({ publicKey: VAPID_PUBLIC_KEY });
@@ -59,7 +63,9 @@ describe("GET /vapid-public-key", () => {
   });
 
   it("404s on the prefixed path — the server is mounted prefix-free, tailscale serve strips /push before proxying", async () => {
-    const res = await fetch(`${baseUrl}/push/vapid-public-key`, { headers: authHeader(VALID_TOKEN) });
+    const res = await fetch(`${baseUrl}/push/vapid-public-key`, {
+      headers: authHeader(VALID_TOKEN),
+    });
     expect(res.status).toBe(404);
   });
 });
@@ -73,7 +79,10 @@ describe("POST /subscribe", () => {
   it("400s on a malformed body", async () => {
     const res = await fetch(`${baseUrl}/subscribe`, {
       method: "POST",
-      headers: { ...authHeader(VALID_TOKEN), "Content-Type": "application/json" },
+      headers: {
+        ...authHeader(VALID_TOKEN),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ nope: true }),
     });
     expect(res.status).toBe(400);
@@ -82,8 +91,14 @@ describe("POST /subscribe", () => {
   it("upserts a new subscription", async () => {
     const res = await fetch(`${baseUrl}/subscribe`, {
       method: "POST",
-      headers: { ...authHeader(VALID_TOKEN), "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: "https://fcm.example/a", keys: { p256dh: "p", auth: "a" } }),
+      headers: {
+        ...authHeader(VALID_TOKEN),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        endpoint: "https://fcm.example/a",
+        keys: { p256dh: "p", auth: "a" },
+      }),
     });
     expect(res.status).toBe(200);
     expect(store.list()).toHaveLength(1);
@@ -91,11 +106,17 @@ describe("POST /subscribe", () => {
   });
 
   it("dedupes by endpoint — subscribing the same endpoint twice never duplicates", async () => {
-    const body = JSON.stringify({ endpoint: "https://fcm.example/a", keys: { p256dh: "p", auth: "a" } });
+    const body = JSON.stringify({
+      endpoint: "https://fcm.example/a",
+      keys: { p256dh: "p", auth: "a" },
+    });
     for (let i = 0; i < 2; i += 1) {
       const res = await fetch(`${baseUrl}/subscribe`, {
         method: "POST",
-        headers: { ...authHeader(VALID_TOKEN), "Content-Type": "application/json" },
+        headers: {
+          ...authHeader(VALID_TOKEN),
+          "Content-Type": "application/json",
+        },
         body,
       });
       expect(res.status).toBe(200);
@@ -111,10 +132,17 @@ describe("POST /unsubscribe", () => {
   });
 
   it("removes a registered subscription", async () => {
-    await store.upsert("https://fcm.example/a", { p256dh: "p", auth: "a" }, Date.now());
+    await store.upsert(
+      "https://fcm.example/a",
+      { p256dh: "p", auth: "a" },
+      Date.now(),
+    );
     const res = await fetch(`${baseUrl}/unsubscribe`, {
       method: "POST",
-      headers: { ...authHeader(VALID_TOKEN), "Content-Type": "application/json" },
+      headers: {
+        ...authHeader(VALID_TOKEN),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ endpoint: "https://fcm.example/a" }),
     });
     expect(res.status).toBe(200);
@@ -124,7 +152,10 @@ describe("POST /unsubscribe", () => {
   it("200s idempotently for an endpoint that was never registered", async () => {
     const res = await fetch(`${baseUrl}/unsubscribe`, {
       method: "POST",
-      headers: { ...authHeader(VALID_TOKEN), "Content-Type": "application/json" },
+      headers: {
+        ...authHeader(VALID_TOKEN),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ endpoint: "https://fcm.example/never-existed" }),
     });
     expect(res.status).toBe(200);

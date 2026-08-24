@@ -27,12 +27,20 @@ describe("public request handler: internal routes must not leak onto the public 
   const cleanup: Array<() => void> = [];
   afterEach(() => cleanup.splice(0).forEach((fn) => fn()));
 
-  async function startServer(config: GatewayConfig, registry: Registry): Promise<number> {
-    const server = http.createServer(createPublicRequestHandler(config, registry));
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  async function startServer(
+    config: GatewayConfig,
+    registry: Registry,
+  ): Promise<number> {
+    const server = http.createServer(
+      createPublicRequestHandler(config, registry),
+    );
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
     cleanup.push(() => server.close());
     const address = server.address();
-    if (address === null || typeof address === "string") throw new Error("no address");
+    if (address === null || typeof address === "string")
+      throw new Error("no address");
     return address.port;
   }
 
@@ -53,11 +61,20 @@ describe("public request handler: internal routes must not leak onto the public 
 
   it("regression: a request to /agents/register on the PUBLIC listener is rejected, never served as the app (the bug a real smoke test caught)", async () => {
     const registry = new Registry(60_000);
-    const port = await startServer(baseConfig({ staticDir: null, devUpstream: null }), registry);
+    const port = await startServer(
+      baseConfig({ staticDir: null, devUpstream: null }),
+      registry,
+    );
     const res = await fetch(`http://127.0.0.1:${port}/agents/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentId: AGENT_ID, hostId: "h", label: "l", version: "1", reachableUrl: "http://x:1" }),
+      body: JSON.stringify({
+        agentId: AGENT_ID,
+        hostId: "h",
+        label: "l",
+        version: "1",
+        reachableUrl: "http://x:1",
+      }),
     });
     expect(res.status).toBe(404);
     const body = await res.text();
@@ -69,7 +86,9 @@ describe("public request handler: internal routes must not leak onto the public 
     const registry = new Registry(60_000);
     const port = await startServer(baseConfig({}), registry);
     for (const path of ["/agents/heartbeat", "/agents/unregister"]) {
-      const res = await fetch(`http://127.0.0.1:${port}${path}`, { method: "POST" });
+      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method: "POST",
+      });
       expect(res.status).toBe(404);
     }
   });

@@ -292,9 +292,9 @@ describe("buildChatTitle", () => {
     // CONTROLS. Each of these would break if the rule were "strip any quote
     // at either end", which is the obvious wrong implementation.
     it("keeps a balanced quotation inside the line", () => {
-      expect(buildChatTitle(ROUTE, 'they call it "SensorMine" apparently')).toBe(
-        'they call it "SensorMine" apparently',
-      );
+      expect(
+        buildChatTitle(ROUTE, 'they call it "SensorMine" apparently'),
+      ).toBe('they call it "SensorMine" apparently');
     });
 
     it("keeps apostrophes, including a leading one", () => {

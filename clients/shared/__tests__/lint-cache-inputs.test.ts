@@ -45,7 +45,10 @@ type NxInput = string | Record<string, unknown>;
 
 interface NxJson {
   readonly namedInputs?: Record<string, readonly NxInput[]>;
-  readonly targetDefaults?: Record<string, { readonly inputs?: readonly NxInput[] }>;
+  readonly targetDefaults?: Record<
+    string,
+    { readonly inputs?: readonly NxInput[] }
+  >;
 }
 
 function readNxJson(): NxJson {
@@ -85,7 +88,9 @@ function sharedRuleFilesRelativeToRoot(): readonly string[] {
   })
     .filter((entry) => entry.isFile())
     .map((entry) =>
-      relative(WORKSPACE_ROOT, join(entry.parentPath, entry.name)).split(sep).join("/"),
+      relative(WORKSPACE_ROOT, join(entry.parentPath, entry.name))
+        .split(sep)
+        .join("/"),
     );
 }
 

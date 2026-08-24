@@ -21,7 +21,9 @@ export interface ActionableTransition {
 export interface ActionableDetectorDeps {
   readonly pushedStateStore: PushedStateReader;
   /** Called with every transition accumulated in one coalesce window. */
-  readonly onBatch: (transitions: readonly ActionableTransition[]) => Promise<void>;
+  readonly onBatch: (
+    transitions: readonly ActionableTransition[],
+  ) => Promise<void>;
   readonly coalesceWindowMs?: number;
   readonly setTimer?: (fn: () => void, ms: number) => unknown;
 }

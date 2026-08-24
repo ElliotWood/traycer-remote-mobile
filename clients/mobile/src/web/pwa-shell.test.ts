@@ -191,7 +191,9 @@ describe("registerServiceWorker", () => {
 
     const shown = banner();
     expect(shown?.textContent).toContain(UPDATE_BANNER_TEXT);
-    expect(shown?.querySelector("button")?.textContent).toBe(UPDATE_BANNER_ACTION);
+    expect(shown?.querySelector("button")?.textContent).toBe(
+      UPDATE_BANNER_ACTION,
+    );
   });
 
   it("offers an update that was already waiting when the page loaded", async () => {

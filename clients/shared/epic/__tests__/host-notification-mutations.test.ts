@@ -41,7 +41,10 @@ describe("markNotificationsRead", () => {
     const { client, calls } = fakeClient();
     await markNotificationsRead(client, ["a", "b"]);
     expect(calls).toEqual([
-      { method: "host.notifications.markRead", params: { kind: "ids", ids: ["a", "b"] } },
+      {
+        method: "host.notifications.markRead",
+        params: { kind: "ids", ids: ["a", "b"] },
+      },
     ]);
   });
 
@@ -83,7 +86,10 @@ describe("markAllNotificationsRead", () => {
     const { client, calls } = fakeClient();
     await markAllNotificationsRead(client, 1_234);
     expect(calls).toEqual([
-      { method: "host.notifications.markAllRead", params: { beforeUpdatedAt: 1_234 } },
+      {
+        method: "host.notifications.markAllRead",
+        params: { beforeUpdatedAt: 1_234 },
+      },
     ]);
   });
 });

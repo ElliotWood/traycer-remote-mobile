@@ -16,9 +16,10 @@ import type { WebSocketLike } from "../ws-factory";
 
 let servers: WebSocketServer[] = [];
 
-function startServer(
-  handler: (socket: import("ws").WebSocket) => void,
-): { url: string; wss: WebSocketServer } {
+function startServer(handler: (socket: import("ws").WebSocket) => void): {
+  url: string;
+  wss: WebSocketServer;
+} {
   const wss = new WebSocketServer({ port: 0 });
   servers.push(wss);
   wss.on("connection", handler);

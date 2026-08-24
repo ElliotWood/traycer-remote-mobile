@@ -10,10 +10,7 @@ import {
 import "./index.css";
 import { lastSelectedHostKey } from "@/lib/persist";
 import { MobileRunnerHost } from "../mobile-runner-host";
-import {
-  createWebHostFetcher,
-  type BakedHost,
-} from "./host-directory-fetcher";
+import { createWebHostFetcher, type BakedHost } from "./host-directory-fetcher";
 import { ManageHostsPanel } from "./manage-hosts-panel";
 import { isStorageDurable, safeStorage } from "./capacitor-web-shim";
 import { installClipboardFallback } from "./clipboard-fallback";
@@ -27,10 +24,7 @@ import {
   teamsThemeToResolved,
 } from "./teams-host";
 import { resolveTeamsThemeParam } from "./teams-theme-param";
-import {
-  applyTeamsDeepLink,
-  browserDeepLinkWindow,
-} from "./teams-deep-link";
+import { applyTeamsDeepLink, browserDeepLinkWindow } from "./teams-deep-link";
 import { setTeamsLinkOpener } from "./external-link";
 import { createWebNotificationHost } from "./web-notification-host";
 import { offerNotificationPermission } from "./notification-permission";

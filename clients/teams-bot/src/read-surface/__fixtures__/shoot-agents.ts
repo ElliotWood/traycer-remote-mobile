@@ -25,8 +25,7 @@
  */
 import type { AgentSummary } from "../bridge-types";
 
-export const SHOOT_AGENTS: readonly AgentSummary[] =
-[
+export const SHOOT_AGENTS: readonly AgentSummary[] = [
   {
     agentId: "a1000000-0000-4000-8000-000000000001",
     title: "Investigate flaky integration suite",

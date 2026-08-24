@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { currentWindow, type FrameWindow, isCrossOriginFramed } from "./embedding";
+import {
+  currentWindow,
+  type FrameWindow,
+  isCrossOriginFramed,
+} from "./embedding";
 
 /**
  * The three arms mirror the browser probe that established this module's

@@ -134,4 +134,4 @@ done
 
 echo "== done =="
 echo "Now verify OFF-BOX (this script cannot prove public reachability):"
-echo "  curl -sS -o /dev/null -w '%{http_code} %{content_type}\\n' https://<FQDN>/help/"
+printf '%s\n' "  curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' https://<FQDN>/help/"

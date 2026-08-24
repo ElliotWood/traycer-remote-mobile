@@ -33,13 +33,9 @@ import type { TenantMapping } from "./types";
  * that surfaces only when someone runs this on Windows for dev/testing —
  * exactly the kind of gap this repo's own environment traps warn about.
  */
-export const DEFAULT_INHERITED_ENV_ALLOWLIST: readonly string[] = Object.freeze([
-  "PATH",
-  "SystemRoot",
-  "TEMP",
-  "TMP",
-  "ComSpec",
-]);
+export const DEFAULT_INHERITED_ENV_ALLOWLIST: readonly string[] = Object.freeze(
+  ["PATH", "SystemRoot", "TEMP", "TMP", "ComSpec"],
+);
 
 export interface BuildTenantEnvironmentOptions {
   readonly tenant: TenantMapping;

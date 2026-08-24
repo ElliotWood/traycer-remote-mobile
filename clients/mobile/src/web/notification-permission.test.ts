@@ -22,7 +22,9 @@ function mountContainer(): HTMLElement {
 }
 
 function banner(): HTMLElement | null {
-  return document.querySelector(`[data-testid="${NOTIFICATION_BANNER_TESTID}"]`);
+  return document.querySelector(
+    `[data-testid="${NOTIFICATION_BANNER_TESTID}"]`,
+  );
 }
 
 function buttonLabelled(label: string): HTMLButtonElement {
@@ -177,7 +179,9 @@ describe("offerNotificationPermission", () => {
     });
 
     expect(
-      document.querySelectorAll(`[data-testid="${NOTIFICATION_BANNER_TESTID}"]`),
+      document.querySelectorAll(
+        `[data-testid="${NOTIFICATION_BANNER_TESTID}"]`,
+      ),
     ).toHaveLength(1);
   });
 });
@@ -194,9 +198,9 @@ describe("offerNotificationPermission, embedded cross-origin", () => {
   });
 
   it("reports surface-blocked, NOT denied, when embedded", () => {
-    expect(harness({ permission: "denied", isEmbedded: true }).outcomes).toEqual(
-      ["surface-blocked"],
-    );
+    expect(
+      harness({ permission: "denied", isEmbedded: true }).outcomes,
+    ).toEqual(["surface-blocked"]);
   });
 
   it("still reports denied for the SAME reading when not embedded", () => {
@@ -229,9 +233,9 @@ describe("offerNotificationPermission, embedded cross-origin", () => {
 
   it("does not ask again once the note is dismissed", () => {
     const first = harness({ permission: "denied", isEmbedded: true });
-    const dismiss = [...(embeddedNote()?.querySelectorAll("button") ?? [])].find(
-      (b) => b.textContent === EMBEDDED_NOTE_DISMISS,
-    );
+    const dismiss = [
+      ...(embeddedNote()?.querySelectorAll("button") ?? []),
+    ].find((b) => b.textContent === EMBEDDED_NOTE_DISMISS);
     expect(dismiss).toBeDefined();
     dismiss?.click();
     expect(embeddedNote()).toBeNull();

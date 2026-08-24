@@ -102,7 +102,9 @@ describe("describeAttachment", () => {
       string,
       unknown
     >;
-    expect(shape["name"]).toBe(`string(${String("Q3-Pricing-Confidential.pptx".length)})`);
+    expect(shape["name"]).toBe(
+      `string(${String("Q3-Pricing-Confidential.pptx".length)})`,
+    );
   });
 
   it("survives a cycle rather than throwing on it", () => {

@@ -74,7 +74,7 @@ if [ -d "${TRAYCER_HOME_ROOT}" ]; then
     discovered="${discovered} $(basename "${home_dir}")"
   done
 fi
-tenants="$(printf '%s\n' ${TRAYCER_TENANT_IDS} ${discovered} | sort -u | tr '\n' ' ')"
+tenants="$(printf '%s %s' "${TRAYCER_TENANT_IDS}" "${discovered}" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')"
 echo "agent-runtime: covering tenants:${tenants:- (none found)}"
 
 for tenant_id in ${tenants}; do

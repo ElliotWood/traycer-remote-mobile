@@ -1,7 +1,10 @@
 import webPush, { WebPushError } from "web-push";
 import type { NotificationActivationEnvelopeV1 } from "./notification-activation-envelope";
 import type { VapidKeys } from "./vapid-keys";
-import type { PushSubscriptionKeys, SubscriptionStore } from "./subscription-store";
+import type {
+  PushSubscriptionKeys,
+  SubscriptionStore,
+} from "./subscription-store";
 import { logWarn } from "./logger";
 
 /**

@@ -1,0 +1,3 @@
+# Vendored verbatim from Microsoft (see appPackage/README.md) — keep
+# byte-comparable to the published schema, so reformatting is drift.
+appPackage/schemas/

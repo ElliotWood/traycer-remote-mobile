@@ -104,13 +104,17 @@ describe("buildCreateEpicRequest — the epic body", () => {
   });
 
   it("builds a byte-identical request from identical input, so a retry is one", () => {
-    expect(buildCreateEpicRequest(INPUT)).toEqual(buildCreateEpicRequest(INPUT));
+    expect(buildCreateEpicRequest(INPUT)).toEqual(
+      buildCreateEpicRequest(INPUT),
+    );
   });
 });
 
 describe("createEpic", () => {
   it("returns the id it sent, because the response carries no epic id", () => {
-    const client = { request: vi.fn().mockResolvedValue({ roomInfo: null, task: null }) };
+    const client = {
+      request: vi.fn().mockResolvedValue({ roomInfo: null, task: null }),
+    };
     return expect(createEpic(client, INPUT)).resolves.toEqual({
       kind: "created",
       epicId: INPUT.epicId,
@@ -118,7 +122,9 @@ describe("createEpic", () => {
   });
 
   it("calls epic.create with the built request", async () => {
-    const client = { request: vi.fn().mockResolvedValue({ roomInfo: null, task: null }) };
+    const client = {
+      request: vi.fn().mockResolvedValue({ roomInfo: null, task: null }),
+    };
     await createEpic(client, INPUT);
     expect(client.request).toHaveBeenCalledWith(
       "epic.create",
@@ -156,7 +162,10 @@ describe("pendingEpicIdAfter", () => {
 
   it("clears it on success so the next create is a genuinely new epic", () => {
     expect(
-      pendingEpicIdAfter({ kind: "created", epicId: INPUT.epicId }, INPUT.epicId),
+      pendingEpicIdAfter(
+        { kind: "created", epicId: INPUT.epicId },
+        INPUT.epicId,
+      ),
     ).toBeNull();
   });
 });

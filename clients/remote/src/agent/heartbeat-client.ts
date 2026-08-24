@@ -18,7 +18,11 @@ export interface HeartbeatClientOptions {
 export type HeartbeatClientEvent =
   | { readonly kind: "registered" }
   | { readonly kind: "heartbeat-sent" }
-  | { readonly kind: "request-failed"; readonly op: "register" | "heartbeat" | "unregister"; readonly status: number | null };
+  | {
+      readonly kind: "request-failed";
+      readonly op: "register" | "heartbeat" | "unregister";
+      readonly status: number | null;
+    };
 
 async function postJson(
   baseUrl: string,
@@ -122,7 +126,11 @@ export class HeartbeatClient {
         this.options.currentState(),
       );
       if (!res.ok) {
-        this.options.onEvent?.({ kind: "request-failed", op, status: res.status });
+        this.options.onEvent?.({
+          kind: "request-failed",
+          op,
+          status: res.status,
+        });
         return false;
       }
       return true;

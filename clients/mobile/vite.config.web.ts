@@ -49,8 +49,18 @@ function webManifestPlugin(base: string): Plugin {
     background_color: "#111111",
     theme_color: "#111111",
     icons: [
-      { src: `${base}icons/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: `${base}icons/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
+      {
+        src: `${base}icons/icon-192.png`,
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: `${base}icons/icon-512.png`,
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
       // `any` AND `maskable` are both required. Android applies its own
       // adaptive-icon mask and, given only `any` icons, crops the artwork to
       // fit - clipping the logo's edges. The maskable variant is the same
@@ -85,7 +95,10 @@ function webManifestPlugin(base: string): Plugin {
           },
           {
             tag: "link",
-            attrs: { rel: "apple-touch-icon", href: `${base}icons/apple-touch-icon.png` },
+            attrs: {
+              rel: "apple-touch-icon",
+              href: `${base}icons/apple-touch-icon.png`,
+            },
             injectTo: "head" as const,
           },
           {
@@ -104,7 +117,12 @@ const clientsRoot = resolve(mobileRoot, "..");
 const guiAppRoot = resolve(clientsRoot, "gui-app");
 const sharedRoot = resolve(clientsRoot, "shared");
 const protocolRoot = resolve(clientsRoot, "..", "protocol");
-const capacitorShim = resolve(mobileRoot, "src", "web", "capacitor-web-shim.ts");
+const capacitorShim = resolve(
+  mobileRoot,
+  "src",
+  "web",
+  "capacitor-web-shim.ts",
+);
 
 function requiredEnv(name: string): string {
   const value = process.env[name];

@@ -59,7 +59,10 @@ function png(width, height, pixel) {
   ]);
 }
 
-const here = new URL(".", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const here = new URL(".", import.meta.url).pathname.replace(
+  /^\/([A-Za-z]:)/,
+  "$1",
+);
 
 // color.png — 192x192, full-bleed. Teal, with a lighter inset square so it
 // reads as an intentional mark rather than a blank tile at small sizes.

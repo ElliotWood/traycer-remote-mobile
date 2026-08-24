@@ -150,7 +150,8 @@ export const pendingInterviewSchema = z.object({
       logWarn("bridge omitted interview questions — interviews are read-only", {
         consequence:
           "the interview card offers no form and points at the desktop",
-        likelyCause: "bridge binary older than the interview-question passthrough",
+        likelyCause:
+          "bridge binary older than the interview-question passthrough",
       });
       return null;
     }),

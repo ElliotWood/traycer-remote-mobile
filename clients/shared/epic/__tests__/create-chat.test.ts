@@ -9,9 +9,9 @@ import {
 
 describe("titleFromInstruction", () => {
   it("takes the first non-empty line, not the first N characters", () => {
-    expect(titleFromInstruction("Audit the auth code\n\nStart with tokens.")).toBe(
-      "Audit the auth code",
-    );
+    expect(
+      titleFromInstruction("Audit the auth code\n\nStart with tokens."),
+    ).toBe("Audit the auth code");
   });
 
   it("skips leading blank lines rather than titling an agent with nothing", () => {
@@ -53,21 +53,28 @@ describe("buildCreateChatRequest", () => {
 
   it("CONTRACT: builds the identical request twice, which is what makes a retry safe", () => {
     const input = { epicId: "e1", chatId: "c1", hostId: "h1", title: "t" };
-    expect(buildCreateChatRequest(input)).toEqual(buildCreateChatRequest(input));
+    expect(buildCreateChatRequest(input)).toEqual(
+      buildCreateChatRequest(input),
+    );
   });
 });
 
 describe("pendingChatIdAfter — the rule that stands between a retry and two agents", () => {
   it("keeps the id after unconfirmed, so the retry is the SAME request", () => {
     expect(
-      pendingChatIdAfter({ kind: "unconfirmed", reason: "socket closed" }, "c1"),
+      pendingChatIdAfter(
+        { kind: "unconfirmed", reason: "socket closed" },
+        "c1",
+      ),
     ).toBe("c1");
   });
 
   it("clears the id after created, so the NEXT create is a new agent", () => {
     // The inverse failure: holding the id would make a second, deliberate
     // create resolve idempotently to the first chat and appear to do nothing.
-    expect(pendingChatIdAfter({ kind: "created", chatId: "c1" }, "c1")).toBeNull();
+    expect(
+      pendingChatIdAfter({ kind: "created", chatId: "c1" }, "c1"),
+    ).toBeNull();
   });
 });
 
@@ -123,7 +130,10 @@ describe("createChat", () => {
     expect(second).toEqual({ kind: "created", chatId: "c1" });
 
     const [, firstBody] = request.mock.calls[0] as [string, { chatId: string }];
-    const [, secondBody] = request.mock.calls[1] as [string, { chatId: string }];
+    const [, secondBody] = request.mock.calls[1] as [
+      string,
+      { chatId: string },
+    ];
     expect(secondBody.chatId).toBe(firstBody.chatId);
   });
 });

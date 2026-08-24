@@ -81,7 +81,8 @@ describe("readTeamsDeepLinkRoute", () => {
     // Built with char codes rather than typed: a control character written
     // into a source file is invisible in review, and writing THIS file put two
     // real ones in it on the first attempt.
-    const ctrl = (code: number): string => `/epics/e${String.fromCharCode(code)}e`;
+    const ctrl = (code: number): string =>
+      `/epics/e${String.fromCharCode(code)}e`;
     expect(readTeamsDeepLinkRoute("/epics/e e/e")).toBeNull();
     expect(readTeamsDeepLinkRoute("/epics/e\te")).toBeNull();
     expect(readTeamsDeepLinkRoute(ctrl(0x00))).toBeNull();
@@ -113,7 +114,9 @@ describe("applyTeamsDeepLink", () => {
     // implementation also satisfies, and that implementation is a dead link.
     const target = fakeWindow({ isSubpath: true });
     applyTeamsDeepLink(REAL_ROUTE, target);
-    expect(target.setHash.mock.calls.length).toBe(target.reload.mock.calls.length);
+    expect(target.setHash.mock.calls.length).toBe(
+      target.reload.mock.calls.length,
+    );
   });
 
   /**
@@ -124,7 +127,10 @@ describe("applyTeamsDeepLink", () => {
    * i.e. in front of the one person nobody can ask.
    */
   it("does nothing when the fragment is already that route", () => {
-    const target = fakeWindow({ isSubpath: true, currentHash: `#${REAL_ROUTE}` });
+    const target = fakeWindow({
+      isSubpath: true,
+      currentHash: `#${REAL_ROUTE}`,
+    });
 
     expect(applyTeamsDeepLink(REAL_ROUTE, target)).toBe("already-there");
 
@@ -135,7 +141,10 @@ describe("applyTeamsDeepLink", () => {
   it("still applies when the fragment holds a DIFFERENT route", () => {
     // The control for the row above: a guard that answered "already there" to
     // everything would pass that test and break every deep link.
-    const target = fakeWindow({ isSubpath: true, currentHash: "#/epics/other/other" });
+    const target = fakeWindow({
+      isSubpath: true,
+      currentHash: "#/epics/other/other",
+    });
 
     expect(applyTeamsDeepLink(REAL_ROUTE, target)).toBe("applied");
     expect(target.reload).toHaveBeenCalledTimes(1);

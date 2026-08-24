@@ -42,7 +42,9 @@ for (const key of ["appId", "botId", "tabHost"]) {
 const zipPath = join(HERE, "traycer-remote.zip");
 await rm(zipPath, { force: true });
 
-const manifest = JSON.parse(await readFile(join(HERE, "manifest.json"), "utf8"));
+const manifest = JSON.parse(
+  await readFile(join(HERE, "manifest.json"), "utf8"),
+);
 
 manifest.id = ids.appId;
 manifest.bots[0].botId = ids.botId;
@@ -63,7 +65,9 @@ const leftovers = [...rendered.matchAll(/REPLACE_WITH_[A-Z_]+/g)].map(
   (m) => m[0],
 );
 if (leftovers.length > 0) {
-  console.error(`manifest still contains placeholders: ${leftovers.join(", ")}`);
+  console.error(
+    `manifest still contains placeholders: ${leftovers.join(", ")}`,
+  );
   process.exit(1);
 }
 if (rendered.includes("00000000-0000-0000-0000-000000000000")) {
@@ -216,5 +220,7 @@ async function writeZip(path, entries) {
 
 console.log(`package: ${zip}`);
 console.log(`  app id  ${manifest.id}`);
-console.log(`  tabs    ${manifest.staticTabs.map((t) => t.contentUrl).join(", ")}`);
+console.log(
+  `  tabs    ${manifest.staticTabs.map((t) => t.contentUrl).join(", ")}`,
+);
 console.log(`  domains ${manifest.validDomains.join(", ")}`);

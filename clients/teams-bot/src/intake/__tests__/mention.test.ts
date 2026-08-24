@@ -62,7 +62,11 @@ describe("stripMentions — entities are the contract, the regex is the fallback
   });
 
   it("falls back to the regex when no entities are supplied", () => {
-    const result = stripMentions("<at>Traycer</at> fleet", undefined, undefined);
+    const result = stripMentions(
+      "<at>Traycer</at> fleet",
+      undefined,
+      undefined,
+    );
     expect(result.text).toBe("fleet");
     expect(result.strippedByEntity).toBe(false);
     expect(result.usedFallback).toBe(true);

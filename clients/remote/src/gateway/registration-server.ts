@@ -36,7 +36,11 @@ async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
+function sendJson(
+  res: http.ServerResponse,
+  status: number,
+  body: unknown,
+): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
 }
@@ -67,7 +71,8 @@ async function handleRequest(
 ): Promise<void> {
   const authHeader = req.headers.authorization ?? "";
   const match = /^Bearer\s+(\S+)$/i.exec(authHeader);
-  const agentId = match === null ? null : resolveAgentIdFromToken(match[1], config);
+  const agentId =
+    match === null ? null : resolveAgentIdFromToken(match[1], config);
   if (agentId === null) {
     sendJson(res, 401, { error: "UNAUTHORIZED" });
     return;

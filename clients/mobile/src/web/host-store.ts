@@ -125,7 +125,10 @@ export function addStoredHost(
   // A page served over HTTPS cannot open a ws:// socket - the browser blocks
   // it as mixed content, and the failure surfaces as an unexplained
   // connection error much later. Say so here instead.
-  if (parsedUrl.protocol === "ws:" && globalThis.location.protocol === "https:") {
+  if (
+    parsedUrl.protocol === "ws:" &&
+    globalThis.location.protocol === "https:"
+  ) {
     return {
       kind: "rejected",
       reason:
@@ -138,7 +141,10 @@ export function addStoredHost(
     reservedHostIds.includes(hostId) ||
     existing.some((host) => host.hostId === hostId)
   ) {
-    return { kind: "rejected", reason: "A host with that id is already listed." };
+    return {
+      kind: "rejected",
+      reason: "A host with that id is already listed.",
+    };
   }
 
   const hosts = [...existing, { hostId, label, websocketUrl }];

@@ -54,7 +54,10 @@ export function forwardToLoopback(params: {
   client.on("error", () => upstream.destroy());
   upstream.on("error", () => client.destroy());
 
-  const head = rewriteHeadForLoopback(headBuffered.toString("utf8"), loopbackPort);
+  const head = rewriteHeadForLoopback(
+    headBuffered.toString("utf8"),
+    loopbackPort,
+  );
   upstream.write(Buffer.concat([Buffer.from(head, "utf8"), bodyAfterHead]));
 
   // Attaching `.pipe()` puts each stream in flowing mode, which resumes a

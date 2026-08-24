@@ -71,7 +71,9 @@ describe("a still-pending approval is announced once, not every tick", () => {
      * all three are here: "it emitted something" is true of the broken code.
      */
     const tracker = new WatchEventTracker();
-    const tick = [status({ chatId: "c-1", pendingApprovals: [approval("a-1")] })];
+    const tick = [
+      status({ chatId: "c-1", pendingApprovals: [approval("a-1")] }),
+    ];
 
     expect(ids(tracker.diff(EPIC, tick))).toEqual([
       `appeared:${approvalEventId("c-1", "a-1")}`,

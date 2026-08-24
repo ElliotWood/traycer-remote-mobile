@@ -44,9 +44,11 @@ const ELLIOT = { id: "29:1elliot", name: "Elliot Wood" };
 describe("rememberProactiveTarget — the binding nothing was doing", () => {
   it("binds a route and keeps the mention target with it", () => {
     const store = new CountingStore();
-    expect(rememberProactiveTarget(store, "epic-1", RAW, ELLIOT, 1000)).toEqual({
-      kind: "bound",
-    });
+    expect(rememberProactiveTarget(store, "epic-1", RAW, ELLIOT, 1000)).toEqual(
+      {
+        kind: "bound",
+      },
+    );
 
     const target = store.targetFor("epic-1");
     expect(target?.reference.conversation.id).toBe("conv-1");

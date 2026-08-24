@@ -9,7 +9,11 @@
  *   2. only `gone` may discard the conversation reference.
  */
 import { describe, expect, it } from "vitest";
-import { pushWatchEvent, type PushDeps, type SendProactive } from "../push-notifications";
+import {
+  pushWatchEvent,
+  type PushDeps,
+  type SendProactive,
+} from "../push-notifications";
 import type { ProactiveStore, ProactiveTarget } from "../proactive-store";
 import type { StoredConversationReference } from "../../state/conversation-reference-store";
 import {
@@ -137,7 +141,9 @@ function failsWith(status: number): SendProactive {
   return async () => {
     // The SDK throws an `HttpError` carrying a numeric `status`. Reproduced
     // structurally, which is exactly how `outcomeOfSendError` reads it.
-    const error: Error & { status?: number } = new Error(`HTTP ${String(status)}`);
+    const error: Error & { status?: number } = new Error(
+      `HTTP ${String(status)}`,
+    );
     error.status = status;
     throw error;
   };
@@ -197,7 +203,10 @@ describe("only `gone` discards the conversation reference", () => {
     const unreachable = harness(new FakeStore(["epic-1"]), async () => {
       throw new Error("getaddrinfo ENOTFOUND smba.example");
     });
-    const result = await pushWatchEvent(unreachable.deps, approval("e1", "epic-1"));
+    const result = await pushWatchEvent(
+      unreachable.deps,
+      approval("e1", "epic-1"),
+    );
     expect(unreachable.store.targetFor("epic-1")).not.toBeNull();
     expect(result).toMatchObject({ kind: "failed", referenceDiscarded: false });
   });
@@ -236,7 +245,10 @@ describe("idempotency across a bridge restart", () => {
     const h = harness(new FakeStore(["epic-1"]), succeeds);
     await pushWatchEvent(h.deps, approval("e1", "epic-1"));
 
-    const resolvedResult = await pushWatchEvent(h.deps, resolved("e1", "epic-1"));
+    const resolvedResult = await pushWatchEvent(
+      h.deps,
+      resolved("e1", "epic-1"),
+    );
     expect(resolvedResult).toEqual({ kind: "corrected", eventId: "e1" });
 
     const reRaised = await pushWatchEvent(h.deps, approval("e1", "epic-1"));
@@ -275,7 +287,10 @@ describe("idempotency across a bridge restart", () => {
      * ignore the channel that also carries the real ones.
      */
     const h = harness(new FakeStore(["epic-1"]), succeeds);
-    const result = await pushWatchEvent(h.deps, resolved("never-sent", "epic-1"));
+    const result = await pushWatchEvent(
+      h.deps,
+      resolved("never-sent", "epic-1"),
+    );
     expect(result).toEqual({ kind: "forgotten", eventId: "never-sent" });
     expect(h.sends.length).toBe(0);
   });

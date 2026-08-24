@@ -39,7 +39,12 @@ describe("ActionTracker", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].clientActionId).toBe("a1");
 
-    tracker.handleAck({ clientActionId: "a1", status: "accepted", reason: null, code: null });
+    tracker.handleAck({
+      clientActionId: "a1",
+      status: "accepted",
+      reason: null,
+      code: null,
+    });
     await expect(outcome).resolves.toEqual({ kind: "applied" });
   });
 
@@ -70,7 +75,12 @@ describe("ActionTracker", () => {
       frame: frame("a1"),
       isSettled: () => false,
     });
-    tracker.handleAck({ clientActionId: "other-id", status: "accepted", reason: null, code: null });
+    tracker.handleAck({
+      clientActionId: "other-id",
+      status: "accepted",
+      reason: null,
+      code: null,
+    });
 
     let settled = false;
     void outcome.then(() => {
@@ -79,7 +89,12 @@ describe("ActionTracker", () => {
     await Promise.resolve();
     expect(settled).toBe(false);
 
-    tracker.handleAck({ clientActionId: "a1", status: "accepted", reason: null, code: null });
+    tracker.handleAck({
+      clientActionId: "a1",
+      status: "accepted",
+      reason: null,
+      code: null,
+    });
     await expect(outcome).resolves.toEqual({ kind: "applied" });
   });
 
@@ -122,7 +137,12 @@ describe("ActionTracker", () => {
     expect(settled).toBe(false);
 
     // The resend's ack finally lands.
-    tracker.handleAck({ clientActionId: "a1", status: "accepted", reason: null, code: null });
+    tracker.handleAck({
+      clientActionId: "a1",
+      status: "accepted",
+      reason: null,
+      code: null,
+    });
     await expect(outcome).resolves.toEqual({ kind: "applied" });
   });
 
@@ -160,9 +180,19 @@ describe("ActionTracker", () => {
     });
     void outcome.then(resolveSpy);
 
-    tracker.handleAck({ clientActionId: "a1", status: "accepted", reason: null, code: null });
+    tracker.handleAck({
+      clientActionId: "a1",
+      status: "accepted",
+      reason: null,
+      code: null,
+    });
     tracker.handleReconnectSnapshot(emptySnapshot);
-    tracker.handleAck({ clientActionId: "a1", status: "rejected", reason: "late", code: null });
+    tracker.handleAck({
+      clientActionId: "a1",
+      status: "rejected",
+      reason: "late",
+      code: null,
+    });
 
     await outcome;
     expect(resolveSpy).toHaveBeenCalledTimes(1);
@@ -171,8 +201,16 @@ describe("ActionTracker", () => {
 
   it("resolves every outstanding action as 'failed' on dispose, never leaving a hang past shutdown", async () => {
     const tracker = new ActionTracker({ send: () => {} });
-    const a = tracker.issue({ clientActionId: "a1", frame: frame("a1"), isSettled: () => false });
-    const b = tracker.issue({ clientActionId: "a2", frame: frame("a2"), isSettled: () => false });
+    const a = tracker.issue({
+      clientActionId: "a1",
+      frame: frame("a1"),
+      isSettled: () => false,
+    });
+    const b = tracker.issue({
+      clientActionId: "a2",
+      frame: frame("a2"),
+      isSettled: () => false,
+    });
 
     tracker.dispose();
 
@@ -193,7 +231,11 @@ describe("ActionTracker", () => {
 
   it("rejects a duplicate clientActionId issued while the first is still in flight", async () => {
     const tracker = new ActionTracker({ send: () => {} });
-    void tracker.issue({ clientActionId: "a1", frame: frame("a1"), isSettled: () => false });
+    void tracker.issue({
+      clientActionId: "a1",
+      frame: frame("a1"),
+      isSettled: () => false,
+    });
     const second = await tracker.issue({
       clientActionId: "a1",
       frame: frame("a1"),
@@ -267,7 +309,12 @@ describe("ActionTracker", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(settled).toBe(false);
 
-      tracker.handleAck({ clientActionId: "a1", status: "accepted", reason: null, code: null });
+      tracker.handleAck({
+        clientActionId: "a1",
+        status: "accepted",
+        reason: null,
+        code: null,
+      });
       await expect(outcome).resolves.toEqual({ kind: "applied" });
     } finally {
       vi.useRealTimers();

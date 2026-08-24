@@ -115,7 +115,10 @@ describe("verifyTraycerPrincipal — the identity comes from the issuer, not the
     if (asAlice.kind !== "verified" || asBob.kind !== "verified") {
       throw new Error("expected both verified");
     }
-    if (asAlice.principal.kind !== "traycer" || asBob.principal.kind !== "traycer") {
+    if (
+      asAlice.principal.kind !== "traycer" ||
+      asBob.principal.kind !== "traycer"
+    ) {
       throw new Error("expected traycer principals");
     }
     expect(asAlice.principal.userId).toBe("traycer-user-alice");
@@ -130,7 +133,9 @@ describe("verifyTraycerPrincipal — the identity comes from the issuer, not the
     const forged =
       Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url") +
       "." +
-      Buffer.from(JSON.stringify({ sub: "traycer-user-alice" })).toString("base64url") +
+      Buffer.from(JSON.stringify({ sub: "traycer-user-alice" })).toString(
+        "base64url",
+      ) +
       ".";
     authn.setResponse(401, { error: "unauthorized" });
     const result = await verify(forged);
@@ -151,7 +156,10 @@ describe("verifyTraycerPrincipal — fails closed on every non-success", () => {
 
   it("500 -> network_error (transient, still refused)", async () => {
     authn.setResponse(500, {});
-    expect(await verify("t")).toEqual({ kind: "failed", reason: "network_error" });
+    expect(await verify("t")).toEqual({
+      kind: "failed",
+      reason: "network_error",
+    });
   });
 
   it("authn unreachable -> network_error, never a guessed identity", async () => {
@@ -167,22 +175,34 @@ describe("verifyTraycerPrincipal — fails closed on every non-success", () => {
 
   it("200 with a malformed body -> malformed_response", async () => {
     authn.setResponse(200, { user: {} });
-    expect(await verify("t")).toEqual({ kind: "failed", reason: "malformed_response" });
+    expect(await verify("t")).toEqual({
+      kind: "failed",
+      reason: "malformed_response",
+    });
   });
 
   it("200 with a non-string user id -> malformed_response", async () => {
     authn.setResponse(200, { user: { id: 12345 } });
-    expect(await verify("t")).toEqual({ kind: "failed", reason: "malformed_response" });
+    expect(await verify("t")).toEqual({
+      kind: "failed",
+      reason: "malformed_response",
+    });
   });
 
   it("200 with an empty-string user id -> malformed_response, never an empty identity", async () => {
     authn.setResponse(200, { user: { id: "" } });
-    expect(await verify("t")).toEqual({ kind: "failed", reason: "malformed_response" });
+    expect(await verify("t")).toEqual({
+      kind: "failed",
+      reason: "malformed_response",
+    });
   });
 
   it("200 with unparseable JSON -> malformed_response", async () => {
     authn.setResponse(200, "not json at all{{{");
-    expect(await verify("t")).toEqual({ kind: "failed", reason: "malformed_response" });
+    expect(await verify("t")).toEqual({
+      kind: "failed",
+      reason: "malformed_response",
+    });
   });
 });
 
@@ -238,7 +258,9 @@ describe("verifyTraycerPrincipal + IdentityRegistry — the full browser routing
       () => {},
     );
     authn.setResponse(200, { user: { id: "traycer-user-stranger" } });
-    const verified = await verify("a-perfectly-valid-token-for-someone-unmapped");
+    const verified = await verify(
+      "a-perfectly-valid-token-for-someone-unmapped",
+    );
     if (verified.kind !== "verified") throw new Error("expected verified");
     expect(registry.resolveTenant(verified.principal)).toEqual({
       kind: "refused",
@@ -273,7 +295,9 @@ describe("verifyTraycerPrincipal — the concurrency ceiling (amplification guar
       }
       waiting.push(() => respond(res));
     });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", () => resolve()),
+    );
     const addr = server.address();
     const port = typeof addr === "object" && addr !== null ? addr.port : 0;
     return {
@@ -315,7 +339,10 @@ describe("verifyTraycerPrincipal — the concurrency ceiling (amplification guar
         fetchImpl: fetch,
         maxConcurrent: cap,
       });
-      expect(overflow).toEqual({ kind: "failed", reason: "capacity_exhausted" });
+      expect(overflow).toEqual({
+        kind: "failed",
+        reason: "capacity_exhausted",
+      });
 
       blocking.release();
       const settled = await Promise.all(held);

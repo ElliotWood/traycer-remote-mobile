@@ -53,7 +53,9 @@ describe("withTransientRetry", () => {
   it("retries exactly once on a host-flagged transient failure and returns the retry's result", async () => {
     const call = vi
       .fn<() => Promise<string>>()
-      .mockRejectedValueOnce(retryableError('"exp" claim timestamp check failed'))
+      .mockRejectedValueOnce(
+        retryableError('"exp" claim timestamp check failed'),
+      )
       .mockResolvedValueOnce("ok");
     const diagnostics: string[] = [];
 

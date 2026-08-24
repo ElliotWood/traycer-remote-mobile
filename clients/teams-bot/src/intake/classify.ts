@@ -39,10 +39,7 @@
 
 export type ProductId = "sensormine" | "dr-migrate";
 export type IntentId =
-  | "new-opportunity"
-  | "product-query"
-  | "feature-request"
-  | "support";
+  "new-opportunity" | "product-query" | "feature-request" | "support";
 
 export interface SkillRoute {
   readonly product: ProductId;
@@ -62,7 +59,10 @@ const PRODUCT_TERMS: ReadonlyArray<{
   readonly product: ProductId;
   readonly terms: readonly string[];
 }> = [
-  { product: "sensormine", terms: ["sensormine", "sensor mine", "smv4", "sm v4"] },
+  {
+    product: "sensormine",
+    terms: ["sensormine", "sensor mine", "smv4", "sm v4"],
+  },
   {
     product: "dr-migrate",
     terms: ["dr migrate", "dr-migrate", "drmigrate", "dr_migrate"],
@@ -102,7 +102,14 @@ const INTENT_TERMS: ReadonlyArray<{
   },
   {
     intent: "support",
-    terms: ["not working", "broken", "error", "bug", "support ticket", "issue with"],
+    terms: [
+      "not working",
+      "broken",
+      "error",
+      "bug",
+      "support ticket",
+      "issue with",
+    ],
   },
   {
     intent: "product-query",
@@ -213,7 +220,11 @@ export function classify(input: ClassifyInput): Classification {
   // request — "SensorMine is great" must not spend an agent — and an intent
   // alone does not say which product's skill to run.
   if (product === null && intent === null) {
-    return { kind: "uncertain", suggestion: null, reason: "nothing-recognised" };
+    return {
+      kind: "uncertain",
+      suggestion: null,
+      reason: "nothing-recognised",
+    };
   }
   if (product === null) {
     return { kind: "uncertain", suggestion: null, reason: "no-product" };

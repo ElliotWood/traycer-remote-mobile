@@ -49,7 +49,7 @@ scan() {
   for f in "$dir"/$glob; do
     [ -e "$f" ] || continue
     base="$(basename "$f")"
-    if ! printf '%s\n' $expected | grep -qxF "$base"; then
+    if ! printf '%s' "$expected" | tr ' ' '\n' | grep -qxF "$base"; then
       offenders+=("$f")
       # A best-effort hint at why it's here, since the author usually knows the
       # word "bak" but not that the directory is globbed.

@@ -29,7 +29,10 @@ const VAPID_KEYS = {
 };
 
 /** Shaped like the real `WebPushError` a `web-push` send throws on rejection — `.statusCode`/`.headers`/`.body`/`.endpoint` — without depending on its exact constructor signature. */
-function webPushErrorShape(statusCode: number, endpoint: string): Error & {
+function webPushErrorShape(
+  statusCode: number,
+  endpoint: string,
+): Error & {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
@@ -71,7 +74,11 @@ describe("push sender — prune on error", () => {
     const send: SendNotificationFn = async (sub) => {
       throw webPushErrorShape(410, sub.endpoint);
     };
-    const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
+    const sender = createPushSender({
+      vapidKeys: VAPID_KEYS,
+      subscriptionStore: store,
+      send,
+    });
 
     await sender.sendToAll(PAYLOAD);
 
@@ -83,7 +90,11 @@ describe("push sender — prune on error", () => {
     const send: SendNotificationFn = async (sub) => {
       throw webPushErrorShape(404, sub.endpoint);
     };
-    const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
+    const sender = createPushSender({
+      vapidKeys: VAPID_KEYS,
+      subscriptionStore: store,
+      send,
+    });
 
     await sender.sendToAll(PAYLOAD);
 
@@ -95,7 +106,11 @@ describe("push sender — prune on error", () => {
     const send: SendNotificationFn = async (sub) => {
       throw webPushErrorShape(500, sub.endpoint);
     };
-    const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
+    const sender = createPushSender({
+      vapidKeys: VAPID_KEYS,
+      subscriptionStore: store,
+      send,
+    });
 
     await sender.sendToAll(PAYLOAD);
 
@@ -103,13 +118,20 @@ describe("push sender — prune on error", () => {
   });
 
   it("leaves other subscriptions untouched when only one fails", async () => {
-    const store = await storeWith(["https://fcm.example/dead", "https://fcm.example/alive"]);
+    const store = await storeWith([
+      "https://fcm.example/dead",
+      "https://fcm.example/alive",
+    ]);
     const send: SendNotificationFn = async (sub) => {
       if (sub.endpoint.endsWith("/dead")) {
         throw webPushErrorShape(410, sub.endpoint);
       }
     };
-    const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
+    const sender = createPushSender({
+      vapidKeys: VAPID_KEYS,
+      subscriptionStore: store,
+      send,
+    });
 
     await sender.sendToAll(PAYLOAD);
 
@@ -124,7 +146,11 @@ describe("push sender — prune on error", () => {
     const send: SendNotificationFn = async (_sub, _payload, options) => {
       seenVapid = options.vapidDetails;
     };
-    const sender = createPushSender({ vapidKeys: VAPID_KEYS, subscriptionStore: store, send });
+    const sender = createPushSender({
+      vapidKeys: VAPID_KEYS,
+      subscriptionStore: store,
+      send,
+    });
 
     await sender.sendToAll(PAYLOAD);
 

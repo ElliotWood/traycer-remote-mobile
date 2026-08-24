@@ -9,7 +9,8 @@ import {
 import { startTestJwksServer, type TestJwksServer } from "./test-jwks-server";
 
 const AUDIENCE = "11111111-2222-4333-8444-555555555555"; // synthetic, not a real Entra app id
-const ISSUER = "https://login.microsoftonline.com/00000000-0000-4000-8000-000000000000/v2.0";
+const ISSUER =
+  "https://login.microsoftonline.com/00000000-0000-4000-8000-000000000000/v2.0";
 const OID = "0b8f1c2e-8f3a-4a1b-9c2d-1e2f3a4b5c6d";
 
 let server: TestJwksServer;
@@ -70,7 +71,11 @@ describe("validateAadIdToken — the hard-refusal boundary this ticket exists to
       {},
     );
     await expect(
-      validateAadIdToken({ token: connectorShapedToken, config, now: Date.now }),
+      validateAadIdToken({
+        token: connectorShapedToken,
+        config,
+        now: Date.now,
+      }),
     ).rejects.toMatchObject({ reason: "issuer_mismatch" });
   });
 
@@ -84,7 +89,11 @@ describe("validateAadIdToken — the hard-refusal boundary this ticket exists to
       {},
     );
     await expect(
-      validateAadIdToken({ token: connectorShapedToken, config, now: Date.now }),
+      validateAadIdToken({
+        token: connectorShapedToken,
+        config,
+        now: Date.now,
+      }),
     ).rejects.toThrow(AadIdTokenError);
   });
 });
@@ -102,9 +111,9 @@ describe("validateAadIdToken — algorithm allowlist", () => {
   });
 
   it("rejects alg:none", async () => {
-    const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString(
-      "base64url",
-    );
+    const header = Buffer.from(
+      JSON.stringify({ alg: "none", typ: "JWT" }),
+    ).toString("base64url");
     const body = Buffer.from(
       JSON.stringify({ iss: ISSUER, aud: AUDIENCE, oid: OID }),
     ).toString("base64url");
@@ -117,7 +126,14 @@ describe("validateAadIdToken — algorithm allowlist", () => {
 
 describe("validateAadIdToken — issuer / audience / time", () => {
   it("rejects a wrong issuer", async () => {
-    const token = signToken({ iss: "https://login.microsoftonline.com/wrong-tenant/v2.0", aud: AUDIENCE, oid: OID }, {});
+    const token = signToken(
+      {
+        iss: "https://login.microsoftonline.com/wrong-tenant/v2.0",
+        aud: AUDIENCE,
+        oid: OID,
+      },
+      {},
+    );
     await expect(
       validateAadIdToken({ token, config, now: Date.now }),
     ).rejects.toMatchObject({ reason: "issuer_mismatch" });
@@ -143,7 +159,12 @@ describe("validateAadIdToken — issuer / audience / time", () => {
 
   it("rejects a not-yet-valid token", async () => {
     const token = jwt.sign(
-      { iss: ISSUER, aud: AUDIENCE, oid: OID, nbf: Math.floor(Date.now() / 1000) + 3600 },
+      {
+        iss: ISSUER,
+        aud: AUDIENCE,
+        oid: OID,
+        nbf: Math.floor(Date.now() / 1000) + 3600,
+      },
       server.privateKeyPem,
       { algorithm: "RS256", keyid: server.kid },
     );
@@ -153,7 +174,10 @@ describe("validateAadIdToken — issuer / audience / time", () => {
   });
 
   it("rejects an unknown kid", async () => {
-    const token = signToken({ iss: ISSUER, aud: AUDIENCE, oid: OID }, { kid: "not-a-real-kid" });
+    const token = signToken(
+      { iss: ISSUER, aud: AUDIENCE, oid: OID },
+      { kid: "not-a-real-kid" },
+    );
     await expect(
       validateAadIdToken({ token, config, now: Date.now }),
     ).rejects.toMatchObject({ reason: "unknown_signing_key" });
@@ -169,21 +193,30 @@ describe("validateAadIdToken — oid claim, no normalization", () => {
   });
 
   it("rejects an uppercase oid — refuses rather than lowercasing it", async () => {
-    const token = signToken({ iss: ISSUER, aud: AUDIENCE, oid: OID.toUpperCase() }, {});
+    const token = signToken(
+      { iss: ISSUER, aud: AUDIENCE, oid: OID.toUpperCase() },
+      {},
+    );
     await expect(
       validateAadIdToken({ token, config, now: Date.now }),
     ).rejects.toMatchObject({ reason: "malformed_oid_claim" });
   });
 
   it("rejects a non-GUID oid", async () => {
-    const token = signToken({ iss: ISSUER, aud: AUDIENCE, oid: "not-a-guid" }, {});
+    const token = signToken(
+      { iss: ISSUER, aud: AUDIENCE, oid: "not-a-guid" },
+      {},
+    );
     await expect(
       validateAadIdToken({ token, config, now: Date.now }),
     ).rejects.toMatchObject({ reason: "malformed_oid_claim" });
   });
 
   it("rejects a prototype-pollution-shaped oid", async () => {
-    const token = signToken({ iss: ISSUER, aud: AUDIENCE, oid: "__proto__" }, {});
+    const token = signToken(
+      { iss: ISSUER, aud: AUDIENCE, oid: "__proto__" },
+      {},
+    );
     await expect(
       validateAadIdToken({ token, config, now: Date.now }),
     ).rejects.toMatchObject({ reason: "malformed_oid_claim" });

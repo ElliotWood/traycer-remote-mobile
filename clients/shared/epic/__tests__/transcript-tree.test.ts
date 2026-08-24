@@ -42,7 +42,10 @@ function fileChange(blockId: string): ContentBlock {
   };
 }
 
-function subagent(blockId: string, spawnToolCallId: string | null): ContentBlock {
+function subagent(
+  blockId: string,
+  spawnToolCallId: string | null,
+): ContentBlock {
   return {
     type: "subagent",
     blockId,
@@ -76,7 +79,10 @@ function steer(blockId: string): ContentBlock {
   };
 }
 
-function artifactOp(blockId: string, parentBlockId: string | null): ContentBlock {
+function artifactOp(
+  blockId: string,
+  parentBlockId: string | null,
+): ContentBlock {
   return {
     type: "artifact_operation",
     blockId,
@@ -94,7 +100,11 @@ function artifactOp(blockId: string, parentBlockId: string | null): ContentBlock
 
 describe("partitionBlocks — the no-silent-drop partition", () => {
   it("classifies every block into exactly one bucket, dropped is empty", () => {
-    const blocks: ContentBlock[] = [toolCall("t1", null), fileChange("f1"), steer("s1")];
+    const blocks: ContentBlock[] = [
+      toolCall("t1", null),
+      fileChange("f1"),
+      steer("s1"),
+    ];
     const result = partitionBlocks(blocks);
     expect(result.dropped).toEqual([]);
     expect(result.alternatePath).toEqual(["s1"]);
@@ -111,14 +121,20 @@ describe("partitionBlocks — the no-silent-drop partition", () => {
   });
 
   it("puts the spawn-suppressed tool_call in `suppressed`, not `dropped`", () => {
-    const blocks: ContentBlock[] = [toolCall("spawn1", null), subagent("sa1", "spawn1")];
+    const blocks: ContentBlock[] = [
+      toolCall("spawn1", null),
+      subagent("sa1", "spawn1"),
+    ];
     const result = partitionBlocks(blocks);
     expect(result.dropped).toEqual([]);
     expect(result.suppressed.get("spawn1")).toBe("spawn-tool-call");
   });
 
   it("counts a nested child as rendered (visible, just indented), not dropped", () => {
-    const blocks: ContentBlock[] = [subagent("sa1", null), toolCall("t1", "sa1")];
+    const blocks: ContentBlock[] = [
+      subagent("sa1", null),
+      toolCall("t1", "sa1"),
+    ];
     const result = partitionBlocks(blocks);
     expect(result.dropped).toEqual([]);
     expect([...result.rendered].sort()).toEqual(["sa1", "t1"].sort());
@@ -136,7 +152,10 @@ describe("partitionBlocks — the no-silent-drop partition", () => {
 
 describe("buildBlockTree — subagent nesting", () => {
   it("nests an eligible child under its subagent parent, never flattens", () => {
-    const blocks: ContentBlock[] = [subagent("sa1", null), toolCall("t1", "sa1")];
+    const blocks: ContentBlock[] = [
+      subagent("sa1", null),
+      toolCall("t1", "sa1"),
+    ];
     const tree = buildBlockTree(blocks);
     expect(tree).toHaveLength(1);
     expect(tree[0].block.blockId).toBe("sa1");
@@ -168,7 +187,10 @@ describe("buildBlockTree — subagent nesting", () => {
   });
 
   it("never nests artifact_operation even with a parentBlockId set", () => {
-    const blocks: ContentBlock[] = [subagent("sa1", null), artifactOp("ao1", "sa1")];
+    const blocks: ContentBlock[] = [
+      subagent("sa1", null),
+      artifactOp("ao1", "sa1"),
+    ];
     const tree = buildBlockTree(blocks);
     expect(tree.map((n) => n.block.blockId).sort()).toEqual(["ao1", "sa1"]);
   });

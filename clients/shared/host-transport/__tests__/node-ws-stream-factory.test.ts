@@ -4,8 +4,6 @@ import type { AddressInfo } from "node:net";
 import { createNodeStreamWebSocketFactory } from "../node-ws-stream-factory";
 import type { StreamWebSocketLike } from "../ws-stream-factory";
 
-
-
 /**
  * Exercises `createNodeStreamWebSocketFactory()` against a REAL local `ws`
  * server - the binary-capable adapter (`IStreamWebSocketFactory`) backing
@@ -19,9 +17,10 @@ import type { StreamWebSocketLike } from "../ws-stream-factory";
 
 let servers: WebSocketServer[] = [];
 
-function startServer(
-  handler: (socket: import("ws").WebSocket) => void,
-): { url: string; wss: WebSocketServer } {
+function startServer(handler: (socket: import("ws").WebSocket) => void): {
+  url: string;
+  wss: WebSocketServer;
+} {
   const wss = new WebSocketServer({ port: 0, perMessageDeflate: true });
   servers.push(wss);
   wss.on("connection", handler);
@@ -56,7 +55,9 @@ function waitForClose(socket: StreamWebSocketLike): Promise<{
 describe("createNodeStreamWebSocketFactory (real ws server)", () => {
   it("opens and exchanges a text envelope", async () => {
     const { url } = startServer((socket) => {
-      socket.on("message", (data, isBinary) => socket.send(data, { binary: isBinary }));
+      socket.on("message", (data, isBinary) =>
+        socket.send(data, { binary: isBinary }),
+      );
     });
     const factory = createNodeStreamWebSocketFactory();
     const socket = factory.create(url);
@@ -76,7 +77,9 @@ describe("createNodeStreamWebSocketFactory (real ws server)", () => {
 
   it("exchanges a binary payload tagged as Uint8Array with byte-exact round trip", async () => {
     const { url } = startServer((socket) => {
-      socket.on("message", (data, isBinary) => socket.send(data, { binary: isBinary }));
+      socket.on("message", (data, isBinary) =>
+        socket.send(data, { binary: isBinary }),
+      );
     });
     const factory = createNodeStreamWebSocketFactory();
     const socket = factory.create(url);

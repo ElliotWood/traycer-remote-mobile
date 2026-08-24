@@ -179,7 +179,8 @@ async function main(): Promise<void> {
    * back to the conversation that started it.
    */
   const stateDir =
-    process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ?? "/srv/traycer/teams-bot/state";
+    process.env.TRAYCER_TEAMS_STATE_DIR?.trim() ??
+    "/srv/traycer/teams-bot/state";
   const assessmentReferences = new DurableConversationReferenceStore(
     `${stateDir}/conversation-refs.json`,
     (message: string, detail: string) => {
@@ -388,7 +389,10 @@ async function main(): Promise<void> {
                 resolveTarget: (event) => {
                   const fromChat = assessmentReferences.recall(event.chatId);
                   if (fromChat !== null) {
-                    return { reference: fromChat, boundAt: fromChat.capturedAt };
+                    return {
+                      reference: fromChat,
+                      boundAt: fromChat.capturedAt,
+                    };
                   }
                   return proactiveStore.targetFor(event.epicId);
                 },

@@ -29,7 +29,10 @@ type StartAssessment = NonNullable<DispatchDeps["startAssessment"]>;
 function startsFine(): StartAssessment {
   return vi.fn(async () => ({
     kind: "started" as const,
-    card: { contentType: "application/vnd.microsoft.card.adaptive", content: {} },
+    card: {
+      contentType: "application/vnd.microsoft.card.adaptive",
+      content: {},
+    },
   }));
 }
 
@@ -174,7 +177,10 @@ describe("intake — confirming a route OPENS A FORM and starts nothing", () => 
 
     const preset = await dispatchActionInvoke(
       { verb: CONFIRM_ROUTE_VERB, conversationId: "c1", data: ROUTE_DATA },
-      makeDeps({ startAssessment: startsFine(), defaultTimeZone: "Australia/Perth" }),
+      makeDeps({
+        startAssessment: startsFine(),
+        defaultTimeZone: "Australia/Perth",
+      }),
     );
     expect(body(preset.card)).toContain("Australia/Perth");
   });
@@ -222,7 +228,11 @@ describe("intake — confirming a route OPENS A FORM and starts nothing", () => 
   it("refuses to open a form for a route with no skill built", async () => {
     const d = deps();
     const result = await dispatchActionInvoke(
-      { verb: CONFIRM_ROUTE_VERB, conversationId: "c1", data: { ...ROUTE_DATA, skill: "" } },
+      {
+        verb: CONFIRM_ROUTE_VERB,
+        conversationId: "c1",
+        data: { ...ROUTE_DATA, skill: "" },
+      },
       d,
     );
     expect(result.acted).toBe(false);
@@ -248,7 +258,8 @@ describe("intake — submitting the form", () => {
     );
     expect(result.acted).toBe(true);
     expect(d.startAssessment).toHaveBeenCalledOnce();
-    const call = vi.mocked(d.startAssessment as StartAssessment).mock.calls[0][0];
+    const call = vi.mocked(d.startAssessment as StartAssessment).mock
+      .calls[0][0];
     // The WHOLE object. Field-by-field only covers fields someone thought of,
     // and a dropped field is precisely the defect being closed.
     expect(call.opportunity).toEqual({

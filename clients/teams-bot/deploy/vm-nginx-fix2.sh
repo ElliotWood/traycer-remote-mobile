@@ -55,7 +55,7 @@ echo "=== probes ==="
 curl -s -m 8 -o /dev/null -w "loopback /healthz                  : %{http_code}\n" http://127.0.0.1:3978/healthz
 curl -s -m 10 -X POST -o /dev/null -w "public   /api/messages unauth (403 expected): %{http_code}\n" \
   -H 'content-type: application/json' -d '{"type":"message"}' \
-  https://${PUBLIC_HOSTNAME}/api/messages
+  "https://${PUBLIC_HOSTNAME}/api/messages"
 curl -s -m 10 -o /dev/null -w "public   /rpc (must remain reachable)      : %{http_code}\n" \
-  https://${PUBLIC_HOSTNAME}/rpc
+  "https://${PUBLIC_HOSTNAME}/rpc"
 echo "SENTINEL_END TEAMSBOT_NGINX_FIX2"

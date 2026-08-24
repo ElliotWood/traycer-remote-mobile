@@ -69,7 +69,9 @@ const MUTATIONS = [
     file: LINK,
     find: '  if (!route.startsWith("/")) return null;',
     replace: "",
-    names: ["rejects a relative route, which would resolve against wherever we are"],
+    names: [
+      "rejects a relative route, which would resolve against wherever we are",
+    ],
   },
   {
     id: "MUT-6",
@@ -77,16 +79,16 @@ const MUTATIONS = [
     file: LINK,
     find: '  if (route.startsWith("//")) return null;',
     replace: "",
-    names: ["rejects a protocol-relative path, because that names another origin"],
+    names: [
+      "rejects a protocol-relative path, because that names another origin",
+    ],
   },
   {
     id: "MUT-7",
     why: "the deep link is offered AFTER the load protocol is answered",
     file: HOST,
-    find:
-      "  if (subPageId !== null) options.onDeepLink?.(subPageId);\n\n  try {\n    // Teams pushes theme changes",
-    replace:
-      "  try {\n    // Teams pushes theme changes",
+    find: "  if (subPageId !== null) options.onDeepLink?.(subPageId);\n\n  try {\n    // Teams pushes theme changes",
+    replace: "  try {\n    // Teams pushes theme changes",
     also: {
       find: "  return { inTeams: true, theme, hostClientType, subPageId };",
       replace:
@@ -113,7 +115,10 @@ function runSuite() {
     );
     return { failed: false, output: out };
   } catch (error) {
-    return { failed: true, output: `${error.stdout ?? ""}${error.stderr ?? ""}` };
+    return {
+      failed: true,
+      output: `${error.stdout ?? ""}${error.stderr ?? ""}`,
+    };
   }
 }
 
@@ -157,7 +162,9 @@ for (const mutation of MUTATIONS) {
     writeFileSync(mutation.file, original);
   }
 
-  const missing = mutation.names.filter((name) => !result.output.includes(name));
+  const missing = mutation.names.filter(
+    (name) => !result.output.includes(name),
+  );
   if (!result.failed) {
     console.log(`${mutation.id} SURVIVED  - ${mutation.why}`);
     exitCode = 1;

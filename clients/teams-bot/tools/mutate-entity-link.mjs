@@ -71,7 +71,9 @@ const MUTATIONS = [
     find: 'if (id === "" || id === UNSUBSTITUTED_APP_ID) return null;',
     replace: 'if (id === "") return null;',
     suite: PRODUCER,
-    names: ["CONTROL: falls back to the web link for the manifest's nil app id"],
+    names: [
+      "CONTROL: falls back to the web link for the manifest's nil app id",
+    ],
   },
   {
     id: "MUT-4",
@@ -85,7 +87,9 @@ const MUTATIONS = [
     find: "%22subEntityId%22%3A%22%2Fepics%2Fepic-1%2Fepic-1%3FfocusArtifactId%3Dchat-1%22",
     replace: "%22subEntityId%22%3A%22%2Fepics%2Fepic-1%2Fchats%2Fchat-1%22",
     suite: CONSUMER,
-    names: ["hands the tab a route these parsers resolve to the epic and the chat"],
+    names: [
+      "hands the tab a route these parsers resolve to the epic and the chat",
+    ],
   },
   {
     id: "MUT-7",
@@ -94,14 +98,17 @@ const MUTATIONS = [
     find: '"subEntityId": "/epics/epic-1/epic-1?focusArtifactId=chat-1"',
     replace: '"subEntityId": "/epics/epic-1/epic-1?focusArtifactId=chat-9"',
     suite: PRODUCER,
-    names: ["carries the route as `subEntityId`, the tab's only inbound channel"],
+    names: [
+      "carries the route as `subEntityId`, the tab's only inbound channel",
+    ],
   },
   {
     id: "MUT-5",
     why: "the tab and the browser are sent to different chats — CONSUMER SIDE",
     file: FIXTURE,
     find: "%22subEntityId%22%3A%22%2Fepics%2Fepic-1%2Fepic-1%3FfocusArtifactId%3Dchat-1%22",
-    replace: "%22subEntityId%22%3A%22%2Fepics%2Fepic-1%2Fepic-1%3FfocusArtifactId%3Dchat-9%22",
+    replace:
+      "%22subEntityId%22%3A%22%2Fepics%2Fepic-1%2Fepic-1%3FfocusArtifactId%3Dchat-9%22",
     suite: CONSUMER,
     names: ["agrees with its own `webUrl` fallback, route for route"],
   },
@@ -109,8 +116,8 @@ const MUTATIONS = [
     id: "MUT-6",
     why: "the route rides under a key Teams does not deliver",
     file: BUILDER,
-    find: 'JSON.stringify({ subEntityId: route })',
-    replace: 'JSON.stringify({ subPageId: route })',
+    find: "JSON.stringify({ subEntityId: route })",
+    replace: "JSON.stringify({ subPageId: route })",
     suite: PRODUCER,
     names: [
       "CONTRACT: emits the golden entity link",
@@ -123,7 +130,11 @@ function runSuite(suite) {
   try {
     const out = execFileSync(
       process.execPath,
-      [join(ROOT, "node_modules", "vitest", "vitest.mjs"), "run", ...suite.spec.split(" ")],
+      [
+        join(ROOT, "node_modules", "vitest", "vitest.mjs"),
+        "run",
+        ...suite.spec.split(" "),
+      ],
       { cwd: suite.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
     return { failed: false, output: out };
@@ -141,7 +152,9 @@ let exitCode = 0;
 for (const suite of [PRODUCER, CONSUMER]) {
   const control = runSuite(suite);
   if (control.failed) {
-    console.error(`CONTROL FAILED in ${suite.cwd} — nothing below means anything`);
+    console.error(
+      `CONTROL FAILED in ${suite.cwd} — nothing below means anything`,
+    );
     console.error(control.output.slice(-2000));
     process.exit(2);
   }
@@ -158,7 +171,10 @@ for (const mutation of MUTATIONS) {
     process.exit(2);
   }
 
-  writeFileSync(mutation.file, original.replace(mutation.find, mutation.replace));
+  writeFileSync(
+    mutation.file,
+    original.replace(mutation.find, mutation.replace),
+  );
   let result;
   try {
     result = runSuite(mutation.suite);
@@ -166,7 +182,9 @@ for (const mutation of MUTATIONS) {
     writeFileSync(mutation.file, original);
   }
 
-  const missing = mutation.names.filter((name) => !result.output.includes(name));
+  const missing = mutation.names.filter(
+    (name) => !result.output.includes(name),
+  );
   if (!result.failed) {
     console.log(`${mutation.id} SURVIVED  — ${mutation.why}`);
     exitCode = 1;

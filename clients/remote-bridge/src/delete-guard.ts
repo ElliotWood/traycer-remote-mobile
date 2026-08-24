@@ -17,8 +17,7 @@
 import type { AgentSummary } from "./action-surface";
 
 export type DeleteCheck =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly reason: string };
+  { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
 export function checkDeleteTarget(
   agents: readonly AgentSummary[],

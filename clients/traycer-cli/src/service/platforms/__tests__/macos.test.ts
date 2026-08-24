@@ -227,12 +227,7 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
 
       const sh = posixShell() ?? "/bin/sh";
       await execFileAsync(sh, ["-c", script, oldCli]);
-      await execFileAsync(sh, [
-        "-c",
-        script,
-        newCli,
-        "--entry=cli-entry.js",
-      ]);
+      await execFileAsync(sh, ["-c", script, newCli, "--entry=cli-entry.js"]);
 
       expect(await readFile(oldArgs, "utf8")).toBe("host\nstart\n");
       expect(await readFile(newArgs, "utf8")).toBe(
@@ -248,65 +243,68 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
   // names the login item after the file, not after /bin/sh), and BOTH CLI
   // generations must still start. Executes the real emitted file, exactly
   // like the inline-form row above.
-  it.skipIf(NO_POSIX_SHELL)("launcher file: starts both an N-1 CLI without --service-label and a current CLI with it, preserving leading invocation args", async () => {
-    const work = mkdtempSync(join(tmpdir(), "traycer-host-start-launcher-"));
-    const launcher = join(work, "traycer-host-start");
-    const oldCli = join(work, "old-cli.sh");
-    const newCli = join(work, "new-cli.sh");
-    const oldArgs = join(work, "old-args.txt");
-    const newArgs = join(work, "new-args.txt");
-    try {
-      await writeFile(
-        launcher,
-        buildHostStartLauncherScript("ai.traycer.host.compat"),
-        "utf8",
-      );
-      await chmod(launcher, 0o755);
-      await writeFile(
-        oldCli,
-        `#!/bin/sh
+  it.skipIf(NO_POSIX_SHELL)(
+    "launcher file: starts both an N-1 CLI without --service-label and a current CLI with it, preserving leading invocation args",
+    async () => {
+      const work = mkdtempSync(join(tmpdir(), "traycer-host-start-launcher-"));
+      const launcher = join(work, "traycer-host-start");
+      const oldCli = join(work, "old-cli.sh");
+      const newCli = join(work, "new-cli.sh");
+      const oldArgs = join(work, "old-args.txt");
+      const newArgs = join(work, "new-args.txt");
+      try {
+        await writeFile(
+          launcher,
+          buildHostStartLauncherScript("ai.traycer.host.compat"),
+          "utf8",
+        );
+        await chmod(launcher, 0o755);
+        await writeFile(
+          oldCli,
+          `#!/bin/sh
 if [ "$1" = "host" ] && [ "$2" = "capabilities" ]; then
   echo "error: unknown command 'capabilities'" >&2
   exit 1
 fi
 printf '%s\\n' "$@" > ${JSON.stringify(oldArgs)}
 `,
-        "utf8",
-      );
-      await writeFile(
-        newCli,
-        `#!/bin/sh
+          "utf8",
+        );
+        await writeFile(
+          newCli,
+          `#!/bin/sh
 if [ "$1" = "--entry=cli-entry.js" ] && [ "$2" = "host" ] && [ "$3" = "capabilities" ] && [ "$4" = "--has" ] && [ "$5" = "service-label" ]; then exit 0; fi
 printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
 `,
-        "utf8",
-      );
-      await chmod(oldCli, 0o700);
-      await chmod(newCli, 0o700);
+          "utf8",
+        );
+        await chmod(oldCli, 0o700);
+        await chmod(newCli, 0o700);
 
-      // launchd execs the launcher directly and the KERNEL honours its
-      // `#!/bin/sh` shebang. Windows has no shebang handling at all, so a
-      // direct spawn there fails ENOENT on a file that plainly exists. Handing
-      // the file to the shell its own shebang names is what the kernel would
-      // have done, so this stays a test of the launcher's CONTENT instead of
-      // becoming a skip. Naming the platform is right here: shebang exec IS a
-      // POSIX kernel feature, not a capability that varies within one.
-      const runLauncher = (args: readonly string[]): Promise<unknown> =>
-        process.platform === "win32"
-          ? execFileAsync(posixShell() ?? "/bin/sh", [launcher, ...args])
-          : execFileAsync(launcher, [...args]);
+        // launchd execs the launcher directly and the KERNEL honours its
+        // `#!/bin/sh` shebang. Windows has no shebang handling at all, so a
+        // direct spawn there fails ENOENT on a file that plainly exists. Handing
+        // the file to the shell its own shebang names is what the kernel would
+        // have done, so this stays a test of the launcher's CONTENT instead of
+        // becoming a skip. Naming the platform is right here: shebang exec IS a
+        // POSIX kernel feature, not a capability that varies within one.
+        const runLauncher = (args: readonly string[]): Promise<unknown> =>
+          process.platform === "win32"
+            ? execFileAsync(posixShell() ?? "/bin/sh", [launcher, ...args])
+            : execFileAsync(launcher, [...args]);
 
-      await runLauncher([oldCli]);
-      await runLauncher([newCli, "--entry=cli-entry.js"]);
+        await runLauncher([oldCli]);
+        await runLauncher([newCli, "--entry=cli-entry.js"]);
 
-      expect(await readFile(oldArgs, "utf8")).toBe("host\nstart\n");
-      expect(await readFile(newArgs, "utf8")).toBe(
-        "--entry=cli-entry.js\nhost\nstart\n--service-label\nai.traycer.host.compat\n",
-      );
-    } finally {
-      await rm(work, { recursive: true, force: true });
-    }
-  });
+        expect(await readFile(oldArgs, "utf8")).toBe("host\nstart\n");
+        expect(await readFile(newArgs, "utf8")).toBe(
+          "--entry=cli-entry.js\nhost\nstart\n--service-label\nai.traycer.host.compat\n",
+        );
+      } finally {
+        await rm(work, { recursive: true, force: true });
+      }
+    },
+  );
 
   // Field observation 2026-07-28 (sfltool dumpbtm): with `/bin/sh` as
   // ProgramArguments[0], BTM recorded `Name: sh, Parent Identifier:
@@ -337,7 +335,10 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
     // same separator assumption is what degrades attestation to
     // `indeterminate` off macOS.
     expect(
-      launcherPath.split(sep).join("/").endsWith(`/${label.id}/traycer-host-start`),
+      launcherPath
+        .split(sep)
+        .join("/")
+        .endsWith(`/${label.id}/traycer-host-start`),
     ).toBe(true);
     expect(plist).toContain(`<key>ProgramArguments</key>
   <array>
@@ -2583,7 +2584,9 @@ printf '%s\\n' "$@" > ${JSON.stringify(newArgs)}
       }
     }
 
-    const itWhenUnreadableIsReachable = it.skipIf(!canMakeDirectoryUnreadable());
+    const itWhenUnreadableIsReachable = it.skipIf(
+      !canMakeDirectoryUnreadable(),
+    );
 
     async function withUnreadableLaunchAgentsDir(
       body: () => Promise<void>,

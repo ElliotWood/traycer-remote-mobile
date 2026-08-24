@@ -75,7 +75,7 @@ echo "=== 5. replace the /authn location block in place ==="
 # Brace-matched replacement rather than a line-range sed: the block spans many
 # lines and contains braces, and a line-count assumption would silently corrupt
 # a neighbouring block the first time anyone reformats the file.
-node - "$SITE" <<'NODE_EOF'
+node - "$SITE" <<'NODE_EOF' || fail "in-place rewrite failed - config untouched by node, restore from ${BACKUP_DIR} if needed"
 const fs = require("fs");
 const path = process.argv[2];
 const src = fs.readFileSync(path, "utf8");
@@ -147,7 +147,6 @@ const replacement = `location ~ ^/authn/(api/v3/user|api/v3/auth/refresh|api/v3/
 fs.writeFileSync(path, src.slice(0, start) + replacement + src.slice(end), "utf8");
 console.log("rewrote the /authn block");
 NODE_EOF
-[ $? -eq 0 ] || fail "in-place rewrite failed - config untouched by node, restore from ${BACKUP_DIR} if needed"
 
 echo "=== 6. nginx -t BEFORE any reload ==="
 if ! nginx -t 2>&1; then

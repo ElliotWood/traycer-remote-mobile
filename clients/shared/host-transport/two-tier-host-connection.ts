@@ -296,14 +296,17 @@ export class TwoTierHostConnectionManager {
       deps.createWatching ??
       ((a, e) =>
         new WatchingConnection(a, e, createWhatwgStreamWebSocketFactory()));
-    this.promoteDialTimeoutMs = deps.promoteDialTimeoutMs ?? PROMOTE_DIAL_TIMEOUT_MS;
+    this.promoteDialTimeoutMs =
+      deps.promoteDialTimeoutMs ?? PROMOTE_DIAL_TIMEOUT_MS;
     this.driving = this.createDriving(auth, drivingEntry);
     this.drivingEntry = drivingEntry;
     this.state = { phase: "steady", drivingHostId: drivingEntry.hostId };
   }
 
   get drivingHostId(): string {
-    return this.state.phase === "steady" ? this.state.drivingHostId : this.state.to;
+    return this.state.phase === "steady"
+      ? this.state.drivingHostId
+      : this.state.to;
   }
 
   /** The single driving connection — epic doc, chat streams, everything. */
@@ -424,7 +427,10 @@ export class TwoTierHostConnectionManager {
     const previousDriving = this.driving;
     const previousDrivingEntry = this.drivingEntry;
     this.driving = nextDriving;
-    this.drivingEntry = { hostId: entry.hostId, websocketUrl: entry.websocketUrl };
+    this.drivingEntry = {
+      hostId: entry.hostId,
+      websocketUrl: entry.websocketUrl,
+    };
     this.state = { phase: "steady", drivingHostId: entry.hostId };
 
     // The demoted machine's full-registry client is closed immediately —

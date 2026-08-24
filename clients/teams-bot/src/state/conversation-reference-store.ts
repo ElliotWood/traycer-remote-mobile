@@ -44,7 +44,10 @@ import { DurableJsonStore } from "./durable-json-store";
 export interface StoredConversationReference {
   readonly channelId: string;
   readonly serviceUrl: string;
-  readonly conversation: { readonly id: string; readonly conversationType?: string };
+  readonly conversation: {
+    readonly id: string;
+    readonly conversationType?: string;
+  };
   readonly bot: { readonly id: string; readonly name?: string };
   /** Present for routing only — see the docblock. Never an identity source. */
   readonly user?: { readonly id: string; readonly aadObjectId?: string };
@@ -64,9 +67,7 @@ export interface ConversationReferenceStore {
   outstanding(): readonly string[];
 }
 
-export class DurableConversationReferenceStore
-  implements ConversationReferenceStore
-{
+export class DurableConversationReferenceStore implements ConversationReferenceStore {
   private readonly store: DurableJsonStore<StoredConversationReference>;
 
   constructor(

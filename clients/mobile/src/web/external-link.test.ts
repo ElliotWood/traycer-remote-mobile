@@ -222,7 +222,11 @@ describe("openExternalUrl - the window path", () => {
       container: h.container,
     });
 
-    expect(openSpy).toHaveBeenCalledWith(URL_A, "_blank", "noopener,noreferrer");
+    expect(openSpy).toHaveBeenCalledWith(
+      URL_A,
+      "_blank",
+      "noopener,noreferrer",
+    );
     // `null` came back, and the outcome is still the handed-over state.
     expect(outcome).toBe("window-unverified");
     expect(h.reported).toEqual(["window-unverified"]);
@@ -336,9 +340,9 @@ describe("reporting", () => {
     // `[data-external-open]` from outside; `dataset.externalOpen` is the
     // camel-cased view of it, and asserting only the latter would leave the
     // name the probe depends on unpinned by anything.
-    expect(
-      document.documentElement.getAttribute("data-external-open"),
-    ).toBe("window-unverified");
+    expect(document.documentElement.getAttribute("data-external-open")).toBe(
+      "window-unverified",
+    );
   });
 
   it("stamps the refusal, which is the reading a probe on a real tab needs", async () => {

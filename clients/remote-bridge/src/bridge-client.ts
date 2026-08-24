@@ -71,9 +71,7 @@ const DEFAULT_PERMISSION_MODE = "supervised";
  * stays `supervised`, because every other caller IS interactive.
  */
 export type BridgePermissionMode =
-  | "supervised"
-  | "auto_accept_edits"
-  | "full_access";
+  "supervised" | "auto_accept_edits" | "full_access";
 
 export const BRIDGE_PERMISSION_MODES: readonly BridgePermissionMode[] = [
   "supervised",
@@ -289,7 +287,10 @@ export class BridgeClient implements RemoteBridgeActions {
     blockId: string,
     answers: readonly InterviewAnswer[],
   ): Promise<ActionOutcome> {
-    return this.ensureChatSession(chatId, undefined).answerInterview(blockId, answers);
+    return this.ensureChatSession(chatId, undefined).answerInterview(
+      blockId,
+      answers,
+    );
   }
 
   async sendMessage(
@@ -402,7 +403,10 @@ export class BridgeClient implements RemoteBridgeActions {
     offset: number,
     limit: number,
   ): Promise<Transcript> {
-    return this.ensureChatSession(chatId, undefined).getTranscript(offset, limit);
+    return this.ensureChatSession(chatId, undefined).getTranscript(
+      offset,
+      limit,
+    );
   }
 
   /**
@@ -467,7 +471,8 @@ export class BridgeClient implements RemoteBridgeActions {
         wsStreamClient: this.streamClient,
         auth: this.auth,
         onDiagnostic: (message) => this.logger.debug(message, null),
-        resolveDefaultSettings: () => this.resolveDefaultSettings(permissionMode),
+        resolveDefaultSettings: () =>
+          this.resolveDefaultSettings(permissionMode),
       });
       this.chatSessions.set(chatId, session);
     }

@@ -419,7 +419,9 @@ add("20-approval-table-and-heading", () =>
 // and no images are produced at all, so a stale set cannot be mistaken for a
 // fresh one.
 if (failures.length > 0) {
-  console.error(`\n${failures.length} card(s) FAILED TO BUILD — rendering nothing:`);
+  console.error(
+    `\n${failures.length} card(s) FAILED TO BUILD — rendering nothing:`,
+  );
   for (const f of failures) console.error(`  ✗ ${f}`);
   console.error(
     "\nA builder that throws usually means the fixture is missing a field the\n" +

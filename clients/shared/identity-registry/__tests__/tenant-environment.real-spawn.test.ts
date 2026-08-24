@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { buildTenantEnvironment } from "../tenant-environment";
@@ -75,7 +81,11 @@ if (BUN_PATH === null && process.env.CI !== undefined) {
   );
 }
 
-const PROBE_SCRIPT = join(__dirname, "fixtures", "print-credentials-user-id.ts");
+const PROBE_SCRIPT = join(
+  __dirname,
+  "fixtures",
+  "print-credentials-user-id.ts",
+);
 
 function provisionTenantHome(userId: string): string {
   const home = mkdtempSync(join(tmpdir(), "a2-real-spawn-"));
@@ -106,48 +116,51 @@ function tenantFor(home: string, hostId: string): TenantMapping {
 
 const describeOrSkip = BUN_PATH !== null ? describe : describe.skip;
 
-describeOrSkip("REAL SPAWN: two different HOMEs resolve two different user.ids", () => {
-  it("proves isolation via the real credentials-resolution code, not the manager's mocked spawnFn", () => {
-    // Safe: this whole `describe` block only runs when `describeOrSkip ===
-    // describe`, which only happens when `BUN_PATH !== null` (see above).
-    const bunPath = BUN_PATH!;
-    const aliceHome = provisionTenantHome("real-user-id-alice-9f2c");
-    const bobHome = provisionTenantHome("real-user-id-bob-7d4e");
-    try {
-      const aliceEnv = buildTenantEnvironment({
-        tenant: tenantFor(aliceHome, "host-alice"),
-        parentEnv: process.env,
-      });
-      const bobEnv = buildTenantEnvironment({
-        tenant: tenantFor(bobHome, "host-bob"),
-        parentEnv: process.env,
-      });
+describeOrSkip(
+  "REAL SPAWN: two different HOMEs resolve two different user.ids",
+  () => {
+    it("proves isolation via the real credentials-resolution code, not the manager's mocked spawnFn", () => {
+      // Safe: this whole `describe` block only runs when `describeOrSkip ===
+      // describe`, which only happens when `BUN_PATH !== null` (see above).
+      const bunPath = BUN_PATH!;
+      const aliceHome = provisionTenantHome("real-user-id-alice-9f2c");
+      const bobHome = provisionTenantHome("real-user-id-bob-7d4e");
+      try {
+        const aliceEnv = buildTenantEnvironment({
+          tenant: tenantFor(aliceHome, "host-alice"),
+          parentEnv: process.env,
+        });
+        const bobEnv = buildTenantEnvironment({
+          tenant: tenantFor(bobHome, "host-bob"),
+          parentEnv: process.env,
+        });
 
-      const aliceResult = spawnSync(bunPath, [PROBE_SCRIPT], {
-        env: aliceEnv,
-        encoding: "utf8",
-      });
-      const bobResult = spawnSync(bunPath, [PROBE_SCRIPT], {
-        env: bobEnv,
-        encoding: "utf8",
-      });
+        const aliceResult = spawnSync(bunPath, [PROBE_SCRIPT], {
+          env: aliceEnv,
+          encoding: "utf8",
+        });
+        const bobResult = spawnSync(bunPath, [PROBE_SCRIPT], {
+          env: bobEnv,
+          encoding: "utf8",
+        });
 
-      expect(aliceResult.status).toBe(0);
-      expect(bobResult.status).toBe(0);
-      expect(aliceResult.stdout.trim()).toBe("real-user-id-alice-9f2c");
-      expect(bobResult.stdout.trim()).toBe("real-user-id-bob-7d4e");
-      expect(aliceResult.stdout.trim()).not.toBe(bobResult.stdout.trim());
+        expect(aliceResult.status).toBe(0);
+        expect(bobResult.status).toBe(0);
+        expect(aliceResult.stdout.trim()).toBe("real-user-id-alice-9f2c");
+        expect(bobResult.stdout.trim()).toBe("real-user-id-bob-7d4e");
+        expect(aliceResult.stdout.trim()).not.toBe(bobResult.stdout.trim());
 
-      // The regression this test exists to catch: a broken environment
-      // construction (e.g. HOME pointed at the wrong tenant, or the parent's
-      // own HOME leaking through) reads the WRONG user.id with zero error —
-      // exactly the failure the bridge pair reproduced live. Also assert
-      // neither child accidentally resolved a nonexistent-file default.
-      expect(aliceResult.stdout.trim()).not.toBe("NONE");
-      expect(bobResult.stdout.trim()).not.toBe("NONE");
-    } finally {
-      rmSync(aliceHome, { recursive: true, force: true });
-      rmSync(bobHome, { recursive: true, force: true });
-    }
-  }, 30_000);
-});
+        // The regression this test exists to catch: a broken environment
+        // construction (e.g. HOME pointed at the wrong tenant, or the parent's
+        // own HOME leaking through) reads the WRONG user.id with zero error —
+        // exactly the failure the bridge pair reproduced live. Also assert
+        // neither child accidentally resolved a nonexistent-file default.
+        expect(aliceResult.stdout.trim()).not.toBe("NONE");
+        expect(bobResult.stdout.trim()).not.toBe("NONE");
+      } finally {
+        rmSync(aliceHome, { recursive: true, force: true });
+        rmSync(bobHome, { recursive: true, force: true });
+      }
+    }, 30_000);
+  },
+);

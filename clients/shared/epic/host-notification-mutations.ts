@@ -61,7 +61,10 @@ export async function markNotificationEntityRead(
   client: HostNotificationMutationClient,
   entity: { readonly epicId: string; readonly chatId?: string },
 ): Promise<void> {
-  await client.request("host.notifications.markRead", { kind: "entity", entity });
+  await client.request("host.notifications.markRead", {
+    kind: "entity",
+    entity,
+  });
 }
 
 /**

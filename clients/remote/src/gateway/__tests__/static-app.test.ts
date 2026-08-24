@@ -13,8 +13,14 @@ describe("static-app: prod staticDir mode, real 404 for missing assets", () => {
   beforeAll(async () => {
     staticDir = await mkdtemp(join(tmpdir(), "traycer-remote-static-test-"));
     await mkdir(join(staticDir, "assets"), { recursive: true });
-    await writeFile(join(staticDir, "index.html"), "<!doctype html><title>app</title>");
-    await writeFile(join(staticDir, "assets", "index-abc123.js"), "console.log(1);");
+    await writeFile(
+      join(staticDir, "index.html"),
+      "<!doctype html><title>app</title>",
+    );
+    await writeFile(
+      join(staticDir, "assets", "index-abc123.js"),
+      "console.log(1);",
+    );
     await writeFile(join(staticDir, "manifest.webmanifest"), '{"name":"app"}');
 
     // Configure with FORWARD slashes deliberately, even though this test
@@ -23,11 +29,17 @@ describe("static-app: prod staticDir mode, real 404 for missing assets", () => {
     // native separator, so a raw forward-slash staticDir must be
     // normalized before the prefix check, or every file 404s).
     const forwardSlashDir = staticDir.split("\\").join("/");
-    const handler = createStaticAppHandler({ devUpstream: null, staticDir: forwardSlashDir });
+    const handler = createStaticAppHandler({
+      devUpstream: null,
+      staticDir: forwardSlashDir,
+    });
     server = http.createServer(handler);
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
     const address = server.address();
-    if (address === null || typeof address === "string") throw new Error("no address");
+    if (address === null || typeof address === "string")
+      throw new Error("no address");
     port = address.port;
   });
 
@@ -36,10 +48,16 @@ describe("static-app: prod staticDir mode, real 404 for missing assets", () => {
     await rm(staticDir, { recursive: true, force: true });
   });
 
-  async function get(path: string): Promise<{ status: number; contentType: string; body: string }> {
+  async function get(
+    path: string,
+  ): Promise<{ status: number; contentType: string; body: string }> {
     const res = await fetch(`http://127.0.0.1:${port}${path}`);
     const body = await res.text();
-    return { status: res.status, contentType: res.headers.get("content-type") ?? "", body };
+    return {
+      status: res.status,
+      contentType: res.headers.get("content-type") ?? "",
+      body,
+    };
   }
 
   it("serves index.html at /", async () => {

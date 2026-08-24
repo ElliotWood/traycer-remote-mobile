@@ -7,7 +7,10 @@ import path from "node:path";
 export default defineConfig({
   resolve: {
     alias: [
-      { find: "@traycer/remote", replacement: path.resolve(__dirname, "./src") },
+      {
+        find: "@traycer/remote",
+        replacement: path.resolve(__dirname, "./src"),
+      },
       {
         find: "@traycer-clients/shared",
         replacement: path.resolve(__dirname, "..", "shared"),

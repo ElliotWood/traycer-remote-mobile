@@ -89,7 +89,9 @@ sw.addEventListener("activate", (event) => {
       const names = await caches.keys();
       await Promise.all(
         names
-          .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+          .filter(
+            (name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME,
+          )
           .map((name) => caches.delete(name)),
       );
     })(),
@@ -347,14 +349,20 @@ sw.addEventListener("fetch", (event) => {
  * build id from the asset list, so a deploy changes these bytes, the worker
  * updates, and the banner offers the new version.
  */
-async function serveShell(request: Request, shellUrl: string): Promise<Response> {
+async function serveShell(
+  request: Request,
+  shellUrl: string,
+): Promise<Response> {
   const cached = await caches.match(shellUrl);
   if (cached !== undefined) return cached;
   return fetch(request);
 }
 
 /** Precached assets are content-hashed, so a hit is always the right bytes. */
-async function serveAsset(request: Request, pathname: string): Promise<Response> {
+async function serveAsset(
+  request: Request,
+  pathname: string,
+): Promise<Response> {
   const cached = await caches.match(pathname);
   if (cached !== undefined) return cached;
   return fetch(request);

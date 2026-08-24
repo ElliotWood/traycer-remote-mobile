@@ -42,7 +42,9 @@ export function rgbify(value: string): string {
 
 /** Read a CSS custom property as the cascade resolves it right now. */
 export function readCssVar(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
 }
 
 /**

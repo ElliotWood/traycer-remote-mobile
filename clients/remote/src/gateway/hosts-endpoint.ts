@@ -30,7 +30,11 @@ export function deriveSchemeAndHost(
 
   const scheme: "ws" | "wss" =
     config.publicScheme ??
-    (trusted && forwardedProto === "https" ? "wss" : trusted && forwardedProto === "http" ? "ws" : "ws");
+    (trusted && forwardedProto === "https"
+      ? "wss"
+      : trusted && forwardedProto === "http"
+        ? "ws"
+        : "ws");
 
   const host =
     config.publicHost ??

@@ -177,7 +177,10 @@ export async function probeHost(params: {
           typeof (details as Record<string, unknown>).code === "string"
             ? (details as Record<string, unknown>).code
             : "unknown";
-        finish({ kind: "unreachable", reason: `Host refused: ${String(code)}` });
+        finish({
+          kind: "unreachable",
+          reason: `Host refused: ${String(code)}`,
+        });
         return;
       }
 

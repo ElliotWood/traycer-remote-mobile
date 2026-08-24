@@ -38,8 +38,8 @@ const MUTATIONS = [
     id: "MUT-2",
     why: "THE TRAP: treat window.open's null return as a failure. This is the obvious fix, and it reports failure on every successful open",
     file: MODULE,
-    from: "    window.open(url, \"_blank\", \"noopener,noreferrer\");\n    return true;",
-    to: "    return window.open(url, \"_blank\", \"noopener,noreferrer\") !== null;",
+    from: '    window.open(url, "_blank", "noopener,noreferrer");\n    return true;',
+    to: '    return window.open(url, "_blank", "noopener,noreferrer") !== null;',
     catcher: "DOES NOT treat window.open's null return as a failure",
   },
   {
@@ -66,7 +66,8 @@ const MUTATIONS = [
     file: MODULE,
     from: '      report("teams-refused");',
     to: '      report("teams");',
-    catcher: "reports teams-refused - NOT unavailable - when the Teams host rejects",
+    catcher:
+      "reports teams-refused - NOT unavailable - when the Teams host rejects",
   },
   {
     id: "MUT-6",
@@ -81,8 +82,8 @@ const MUTATIONS = [
     id: "MUT-7",
     why: "hand the Teams opener over BEFORE the handshake succeeds, so the PWA routes every link into an SDK with no host",
     file: HOST,
-    from: "  if (outcome !== \"ok\") return OUTSIDE_TEAMS;",
-    to: "  options.onLinkOpener?.((url: string) => sdk.openLink(url));\n  if (outcome !== \"ok\") return OUTSIDE_TEAMS;",
+    from: '  if (outcome !== "ok") return OUTSIDE_TEAMS;',
+    to: '  options.onLinkOpener?.((url: string) => sdk.openLink(url));\n  if (outcome !== "ok") return OUTSIDE_TEAMS;',
     catcher:
       "hands over NOTHING when the handshake times out under a non-Teams parent",
   },
@@ -143,8 +144,19 @@ function runSuite() {
   try {
     execFileSync(
       "npx",
-      ["vitest", "run", "src/web", "--reporter=json", "--outputFile=.mutate-out.json"],
-      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: true },
+      [
+        "vitest",
+        "run",
+        "src/web",
+        "--reporter=json",
+        "--outputFile=.mutate-out.json",
+      ],
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: true,
+      },
     );
   } catch (error) {
     // A red suite exits non-zero, which is the expected case here - but so does
@@ -173,7 +185,9 @@ function runSuite() {
 console.log("control: the suite must be GREEN before any mutation is believed");
 const controlFailures = runSuite();
 if (controlFailures.length > 0) {
-  console.log(`ABORT - control is already red:\n  ${controlFailures.join("\n  ")}`);
+  console.log(
+    `ABORT - control is already red:\n  ${controlFailures.join("\n  ")}`,
+  );
   process.exit(1);
 }
 console.log("control: green\n");

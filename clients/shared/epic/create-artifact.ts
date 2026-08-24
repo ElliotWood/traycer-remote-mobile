@@ -27,7 +27,10 @@ import type { CreateArtifactRequest } from "@traycer/protocol/host/epic/unary-sc
 import type { ArtifactKind } from "./epic-doc-artifacts";
 
 /** Only `request` is needed, so tests can inject a fake. */
-export type CreateArtifactClient = Pick<HostRequester<HostRpcRegistry>, "request">;
+export type CreateArtifactClient = Pick<
+  HostRequester<HostRpcRegistry>,
+  "request"
+>;
 
 /**
  * Stated as a value, not a comment, so the UI reads it rather than restating

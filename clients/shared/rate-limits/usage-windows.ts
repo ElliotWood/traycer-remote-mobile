@@ -104,7 +104,8 @@ export function extractUsageWindows(
       for (const extra of rateLimits.extraWindows) {
         if (extra.primary !== null) {
           rows.push({
-            label: extra.limitName ?? windowLabel(extra.primary.durationMinutes),
+            label:
+              extra.limitName ?? windowLabel(extra.primary.durationMinutes),
             window: extra.primary,
           });
         }

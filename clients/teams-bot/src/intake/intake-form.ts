@@ -118,10 +118,7 @@ export function isKnownJurisdiction(id: string): boolean {
 /** A buyer and an owner are free text, but a card is not a document. */
 const NAME_MAX = 120;
 
-function read(
-  data: Readonly<Record<string, unknown>>,
-  key: string,
-): string {
+function read(data: Readonly<Record<string, unknown>>, key: string): string {
   const value = data[key];
   return typeof value === "string" ? value.trim() : "";
 }

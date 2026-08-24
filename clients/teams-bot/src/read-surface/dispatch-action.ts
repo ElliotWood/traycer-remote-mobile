@@ -170,8 +170,9 @@ async function dispatchAnswerInterview(
 
   const answers: InterviewAnswerInput[] = [];
   for (const ref of questions.data) {
-    const raw = (readString(request.data, interviewInputId(ref.index)) ?? "")
-      .trim();
+    const raw = (
+      readString(request.data, interviewInputId(ref.index)) ?? ""
+    ).trim();
     // A multi-select ChoiceSet returns its picks joined by a comma and
     // nothing else — there is no per-value escaping in Adaptive Cards, which
     // is why the choice VALUES are the agent's own option labels rather than
@@ -645,7 +646,10 @@ export async function dispatchActionInvoke(
           : // Already stopped, or expired. Say the same thing rather than
             // "you weren't replying to anything" — the user pressed Stop and
             // the state they wanted is the state they now have.
-            { chatId: "", title: previous.kind === "expired" ? previous.title : null },
+            {
+              chatId: "",
+              title: previous.kind === "expired" ? previous.title : null,
+            },
       ),
       acted: true,
     };
@@ -727,11 +731,7 @@ export async function dispatchActionInvoke(
         command = { kind: "log", chatId, offset: 0 };
       }
     }
-    const cards = await dispatchCommand(
-      command,
-      request.conversationId,
-      deps,
-    );
+    const cards = await dispatchCommand(command, request.conversationId, deps);
     const card = cards[0];
     if (card === undefined) {
       return {

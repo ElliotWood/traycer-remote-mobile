@@ -13,7 +13,11 @@ function twoTenantRegistry(): IdentityRegistry {
   return IdentityRegistry.fromConfig(
     {
       tenants: [
-        { home: "/srv/traycer/alice", hostId: "host-alice", entraOid: ALICE_OID },
+        {
+          home: "/srv/traycer/alice",
+          hostId: "host-alice",
+          entraOid: ALICE_OID,
+        },
         { home: "/srv/traycer/bob", hostId: "host-bob", entraOid: BOB_OID },
       ],
     },
@@ -167,7 +171,9 @@ describe("TenantConnectionManager — bounded restart on crash", () => {
     calls[2].child.simulateExit(1, null);
     fireAll();
     expect(calls).toHaveLength(3);
-    expect(terminalCalls).toEqual([{ hostId: "host-alice", reason: "crash_loop_exhausted" }]);
+    expect(terminalCalls).toEqual([
+      { hostId: "host-alice", reason: "crash_loop_exhausted" },
+    ]);
 
     const result = manager.ensureConnection("host-alice");
     expect(result).toEqual({ kind: "refused", reason: "crash_loop_exhausted" });

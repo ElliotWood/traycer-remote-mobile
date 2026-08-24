@@ -12,10 +12,7 @@ import {
   type TestJwksServer,
 } from "../../auth/__tests__/test-jwks-server";
 import { dispatchCommand, type DispatchDeps } from "../dispatch";
-import {
-  dispatchActionInvoke,
-  HANDLED_ACTION_VERBS,
-} from "../dispatch-action";
+import { dispatchActionInvoke, HANDLED_ACTION_VERBS } from "../dispatch-action";
 import { ANSWER_VERB, SEND_VERB } from "../cards";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
 import { InMemoryFocusedChatStore } from "../focused-chat-store";
@@ -503,7 +500,9 @@ describe("read-surface/dispatch-action — the send path", () => {
         }),
       }),
     );
-    expect(JSON.stringify(result.card.content)).toContain("Unknown card action");
+    expect(JSON.stringify(result.card.content)).toContain(
+      "Unknown card action",
+    );
   });
 
   it("CONTRACT: identity is resolved BEFORE the message is issued", async () => {

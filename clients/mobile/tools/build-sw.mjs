@@ -147,10 +147,11 @@ async function main() {
     );
   }
 
-  const { buildId, text, precache: sorted } = await buildServiceWorkerText(
-    mobileRoot,
-    precache,
-  );
+  const {
+    buildId,
+    text,
+    precache: sorted,
+  } = await buildServiceWorkerText(mobileRoot, precache);
   await writeFile(resolve(distDir, "sw.js"), text, "utf8");
 
   process.stdout.write(

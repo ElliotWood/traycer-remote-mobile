@@ -129,9 +129,9 @@ describe("installMicrophonePolicy: the surface it stamps", () => {
   });
 
   it("reports no-api when navigator.mediaDevices is absent", () => {
-    expect(
-      install(policyDoc(true), STREAM, false).surfaces,
-    ).toEqual(["no-api"]);
+    expect(install(policyDoc(true), STREAM, false).surfaces).toEqual([
+      "no-api",
+    ]);
   });
 
   it("stamps at install, before any getUserMedia call", () => {

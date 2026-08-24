@@ -384,4 +384,3 @@ export function applyTeamsHostAttributes(
   root.setAttribute("data-teams-host", state.hostClientType ?? "unknown");
   if (state.theme !== null) root.setAttribute("data-teams-theme", state.theme);
 }
-

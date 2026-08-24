@@ -55,11 +55,10 @@ const MUTATIONS = [
   {
     id: "MUT-2",
     why: "the block is detected and reported, then falls through and rejects anyway - the right reading followed by the wrong action",
-    from:
-      '          report("surface-blocked");\n' +
-      "          return;\n",
+    from: '          report("surface-blocked");\n' + "          return;\n",
     to: '          report("surface-blocked");\n',
-    catcher: "RESOLVES rather than rejecting, so the row is not retried forever",
+    catcher:
+      "RESOLVES rather than rejecting, so the row is not retried forever",
   },
   {
     id: "MUT-3",
@@ -70,14 +69,16 @@ const MUTATIONS = [
     to:
       "      const permission = getPermission();\n" +
       '      if (isSurfaceBlocked() || permission !== "granted") {',
-    catcher: "still DISPLAYS when the surface is embedded but the grant is held",
+    catcher:
+      "still DISPLAYS when the surface is embedded but the grant is held",
   },
   {
     id: "MUT-4",
     why: "the construction stamp is dropped, so `<html data-native-notify>` is absent until a notification arrives - which on a quiet day is never",
     from: '  report("idle");\n',
     to: "",
-    catcher: "stamps idle at construction, before anything has been asked of it",
+    catcher:
+      "stamps idle at construction, before anything has been asked of it",
   },
   {
     id: "MUT-5",
@@ -101,7 +102,8 @@ const MUTATIONS = [
     why: "a successful display never updates the attribute, so it keeps asserting the boot state while notifications are being drawn",
     from: '      report("shown");',
     to: '      report("idle");',
-    catcher: "still DISPLAYS when the surface is embedded but the grant is held",
+    catcher:
+      "still DISPLAYS when the surface is embedded but the grant is held",
   },
   {
     id: "MUT-8",

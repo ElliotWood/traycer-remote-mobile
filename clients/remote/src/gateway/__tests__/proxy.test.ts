@@ -13,7 +13,9 @@ const AGENT_TOKEN = "agent-shared-secret";
 const AGENT_ID = "22222222-2222-2222-2222-222222222222";
 const HOST_ID = "test-host-id";
 
-async function listenEphemeral(server: net.Server | http.Server): Promise<number> {
+async function listenEphemeral(
+  server: net.Server | http.Server,
+): Promise<number> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (address === null || typeof address === "string") {
@@ -116,7 +118,10 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
     // `http.Server`'s `upgrade` event's third parameter (`head`) captures:
     // bytes the parser already read past the request head. If the gateway
     // doesn't forward `head` before piping, these bytes are silently lost.
-    const immediateFrameBytes = Buffer.from("simulated-first-ws-frame-bytes", "utf8");
+    const immediateFrameBytes = Buffer.from(
+      "simulated-first-ws-frame-bytes",
+      "utf8",
+    );
     const upgradeRequest =
       `GET /h/${HOST_ID}/rpc HTTP/1.1\r\n` +
       `Host: gateway.example.invalid\r\n` +
@@ -125,7 +130,9 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
       `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n` +
       `Sec-WebSocket-Version: 13\r\n` +
       `\r\n`;
-    client.write(Buffer.concat([Buffer.from(upgradeRequest, "utf8"), immediateFrameBytes]));
+    client.write(
+      Buffer.concat([Buffer.from(upgradeRequest, "utf8"), immediateFrameBytes]),
+    );
 
     await new Promise<void>((resolve, reject) => {
       const start = Date.now();
@@ -138,7 +145,11 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
         }
         if (Date.now() - start > 4_000) {
           clearInterval(interval);
-          reject(new Error(`timed out; received so far: ${Buffer.concat(received).toString("utf8")}`));
+          reject(
+            new Error(
+              `timed out; received so far: ${Buffer.concat(received).toString("utf8")}`,
+            ),
+          );
         }
       }, 50);
     });
@@ -168,7 +179,10 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
     const res = await httpProbe(gatewayPort, "/h/does-not-exist/rpc");
     expect(res.status).toBe(404);
     expect(res.contentType).toContain("application/json");
-    expect(JSON.parse(res.body)).toEqual({ error: "HOST_UNKNOWN", hostId: "does-not-exist" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "HOST_UNKNOWN",
+      hostId: "does-not-exist",
+    });
   });
 
   it("offline hostId (heartbeat lapsed): 503 HOST_OFFLINE, JSON", async () => {
@@ -179,12 +193,17 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
     const res = await httpProbe(gatewayPort, `/h/${HOST_ID}/rpc`);
     expect(res.status).toBe(503);
     expect(res.contentType).toContain("application/json");
-    expect(JSON.parse(res.body)).toEqual({ error: "HOST_OFFLINE", hostId: HOST_ID });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "HOST_OFFLINE",
+      hostId: HOST_ID,
+    });
   });
 
   it("empty registry: GET /hosts-equivalent path check - unknown hostId still 404s cleanly, not a hang", async () => {
     const received: Buffer[] = [];
-    const fakeHost = net.createServer((s) => s.on("data", (c) => received.push(c as Buffer)));
+    const fakeHost = net.createServer((s) =>
+      s.on("data", (c) => received.push(c as Buffer)),
+    );
     cleanup.push(() => fakeHost.close());
     const registry = new Registry(60_000); // nothing registered
     const config = baseConfig({});
@@ -203,7 +222,11 @@ describe("gateway proxy: /h/{hostId} routing, real end-to-end forwarding", () =>
 async function httpProbe(
   port: number,
   path: string,
-): Promise<{ readonly status: number; readonly contentType: string; readonly body: string }> {
+): Promise<{
+  readonly status: number;
+  readonly contentType: string;
+  readonly body: string;
+}> {
   const client = net.connect(port, "127.0.0.1");
   await new Promise<void>((resolve) => client.on("connect", resolve));
   client.write(

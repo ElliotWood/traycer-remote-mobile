@@ -82,7 +82,9 @@ function granting(): { writes: string[] } {
 function refusing(): void {
   useNavigator({
     writeText: () =>
-      Promise.reject(new DOMException("Write permission denied.", "NotAllowedError")),
+      Promise.reject(
+        new DOMException("Write permission denied.", "NotAllowedError"),
+      ),
   });
 }
 

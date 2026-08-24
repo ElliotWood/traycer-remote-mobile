@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HostNotificationEntry } from "@traycer/protocol/host/notifications/host-notifications";
-import { ActionableDetector, type ActionableTransition } from "../actionable-detector";
+import {
+  ActionableDetector,
+  type ActionableTransition,
+} from "../actionable-detector";
 import { APPROVAL_ENTRY, STALLED_ENTRY } from "./fixtures";
 
 /** Minimal in-memory stand-in satisfying `PushedStateStore`'s public surface. */
@@ -140,7 +143,9 @@ describe("ActionableDetector edge trigger", () => {
     // `HostNotificationEntry` as-is. A single assertion between two
     // genuinely-overlapping types (every other field matches; `kind` only
     // widens) needs no `unknown` bridge.
-    const futureKindEntry: Omit<HostNotificationEntry, "kind"> & { readonly kind: string } = {
+    const futureKindEntry: Omit<HostNotificationEntry, "kind"> & {
+      readonly kind: string;
+    } = {
       ...APPROVAL_ENTRY,
       kind: "some.future.kind",
       severity: "needs_action",

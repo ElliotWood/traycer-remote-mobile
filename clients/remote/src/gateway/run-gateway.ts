@@ -15,7 +15,9 @@ export async function runGateway(configPath: string): Promise<void> {
     `[traycer-remote gateway] internal registration listener on ${config.internalListen.host}:${config.internalListen.port} (not publicly served)`,
   );
 
-  const publicServer = http.createServer(createPublicRequestHandler(config, registry));
+  const publicServer = http.createServer(
+    createPublicRequestHandler(config, registry),
+  );
 
   attachProxy(publicServer, {
     registry,
@@ -26,12 +28,16 @@ export async function runGateway(configPath: string): Promise<void> {
     },
   });
 
-  publicServer.listen(config.publicListen.port, config.publicListen.host, () => {
-    // eslint-disable-next-line no-console
-    console.log(
-      `[traycer-remote gateway] public listener on ${config.publicListen.host}:${config.publicListen.port}`,
-    );
-  });
+  publicServer.listen(
+    config.publicListen.port,
+    config.publicListen.host,
+    () => {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[traycer-remote gateway] public listener on ${config.publicListen.host}:${config.publicListen.port}`,
+      );
+    },
+  );
 
   const shutdown = (): void => {
     publicServer.close();

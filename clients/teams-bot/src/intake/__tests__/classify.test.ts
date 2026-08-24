@@ -134,9 +134,9 @@ describe("classify — the low-confidence suggestion the card turns into a butto
   });
 
   it("is case-insensitive", () => {
-    expect(classify({ text: "DOES THIS FIT SENSORMINE", ...noFiles }).kind).toBe(
-      "routed",
-    );
+    expect(
+      classify({ text: "DOES THIS FIT SENSORMINE", ...noFiles }).kind,
+    ).toBe("routed");
   });
 
   it("empty text is not recognised rather than routed", () => {

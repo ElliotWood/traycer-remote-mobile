@@ -99,13 +99,16 @@ function runner(overrides: {
     spawnWatch: overrides.spawn,
     onEvent: overrides.onEvent,
     onInfo: () => {},
-    onWarn: (message, detail) => overrides.warnings.push(`${message}|${detail}`),
+    onWarn: (message, detail) =>
+      overrides.warnings.push(`${message}|${detail}`),
     schedule: overrides.clock.schedule,
     now: overrides.clock.now,
   });
 }
 
-const envOk = async (): Promise<NodeJS.ProcessEnv> => ({ TRAYCER_EPIC_ID: "epic-1" });
+const envOk = async (): Promise<NodeJS.ProcessEnv> => ({
+  TRAYCER_EPIC_ID: "epic-1",
+});
 
 /** Lets the runner's internal promise chain drain. */
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
@@ -244,7 +247,9 @@ describe("watch-runner — it actually runs the watcher", () => {
     spawns[0].handlers.onLine("   ");
     await settle();
 
-    expect(warnings.filter((w) => w.includes("unreadable line"))).toHaveLength(1);
+    expect(warnings.filter((w) => w.includes("unreadable line"))).toHaveLength(
+      1,
+    );
     r.stop();
   });
 });
@@ -320,7 +325,10 @@ describe("watch-runner — lifecycle", () => {
     spawns[1].handlers.onExit(1);
     clock.advance(RESTART_DELAYS_MS[0]);
     await settle();
-    expect(spawns, "second failure must wait longer than the first").toHaveLength(2);
+    expect(
+      spawns,
+      "second failure must wait longer than the first",
+    ).toHaveLength(2);
     clock.advance(RESTART_DELAYS_MS[1] - RESTART_DELAYS_MS[0]);
     await settle();
     expect(spawns).toHaveLength(3);
@@ -363,7 +371,9 @@ describe("watch-runner — lifecycle", () => {
     expect(warnings.join()).toContain("identity unresolved");
     clock.advance(RESTART_DELAYS_MS[0]);
     await settle();
-    expect(warnings.filter((w) => w.includes("identity unresolved"))).toHaveLength(2);
+    expect(
+      warnings.filter((w) => w.includes("identity unresolved")),
+    ).toHaveLength(2);
     r.stop();
   });
 

@@ -100,9 +100,20 @@ describe("normalizeReasoningForModel", () => {
   it("never returns a value outside the model's options, across every input", () => {
     // The ticket's actual guarantee, asserted as a property rather than as
     // three examples that happen to hold.
-    const m = model({ supportedReasoningEfforts: EFFORTS, defaultReasoningEffort: null });
+    const m = model({
+      supportedReasoningEfforts: EFFORTS,
+      defaultReasoningEffort: null,
+    });
     const ids = EFFORTS.map((e) => e.id);
-    for (const input of ["low", "medium", "high", "extra-high", "", "MAX", "  high  "]) {
+    for (const input of [
+      "low",
+      "medium",
+      "high",
+      "extra-high",
+      "",
+      "MAX",
+      "  high  ",
+    ]) {
       expect(ids).toContain(normalizeReasoningForModel(input, m));
     }
   });

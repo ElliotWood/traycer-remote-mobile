@@ -125,7 +125,7 @@ else
     echo "nginx -t FAILED — rolling back" >&2
     cat /tmp/nginxt.log >&2
     rm -f "$DROPIN"
-    latest="$(ls -t /root/nginx-backups/traycer.*.bak 2>/dev/null | head -1)"
+    latest="$(find /root/nginx-backups -maxdepth 1 -name 'traycer.*.bak' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
     [ -n "$latest" ] && cp "$latest" "$SITE"
     nginx -t
     exit 1

@@ -36,45 +36,46 @@ interface WirePush {
   readonly replaceKey: string;
 }
 
-const ROUTED: ReadonlyArray<readonly [string, WirePush, NotificationPayload]> = [
+const ROUTED: ReadonlyArray<readonly [string, WirePush, NotificationPayload]> =
   [
-    "approval",
-    WIRE.approval,
-    {
-      kind: "approval",
-      epicId: "epic-1",
-      chatId: "chat-1",
-      approvalId: "appr-1",
-      sessionId: undefined,
-      artifactId: undefined,
-    },
-  ],
-  [
-    "interview",
-    WIRE.interview,
-    {
-      kind: "interview",
-      epicId: "epic-1",
-      chatId: "chat-2",
-      interviewBlockId: "iv-1",
-    },
-  ],
-  [
-    "agent stalled",
-    WIRE.stalled,
-    { kind: "chat", epicId: "epic-1", chatId: "chat-3" },
-  ],
-  [
-    "agent stopped",
-    WIRE.stopped,
-    { kind: "chat", epicId: "epic-1", chatId: "chat-4" },
-  ],
-  [
-    "workspace operation failed",
-    WIRE.workspaceFailed,
-    { kind: "chat", epicId: "epic-1", chatId: "chat-5" },
-  ],
-];
+    [
+      "approval",
+      WIRE.approval,
+      {
+        kind: "approval",
+        epicId: "epic-1",
+        chatId: "chat-1",
+        approvalId: "appr-1",
+        sessionId: undefined,
+        artifactId: undefined,
+      },
+    ],
+    [
+      "interview",
+      WIRE.interview,
+      {
+        kind: "interview",
+        epicId: "epic-1",
+        chatId: "chat-2",
+        interviewBlockId: "iv-1",
+      },
+    ],
+    [
+      "agent stalled",
+      WIRE.stalled,
+      { kind: "chat", epicId: "epic-1", chatId: "chat-3" },
+    ],
+    [
+      "agent stopped",
+      WIRE.stopped,
+      { kind: "chat", epicId: "epic-1", chatId: "chat-4" },
+    ],
+    [
+      "workspace operation failed",
+      WIRE.workspaceFailed,
+      { kind: "chat", epicId: "epic-1", chatId: "chat-5" },
+    ],
+  ];
 
 describe("push-service activation envelopes", () => {
   it.each(ROUTED)("parses the %s push as a V1 envelope", (_label, push) => {

@@ -78,10 +78,9 @@ export function ManageHostsPanel(props: {
   }, [binding]);
 
   const onAdd = useCallback(() => {
-    const result = addStoredHost(
-      { hostId, label, websocketUrl },
-      [props.bakedHostId],
-    );
+    const result = addStoredHost({ hostId, label, websocketUrl }, [
+      props.bakedHostId,
+    ]);
     if (result.kind === "rejected") {
       setError(result.reason);
       return;
@@ -103,7 +102,14 @@ export function ManageHostsPanel(props: {
     setWebsocketUrl("");
     setHostId("");
     refreshDirectory();
-  }, [binding, hostId, label, websocketUrl, props.bakedHostId, refreshDirectory]);
+  }, [
+    binding,
+    hostId,
+    label,
+    websocketUrl,
+    props.bakedHostId,
+    refreshDirectory,
+  ]);
 
   const onRemove = useCallback(
     (id: string) => {
@@ -236,7 +242,10 @@ export function ManageHostsPanel(props: {
           </p>
         </div>
         {error === null ? null : (
-          <p className="text-ui-sm text-destructive" data-testid="add-host-error">
+          <p
+            className="text-ui-sm text-destructive"
+            data-testid="add-host-error"
+          >
             {error}
           </p>
         )}

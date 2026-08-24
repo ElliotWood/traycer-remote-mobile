@@ -38,10 +38,7 @@ const ENVELOPE_VERSION = 1;
  * wrong the day a second source is relayed.
  */
 export type NotificationActivationFeedSource =
-  | "host"
-  | "cloud"
-  | "app-local"
-  | "global";
+  "host" | "cloud" | "app-local" | "global";
 
 export interface NotificationActivationFeed {
   readonly source: NotificationActivationFeedSource;

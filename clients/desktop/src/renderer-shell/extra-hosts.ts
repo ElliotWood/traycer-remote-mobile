@@ -63,7 +63,10 @@ function toEntry(item: unknown): HostDirectoryEntry | null {
   if (typeof hostId !== "string" || hostId.trim().length === 0) {
     return null;
   }
-  if (typeof websocketUrl !== "string" || !isDialableWebsocketUrl(websocketUrl)) {
+  if (
+    typeof websocketUrl !== "string" ||
+    !isDialableWebsocketUrl(websocketUrl)
+  ) {
     return null;
   }
 
@@ -128,5 +131,6 @@ export function createExtraHostsFetcher(raw: unknown): RemoteHostFetcher {
   // and neither can happen to a value Vite baked in at build time. An empty
   // parse here is a genuine empty registry, not a sign-out to be recovered
   // from and not a failure whose last-known entries must be retained.
-  return () => Promise.resolve({ kind: "hosts", entries: parseExtraHosts(raw) });
+  return () =>
+    Promise.resolve({ kind: "hosts", entries: parseExtraHosts(raw) });
 }

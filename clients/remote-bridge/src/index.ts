@@ -197,7 +197,13 @@ program
         return;
       }
       await withBridge(opts, (bridge) =>
-        runSend(bridge, chatId, text, logger, mode as BridgePermissionMode | undefined),
+        runSend(
+          bridge,
+          chatId,
+          text,
+          logger,
+          mode as BridgePermissionMode | undefined,
+        ),
       );
     },
   );
@@ -368,9 +374,7 @@ program
   )
   .action(async (opts: { epicId?: string; senderAgentId?: string }) => {
     const logger = createLogger("info");
-    await withBridge(opts, (bridge) =>
-      runWatch(bridge, bridge.epicId, logger),
-    );
+    await withBridge(opts, (bridge) => runWatch(bridge, bridge.epicId, logger));
   });
 
 function isBridgeCliEntrypoint(argv1: string | undefined): boolean {

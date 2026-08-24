@@ -293,9 +293,7 @@ describe("the generated service worker", () => {
       expect(
         await runFetch(listeners, { url: `${ORIGIN}/authn/api/v3/user` }),
       ).toBeNull();
-      expect(
-        await runFetch(listeners, { url: `${ORIGIN}/rpc` }),
-      ).toBeNull();
+      expect(await runFetch(listeners, { url: `${ORIGIN}/rpc` })).toBeNull();
     });
 
     it("does not intercept a lazily-loaded chunk that was never precached", async () => {
@@ -307,7 +305,9 @@ describe("the generated service worker", () => {
       await runInstall(listeners);
 
       expect(
-        await runFetch(listeners, { url: `${ORIGIN}/next/assets/mermaid-xyz.js` }),
+        await runFetch(listeners, {
+          url: `${ORIGIN}/next/assets/mermaid-xyz.js`,
+        }),
       ).toBeNull();
     });
 
@@ -412,9 +412,9 @@ describe("the generated service worker", () => {
       const click = runNotificationClick(listeners, PAYLOAD);
       await tick();
 
-      expect(
-        (visible.messages[0] as { payload: unknown }).payload,
-      ).toEqual(PAYLOAD);
+      expect((visible.messages[0] as { payload: unknown }).payload).toEqual(
+        PAYLOAD,
+      );
       void click.settled;
     });
 
@@ -609,7 +609,10 @@ describe("the generated service worker", () => {
       // BYTES differ; if a deploy left these identical, users would keep the
       // old shell forever and the banner would never appear.
       const a = await loadWorker(PRECACHE, []);
-      const b = await loadWorker([...PRECACHE.slice(0, 1), "/next/assets/index-DEF.js"], []);
+      const b = await loadWorker(
+        [...PRECACHE.slice(0, 1), "/next/assets/index-DEF.js"],
+        [],
+      );
       expect(b.buildId).not.toBe(a.buildId);
       expect(b.text).not.toBe(a.text);
     });

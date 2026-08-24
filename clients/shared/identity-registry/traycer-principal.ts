@@ -125,7 +125,10 @@ async function verifyAgainstAuthn(
   try {
     response = await fetchImpl(userEndpoint(authnBaseUrl), {
       method: "GET",
-      headers: { Authorization: `Bearer ${bearer}`, Accept: "application/json" },
+      headers: {
+        Authorization: `Bearer ${bearer}`,
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
@@ -134,7 +137,11 @@ async function verifyAgainstAuthn(
     return { kind: "failed", reason: "network_error" };
   }
 
-  if (response.status === 401 || response.status === 403 || response.status === 404) {
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    response.status === 404
+  ) {
     return { kind: "failed", reason: "rejected" };
   }
   if (response.status < 200 || response.status >= 300) {

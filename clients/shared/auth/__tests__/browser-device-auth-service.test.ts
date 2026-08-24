@@ -69,7 +69,9 @@ function installRouter(routes: Record<string, Spec[]>): void {
         : input instanceof URL
           ? input.toString()
           : input.url;
-    const key = Object.keys(routes).find((candidate) => url.includes(candidate));
+    const key = Object.keys(routes).find((candidate) =>
+      url.includes(candidate),
+    );
     if (key === undefined) {
       throw new Error(`unexpected fetch to ${url}`);
     }

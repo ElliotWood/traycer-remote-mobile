@@ -89,8 +89,8 @@ const MUTATIONS = [
   {
     id: "MUT-5",
     why: "the replacement error is named NotAllowedError, so upstream classifies it as a user denial exactly as before and the dead Open Settings button returns - the fix that changes the words and not the outcome",
-    from: "    this.name = \"TraycerMicrophonePolicyError\";",
-    to: "    this.name = \"NotAllowedError\";",
+    from: '    this.name = "TraycerMicrophonePolicyError";',
+    to: '    this.name = "NotAllowedError";',
     catcher:
       "THE FIX: a policy refusal names the host page and raises no Settings prompt",
   },
@@ -104,8 +104,8 @@ const MUTATIONS = [
   {
     id: "MUT-7",
     why: "an unreadable policy is reported as a measured refusal, so Firefox and Safari claim `policy-blocked` having never been asked",
-    from: "      : allowed === null\n        ? \"unmeasured\"",
-    to: "      : allowed === null\n        ? \"policy-blocked\"",
+    from: '      : allowed === null\n        ? "unmeasured"',
+    to: '      : allowed === null\n        ? "policy-blocked"',
     catcher: "reports unmeasured",
   },
   {
@@ -118,8 +118,8 @@ const MUTATIONS = [
   {
     id: "MUT-9",
     why: "the policy is asked about the wrong feature and its well-formed boolean is reported as the microphone's",
-    from: "    return policy.allowsFeature(\"microphone\");",
-    to: "    return policy.allowsFeature(\"camera\");",
+    from: '    return policy.allowsFeature("microphone");',
+    to: '    return policy.allowsFeature("camera");',
     catcher: "reads featurePolicy",
   },
   {
@@ -144,12 +144,13 @@ const MUTATIONS = [
     id: "MUT-12",
     why: "the absent mediaDevices is left absent, so an insecure context reports a leaked TypeError string instead of a sentence",
     from:
-      "      Object.defineProperty(nav, \"mediaDevices\", {\n" +
+      '      Object.defineProperty(nav, "mediaDevices", {\n' +
       "        value: synthesized,\n" +
       "        configurable: true,\n" +
       "      });",
     to: "      void synthesized;",
-    catcher: "synthesizes a rejecting mediaDevices rather than leaving it absent",
+    catcher:
+      "synthesizes a rejecting mediaDevices rather than leaving it absent",
   },
 ];
 

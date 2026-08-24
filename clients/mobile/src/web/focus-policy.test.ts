@@ -37,8 +37,10 @@ function fakeDocument(initial: {
   return {
     doc,
     set: (next) => {
-      if (next.nativeHasFocus !== undefined) nativeHasFocus = next.nativeHasFocus;
-      if (next.visibilityState !== undefined) visibilityState = next.visibilityState;
+      if (next.nativeHasFocus !== undefined)
+        nativeHasFocus = next.nativeHasFocus;
+      if (next.visibilityState !== undefined)
+        visibilityState = next.visibilityState;
     },
     nativeCalls: () => nativeCalls,
   };
@@ -94,32 +96,51 @@ describe("framedFocusReading", () => {
     // Both geometry terms are the ones that would say NO, so this fails the
     // moment the short-circuit is removed rather than passing by agreement.
     expect(
-      framedFocusReading({ nativeHasFocus: true, visible: false, onScreen: false }),
+      framedFocusReading({
+        nativeHasFocus: true,
+        visible: false,
+        onScreen: false,
+      }),
     ).toBe(true);
   });
 
   it("is true for a visible on-screen frame that does not hold focus", () => {
     expect(
-      framedFocusReading({ nativeHasFocus: false, visible: true, onScreen: true }),
+      framedFocusReading({
+        nativeHasFocus: false,
+        visible: true,
+        onScreen: true,
+      }),
     ).toBe(true);
   });
 
   it("is false when the page is not visible", () => {
     expect(
-      framedFocusReading({ nativeHasFocus: false, visible: false, onScreen: true }),
+      framedFocusReading({
+        nativeHasFocus: false,
+        visible: false,
+        onScreen: true,
+      }),
     ).toBe(false);
   });
 
   it("is false when the frame is off screen", () => {
     expect(
-      framedFocusReading({ nativeHasFocus: false, visible: true, onScreen: false }),
+      framedFocusReading({
+        nativeHasFocus: false,
+        visible: true,
+        onScreen: false,
+      }),
     ).toBe(false);
   });
 });
 
 describe("installFocusPolicy", () => {
   it("leaves the native method strictly alone outside a frame", () => {
-    const { doc } = fakeDocument({ nativeHasFocus: false, visibilityState: "visible" });
+    const { doc } = fakeDocument({
+      nativeHasFocus: false,
+      visibilityState: "visible",
+    });
     const before = doc.hasFocus;
     const observer = controllableObserver();
 
@@ -134,7 +155,10 @@ describe("installFocusPolicy", () => {
   });
 
   it("reports `unmeasured` and overrides nothing when there is no observer", () => {
-    const { doc } = fakeDocument({ nativeHasFocus: false, visibilityState: "visible" });
+    const { doc } = fakeDocument({
+      nativeHasFocus: false,
+      visibilityState: "visible",
+    });
     const before = doc.hasFocus;
 
     const result = install({ framed: true, doc, observe: NO_OBSERVER });
@@ -145,7 +169,10 @@ describe("installFocusPolicy", () => {
   });
 
   it("reports `framed` and installs the reading when framed with an observer", () => {
-    const { doc } = fakeDocument({ nativeHasFocus: false, visibilityState: "visible" });
+    const { doc } = fakeDocument({
+      nativeHasFocus: false,
+      visibilityState: "visible",
+    });
     const before = doc.hasFocus;
 
     const result = install({
@@ -163,7 +190,10 @@ describe("installFocusPolicy", () => {
     // The safe default, and the reason it is asserted rather than assumed: a
     // `true` here would suppress notifications on an assumption during the
     // window before the first callback.
-    const { doc } = fakeDocument({ nativeHasFocus: false, visibilityState: "visible" });
+    const { doc } = fakeDocument({
+      nativeHasFocus: false,
+      visibilityState: "visible",
+    });
     install({ framed: true, doc, observe: controllableObserver().observe });
 
     expect(doc.hasFocus()).toBe(false);
@@ -207,7 +237,10 @@ describe("installFocusPolicy", () => {
   });
 
   it("reports each on-screen change so an installed observer can be told from a live one", () => {
-    const { doc } = fakeDocument({ nativeHasFocus: false, visibilityState: "visible" });
+    const { doc } = fakeDocument({
+      nativeHasFocus: false,
+      visibilityState: "visible",
+    });
     const observer = controllableObserver();
     const result = install({ framed: true, doc, observe: observer.observe });
 
@@ -218,7 +251,10 @@ describe("installFocusPolicy", () => {
   });
 
   it("falls back to `unmeasured` when the document refuses the override", () => {
-    const { doc } = fakeDocument({ nativeHasFocus: false, visibilityState: "visible" });
+    const { doc } = fakeDocument({
+      nativeHasFocus: false,
+      visibilityState: "visible",
+    });
     const frozen = Object.freeze(doc);
     const spy = vi.spyOn(Object, "defineProperty").mockImplementation(() => {
       throw new TypeError("refused");

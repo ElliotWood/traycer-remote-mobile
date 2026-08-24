@@ -124,7 +124,11 @@ export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
 export type ClassifiedAttachment =
   /** Personal chat: a direct, pre-authorised download. */
-  | { readonly kind: "file"; readonly name: string; readonly downloadUrl: string }
+  | {
+      readonly kind: "file";
+      readonly name: string;
+      readonly downloadUrl: string;
+    }
   /** Channel/group: a SharePoint reference. Needs Graph; not built. */
   | { readonly kind: "needs-graph"; readonly name: string }
   /** Looks like a file and is missing what we would need to fetch it. */
@@ -184,7 +188,8 @@ export function classifyAttachment(raw: unknown): ClassifiedAttachment {
   // nothing.
   const contentUrl = readField(record, "contentUrl");
   const isSharePoint =
-    contentUrl !== null && /^https:\/\/[^/]*sharepoint\.com\//i.test(contentUrl);
+    contentUrl !== null &&
+    /^https:\/\/[^/]*sharepoint\.com\//i.test(contentUrl);
   if (contentType === "reference" || isSharePoint) {
     return { kind: "needs-graph", name };
   }
@@ -294,7 +299,10 @@ export async function stageAttachments(
   if (directory === null) {
     // Only reachable if `newId` is overridden with something that is not a
     // UUID — a test seam, not a runtime path. Refuse rather than join it.
-    return { kind: "refused", reason: "I couldn't create a place to put them." };
+    return {
+      kind: "refused",
+      reason: "I couldn't create a place to put them.",
+    };
   }
 
   const mkdirImpl = deps.mkdirImpl ?? defaultMkdir;
@@ -304,7 +312,10 @@ export async function stageAttachments(
     await mkdirImpl(directory);
   } catch {
     logWarn("could not create staging directory", { directory });
-    return { kind: "refused", reason: "I couldn't create a place to put them." };
+    return {
+      kind: "refused",
+      reason: "I couldn't create a place to put them.",
+    };
   }
 
   const staged: StagedFile[] = [];
