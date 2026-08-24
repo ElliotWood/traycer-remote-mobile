@@ -71,9 +71,13 @@ jobs:
           # For fork PRs the protected tag set is the BASE repo's, not the fork's.
           BASE_REPO_URL: ${{ github.event.pull_request.base.repo.clone_url || format('https://github.com/{0}.git', github.repository) }}
         run: |
+          # Without pipefail, jq exits 0 on empty input and swallows a
+          # resolve-baselines.ts failure - the guard below then reads an empty
+          # file (not `[]`), compares "" to "0", and fails OPEN.
+          set -o pipefail
           bun run protocol/scripts/compat/resolve-baselines.ts "$BASE_REPO_URL" \
             | jq -c '.baselines' > /tmp/baselines.json
-          if [ "$(jq 'length' /tmp/baselines.json)" = "0" ]; then
+          if [ ! -s /tmp/baselines.json ] || [ "$(jq 'length' /tmp/baselines.json)" = "0" ]; then
             echo "::error::resolve-baselines.ts produced no protected baselines; refusing to run the gate with zero baselines." >&2
             exit 1
           fi
