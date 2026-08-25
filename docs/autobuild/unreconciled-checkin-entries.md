@@ -3462,4 +3462,3 @@ length after a `cloud repair complete`, the way this run answered the 16:15
 entry's. Pre-write size: **191,722 B**. If this still says PENDING, the entry
 reached disk and the check did not complete: the unmeasured middle state, not a
 pass.
-
