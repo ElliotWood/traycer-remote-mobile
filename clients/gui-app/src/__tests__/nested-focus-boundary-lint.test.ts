@@ -4,7 +4,7 @@ import { ESLint, Linter } from "eslint";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 type RestrictedSyntaxRestriction = {
   readonly selector: string;
@@ -344,6 +344,15 @@ describe("eslint config retains raw tabActivate restriction", () => {
     return configMentionsTabActivate(config.rules?.["no-restricted-syntax"]);
   }
 
+  // The process's first calculateConfigForFile pays the one-time
+  // eslint.config.mjs module load (32s measured on a cold Windows cache,
+  // 2026-08-26), billed to whichever row happens to run first - which then
+  // times out while every sibling row passes in milliseconds. Pay it here,
+  // under its own budget, so the 20s per-test budget measures the rows.
+  beforeAll(async () => {
+    await fileHasTabActivateRestriction("src/lib/tab-navigation.ts");
+  }, 120_000);
+
   const productionOverridesThatMustRetain = [
     "src/lib/routes.ts",
     "src/stores/epics/canvas/store.ts",
@@ -439,6 +448,14 @@ describe("eslint config actually catches tabActivate bypass forms (lintText)", (
     expect(result, `expected a lint result for ${relativePath}`).toBeDefined();
     return result.messages;
   }
+
+  // The process's first lintText pays typescript-eslint's project-service
+  // program build (22s measured, 2026-08-26; separate cache from the config
+  // load warmed above), billed to whichever bypass row runs first. Same
+  // treatment: pay it once here so the rows keep their 20s budget.
+  beforeAll(async () => {
+    await lintBypassAt("export {};\n", PRODUCTION_FILE_PATH);
+  }, 120_000);
 
   const bypassForms = [
     {
