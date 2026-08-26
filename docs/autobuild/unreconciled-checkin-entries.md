@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-one** entries in this
+everything came down, nothing went up. The **twenty-two** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-one**. Three count sites remain in this header: this
+on this file → **twenty-two**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,78 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-one entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-two entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-27 04:15 — quiet hold: upstream stands still for the first time in three runs, and the tip's CI is finally seen green by the run that checks it
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none** — newest pile file anywhere is still the 08-26 08:15 run's own `scratch/assemble/part1.md` (08-26 08:27); the three `C:\repo` piles are frozen at 08-12 |
+| `main` vs `origin/main` | **0 / 0** @ `98bfd7e01` |
+| CI on `main` @ `98bfd7e01` (the tip) | **green — all six workflows, attempt 1** — see below |
+| `CredentialLeaseReleasedError` storm | **5,830** at 04:16 (was 4,520 at 00:20) — ~330/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | none new — last remains 00:15:17 today, recorded by the 00:15 entry |
+
+### Upstream stands still, and the map was re-derived anyway
+
+`upstream/main` did not move this window — still `c60338665`, the first
+run since 16:15 to find it where the previous run left it. Counts are now
+**314** in / our **492** (ours +2: the 00:15 entry's two docs-only pushes).
+`git merge-tree --write-tree main upstream/main` → **43** conflicted paths,
+same composition (20 `clients/mobile` add/adds, 21 content, the same two
+modify/deletes) — re-derived per the standing rule even though an unmoved
+tip plus two docs-only commits to a path upstream does not carry could not
+have changed it. The pricing (four hand-merges + one policy call) holds at
+a fourth consecutive derivation.
+
+### The tip's CI is green on attempt 1, and the flake did not fire
+
+The 00:15 method note recorded that each entry had been quoting CI for the
+*previous* push's commit, which is how one red run went unseen. This run
+closes that loop: `98bfd7e01` — the 00:45 addendum's own push — ran
+**green, all six workflows, attempt 1**, with `desktop darwin + packaging`
+and `traycer-clients-gui-app shard 2` both passing on the fourth
+consecutive docs-only tree. The flake tally stands at two fires in four
+otherwise-identical trees, and the two newest trees are both green on
+attempt 1. The 00:15 rule was *"a ticket if it fires again"* — it did not
+fire. This push adds a fifth data point; the next run reads it.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (`agent role list`, `host.log` counts, five-pile mtime attribution), merge re-derivation at the unmoved upstream tip, CI verified on the tip itself rather than its predecessor — all read-only |
+| This entry | written here, count sites 21 → 22 in lockstep per the header's rule |
+| Push notification | **not sent** — a quiet hold with all-green CI is not new information Elliot can act on; the 16:15 ask stands |
+| Build work | **none, deliberately** — the standing goal's next step is still the fork merge, still Elliot's decision; the candidate branch remains one instruction away |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — the 16:15 map holds verbatim at
+   `upstream/main@c60338665` (314 in / 492 ours / 43 conflicted paths).
+   Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (5,830 lines and counting) and the recurring RPC WS token-expiry
+   closes.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-27 00:15 — quiet hold: the map survives a third upstream move, and the tip's red CI is a coin-flip flake with a named test
 
