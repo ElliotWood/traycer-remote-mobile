@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **eighteen** entries in this
+everything came down, nothing went up. The **nineteen** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,8 +33,8 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **eighteen**. Three count sites remain in this header: the
-two *eighteen*s above and the one under *What to do now*. Re-derive and
+on this file → **nineteen**. Three count sites remain in this header: the
+two *nineteen*s above and the one under *What to do now*. Re-derive and
 update all three, or update none. (The old fifth site — "consecutive
 check-ins have flagged this" — is retired rather than updated: the runs of
 2026-08-19..26 wrote their flags into the channel that was destroyed, so
@@ -43,13 +43,94 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the eighteen entries below back into `traycer-remote-teams/autobuild/index.md`
+the nineteen entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-26 16:15 — the merge priced path by path: four hand-merges and one policy call; the other thirty-eight sides are obvious
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| `main` vs `origin/main` | **0 / 0** @ `2c5dc114` |
+| `CredentialLeaseReleasedError` storm | **1,853** at 16:23 (was 1,607 at 12:15) — still WARN-only, still the attended-minute dependency |
+
+### What this run adds: the decision is priced, not just measured
+
+Three consecutive runs correctly held the fork merge as Elliot's and correctly
+did not attempt it. But the escalation priced it as *"~42 conflicts in 4
+clusters"* — a size, not a cost. This run classified **every conflicted path
+by what each side actually did since the merge-base** (`8f21d506f`). Nothing
+was resolved and nothing was decided; each row is a `git diff --numstat` from
+the base to each tip, plus a direct main↔upstream diff where both copies
+descend from the same lineage.
+
+Current figures: `upstream/main` moved again mid-run (fetch pulled `988a9a7a`
+→ `2635ce3e7`), now **309** in / our **488**; `git merge-tree --write-tree
+main upstream/main` → **43** conflicted paths (12:15 counted 42 at the older
+tip). The clusters, priced:
+
+| Cluster | Paths | What the diffs say | Side to take |
+| --- | --- | --- | --- |
+| **Build plumbing** | 4 — `test.yml`, `bun.lock`, root + gui-app `package.json` | ours adds the fork CI matrix / workspace entries; theirs adds their own jobs and deps | union by hand for the three JSONs/YAML; **regenerate `bun.lock` from the merged manifests, never merge it textually** |
+| **`clients/shared/host-transport`** | 5 | ours since base is almost entirely the self-alias→relative import rewrite (2-line diffs; `ws-stream-client` also carries stdout-reservation comments for `remote-bridge`); theirs is a big rewrite (`remote-session` +2308, its test +4782, `ws-rpc-client` +326/−144, `ws-stream-client` +662) | **theirs wholesale, then re-run the alias rewrite.** ⚠️ then re-verify the desktop loopback bridge still dials — upstream's remote stack is relay-pinned, and our bridge work sits in these files' *consumers*, which is what the 2-line deltas prove |
+| **gui-app extractions** | 4 — `provider-ordering`, `profile-usage-projection`, `rate-limit-envelope`, `provider-profile-model` | ours are extraction stubs (−455/−169/−94/−79; `provider-ordering` on `main` is a re-export whose own docblock says "MOVED to `clients/shared/providers/`"); theirs carry real semantic changes (+124, +42/−18, +33/−11, +30) | **keep the stubs; port their delta into the `clients/shared` copies.** The conflict is the planned upstream contribution arriving as files — do not resolve it by un-extracting |
+| **gui-app hand-merges** | 10 | `router.tsx` ours +31 (hash history) vs theirs +84; the mermaid/export/save-blob quartet both-sides-touched but nearly convergent (direct main↔upstream residue 9/9, 8/15, 11/21; only `save-blob-to-disk.ts` is real at 87/61); `index.ts` ours +2 exports; two modify/deletes below | genuine merges, all small |
+| **`clients/mobile`** | 20 add/add | ours (98 files) is upstream's 08-24 shell snapshot **plus our 61-file web layer** (`sw.ts`, `teams-host.ts`, push, safe-storage, tools — all ours-only, merge silently). Theirs (109 files) adds ~72 theirs-only Capacitor/iOS files, which **also merge silently** — the add/add set is only the shared-lineage paths where their copy has since evolved | **theirs for the 11 Capacitor/iOS paths** (our copies are stale snapshots of their own lineage — `capacitor.config`, `ios/*`, `dev-ios`, `mobile-runner-host` + test, `vitest.config`); **hand-merge the ~9 web-shell files** where our wiring meets their evolution — `src/web/main.tsx` is the real one (their +192/−275 against our teams-host/pwa-shell wiring), then `vite.config.ts`, `mobile.css`, `package.json`, `tsconfig.json`, `vite-env.d.ts`, `.gitignore`, `AGENTS.md`, `README.md` |
+
+**The two modify/deletes decode cleanly, and one of them was about to be
+mis-fought.** `host-picker.tsx`: upstream deleted it in the host-lifecycle
+redesign (`22ffa612c`, #1243) — its successor is
+`settings/host-scope/host-switcher.tsx` — and our entire modification is **2
+lines** (yesterday's launch-config extra hosts, `0b671885b`). Fighting for our
+file would resurrect a component upstream retired; the right resolution is
+their deletion plus a 2-line re-port into their switcher.
+`nested-focus-boundary-lint.test.ts`: upstream deleted the test, we modified
+it — one look at *why* they deleted it decides it, and nothing else hangs off
+it.
+
+**So the merge's real residue is four hand-merges and one policy call:**
+`src/web/main.tsx`, `router.tsx`, `save-blob-to-disk.ts` (+ its test), and
+porting four small upstream deltas into our `clients/shared` extractions. The
+policy call: post-merge, the fork carries upstream's Capacitor/iOS tree
+(~72 inert files). Convergence-architecture says *"we skip native"* — but
+deleting them re-manufactures this same conflict surface on every future
+upstream merge. **Recommendation: carry them inert; delete nothing.** The
+other 38 paths have an obvious side once the clusters above are accepted.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, `host.log`, worktree dirt) — all clean, all read-only |
+| The map | derived per-path from `8f21d506f` to both tips; commands recorded inline so every row is re-derivable |
+| This entry | written here, count sites 18 → 19 in lockstep per the header's rule |
+| Push notification | **sent** — the merge is now priced at four hand-merges + one policy call, which is new information, not a repeat of the 08:15 ask |
+| Build work | **none** — the merge stays Elliot's, unchanged; a candidate branch is now one instruction away if he wants it built before deciding |
+
+### 🟠 Blocked on Elliot — carried, first item re-priced
+
+1. **Fork-merge direction** — now with the map above. Saying *"run it on a
+   candidate branch"* is enough; the map makes it a day's work, not an
+   investigation.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease the WARN storm is
+   about.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-26 12:15 — quiet hold: the fleet is verifiably clean, the merge is still Elliot's, and the numbers it waits on drifted while it waited
 
