@@ -94,6 +94,14 @@ outcomes.
 recorded rerun-attribution quirk). Outcome recorded below if finished before
 this entry lands; otherwise check run 32957853364 attempt 2.
 
+**Addendum, 00:45, same run:** attempt 2 reads `cancelled` — cancelled by
+**this entry's own push** (Tests has `cancel-in-progress: true` per ref, the
+recorded 08-24 behaviour arriving on the check-in's own action; do not read
+it as an operator stopping it). The push's superseding run **32979891662**
+on `77d276159` completed **green, all jobs, attempt 1** — darwin and shard 2
+both passed on the third consecutive docs-only tree. The tip of `main` is
+green and the flake verdict stands on three data points.
+
 **A method note the next reader inherits:** the 16:15 and 20:15 entries each
 quoted CI green for the *previous* push's commit — correct at the time, since
 the current push's run had not finished — which is exactly how `2c5dc114`'s
