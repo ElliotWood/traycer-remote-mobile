@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **nineteen** entries in this
+everything came down, nothing went up. The **twenty** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,9 +33,10 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **nineteen**. Three count sites remain in this header: the
-two *nineteen*s above and the one under *What to do now*. Re-derive and
-update all three, or update none. (The old fifth site — "consecutive
+on this file → **twenty**. Three count sites remain in this header: this
+derivation, the survivor count above, and the one under *What to do now*
+(the 08-24 artifact-pile *nineteen* is frozen history — never update it).
+Re-derive and update all three, or update none. (The old fifth site — "consecutive
 check-ins have flagged this" — is retired rather than updated: the runs of
 2026-08-19..26 wrote their flags into the channel that was destroyed, so
 that count stopped being derivable the day it was needed most.)
@@ -43,13 +44,76 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the nineteen entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-26 20:15 — quiet hold: the priced map survives upstream's next move, and the WARN storm's 6× step is a watchdog waking, not a person arriving
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none** — every dirty pile across the five live worktrees has **zero** files modified after 16:24 |
+| CI on `main` @ `7f0ee0ab` (the tip) | **green — all six workflows**, run created with the 16:15 entry's push |
+| `main` vs `origin/main` | **0 / 0** @ `7f0ee0ab` |
+| `CredentialLeaseReleasedError` storm | **3,152** at 20:16 (was 1,853 at 16:23) — rate stepped ~60/hr → ~354/hr at 16:33:08; see below |
+
+### The map survives upstream's next move
+
+`upstream/main` moved again (`2635ce3e7` → `4a6b85930`), now **311** in /
+our **489**. `git merge-tree --write-tree main upstream/main` → **43**
+conflicted paths, and they are the same set the 16:15 map priced: same five
+clusters, same two modify/deletes, same 20 `clients/mobile` add/adds.
+Re-derived, not assumed — the pricing (four hand-merges + one policy call)
+holds at the new tip unchanged.
+
+### The storm's step change is internal, and the tempting read was checked before it was written
+
+The count nearly doubled in four hours, and the hourly grouping shows a
+step, not a drift: ~60/hr from 09:00 through 15:00, **147** in hour 16,
+~354/hr from 17:00 on. All four Tiptap rooms' `stayed disconnected;
+rebuilding provider` loops first appear at **16:33:08.261–.263** — four
+rooms inside two milliseconds — and the 16:25–16:35 window contains **no
+other line of any kind**: no connection, no subscribe, no INFO. So the step
+is a host-internal room watchdog first firing ~12h after the 04:23 epic
+open, not a client arriving. Checked because the tempting read — the 16:15
+push notification was tapped and someone glanced at the epic — would have
+been *evidence the escalation landed*, and it is disconfirmed: nothing
+connected. Same root cause, same remedy (the attended minute); until then,
+roughly six more WARN lines per minute of pure noise.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, `host.log`, five worktrees' status with post-16:24 mtime attribution), CI on the tip, merge re-derivation at the new upstream tip — all read-only |
+| This entry | written here, count sites 19 → 20 in lockstep per the header's rule |
+| Push notification | **not sent** — a quiet hold plus a noise-rate diagnosis is not new information Elliot can act on; the 16:15 ask stands |
+| Build work | **none, deliberately** — the standing goal's next step is still the fork merge, still Elliot's decision; the candidate branch remains one instruction away |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — the 16:15 map holds verbatim at
+   `upstream/main@4a6b85930` (311 in / 489 ours / 43 conflicted paths).
+   Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm, now ~6 lines/min.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-26 16:15 — the merge priced path by path: four hand-merges and one policy call; the other thirty-eight sides are obvious
 
