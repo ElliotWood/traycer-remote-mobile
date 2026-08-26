@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **seventeen** entries in this
+everything came down, nothing went up. The **eighteen** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,8 +33,8 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **seventeen**. Three count sites remain in this header: the
-two *seventeen*s above and the one under *What to do now*. Re-derive and
+on this file → **eighteen**. Three count sites remain in this header: the
+two *eighteen*s above and the one under *What to do now*. Re-derive and
 update all three, or update none. (The old fifth site — "consecutive
 check-ins have flagged this" — is retired rather than updated: the runs of
 2026-08-19..26 wrote their flags into the channel that was destroyed, so
@@ -43,13 +43,72 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the seventeen entries below back into `traycer-remote-teams/autobuild/index.md`
+the eighteen entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-26 12:15 — quiet hold: the fleet is verifiably clean, the merge is still Elliot's, and the numbers it waits on drifted while it waited
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged from 08:15's reading — **04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`, idle-eviction 04:33; nothing has run since |
+| Agents blocked / errored / stranded | **none** |
+| Idle with work outstanding | the fork merge (Elliot, by explicit decision) and ConvBot S1 grading (Elliot + VM) — both carried, not re-litigated |
+| Dirty trees attributable to an agent | **none** — every untracked pile mtimes to 08-24 or earlier (electric-stork `scratch/` 08-09..24; focus-truth worktree's `clients/teams-bot`, `clients/teams-help`, `scratch/guiapp-measure` all 08-12; wt-guiapp-main `scratch/` incl. `entry.md`, which is the 08-24 recovery source — keep until reconciliation) |
+| CI on `main` @ `b818f7e7` (the tip) | **green — all six workflows**, 2026-08-25 22:30 UTC. `4d273da0`'s pre-commit red was the missing trailing newline the tip commit exists to fix |
+| `main` vs `origin/main` | **0 / 0** |
+| `CredentialLeaseReleasedError` storm | continuing — **1,607** at 12:15 (was 1,345 at 08:15), still WARN-only, still the attended-desktop-minute dependency, still adjacent noise |
+
+### The one derived fact this run adds: the merge's numbers moved while the decision waited
+
+Re-measured, same commands as 04:15, current tips: `upstream/main` @
+`988a9a7a` is **306** commits in (was 299) against our **487** (was 485).
+`git merge-tree --write-tree main upstream/main` still exits 1 — **42**
+CONFLICT lines across ~40 distinct paths (was ~38). The clusters are the
+same four: `clients/mobile` **20** (the adopt-or-contribute question as
+files), `clients/gui-app` **11**, `clients/shared` **5**, plus `test.yml`,
+`bun.lock`, `package.json`, `traycer-cli`. Nothing about the decision's
+shape changed; the conflict surface grows by roughly a path a day while it
+waits. Recorded so the next escalation quotes current numbers rather than
+04:15's.
+
+### Two standing-record corrections, verified on the trunk rather than inherited
+
+- **The Teams web shell is ON `main`** — `clients/mobile/src/web/teams-host.ts`,
+  its test, and `sw.ts` are tracked on the trunk (landed 08-24 via
+  `autobuild/next-teams-shell-on-main`). Any note still saying the shell
+  lives only on a branch is stale.
+- **`traycer/chat-transfer` is fully merged** — 0 ahead of `main`, so the
+  electric-stork worktree holds no outstanding branch work; its dirt is
+  scratch only.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, `host.log`, four active worktrees' status + mtime attribution), CI on the tip, merge-number re-derivation — all read-only |
+| This entry | written here, count sites 17 → 18 in lockstep per the header's own rule |
+| Build work | **none, deliberately** — same reason as 08:15: the standing goal's next step *is* the fork merge, and that is Elliot's decision, already escalated by push notification. A second notification four hours later would be nagging, not escalating |
+
+### 🟠 Blocked on Elliot — unchanged from 08:15, carried verbatim
+
+1. **Fork-merge direction** (numbers updated above).
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease the WARN storm is
+   about.
+3. **Unchanged from 08-24:** VM start-or-stays-off (deallocated since
+   08-19 13:16), `GUI_APP_RUNNER`, retiring `/`, the Teams app-package
+   install (the exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-26 08:15 — the repair this file was built against fired once for everything, and what it destroyed included every escalation asking to prevent it
 
