@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty** entries in this
+everything came down, nothing went up. The **twenty-one** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty**. Three count sites remain in this header: this
+on this file → **twenty-one**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,89 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-one entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-27 00:15 — quiet hold: the map survives a third upstream move, and the tip's red CI is a coin-flip flake with a named test
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — four roles still claimed, all holders idle |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none** — newest file in any pile is the 08:15 run's own `scratch/assemble/part1.md` (08-26 08:27); electric-stork's newest predates 08-25 00:41 |
+| `main` vs `origin/main` | **0 / 0** @ `244ef823` |
+| CI on `main` @ `244ef823` (the tip) | **five of six green; Tests FAILED — flake, rerun issued**, see below |
+| `CredentialLeaseReleasedError` storm | **4,520** at 00:20 (was 3,152 at 20:16) — the ~350/hr watchdog rate holding steady |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | recurred **00:15:17 today** — fourth since the 08-25 rotation (08-25 12:15, 08-25 16:17, 08-26 00:15). Same attended-minute family; the CLI still answers |
+
+### The map survives upstream's next move, again
+
+`upstream/main` moved again (`4a6b85930` → `c60338665`), now **314** in /
+our **490**. `git merge-tree --write-tree main upstream/main` → **43**
+conflicted paths, verbatim the 16:15 set: 4 build-plumbing, 5
+`host-transport`, 4 gui-app extractions, 9 gui-app hand-merges including
+the same two modify/deletes, 20 `clients/mobile` add/adds, 1 `traycer-cli`.
+Re-derived, not assumed — the pricing (four hand-merges + one policy call)
+holds at the third consecutive upstream tip.
+
+### The tip's red Tests run is a flake with a named test — and the previous red went unrecorded
+
+CI @ `244ef823` — a docs-only commit (69 insertions, this file) — failed
+**Tests** in two jobs: `desktop darwin + packaging`, where **one test of 25**
+in `src/electron-main/ipc/__tests__/host-management-channel.test.ts` failed
+(*"returns installVersion's committed ok outcome when its post-pin registry
+projection rejects"*), and `traycer-clients-gui-app shard 2`. The discriminator
+that makes this a flake and not a regression: the last three `main` commits are
+each docs-only deltas to this file on an otherwise identical tree, and their
+Tests runs went **fail (`2c5dc114`) → pass (`7f0ee0ab`) → fail (`244ef823`)**,
+with `desktop darwin + packaging` the repeat offender. Same tree, alternating
+outcomes.
+
+`gh run rerun 32957853364 --failed` issued (shows as "ElliotWood" — the
+recorded rerun-attribution quirk). Outcome recorded below if finished before
+this entry lands; otherwise check run 32957853364 attempt 2.
+
+**A method note the next reader inherits:** the 16:15 and 20:15 entries each
+quoted CI green for the *previous* push's commit — correct at the time, since
+the current push's run had not finished — which is exactly how `2c5dc114`'s
+red run was never seen by any entry. A darwin flake that has now fired in two
+of the last three runs deserves a ticket if it fires again; the failing test
+is upstream-inherited desktop code, not this epic's.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, `host.log` counts, dirty-pile mtime attribution across the piles), merge re-derivation at `c60338665`, CI triage down to the failing test name — all read-only |
+| CI | `gh run rerun --failed` on the tip's Tests run — maintenance with precedent (the 08-24 shard-1 flake), not a policy call |
+| This entry | written here, count sites 20 → 21 in lockstep per the header's rule |
+| Push notification | **not sent** — a quiet hold plus a flake rerun is not new information Elliot can act on; the 16:15 ask stands |
+| Build work | **none, deliberately** — the standing goal's next step is still the fork merge, still Elliot's decision; the candidate branch remains one instruction away |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — the 16:15 map holds verbatim at
+   `upstream/main@c60338665` (314 in / 490 ours / 43 conflicted paths).
+   Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (4,520 lines and counting) and the recurring 4-hourly RPC WS
+   token-expiry closes.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-26 20:15 — quiet hold: the priced map survives upstream's next move, and the WARN storm's 6× step is a watchdog waking, not a person arriving
 
