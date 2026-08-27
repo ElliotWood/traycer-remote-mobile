@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-three** entries in this
+everything came down, nothing went up. The **twenty-four** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-three**. Three count sites remain in this header: this
+on this file → **twenty-four**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,76 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-three entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-four entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-27 16:15 — quiet hold: upstream moves two commits and the conflict map does not move at all
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none new** — `wt-guiapp-main`'s scratch pile frozen at 08-26 08:28, the three `C:\repo` piles at 08-12, electric-stork's draft at 08-24; the 12:15 run stranded nothing |
+| `main` vs `origin/main` | **0 / 0** @ `3d539293f` |
+| CI on `main` @ `3d539293f` (the tip) | **green — all six workflows, Tests attempt 1** — the flake did not fire on the seventh consecutive docs-only tree |
+| `CredentialLeaseReleasedError` storm | **9,917** at 16:22 (was 8,521 at 12:17) — ~335/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | recurred **16:15:22** — sixth since the 08-25 rotation, the once-per-check-in expiry family |
+
+### Upstream moves two commits and the conflict map does not move at all
+
+`upstream/main` moved `c739b8863` → `ee65c9a0e` — two commits, a
+notifications-feed fix (`#1473`) and a gui-app Monitor-tile find feature
+(`#1468`) — now **321** in / our **495** (ours +2: the 12:15 run's ticket
+and entry commits). `git merge-tree --write-tree` at the new tip → **49**
+conflicted paths, **zero added, zero removed** — compared path-by-path
+against the old tip's set, not just counted. Method control: the same
+command at `c739b8863` reproduces **49 exactly**. First window since the
+Oxlint growth where the surface stands still; pricing holds at **four
+hand-merges + two policy calls**.
+
+**This run's first derivation read 50 and was discarded.** The merge's
+`warning: Cannot merge binary files` line — about the AppIcon add/add,
+itself a real member of the 49 — passed a filter the second derivation
+excluded, and was counted as a fiftieth path. Both tips were re-derived
+through one filter before either number was believed; the diff then showed
+the truth (zero churn) that the count alone had misstated. Same class as
+the 12:15 run's PowerShell stream mangle: a changed number read through a
+changed method is not a changed fact.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list, `host.log` counts, pile mtime attribution), merge re-derivation at the new tip with a path-level diff and an old-tip control, CI read at attempt level on the tip itself |
+| Fleet fact settled | `traycer/chat-transfer` is fully merged — 0 ahead of `main` — so the chat-transfer branch this window's worktree sits on names landed work, not outstanding work |
+| This entry | the twenty-fourth; count sites 23 → 24 in lockstep per the header's rule, verified against `grep -c` after appending |
+| Push notification | **not sent** — quiet hold, price unchanged; the 12:15 ask stands and a repeat would dull it |
+| Build work | **none, deliberately** — the flake ticket's observability fix still touches `.github/workflows/test.yml` and `nx.json`, and both are still inside the 49 |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@ee65c9a0e`: 321 in /
+   495 ours / **49** conflicted paths, composition unchanged; pricing
+   **four hand-merges + two policy calls** (`.gitleaks.toml` inside the
+   Oxlint call). Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (9,917 lines) and the token expiry behind the sixth RPC WS close.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-27 12:15 — the 08:15 run died standing by with its work unposted, and upstream's Oxlint migration prices a second policy call into the merge
 
