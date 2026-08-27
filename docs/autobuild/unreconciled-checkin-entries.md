@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-two** entries in this
+everything came down, nothing went up. The **twenty-three** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-two**. Three count sites remain in this header: this
+on this file → **twenty-three**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,124 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-two entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-three entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-27 12:15 — the 08:15 run died standing by with its work unposted, and upstream's Oxlint migration prices a second policy call into the merge
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **one — the 08:15 check-in itself**, dead with uncommitted work (see below); the four role holders idle, roles unchanged |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **one** — `wt-guiapp-main` held the 08:15 run's stranded pile (recovered by this entry); every other pile frozen, newest elsewhere is electric-stork's `scratch/checkin-1615-draft.md` (08-24 16:50) |
+| `main` vs `origin/main` | **0 / 0** @ `9cb18d9b2` before this push |
+| CI on `main` @ `9cb18d9b2` (the tip) | **green via attempt 2** — attempt 1 failed `traycer-clients-gui-app shard 4`, a third distinct flake job; rerun issued 08:22 by the 08:15 run, green 08:27:34 |
+| `CredentialLeaseReleasedError` storm | **8,521** at 12:17 (was 5,830 at 04:16) — ~336/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | recurred **08:17:08** — fifth since the 08-25 rotation; plus one `getTaskCollabTokens` 401 at 04:15:27, same expiry family |
+
+### The 08:15 check-in ran, worked, and died before landing any of it
+
+The evidence chain, each link measured: the once-per-check-in token-expiry
+fatal close fired at **08:17:08**; `gh run rerun --failed` was issued on the
+tip's red Tests run at **08:22** (attributed "ElliotWood" — the recorded
+rerun quirk, and no attended session ran); files were written in
+`wt-guiapp-main` up to **08:24:21**; then nothing — no commit, no push, no
+entry, for four hours. Cause class: **died standing by**, most plausibly
+watching the rerun it had just issued — which went green at 08:27:34, three
+minutes after its last file write.
+
+Its footprint, all recovered by this entry rather than re-derived:
+
+|  |  |
+| --- | --- |
+| `docs/autobuild/ci-tests-flake.md` | a complete, evidence-backed ticket executing the 00:15 rule (*"a ticket if it fires again"* — it fired, on a **third distinct job**). Committed with this push, attributed |
+| the header's three count sites, edited 22 → 23 | for an entry it never appended. **Adopted** — this entry is the twenty-third, which makes the stranded arithmetic true |
+| the rerun | its outcome (green, attempt 2) is recorded in this entry's probe table |
+
+**The count-lockstep rule caught its first real desync.** Had this run not
+looked, the next reader would have found a header claiming twenty-three
+against a grep reading twenty-two — a mismatch that is precisely a dead
+run's silhouette. The rule's cost (three sites in lockstep) bought exactly
+the alarm it was designed to buy.
+
+### The flake ticket the 08:15 run filed — now on `main`
+
+`9cb18d9b2`'s attempt-1 red was `traycer-clients-gui-app shard 4` — after
+darwin + shard 2 (twice) and shard 1 on 08-24. Six consecutive docs-only
+pushes to an identical code tree have produced three attempt-1 reds with
+three distinct failing jobs. The ticket (`docs/autobuild/ci-tests-flake.md`)
+records the run table and the sharper half: **NX swallows the vitest
+reporter, so a red gui-app shard cannot name its failing test** — it cannot
+be attributed, deflaked, or told apart from a real regression. GitHub
+issues are disabled on the fork, so the ticket lives beside this ledger;
+the fixing commit deletes it.
+
+### Upstream's Oxlint/Oxfmt migration grows the map 43 → 49 — and the growth is a policy call, not six chores
+
+`upstream/main` moved `c60338665` → `c739b8863` (five commits), now **319**
+in / our **493**. `git merge-tree --write-tree` at the new tip → **49**
+conflicted paths. **Method control before trusting the change:** the same
+command at the previous tip reproduces **43 exactly**, the value four prior
+derivations recorded — so the growth is real, not a counting artifact.
+(This run's first derivation read 49-and-2 through a PowerShell stream
+mangle; both readings were discarded and re-derived through one clean
+path before either was believed.)
+
+The diff is **+6 / −0**, and all six new paths come from **one upstream
+commit** — `0041bbff9` *"build: migrate tooling to Oxlint and Oxfmt"* —
+landing on files the fork just repaired:
+
+| New conflict | Ours, colliding |
+| --- | --- |
+| `.gitleaks.toml` | `cb232d22f` — the secret-scanner fix. **Both-sides-touched with a security control on our side**: a take-theirs here silently un-fixes the scanner |
+| `nx.json` | `66a979403` — the workspace lint gate seeing its own rules |
+| 4 × `package.json` (desktop, shared, traycer-cli, protocol) | `20cb82654` — the lint gate that could not fail (`--fix` removal), plus `b47a98001` |
+
+**Why this is a second policy call.** The fork spent this week making the
+eslint-era gates honest (`2d4384dd5` — six hooks fixed at their roots).
+Upstream has now replaced the toolchain those repairs live in. Adopting
+Oxlint/Oxfmt means re-deriving the gate repairs under the new tools;
+declining means permanent tooling divergence on every future merge. Neither
+is a chore, and `.gitleaks.toml` sits inside the call. **Pricing is now
+four hand-merges + TWO policy calls** (was one) — the first change to the
+price since it was set on 08-26.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, `host.log` counts, five-pile mtime attribution), stranded-run forensics, merge re-derivation with a method control at the old tip, CI read at attempt level on the tip itself |
+| Recovery | the 08:15 run's ticket and count edits committed, attributed to it |
+| This entry | the twenty-third; count sites already read twenty-three from the stranded edit — verified against `grep -c` after appending |
+| Push notification | **sent** — the merge price rose in kind while the decision waits, and that is new information Elliot can act on; the quiet-hold precedent does not cover a price change |
+| Build work | **none, deliberately** — the flake ticket's observability fix must touch `.github/workflows/test.yml` and `nx.json`, and both **joined the conflict surface this window**; editing them on `main` now would manufacture both-sides-touched conflicts hours before the merge might run |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@c739b8863`: 319 in /
+   493 ours / **49** conflicted paths; pricing **four hand-merges + two
+   policy calls** — the Oxlint/Oxfmt adoption is the new one, and
+   `.gitleaks.toml` inside it needs a hand, not a side. Saying *"run it on
+   a candidate branch"* is enough, and the surface has now grown twice
+   while waiting.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (8,521 lines) and the token expiry behind the fifth RPC WS close.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-27 04:15 — quiet hold: upstream stands still for the first time in three runs, and the tip's CI is finally seen green by the run that checks it
 
