@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-five** entries in this
+everything came down, nothing went up. The **twenty-six** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-five**. Three count sites remain in this header: this
+on this file → **twenty-six**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,83 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-five entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-six entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-28 00:15 — quiet hold: upstream's biggest move yet misses the 49 entirely, and a wrong filter read the map at triple size before the old-tip control caught it
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none new** — `wt-guiapp-main`'s scratch pile frozen at 08-26 08:27 (this run's own two derivation files were written there, recorded here, and deleted before commit), the `C:\repo` piles unchanged at 08-12, electric-stork's draft at 08-24 16:50; `wt-ci-fork` and `wt-push-subscribe` clean; the 20:15 run stranded nothing |
+| `main` vs `origin/main` | **0 / 0** @ `bda4b530f` |
+| CI on `main` @ `bda4b530f` (the tip) | **green — all six workflows, Tests attempt 1** — the ninth consecutive docs-only tree, and the third in a row where the flake did not fire |
+| `CredentialLeaseReleasedError` storm | **12,613** at 00:20 (was 11,245 at 20:17) — ~337/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **none this window as of 00:20** — the first check-in window since the 08-25 rotation without an instance; both CLI calls succeeded first try. Last remains 20:17:08 |
+
+### Three upstream commits and 73 files, and the map still does not move
+
+`upstream/main` moved `20dceb79c` → `f6a1f3570` — three commits: gui-app
+Chrome-tab drag behaviour (`#1477`), a protocol fix restoring workspace
+agent-selection guides (`#1417`), and a gui-app+protocol simplification of
+harness enablement to a sticky toggle (`#1472`) — now **325** in / our
+**497** (ours +1: the 20:15 run's entry commit). `git merge-tree
+--write-tree` at the new tip → **49** conflicted paths, compared
+**path-by-path** against the old tip's set through one shared filter:
+**zero added, zero removed, diff IDENTICAL**. Method control: the same
+command and filter at `20dceb79c` reproduces **49 exactly**. Third
+consecutive window the Oxlint-era surface stands still under upstream
+movement; pricing holds at **four hand-merges + two policy calls**. The
+intersection was also taken directly rather than inferred from the stable
+count: the 73 files the three commits touch were matched against the 49 —
+**zero overlap**, upstream's largest move this week landing entirely
+outside the merge's hard surface.
+
+**This run's first derivation read 165 at both tips and was discarded.**
+The `--name-only` conflicted-paths section ends at the first blank line;
+a filter that only dropped `warning:` lines kept every informational
+`CONFLICT (...)` line below the separator and counted them as paths. What
+exposed it was the old-tip control reading 165 too — a real change cannot
+triple both tips at once, so the identical wrongness indicted the method,
+not the fact. Same class as the 16:15 run's fiftieth path and the 12:15
+run's stream mangle: a changed number read through a changed method is not
+a changed fact, and the control exists to say which one changed.
+
+### Done this run
+
+| | |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list, `host.log` counts, pile mtime attribution across all five sites), merge re-derivation at the new tip with a path-level diff, an old-tip method control, and a direct 73-file intersection against the 49, CI read at attempt level on the tip itself |
+| This entry | the twenty-sixth; count sites 25 → 26 in lockstep per the header's rule, verified against `grep -c` after appending |
+| Push notification | **not sent** — quiet hold, price unchanged; the 12:15 ask stands and a repeat would dull it |
+| Build work | **none, deliberately** — the flake ticket's observability fix still touches `.github/workflows/test.yml` and `nx.json`, and both are still inside the 49 (as is `.gitleaks.toml`, re-verified this window) |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@f6a1f3570`: 325 in /
+   497 ours / **49** conflicted paths, composition unchanged; pricing
+   **four hand-merges + two policy calls** (`.gitleaks.toml` inside the
+   Oxlint call). Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (12,613 lines) and the token expiry behind the RPC WS close
+   family (quiet this window, seven instances on record).
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-27 20:15 — quiet hold: a second consecutive upstream move leaves the 49 unchanged, and the flake stays silent for a second tree in a row
 
