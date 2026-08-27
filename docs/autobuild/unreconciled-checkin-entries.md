@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-seven** entries in this
+everything came down, nothing went up. The **twenty-eight** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-seven**. Three count sites remain in this header: this
+on this file → **twenty-eight**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,105 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-28 08:15 — quiet hold: one relay-recovery commit moves nine of the 49's far sides, every one inside a cluster the pricing already treats as insensitive
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none new** — `wt-guiapp-main`'s pile still frozen at 08-26 08:27, the `C:\repo` piles unchanged (mtimes 08-14), electric-stork's draft at 08-24 16:50; `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` | **0 / 0** @ `f931eec0c` |
+| CI on `main` @ `f931eec0c` (the tip) | **green — all six workflows, Tests attempt 1** — the eleventh consecutive docs-only tree, and the fifth in a row where the flake did not fire |
+| `CredentialLeaseReleasedError` storm | **15,202** at 08:20 (was 13,877 at 04:17) — ~331/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **none new** — count still eight; this run's 4h-token expiry surfaced as the CLI's *first call* instead (`E_UNEXPECTED … 401`), recovered by the recorded retry-then-`whoami` |
+
+### Ten more upstream commits; the map stands still a fifth window, and what moves lands only where the pricing already doesn't care
+
+`upstream/main` moved `8f033974f` → `272e4950f` — ten commits, now **345**
+in / our **499** (ours +1: the 04:15 run's entry commit). `git merge-tree
+--write-tree` at the new tip → **49** conflicted paths, compared
+path-by-path against the old tip's set through the shared blank-line
+filter: **diff IDENTICAL**. Method control: the same command and filter at
+`8f033974f` reproduces **49 exactly**. Merge-base checked at both tips:
+still `8f21d506f`. Fifth consecutive window the count and composition
+stand still.
+
+**Conflict content moved on nine paths, and one commit explains all nine.**
+`7ec99c210` (#1475, *"recover the relay session fast after an app
+switch"*) is the only one of the ten to intersect the 49: three
+`clients/shared/host-transport/remote/` files (`remote-session.ts`, its
+test, `create-remote-transport.ts` — the `ws-rpc-client`/`ws-stream-client`
+pair did **not** move this window), five `clients/mobile` files
+(`mobile-runner-host.ts` + test, `package.json`, `vitest.config.ts`,
+`ios/…/CapApp-SPM/Package.swift`), and `bun.lock`. Two independent
+derivations agree: the ten commits' 128-file touch-set intersected with
+the 49 names exactly the nine paths a marker-normalized blob diff finds.
+
+**The price does not move.** The host-transport cluster is priced *"theirs
+wholesale, then re-run the alias rewrite"* — insensitive to far-side churn
+by construction, and its precondition (our side stays the 2-line alias
+diffs) holds: every fork commit since the pricing is docs-only. The five
+mobile files sit in the *"theirs for the Capacitor/iOS paths"* bucket plus
+`package.json` among the small web-shell hand-merges; `bun.lock` is
+*"regenerate from the merged manifests, never merge textually"*. The four
+named hand-merges (`src/web/main.tsx`, `router.tsx`, `save-blob-to-disk.ts`
++ test) and the four `clients/shared` extraction ports: **zero overlap**
+with the ten commits, untouched a fifth time. The post-merge bridge
+re-verify stays mandatory — #1475 is the second consecutive window the
+remote-session cluster's far side moved.
+
+**A method trap this run walked into and out of, recorded because the next
+blob-level read will meet it.** The first pass said **46 of 49** conflicted
+outputs differed between the two merge trees. False: the merges were
+labeled with tip OIDs, so every conflict-marker line embeds the upstream
+hash and every conflicted blob differs *trivially*. Normalizing the marker
+labels (strip everything after the `<<<<<<<`/`>>>>>>>`/`|||||||` runs)
+collapses 46 to the nine above, and the touch-set intersection confirms
+the nine from the other side. A conflict-content diff between merge trees
+built from different tip labels is non-discriminating until the labels are
+normalized — it reads as "everything moved" about a window where almost
+nothing did.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list, `host.log` counts since rotation, pile mtime attribution), merge re-derivation at the new tip with a path-level diff and an old-tip method control, a merge-base check at both tips, the 128-file intersection against the 49, a marker-normalized blob diff with its non-discriminating first read recorded, CI read at attempt level on the tip itself |
+| This entry | the twenty-eighth; count sites 27 → 28 in lockstep per the header's rule, verified against `grep -c` after appending |
+| Push notification | **not sent** — price unchanged (four hand-merges + two policy calls); the 12:15 ask stands and a repeat would dull it |
+| Build work | **none, deliberately** — the flake ticket's observability fix still touches `.github/workflows/test.yml` and `nx.json`, and both are still inside the 49 (re-verified this window, `.gitleaks.toml` too) |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@272e4950f`: 345 in /
+   499 ours / **49** conflicted paths, composition unchanged through five
+   windows; pricing **four hand-merges + two policy calls**
+   (`.gitleaks.toml` inside the Oxlint call). The post-merge *"re-verify
+   the loopback bridge dials"* step stays mandatory — #1475 moved the
+   remote-session cluster's far side again. Saying *"run it on a candidate
+   branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (15,202 lines) and the 4h token expiry this run met as a CLI 401
+   rather than a WS close.
+3. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-28 04:15 — quiet hold: upstream's protocol rewrite is the first move to land INSIDE the 49 — in the one cluster already priced "theirs wholesale"
 
