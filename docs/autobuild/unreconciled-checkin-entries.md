@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **thirty-three** entries in this
+everything came down, nothing went up. The **thirty-four** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **thirty-three**. Three count sites remain in this header: this
+on this file → **thirty-four**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,117 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the thirty-three entries below back into `traycer-remote-teams/autobuild/index.md`
+the thirty-four entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-29 08:15 — quiet hold: five gui-app commits upstream and the map does not move a byte — same 50, zero stage OIDs changed, zero silent resolutions, the first fully frozen window since the pricing
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** |
+| Genuine rate-limiting (level-anchored, whole-word `429`, UUID-substring lines removed) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`; claim ids `1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`, recorded here so the next run can compare ids rather than counts), all holders idle; 0 of 115 registered agents active; `agent list --all --json` keyed by id against the 04:15 snapshot → 0 added, 0 removed, 0 changed |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, nothing new |
+| Dirty trees attributable to an agent | **none new.** electric-stork's `scratch/` gained only this run's derivation files; `wt-guiapp-main`'s pile frozen at the same mtimes (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` and the list files 08-24 16:47); the build repo's three untracked paths unchanged (`teams-bot/` 08-12 12:19, `teams-help/` and `scratch/guiapp-measure/` 08-12 12:39); `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` | **0 / 0** @ `cd950382c` — the 04:15 landing, the only movement on `main` since 00:15 |
+| CI on `main` @ `cd950382c` (the tip) | **green on attempt 1, 14/14 jobs** — Tests run `33199079926`, 04:23:38 → 04:29:50 (`attempt: 1`, `conclusion: success`, zero non-success jobs via `gh run view --json jobs`); the other five workflows green. The flake family did not fire; the ticket gets no row |
+| `CredentialLeaseReleasedError` storm | **23,131** at 08:16 (was 21,843 at 04:17) — +1,288 in 3h59m, ~323/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **twelve** since rotation, one new: **08:16:03.571**. This window the order was the reverse of 04:15: this run's `claude.exe` was created 08:15:03, its **first CLI call 401'd at 08:15:39** (`Failed to fetch authenticated user … status 401`), `traycer whoami` refreshed, the retried `agent list` answered — and the host-side close landed **24 s after** the client-side 401. At 04:15 the close came first and the first CLI call succeeded. Same 4h token life, both ends of it seen in one run; the retry → `whoami` → retry sequence in [[cli-token-expiry-matches-checkin-interval]] worked exactly as written and cost one call |
+| Headless `claude -p` on the box | **1** — this run (pid 4668 ← `powershell.exe` 34592 running `scripts/autobuild-checkin.ps1` ← `svchost.exe` 2476, i.e. the scheduled task). The OpenClaw gateway (node 13656, since 08-28 12:39:43) is still up and has a **new child** since 04:15 — node 24820, created **06:45:12**, running `openclaw/dist/memory-core-…` with the gateway as its parent. That is the gateway's own subprocess, not a third autonomous actor; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none today.** Newest explorer-parented process is still `chrome.exe` at **2026-08-28 11:50:51**; the Claude desktop app from 10:23:15 is still resident. No Kernel-Power 42 or Power-Troubleshooter 1 events since 08-29 00:00; up since 2026-08-25 02:29:29 |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running — the CI runner, expected |
+
+### Five upstream commits, 27 files, all in `clients/gui-app` — and the map is frozen in every stage OID for the first time
+
+`upstream/main` moved `7d8ca0107` → `16c3cb515` — five commits, no merges
+(#1536 link-code button label color, #1533 usage legend colors, **#1535 new
+Epic chats can switch hosts**, #1541 appended index delta vs snapshot,
+#1544 managed Grok profiles), now **376** in / our **505** (ours +1: the 04:15
+landing commit). Touch-set: **27** files, every one under `clients/gui-app`
+— zero in `protocol/`, `clients/shared/`, `clients/traycer-cli/` or
+`clients/desktop/`.
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` at the
+new tip → **50** conflicted paths. Method control: the same parse at
+`7d8ca0107` → **50**, and that list diffs against the 04:15 run's own saved
+paths file **IDENTICAL**, so this run's parse chains back to the recorded
+history. Path diff old-control → new: **empty**. Merge-base at both tips:
+still `8f21d506f`.
+
+**Nothing moved — not the set, not a far side, not a silent resolution.**
+Three derivations, all empty:
+
+| Derivation | Result |
+| --- | --- |
+| stage-OID diff between the two tips' un-flagged `merge-tree` outputs (every stage-1/2/3 line for every one of the 50 paths) | **empty** — the first window since the 08-26 pricing where no stage OID changed at all (00:15 moved four far sides; 04:15 added three stage lines) |
+| the 27-file touch-set ∩ the 50 | **0** paths |
+| the 27-file touch-set ∩ the 545 files our side has changed since the merge-base | **0** paths — so no both-sides-touched file auto-merged this window either; there is no [[silent-resolutions-are-both-sides-touched]] list to read |
+
+Every priced item is therefore byte-identical to 04:15 without
+re-measurement: **five hand-merges + two policy calls**, `macos.test.ts`
+still the ~20-line fifth, `mobile-runner-host.ts` still *theirs* for
+`browserView`, `remote-session.ts` still one hunk, the bridge re-verify
+still earned by #1458/#1475/#1509. `.github/workflows/test.yml`,
+`.gitleaks.toml` and `nx.json` re-verified inside the 50 (lines 1, 2 and 48
+of this window's list), so the flake ticket's observability fix stays
+parked. Merged-tree OID changed (`7f068794` → `05436f8b`) because upstream's
+27 files changed — that is the auto-merged side moving, not the map.
+
+**The one commit worth a sentence to a role holder, not a resolution.**
+#1535 rewrites `new-conversation-modal-host-scope.ts`: an *unnamed* new-chat
+request's host picker goes from `{ kind: "fixed" }` (rendered inert) to
+`{ kind: "selected", onSelect }`, which writes the Epic-local placement pin
+without touching the app-wide active host; a caller-named host stays fixed.
+That is choosing a host **at creation**. This branch's
+`scripts/chat-transfer/move-chat.mjs` moves an **existing** chat with its
+history — a different operation, and the two share zero files (the commit is
+outside our 545). Not a conflict and not a duplicate; recorded because it is
+the upstream-native seam the *Mobile host switcher* role's picker sits next
+to, and the holder (`aff63e24`) should know upstream now has a live selector
+there before building another one. Nothing sent — the role is idle and the
+finding is in this file.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by claim id — ids now recorded, the 115-agent list keyed by id against 04:15, `host.log` counts since rotation with the level-anchored 429 method, pile mtime attribution across the five sites, process sweep with dated creation times and two levels of parent attribution including the OpenClaw gateway's new child, sleep/wake event query, VM power state), merge re-derivation at the new tip with an old-tip control chained to the 04:15 saved paths file, a path-level diff, the stage-OID diff, the 27-file intersection against both the 50 and our 545, the three parked-fix paths re-verified in the list, and #1535's host-scope change read against this branch's chat-transfer tool |
+| Recovery | none needed — the 04:15 run finished cleanly (`ran, 20 lines of output`; its entry landed at 04:23 and went green on attempt 1) |
+| This entry | the thirty-fourth; count sites 33 → 34 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | no row — the tip went green on attempt 1 |
+| Push notification | **not sent** — nothing in the price or the ask moved by a byte; a push for a frozen window would dull the one that matters |
+| Build work | **none, deliberately** — the only parked fix (the flake ticket's observability half) still touches `test.yml` and `nx.json` inside the 50 |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the frozen window and the #1535 adjacency; `checkin-entries-live-on-main` count → 34 and the standing-ask numbers; `cli-token-expiry-matches-checkin-interval` gains the client-401-before-host-close ordering |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@16c3cb515`: 376 in /
+   505 ours / **50** conflicted paths, every stage OID byte-identical to
+   `7d8ca0107`; pricing **five hand-merges + two policy calls**, unchanged.
+   Preconditions unchanged: resolve `clients/mobile/src/mobile-runner-host.ts`
+   as *theirs* (it is what satisfies `IRunnerHost.browserView` since #1491);
+   regenerate `bun.lock`; the post-merge *"re-verify the loopback bridge
+   dials"* step stays mandatory (#1458, #1475, #1509). Saying *"run it on a
+   candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (23,131 lines).
+3. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+4. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-29 04:15 — quiet hold: the 49 becomes 50 — one test file joins as the smallest hand-merge in the map, and nothing already in it moves
 
