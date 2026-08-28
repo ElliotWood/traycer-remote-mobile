@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **thirty** entries in this
+everything came down, nothing went up. The **thirty-one** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **thirty**. Three count sites remain in this header: this
+on this file → **thirty-one**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,184 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the thirty entries below back into `traycer-remote-teams/autobuild/index.md`
+the thirty-one entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-28 20:15 — quiet hold: the 49 changes membership for the first time in eight windows and gets one file cheaper, and the box was attended this morning by someone the ledger's asks did not reach
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** — WARN/ERROR lines containing a whole-word `429`, minus the `EpicTokenRefresher`/Tiptap UUID-substring lines → 0 |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active; the `agent list --all --json` payload is byte-identical to the 16:15 snapshot except its timestamp (`fc` on the two files) |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, nothing new |
+| Dirty trees attributable to an agent | **none new.** electric-stork's `scratch/` gained only this run's derivation files; `wt-guiapp-main`'s pile still frozen (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` 08-24 16:47); `C:\repo`'s three untracked paths unchanged (`teams-bot/`, `teams-help/`, `scratch/guiapp-measure/`); `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` | **0 / 0** @ `1d5f3b88d` — the 16:15 landing, the only movement on `main` since 08:15 |
+| CI on `main` @ `1d5f3b88d` (the tip) | Tests **attempt 1 RED** — `traycer-clients-gui-app shard 3`, 16:23:56 → 16:29:40, and **no attempt 2 existed** (`attempts/2/jobs` → 404 at 20:17). The other five workflows green. `gh run rerun --failed` issued **20:18:45**, attempt 2 `queued` five seconds later, shard 3 `in_progress` from 20:18:51 → **attempt 2 GREEN** (shard 3 alone, 20:18:51 → 20:24:16, `conclusion: success`) — read once at landing time rather than waited on |
+| `CredentialLeaseReleasedError` storm | **19,197** at 20:19 (was 17,858 at 16:17) — ~335/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **one new — 20:19:00**, the tenth since rotation, again on the schedule boundary (the ninth was 16:16:33); this run's three CLI calls (20:15:5x) landed before it and all answered. `traycer whoami` printed its answer and then aborted on a libuv assertion (`!(handle->flags & UV_HANDLE_CLOSING)`, `src\win\async.c:76`) — output complete, exit unclean; a script keyed on its exit status would misread a working login |
+| Headless `claude -p` on the box | **1** — this run (pid 23720, parent the check-in's `powershell.exe`). The OpenClaw gateway (pid 13656, since 12:39:43) is still up; nothing else autonomous |
+| Interactive logons today (types 2/10/11) | **unmeasurable from this run** — the Security log answers *unauthorized* to an unelevated reader, and a 4624 query returns **no events at all**, not zero matching ones. See below: the 16:15 line that read *"0 — unattended, measured"* was the absent state, not a zero |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01**, parent `traycer.exe host start` under a `wscript` launcher — no restart today. Recorded because a clock-only format (`HH:mm:ss`) made it read as a 16:17 restart *this afternoon*, one minute after the 16:15 run's WS close; the date disproved it. Print dates |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running — the CI runner, expected |
+
+### ✅ The box was attended this morning, and the ledger's own probe could not have seen it
+
+Two processes on the box today have `explorer.exe` (pid 13460, the shell of
+the session logged on at boot, 08-25 02:29) as their parent: the **Claude
+desktop app** (`Claude.exe`, the Store package, started **10:23:15**, nine
+processes) and the Claude-in-Chrome native host (`chrome-native-host.exe`,
+**11:50:52**). Neither has a Startup entry (`Win32_StartupCommand` → none
+named Claude), and neither runs under the `AlfredGateway` task's
+`powershell.exe`, so neither is the assistant acting alone. An explorer-parented
+GUI launch is a person at the keyboard — or at an RDP session, which reads the
+same. **Someone was here from at least 10:23 to 11:50**, and the 16:15
+entry's open question (*"whether the 11:50 session was Elliot driving or the
+assistant acting alone"*) closes on the driving side.
+
+The probe that said otherwise is the wrong instrument twice over. A count of
+new logons cannot see a session that logged on at boot and never logged off —
+the interactive session here is three days old and every keyboard minute since
+lands in it — and this run found the count is not even readable: the Security
+log refuses an unelevated reader, and `Get-WinEvent` reports *no events found*
+for the whole day, which is the empty-query silhouette from
+[[measurements-need-three-states]], not a measured zero. Whether the 16:15 run
+ran elevated or read the same empty answer as zero is not knowable from its
+entry; either way *"unattended, measured"* was not measured. Process ancestry
+is the readable instrument, and it is what this run used.
+
+**Why it matters more than a corrected cell.** Nothing in the blocked-on-Elliot
+list moved during or after those ninety minutes: no candidate branch, no VM
+start, no epic open, no word in this file. Either the file was not opened or
+its asks were declined silently, and the ledger cannot tell those apart. Ask 3
+below — the Discord channel — is the difference between *"the asks are in a
+file on `main`"* and *"the asks reached him"*. Still not posted unasked.
+
+### Three upstream commits; the map changes membership for the first time in eight windows, and the price moves down by one small merge
+
+`upstream/main` moved `3a1731569` → `f63ef2551` — three commits (#1509 shared
+remote-session ready boundary; #1511 gui-app mobile header slot; #1515 mobile
+client identity + store-aware update remedy), now **358** in / our **502**
+(ours +2: the 16:15 run's two landing commits). `git merge-tree --write-tree
+--name-only` at the new tip → **49** conflicted paths. Method control: the same
+command and filter at `3a1731569` reproduces the 16:15 list **IDENTICAL**.
+Merge-base at both tips: still `8f21d506f`.
+
+**The count held; the set did not** — a first since the 08-26 pricing:
+
+| Left the 49 | Entered the 49 |
+| --- | --- |
+| `clients/gui-app/index.ts` — a content conflict for seven windows (ours +3 exports, theirs +5 on the same block). #1515 reshaped upstream's export block into a multi-line form and the two sides now interleave without a shared line; merge-tree auto-merges it, hunks 1 → **0** | `clients/gui-app/src/lib/mobile-app.ts` — **add/add**. Ours is upstream's 08-24 file verbatim (34 lines, from `8f9785fd8`); theirs is that file plus 26 lines of `MobileAppPlatform`. Ours is a byte-exact prefix, so the resolution is *theirs* with no judgment in it |
+
+Content moved on **5 of the 50-path union** by the marker-normalized blob diff
+(the two above plus `src/web/main.tsx`, `remote-session.ts`, its test); the
+three commits' 21-file touch-set intersected with the new 49 names **4** — the
+same five minus `index.ts`, which is no longer a member. Two derivations
+agree. A third, cheaper one agrees too and is worth recording for the next
+reader: the un-flagged `merge-tree --write-tree` output lists stage-1/2/3 blob
+OIDs per conflicted path, and diffing that between tips names the same three
+stage-3 movers plus the swap directly, with no label normalization needed.
+
+**Pricing, bucket by bucket, all from the 08-26 table:**
+
+- **gui-app hand-merges** (*"10, genuine merges, all small"*, `index.ts`
+  listed as *"ours +2 exports"*) — **one fewer.** And it is real relief, not a
+  [[clean-merge-may-not-compile]] deferral: the auto-merged file keeps both of
+  our exports, `registerHostPickerExtra` resolves to `host-picker-extra.ts`
+  (ours-only, imports nothing but a React type) and `setHostThemeOverride`
+  to `theme-applier.ts`, which is outside the 49 and carries the symbol on
+  our side (upstream: 0 hits, so no far-side rewrite can remove it).
+- **the real hand-merge**, `src/web/main.tsx` — **grew by 11 lines**, the
+  first movement on any of the four named hand-merges since the pricing:
+  #1515's `setMobileAppPlatform` import and call land at merged lines 224 and
+  372–381, **inside the upstream half of hunk 1** (lines 212–444), so they are
+  part of the merge and not around it. Cheap — under our web shell
+  `Capacitor.getPlatform()` is `"web"` and the call sets `null`, the default —
+  but it is inside the hunk and the merger has to carry it.
+- **host-transport** (*"theirs wholesale, then re-run the alias rewrite"*) —
+  price unchanged by construction; the precondition holds, and this window
+  makes it visible: `remote-session.ts` still has exactly **one** hunk, lines
+  27–32, and it is the `../../auth/bearer-revalidator` alias against
+  upstream's self-alias plus one new upstream import. The 298 far-side lines
+  auto-merge around it.
+- **mobile add/add** — one more path, priced *theirs*, zero judgment.
+
+Net: **four hand-merges + two policy calls**, with the gui-app small-merge
+list one shorter. `.github/workflows/test.yml`, `nx.json` and `.gitleaks.toml`
+re-verified inside the 49 (lines 1, 2 and 47 of the list), so the flake
+ticket's observability fix stays parked.
+
+**The post-merge bridge re-verify is earned a third time, and this time by a
+semantic change rather than churn.** #1509 redefines *when a remote session
+reports ready*: a stream is marked restored on its **first accepted chunk**
+instead of its first completed frame, with a per-stream reassembly watchdog
+and a stall-provenance license replacing the implicit completion bound. That
+is the readiness a `kind: "remote"` dial reports. The fork's loopback bridge
+(`scripts/remote-host-bridge/remote-host-bridge.mjs`, `5653043cc`) imports
+only `node:net`/`tls`/`crypto`/`fs`/`os`/`path` — it does not import
+`remote-session`, so #1509 cannot break the bridge as a module. What it can
+change is what the desktop *sees* through it, which is exactly what the
+re-verify step measures. #1458 and #1475 earned the step by rewriting the far
+side; #1509 earns it by changing the meaning of the value the step reads.
+
+### CI: shard 3 joins the family, and the ticket's observability half is confirmed on it
+
+The 16:15 landing commit (`1d5f3b88d`, a two-file docs delta) went red on
+`traycer-clients-gui-app shard 3` — the family's **fourth distinct shard**,
+and the fourth gui-app shard to flake (1, 2, 4 recorded; now 3). The failed
+step's log was read, not assumed: it ends at `NX Running target test for
+project traycer-clients-gui-app failed` / `Process completed with exit code
+1`, **naming no test** — the defect the ticket's half (1) describes,
+reproduced on a fresh member. Rerun issued 20:18:45; attempt 2 **green** at
+20:24:16 — read once from `actions/runs/33147777425/attempts/2/jobs` at
+landing time, not waited on: the entry was drafted with the cell pending and
+the cell filled because the landing-time read happened to answer, which is the
+16:15 rule working as intended. The ticket's fifth row carries the verdict.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list with a byte-level diff against 16:15, `host.log` counts since rotation, pile mtime attribution across the five sites, process sweep with dated creation times and two levels of parent attribution, Startup-entry read, Security-log access check, VM power state), merge re-derivation at the new tip with a path-level diff, an old-tip method control, the 21-file intersection against the 49, a marker-normalized blob diff **and** a stage-OID diff as a third derivation, hunk counts and hunk line ranges on every moved path, a compile-relief check on the path that left, the bridge's import list against #1509, CI read at attempt level on the tip itself with the failed step's log read |
+| Recovery | none needed — the 16:15 run finished cleanly (`ran, 19 lines of output`) |
+| This entry | the thirty-first; count sites 30 → 31 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | fifth row (`1d5f3b88d`, shard 3, attempt 2 green) and the family summary (five red, four distinct jobs; shards 1–4) |
+| Push notification | **not sent** — the price moved *down* by one small merge; the asks stand and a repeat would dull them |
+| Build work | **none, deliberately** — the flake ticket's observability fix still touches two files inside the 49 (re-verified this window) |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the membership change and the third re-verify earner; `merge-tree-name-only-counts-warnings` gains the stage-OID derivation; new `logon-count-is-not-attendance` for the probe corrected above |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@f63ef2551`: 358 in /
+   502 ours / **49** conflicted paths — same count, first membership change
+   (`index.ts` out, `mobile-app.ts` in); pricing **four hand-merges + two
+   policy calls** (`.gitleaks.toml` inside the Oxlint call), one small
+   gui-app merge cheaper, `src/web/main.tsx` eleven lines dearer. The
+   post-merge *"re-verify the loopback bridge dials"* step stays mandatory,
+   now earned by #1458, #1475 **and #1509**. Saying *"run it on a candidate
+   branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (19,197 lines) and the 4h token expiry on every schedule boundary
+   (tenth instance 20:19:00, on this run's boundary).
+3. **Discord as the check-in's outbound channel** — you were at this
+   keyboard for ninety minutes this morning and none of these moved. If you
+   want the blocked-on-you list posted to `channel:1541301538851524649`
+   each run instead of only here, say so in that channel or in this file;
+   nothing will post there until you do.
+4. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-28 16:15 — quiet hold: the 12:15 run ended its turn on a sentence instead of a tool call, and its entry lands here four hours late carrying the verdict it stopped to wait for
 

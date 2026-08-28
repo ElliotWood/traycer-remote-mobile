@@ -24,11 +24,12 @@ runs alternate:
 | `98bfd7e01` | ✅ (run 32980641738) | — |
 | `9cb18d9b2` | ❌ (run 32999100333) | `traycer-clients-gui-app shard 4` — a **third** distinct job |
 | `b21d05c00` | ❌ (run 33122275631) | `traycer-clients-gui-app shard 4` again — the family's first **repeat** member; `gh run rerun --failed` at 12:19 AEST, attempt 2 green (shard 4 passed 12:25:51 AEST). Filed by the 16:15 run; the 12:15 run that caught it ended before the rerun finished |
+| `1d5f3b88d` | ❌ (run 33147777425) | `traycer-clients-gui-app shard 3` — a **fourth** distinct shard; the failed step's log again names no test (NX-collapsed, read not assumed). `gh run rerun --failed` at 20:18:45 AEST by the 20:15 run; attempt 2 green (shard 3 passed 20:24:16 AEST), read at landing time from `actions/runs/33147777425/attempts/2/jobs` |
 
-Identical trees, four red runs, three distinct failing jobs, shard 4 twice.
+Identical trees, five red runs, four distinct failing jobs, shard 4 twice.
 A flake family, not a regression. Prior recorded member: gui-app **shard 1**, on
 2026-08-24 (run 32682942738, green on attempt 2) — so gui-app shards have
-now flaked at 1, 2 and 4.
+now flaked at 1, 2, 3 and 4.
 
 ## The observability defect that is half of this ticket
 
