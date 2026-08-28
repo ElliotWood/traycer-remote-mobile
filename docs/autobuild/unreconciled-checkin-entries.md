@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-eight** entries in this
+everything came down, nothing went up. The **twenty-nine** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-eight**. Three count sites remain in this header: this
+on this file → **twenty-nine**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,134 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
+the twenty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-28 12:15 — quiet hold: the flake fires a fourth time on a docs-only tree, and a second autonomous claude appears on the box that the check-in lock cannot see
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** — the 30 WARN lines a `429`/`rate-limit` grep returns are every one the UUID-substring trap: `EpicTokenRefresher` lease-storm lines and Tiptap room-rebuild lines whose ids contain the digits |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none new** — `wt-guiapp-main`'s pile still frozen at 08-26 08:27 (`assemble/`) and 08-25 00:41 (`checkin-0015/`), the `C:\repo` piles unchanged (mtimes 08-14), electric-stork's draft at 08-24 16:50; `wt-ci-fork` and `wt-push-subscribe` clean; the 08:15 run stranded nothing |
+| `main` vs `origin/main` | **0 / 0** @ `b21d05c00` |
+| CI on `main` @ `b21d05c00` (the tip) | 🔴 **Tests attempt 1 RED — `traycer-clients-gui-app shard 4`**, 13 of 14 test jobs and the other five workflows green. Docs-only tree (`git diff-tree --name-only b21d05c00` → the one ledger file), so this is the ticketed flake family's fourth firing, not a regression. `gh run rerun --failed` issued 12:19; **attempt 2: **GREEN** — shard 4 alone re-ran 12:20:51 → 12:25:51 and passed (`conclusion: success`). *Cell filled by the 16:15 run: this run ended before the rerun finished — see the 16:15 entry*** |
+| `CredentialLeaseReleasedError` storm | **16,546** at 12:16 (was 15,202 at 08:20) — ~342/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **none new** — count still eight, last 04:15:24; this run's 4h-token expiry again surfaced as the CLI's *first call* (`401`), recovered by the recorded retry-then-`whoami` — the second consecutive run in that shape |
+| Other `claude.exe` on the box | **one that is not a check-in** — see below |
+
+### Six more upstream commits; the map stands still a sixth window, and this time nothing inside the 49 moves at all
+
+`upstream/main` moved `272e4950f` → `ba40f7022` — six commits (#1507,
+#1499, #1500 gui-app; #1503, #1505, #1508 traycer-cli), now **351** in /
+our **500** (ours +1: the 08:15 run's entry commit). `git merge-tree
+--write-tree` at the new tip → **49** conflicted paths, compared
+path-by-path against the old tip's set through the shared blank-line
+filter: **diff IDENTICAL**. Method control: the same command and filter at
+`272e4950f` reproduces **49 exactly**. Merge-base at both tips: still
+`8f21d506f`. Sixth consecutive window the count and composition stand
+still.
+
+**Both content derivations read zero this window.** The six commits'
+61-file touch-set intersected with the 49: **empty**. The marker-normalized
+blob diff between the two merge trees (labels stripped per the 08:15 entry's
+trap): **0 of 49 moved**. After two windows in which the host-transport
+cluster's far side moved (#1458, then #1475), this one leaves every
+conflicted blob byte-identical — the price is unchanged and so is the
+mandatory post-merge bridge re-verify, which those two earlier windows
+earned and this one does not un-earn.
+
+### 🔴 The flake, fourth firing — and the first that a check-in caught while it could still act
+
+The 08:15 entry's own push produced this run. Its `Tests` workflow went red
+on **shard 4** — the same job as the family's third member (`9cb18d9b2`,
+08-27 04:15) — on a tree that differs from the last five green ones by one
+ledger file. Everything the flake ticket predicted holds: the failed-step
+log ends at `NX Running target test for project traycer-clients-gui-app
+failed` / `Process completed with exit code 1` and names no test; the last
+reporter line before the collapse is a passing `auth-service.test.ts` case
+at 1507ms, which is a clue about what shard 4 was doing and not an
+attribution. Standing practice executed: `gh run rerun --failed` at 12:19,
+attempt 2 result recorded in the table above and in the ticket's instance
+list. The observability half of the ticket is still the fix that matters,
+and it still touches two files inside the 49.
+
+**What this does to the streak the last five entries counted.** "Eleventh
+consecutive docs-only tree, fifth in a row where the flake did not fire" is
+now "twelfth docs-only tree, and the flake fired". A five-run quiet stretch
+on identical trees says nothing about the flake's rate that the 6-of-12
+overall reading does not say better: **half of all docs-only pushes since
+08-26 have gone red on attempt 1**, on three distinct jobs, with shard 4
+now the repeat member.
+
+### 🟠 A second autonomous `claude -p` is on the box, and the check-in lock does not know it exists
+
+The process sweep counted **two** headless `claude.exe` sessions, not one:
+this check-in (pid 9268, 12:15:03) and pid **8252**, started **11:50:05**,
+whose command line is check-in-shaped — `-p`, `--permission-mode
+bypassPermissions`, `--model claude-opus-5`, `--effort high` — but whose
+parent is `node …\npm\node_modules\openclaw\openclaw.mjs gateway` and whose
+tool surface is `--allowedTools mcp__openclaw__* --strict-mcp-config`. It is
+an **OpenClaw gateway session**: a chat-driven automation, not this script,
+and not a Traycer agent either — `host.log` records no Traycer activity
+since 10:00 beyond the lease storm, so nothing there says where it works.
+Its working directory is not exposed by `Get-Process`.
+
+Recorded rather than acted on, because the evidence supports exactly this
+much: the `.checkin.lock` guards against a second *check-in* and this is
+not one, so it is a separate occupant the collision rule in the prompt's §6
+does not cover. Two things it may mean, neither established: it could be
+Elliot driving claude from a chat client — the nearest thing to attendance
+on a day with **zero interactive logons** (boot 08-25 02:29, `Win32_LogonSession`
+types 2/10/11 today → 0) — or it could be a scheduled job. Also measured
+and filed as a **non-finding**: nine `WindowsApps\Claude_*\app\Claude.exe`
+processes started **10:23** today. That is the Anthropic desktop app, not
+Traycer's, and with no logon behind it the launch is not evidence anyone
+was here. The Traycer host has not opened the epic; the file-sync /
+repair window this ledger exists because of has not moved.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list, `host.log` counts since rotation, pile mtime attribution across the five sites, process sweep with parent attribution, logon-session read), merge re-derivation at the new tip with a path-level diff and an old-tip method control, a merge-base check at both tips, the 61-file intersection against the 49, a marker-normalized blob diff, CI read at attempt level on the tip itself with `diff-tree` proving the tree docs-only, the failed-step log read for a test name (none, as the ticket predicts) |
+| CI | `gh run rerun --failed` on 33122275631 at 12:19; attempt 2 verdict in the table |
+| Flake ticket | fourth instance appended to `docs/autobuild/ci-tests-flake.md` — *by the 16:15 run, in the commit that lands this entry; the 12:15 run wrote none of it* |
+| This entry | the twenty-ninth; count sites 28 → 29 in lockstep per the header's rule, verified against `grep -c` after appending — *done by the 16:15 run; nothing from this run reached `main` under its own timestamp* |
+| Push notification | **not sent** — price unchanged (four hand-merges + two policy calls); the 12:15 ask stands and a repeat would dull it |
+| Build work | **none, deliberately** — the flake ticket's observability fix still touches `.github/workflows/test.yml` and `nx.json`, and both are still inside the 49 (re-verified this window, `.gitleaks.toml` too) |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@ba40f7022`: 351 in /
+   500 ours / **49** conflicted paths, composition unchanged through six
+   windows, conflict content unmoved this window; pricing **four
+   hand-merges + two policy calls** (`.gitleaks.toml` inside the Oxlint
+   call). The post-merge *"re-verify the loopback bridge dials"* step stays
+   mandatory on the strength of #1458/#1475. Saying *"run it on a candidate
+   branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (16,546 lines) and the 4h token expiry that two consecutive runs
+   have now met as a CLI first-call 401.
+3. **Whether the OpenClaw gateway is yours** — if it is a channel you read,
+   say so in it and the next check-in can treat it as the attended path
+   instead of an unexplained occupant.
+4. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-28 08:15 — quiet hold: one relay-recovery commit moves nine of the 49's far sides, every one inside a cluster the pricing already treats as insensitive
 

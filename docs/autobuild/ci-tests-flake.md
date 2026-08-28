@@ -23,9 +23,10 @@ runs alternate:
 | `77d276159` | ✅ (run 32979891662) | — |
 | `98bfd7e01` | ✅ (run 32980641738) | — |
 | `9cb18d9b2` | ❌ (run 32999100333) | `traycer-clients-gui-app shard 4` — a **third** distinct job |
+| `b21d05c00` | ❌ (run 33122275631) | `traycer-clients-gui-app shard 4` again — the family's first **repeat** member; `gh run rerun --failed` at 12:19 AEST, attempt 2 green (shard 4 passed 12:25:51 AEST). Filed by the 16:15 run; the 12:15 run that caught it ended before the rerun finished |
 
-Identical trees, three red runs, three distinct failing jobs. A flake
-family, not a regression. Prior recorded member: gui-app **shard 1**, on
+Identical trees, four red runs, three distinct failing jobs, shard 4 twice.
+A flake family, not a regression. Prior recorded member: gui-app **shard 1**, on
 2026-08-24 (run 32682942738, green on attempt 2) — so gui-app shards have
 now flaked at 1, 2 and 4.
 
