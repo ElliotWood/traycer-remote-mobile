@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **thirty-one** entries in this
+everything came down, nothing went up. The **thirty-two** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **thirty-one**. Three count sites remain in this header: this
+on this file → **thirty-two**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,135 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the thirty-one entries below back into `traycer-remote-teams/autobuild/index.md`
+the thirty-two entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-29 00:15 — quiet hold: upstream's in-app Browser lands 434 files, moves four of the 49 without changing the set, and turns one "zero-judgment" resolution into the thing that makes the merge compile
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** — and the method is now exact rather than by exclusion: strip the `[timestamp]` prefix first, then whole-word `429` on `[WARN]`/`[ERROR]` lines → 0. Without the strip the count is **36**, every one the millisecond field (`…:03.429]`); the 20:15 line's *"EpicTokenRefresher/Tiptap UUID-substring lines"* was the right zero for the wrong reason — those twelve `EpicTokenRefresher` hits are timestamps, not UUIDs ([[hostlog-429-grep-is-milliseconds]]) |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active; `agent list --all --json` keyed by id against the 20:15 snapshot → 0 added, 0 removed, 0 changed |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, nothing new |
+| Dirty trees attributable to an agent | **none new.** electric-stork's `scratch/` gained only this run's derivation files; `wt-guiapp-main`'s pile still frozen (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` 08-24 16:47); `C:\repo`'s three untracked paths unchanged (`teams-bot/`, `teams-help/`, `scratch/guiapp-measure/`); `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` | **0 / 0** @ `5859b3b45` — the 20:15 landing, the only movement on `main` since 16:15 |
+| CI on `main` @ `5859b3b45` (the tip) | **all six green on attempt 1** — Tests 20:26:40 → 20:32:24 (`attempt: 1`, `conclusion: success`, read via `gh run view`). The flake family did not fire on this tip; the ticket gets no row |
+| `CredentialLeaseReleasedError` storm | **20,532** at 00:21 (was 19,197 at 20:19) — ~331/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **none new by 00:21:55** — still ten since rotation, the last at 20:19:00. The 16:15 and 20:15 boundaries each produced one within four minutes of the run starting; this one had not by seven minutes in. A read at 00:21:55, not a conclusion — this run's two CLI calls (00:16–00:17) both answered |
+| Headless `claude -p` on the box | **1** — this run (pid 28972, parent the check-in's `powershell.exe` 15368 under `svchost`, i.e. the scheduled task). The OpenClaw gateway (pid 13656, since 08-28 12:39:43) is still up; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none today.** Newest explorer-parented process on the box is still `chrome.exe` at **2026-08-28 11:50:51**; the Claude desktop app from 10:23:15 is still resident (nine processes). Unattended since the 08-28 morning session the 20:15 entry found |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart. Box up since 2026-08-25 02:29:29 |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running — the CI runner, expected |
+
+### Three upstream commits, 448 files, and the 49 does not move — but four of its far sides do
+
+`upstream/main` moved `f63ef2551` → `5696d42e5` — three commits (#1512
+gui-app landing-terminal toggle, 2 files; **#1491 the end-to-end in-app
+Browser, 434 files**; #1516 shared worktree row-state derivation, 12 files),
+now **361** in / our **503** (ours +1: the 20:15 landing commit). Touch-set
+by area: `clients/gui-app` 307, `clients/desktop` 86, `protocol/src` 32,
+`clients/shared` 13, `clients/mobile` 1, plus the root manifests.
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` at the
+new tip → **49** conflicted paths, and the path list is **identical** to the
+20:15 set (`diff` on the two lists, empty). Method control: the same command
+at `f63ef2551` reproduces the 20:15 run's own saved list (paths extracted
+from its stage-OID file) **identical**. Merge-base at both tips: still
+`8f21d506f`.
+
+**Movement inside the 49, by two derivations that agree:** the 448-file
+touch-set intersected with the 49 → **4** paths; the stage-OID diff between
+the two tips' un-flagged `merge-tree` outputs → the same **4**, all stage-3
+(theirs) only:
+
+| Path | What moved on theirs | Bucket (08-26 pricing) |
+| --- | --- | --- |
+| `package.json` | +`perfect-freehand`, +`zod` catalog entries | build plumbing — union by hand |
+| `clients/desktop/package.json` | `enableCookieEncryption: false → true`, +`@types/jsdom ^30`, +`perfect-freehand ^1.2.2` | manifest — union by hand |
+| `bun.lock` | the lock entries for the above | **regenerate, never merge textually** |
+| `clients/mobile/src/mobile-runner-host.ts` | **+1 line:** `readonly browserView = null;` | `clients/mobile` add/add — *theirs* |
+
+**The named hand-merges did not move at all:** `clients/mobile/src/web/main.tsx`
+still 3 hunks at the same lines (3–445, 450–453, 463–562 — byte-for-byte the
+20:15 marker positions); `clients/shared/host-transport/remote/remote-session.ts`
+still 1 hunk at 27–32; `clients/gui-app/index.ts` still auto-merges with 0
+markers and both of our exports resolve at merged lines 3 and 18. Pricing:
+**four hand-merges + two policy calls, unchanged.**
+
+### The one new fact: `browserView` is a required member, and "theirs on the add/add" is what satisfies it
+
+#1491 adds `readonly browserView: BrowserViewBridge | null` to `IRunnerHost`
+(`clients/shared/platform/runner-host.ts:90`), non-optional. That file is
+**outside** the 49 — ours is +7 lines since base, theirs adds the member, and
+`merge-tree` merges them — so the merged tree carries the requirement whether
+or not anyone notices. Everything that must satisfy it, measured on both
+sides:
+
+| Implementor / typed literal | In the 49? | `browserView` on theirs | on ours | How it resolves |
+| --- | --- | --- | --- | --- |
+| `clients/desktop/src/renderer-shell/desktop-runner-host.ts` | no (ours +1 line since base) | 3 | 0 | auto-merge, theirs' addition lands |
+| `clients/shared/host-client/mock/mock-runner-host.ts` | no (ours +2 lines) | 1 | 0 | auto-merge, same |
+| `clients/gui-app/__tests__/create-fake-runner-host.ts` and the two dialog tests #1491 touched | no | 1 each | 0 | auto-merge, same |
+| **`clients/mobile/src/mobile-runner-host.ts`** | **yes — add/add, 36 hunks** | **1** | **0** | **only if the resolution is *theirs*** |
+
+The ~30 other `IRunnerHost` mentions on ours are type references or
+`Object.create(proto)` casts — 0 `browserView` on either side, and upstream's
+own CI compiles them as they are. Our web layer never types a host literal:
+it constructs `new MobileRunnerHost(…)` (`clients/mobile/src/web/main.tsx:175`)
+and `MockRunnerHost` in tests, both of which gain the member on theirs.
+
+**So the price did not change, but a precondition became explicit.** The
+`clients/mobile` add/add bucket was priced *theirs* on 08-26 as a matter of
+convenience — ours was described as a shell snapshot plus a web layer that
+merges silently around it. As of #1491 that resolution is **load-bearing for
+compile**: keep ours on `mobile-runner-host.ts` and the merged tree fails
+`tsc` on a file that was never clean to begin with — the
+[[clean-merge-may-not-compile]] shape, arriving through a conflicted path
+rather than a clean one. Carried into ask 1 below as a sentence, not a new
+step.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list keyed by id against 20:15, `host.log` counts since rotation with the 429 method made exact, pile mtime attribution across the five sites, process sweep with dated creation times and parent attribution, VM power state), merge re-derivation at the new tip with a path-level diff, an old-tip method control against the 20:15 run's own file, the 448-file intersection, a stage-OID diff as the second derivation, hunk positions on all three named hand-merges, the `index.ts` auto-merge re-verified, and the `IRunnerHost` implementor map on both sides |
+| Recovery | none needed — the 20:15 run finished cleanly (its entry landed at 20:26 and went green on attempt 1) |
+| This entry | the thirty-second; count sites 31 → 32 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | no row — the tip went green on attempt 1 |
+| Push notification | **not sent** — nothing moved that a human must act on before the next window |
+| Build work | **none, deliberately** — the only parked fix (the flake ticket's observability half) still touches `test.yml` and `nx.json` inside the 49 (lines 1 and 47 of this window's list) |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the held set and the `browserView` precondition; `hostlog-429-grep-is-milliseconds` gains the exact derivation; `checkin-entries-live-on-main` count → 32 |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@5696d42e5`: 361 in /
+   503 ours / **49** conflicted paths, set identical to 20:15; pricing
+   **four hand-merges + two policy calls**, unchanged. **New precondition,
+   no new step:** resolve `clients/mobile/src/mobile-runner-host.ts` as
+   *theirs* (already the priced answer) — as of #1491 it is what satisfies
+   `IRunnerHost.browserView`, so "keep ours" there no longer compiles.
+   `bun.lock` picks up two new catalog entries; regenerate it. The
+   post-merge *"re-verify the loopback bridge dials"* step stays mandatory
+   (#1458, #1475, #1509). Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (20,532 lines).
+3. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+4. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-28 20:15 — quiet hold: the 49 changes membership for the first time in eight windows and gets one file cheaper, and the box was attended this morning by someone the ledger's asks did not reach
 
