@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **twenty-nine** entries in this
+everything came down, nothing went up. The **thirty** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **twenty-nine**. Three count sites remain in this header: this
+on this file → **thirty**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,146 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the twenty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
+the thirty entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-28 16:15 — quiet hold: the 12:15 run ended its turn on a sentence instead of a tool call, and its entry lands here four hours late carrying the verdict it stopped to wait for
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation (2026-08-25 00:15) | **0** |
+| Genuine rate-limiting (level-anchored) | **0** — WARN/ERROR lines containing a whole-word `429`, minus the `EpicTokenRefresher`/Tiptap UUID-substring lines → 0 |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `terminal=completed`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — the same four roles claimed (`agent role list`), all holders idle; 0 of 115 registered agents active |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried; plus **the 12:15 run's own stranded entry**, landed this run (below) |
+| Dirty trees attributable to an agent | **one, and it is the 12:15 check-in's** — electric-stork's `scratch/` gained `entry-1215.md` (12:24), `agents-0028.json` (12:16) and the run's four merge-tree derivation files; recovered, not deleted. `wt-guiapp-main`'s pile still frozen (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` 08-24 16:47), the `C:\repo` piles unchanged (08-12), electric-stork's older draft at 08-24 16:50; `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` | **0 / 0** @ `b21d05c00` — still the 08:15 tip, because the 12:15 run landed nothing |
+| CI on `main` @ `b21d05c00` (the tip) | Tests **attempt 1 RED** (`traycer-clients-gui-app shard 4`, 08:23:08 → 08:28:11) → **attempt 2 GREEN** (shard 4 alone, 12:20:51 → 12:25:51, `conclusion: success`); the other five workflows green on attempt 1. Read at attempt level via `actions/runs/33122275631/attempts/{1,2}/jobs`, not from the run's summary |
+| `CredentialLeaseReleasedError` storm | **17,858** at 16:17 (was 16,546 at 12:16) — ~328/hr, the watchdog rate holding |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **one new — 16:16:33**, the ninth since rotation, again on the schedule boundary; this run's first CLI call (16:15) landed *before* it and succeeded, the role list (16:16:35) landed *after* it and also succeeded — so this instance cost nothing |
+| Headless `claude -p` on the box | **1** — this run. The OpenClaw session the 12:15 entry saw is gone; its gateway is attributed below |
+| Interactive logons today (types 2/10/11) | **0** — unattended, measured |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running — the CI runner, expected |
+
+### 🟠 The 12:15 run measured everything, then returned instead of acting — the third standing-by death, and the first that left a complete draft
+
+Its log (`logs/autobuild-checkin_2026-08-28_1215.log`, 838 bytes, UTF-16) has
+three lines: `check-in starting`, **one** body line — *"Privately: everything
+left — the verdict cell in the entry, the flake-ticket row, the splice, the
+commit, the push, and the post-landing memory update — depends on the rerun
+result, and the wait f…"* — and `check-in finished (exit 0) - SUSPECT: only 1
+lines of output` at **12:24**. No error, no rate limit, no network death: the
+run **ended its turn by narrating what it was about to do**, and in headless
+`claude -p` ending the turn ends the process. The rerun it was waiting for went
+green at **12:25:51** — ninety seconds after the run gave up on it.
+
+What it had already done, all of it recoverable from disk and none of it from
+the log: the full fleet sweep, the merge re-derivation at `ba40f7022` with an
+old-tip control (`scratch/mt-*.txt`, `touch-0028.txt`), `gh run rerun --failed`
+at 12:19, and a **complete** entry (`scratch/entry-1215.md`) with exactly one
+cell unfilled — `{{S4_VERDICT}}`. The count-lockstep alarm from the 08-27
+recurrence could not fire this time because the run never touched the ledger:
+nothing on `main` was inconsistent, the tip simply did not move for eight
+hours. **The silhouette of this variant is a `SUSPECT` verdict beside a
+complete draft in `scratch/`**, and it is only visible by listing that
+directory.
+
+The ledger convention already had the right shape for this and the run did not
+use it: the 08-24 and 08-27 entries both recorded a rerun as *pending* and let
+the next run fill the cell. Waiting in-turn for CI is the wrong trade on a
+4-hour cadence — a verdict cell is worth four hours only if nothing else is
+riding on the same commit, and here the ticket row, the header counts, the
+memory update and the push all were. **Landed this run:** the 12:15 entry
+verbatim below with the cell filled and its two stale claims annotated, plus
+the flake ticket's fourth row, in a commit of their own so the ledger's
+per-entry history stays honest about *when* each was written.
+
+### ✅ The 12:15 entry's open question 3 is answered from the box: the OpenClaw gateway is Elliot's own assistant
+
+The gateway process (`openclaw.mjs gateway`, pid 13656, started **12:39:43**
+— a relaunch; the one the 12:15 run saw is gone) has parent pid 9772:
+`powershell.exe … -File C:\repo\assistant-core\infra\alfred-native\alfred-gateway-task.ps1`,
+up since **08-26 23:05:57**. That file is a supervise loop (*"relaunch if the
+gateway ever exits … always-on"*) whose header reads *"Runs as ME → sees
+~/.claude subscription OAuth"*, and the scheduled task that runs it is
+**`AlfredGateway`** (State `Ready`, `launch-gateway-hidden.vbs`). Its channel
+is **Discord** — it loads `DISCORD_BOT_TOKEN` from `assistant-core\.env`, and at
+**16:16:01** this run's process sweep caught a child mid-flight:
+`openclaw message send --channel discord --target channel:1541301538851524649
+--media …`. The older `OpenClaw Gateway` task is `Disabled`; the alfred one
+replaced it.
+
+So: not a scheduled job of unknown provenance, and not a colliding check-in —
+Elliot's own assistant infrastructure, launched from his own repo, posting
+into a Discord channel he reads. That makes it the **first attended path this
+ledger has ever been able to name**: a check-in *could* deliver its
+blocked-on-Elliot list there instead of into a file nobody opens. **Not done**
+— posting into someone's assistant channel unasked is outward-facing, and
+whether the 11:50 session was Elliot driving or the assistant acting alone is
+still not established. Carried as an ask below, stated so that a one-word
+answer unblocks it.
+
+### Four more upstream commits; the map stands still a seventh window, and nothing inside the 49 moves
+
+`upstream/main` moved `ba40f7022` → `3a1731569` — four commits (#1510 gui-app
+PR-refresh test; #1501, #1506 traycer-cli auth/host-status; #1514 gui-app
+rebind-draft polish), now **355** in / our **500** (ours unchanged: the 12:15
+run landed nothing). `git merge-tree --write-tree` at the new tip → **49**
+conflicted paths, compared path-by-path against the old tip's set through the
+shared blank-line filter: **diff IDENTICAL** — and identical to the 12:15
+run's own list, so the derivation reproduces across runs as well as across
+tips. Method control: the same command and filter at `ba40f7022` reproduces
+**49 exactly**. Merge-base at both tips: still `8f21d506f`.
+
+**Both content derivations read zero.** The four commits' 67-file touch-set
+intersected with the 49: **empty**. The marker-normalized blob diff between the
+two merge trees (`ca529664…` vs `9c9cfef9…`, labels stripped per the 08:15
+entry's trap): **0 of 49 moved**. Second consecutive window with every
+conflicted blob byte-identical. Price unchanged; the mandatory post-merge
+bridge re-verify (earned by #1458/#1475) stays. `.github/workflows/test.yml`,
+`nx.json` and `.gitleaks.toml` re-verified inside the 49, so the flake ticket's
+observability fix stays parked.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles, the 115-agent list, `host.log` counts since rotation, pile mtime attribution across the five sites, process sweep with two levels of parent attribution, scheduled-task read, logon-session read, VM power state), merge re-derivation at the new tip with a path-level diff, an old-tip method control **and** a cross-run control against the 12:15 list, a merge-base check at both tips, the 67-file intersection against the 49, a marker-normalized blob diff, CI read at attempt level on the tip itself |
+| Recovery | the 12:15 run's entry landed from its draft with the verdict cell filled from `attempts/2/jobs`; its two claims that had not yet come true (the ticket row, the count sites) annotated rather than silently made true; the flake ticket's fourth instance appended — **commit 1** |
+| This entry | the thirtieth; count sites 28 → 29 → 30 across the two commits per the header's rule, verified against `grep -c` after each |
+| Push notification | **not sent** — price unchanged (four hand-merges + two policy calls); the 12:15 ask stands |
+| Build work | **none, deliberately** — the flake ticket's observability fix still touches two files inside the 49 (re-verified this window) |
+| Memory | `checkin-no-ops-have-two-causes` gains the "complete draft beside a SUSPECT verdict" silhouette and the *land it pending* rule; `openclaw-gateway-spawns-claude-sessions` gains the `AlfredGateway` attribution |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@3a1731569`: 355 in /
+   500 ours / **49** conflicted paths, composition unchanged through seven
+   windows, conflict content unmoved for two; pricing **four hand-merges +
+   two policy calls** (`.gitleaks.toml` inside the Oxlint call). The
+   post-merge *"re-verify the loopback bridge dials"* step stays mandatory.
+   Saying *"run it on a candidate branch"* is enough.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (17,858 lines) and the 4h token expiry that now lands on every
+   schedule boundary (ninth instance 16:16:33).
+3. **Discord as the check-in's outbound channel** — the gateway is yours
+   (`AlfredGateway` / `assistant-core`). If you want the blocked-on-you list
+   posted to `channel:1541301538851524649` each run instead of only here,
+   say so in that channel or in this file; nothing will post there until you
+   do.
+4. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-28 12:15 — quiet hold: the flake fires a fourth time on a docs-only tree, and a second autonomous claude appears on the box that the check-in lock cannot see
 
