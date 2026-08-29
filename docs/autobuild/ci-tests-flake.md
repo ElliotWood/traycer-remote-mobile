@@ -25,8 +25,9 @@ runs alternate:
 | `9cb18d9b2` | ❌ (run 32999100333) | `traycer-clients-gui-app shard 4` — a **third** distinct job |
 | `b21d05c00` | ❌ (run 33122275631) | `traycer-clients-gui-app shard 4` again — the family's first **repeat** member; `gh run rerun --failed` at 12:19 AEST, attempt 2 green (shard 4 passed 12:25:51 AEST). Filed by the 16:15 run; the 12:15 run that caught it ended before the rerun finished |
 | `1d5f3b88d` | ❌ (run 33147777425) | `traycer-clients-gui-app shard 3` — a **fourth** distinct shard; the failed step's log again names no test (NX-collapsed, read not assumed). `gh run rerun --failed` at 20:18:45 AEST by the 20:15 run; attempt 2 green (shard 3 passed 20:24:16 AEST), read at landing time from `actions/runs/33147777425/attempts/2/jobs` |
+| `f961c985e` | ❌ (run 33228761908) | `desktop darwin + packaging` — a **fifth** distinct member and a **second** darwin test: 1 of 25 in `src/electron-main/host/__tests__/host-lifecycle.test.ts` (*"forced reload emits null for unchanged unreachable pid metadata and restores the same host id when it is reachable again"*), named by the job log (darwin is not NX-collapsed). Upstream-inherited (authors Anurag Sharma / Hardik Shingala, last touched on `main` 2026-08-03 by #913; not in the fork's 545 since-base paths). All four gui-app shards green on attempt 1. `gh run rerun --failed` at 16:19:24 AEST by the 16:15 run; attempt 2 was `in_progress` at landing (darwin started 16:19:29 AEST) — read `actions/runs/33228761908/attempts/2/jobs` |
 
-Identical trees, five red runs, four distinct failing jobs, shard 4 twice.
+Identical trees, six red runs, five distinct failing members (two darwin tests, three gui-app shards), shard 4 twice.
 A flake family, not a regression. Prior recorded member: gui-app **shard 1**, on
 2026-08-24 (run 32682942738, green on attempt 2) — so gui-app shards have
 now flaked at 1, 2, 3 and 4.
@@ -56,9 +57,10 @@ Two independent halves; either alone helps:
 
 1. **Make shard failures observable** — vitest reporter output (or at
    minimum the failing file list) must survive NX into the job log.
-2. **Deflake or quarantine the members** — the darwin
-   `host-management-channel` test (upstream-inherited desktop code, not
-   fork-authored) and whatever the shards turn out to be once (1) lands.
+2. **Deflake or quarantine the members** — the two darwin tests
+   (`host-management-channel` and `host-lifecycle`, both upstream-inherited
+   desktop code, not fork-authored) and whatever the shards turn out to be
+   once (1) lands.
 
 Verify any fix against the runs in the table — same tree, so a rerun of
 those exact commits is a controlled experiment.

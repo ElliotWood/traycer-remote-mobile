@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **thirty-five** entries in this
+everything came down, nothing went up. The **thirty-six** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **thirty-five**. Three count sites remain in this header: this
+on this file → **thirty-six**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,180 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the thirty-five entries below back into `traycer-remote-teams/autobuild/index.md`
+the thirty-six entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-29 16:15 — quiet hold: five more upstream commits and the map is frozen for a third window; the flake family fires on the 12:15 landing with a fifth member, and the 4h token shows a fourth face
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (62,601 lines at 16:20; rotation still 08-24 16:30) |
+| Genuine rate-limiting (level-anchored, whole-word `429`, UUID-substring lines removed) | **0** (44 lines carry `429` inside a UUID — the noise the method exists to drop) |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claim ids as 08:15 and 12:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; compared by id), all holders idle; 0 of 115 registered agents `active`; `agent list --all --json` keyed by id against the 12:15 snapshot → **0 added, 0 removed, 0 changed** |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, nothing new |
+| Dirty trees attributable to an agent | **none new.** electric-stork's `scratch/` gained only this run's derivation files; `wt-guiapp-main`'s pile frozen at the same mtimes (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` and the list files 08-24 16:47); the build repo's three untracked paths unchanged (`clients/teams-bot/` 08-12 12:19, `clients/teams-help/` and `scratch/guiapp-measure/` 08-12 12:39); `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` | **0 / 0** @ `f961c985e` — the 12:15 landing, the only movement on `main` since 08:15 |
+| CI on `main` @ `f961c985e` (the tip) | **RED on attempt 1, 13/14 jobs** — Tests run `33228761908`, 12:21:52 → 12:27:52: `test (desktop darwin + packaging)` failed 12:21:55 → 12:23:37; all four gui-app shards and the other nine jobs `success`; pre-commit, Secret scan, Real supervisor, Protocol Compatibility and CodeQL all `success`. A docs-only commit (one file, `docs/autobuild/unreconciled-checkin-entries.md`) on a tree identical to the green `b935a22d4` — **the flake family**, and this time the log names the test (below). `gh run rerun --failed` issued **16:19:24**; attempt 2 `in_progress` at landing, darwin started 16:19:29 — **not waited for**, per the ticket's own rule |
+| `CredentialLeaseReleasedError` storm | **25,849** at 16:20 (was 24,476 at 12:17) — +1,373 in 4h03m, ~339/hr, the watchdog rate holding; still one per ~11 s |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **thirteen** since rotation, one new: **16:18:15.138**. A fourth ordering (below): host close and **no client-visible 401 at all** — `credentials.savedAt` reads **16:18:15**, the same second as the close |
+| Headless `claude -p` on the box | **1** — this run (pid 7896 ← `powershell.exe` 7832 running `scripts/autobuild-checkin.ps1` ← `svchost.exe` 2476, i.e. the scheduled task). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 06:45:12) both still up, unchanged — no new children since 08:15; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none today.** Newest explorer-parented process is still `chrome.exe` at **2026-08-28 11:50:51**; the Claude desktop app from 10:23:15 (pid 29588 and its nine children) is still resident. No Kernel-Power 42 or Power-Troubleshooter 1 events since 08-29 00:00 (a genuine zero, not an error); up since 2026-08-25 02:29:29 |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running — the CI runner, expected (and it answered: all four shards scheduled and ran); the three sensormine VMs deallocated |
+
+### Five upstream commits, 61 files — and the map is frozen for a third consecutive window
+
+`upstream/main` moved `16c3cb515` → `5e13f233b` — five commits, no merges
+(#1518 two-step sweep dialog, #1548 sanitize holder-error revisions, #1545
+gate sends on a real rebind draft, **#1547 preserve cross-host chat
+ownership**, #1543 preserve system overlay after task creation), now **381**
+in / our **507** (ours +1: the 12:15 landing commit, `docs/autobuild` only).
+Touch-set: **61** files — 54 under `clients/gui-app`, **4 under**
+**`clients/shared/host-transport`** (`host-messenger.ts`,
+`worktree-delete-stream-client.ts` and two tests), 2 under `protocol/`, 1
+under `clients/traycer-cli`. Merge-base at both tips: still `8f21d506f`.
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` → **50**
+conflicted paths; the list (parsed to the first blank line, per
+[[merge-tree-name-only-counts-warnings]]) diffs against the 08:15 saved
+`mt-16c3cb515-0815.paths` **IDENTICAL**, so this run chains to the recorded
+history. Old-tip control: the un-flagged output at `16c3cb515` and at
+`5e13f233b`, **both against the same our-side `f961c985e`**, ref labels
+normalised before diffing (the 12:15 lesson):
+
+| Derivation | Result |
+| --- | --- |
+| stage-OID diff, old-tip control vs new tip (all **127** stage-1/2/3 lines across the 50 paths, 127 at both tips) | **empty** — third consecutive frozen window |
+| touch-set (61) ∩ the 50 | **0** |
+| touch-set (61) ∩ our 545 since-base | **0** — so no silent both-sides resolution either |
+| merged-tree OID | `81a70e054` → `50f20b2ff` — upstream's own 61 files flowing through the auto-merged side, not the map moving |
+
+Every priced item is byte-identical without re-measurement: **five**
+**hand-merges + two policy calls**, `macos.test.ts` still the ~20-line fifth,
+`mobile-runner-host.ts` still *theirs* for `browserView`, `remote-session.ts`
+still one hunk, the bridge re-verify still earned by #1458/#1475/#1509.
+`.github/workflows/test.yml`, `.gitleaks.toml` and `nx.json` re-verified
+inside the 50, so the flake ticket's observability fix stays parked.
+
+**The host-transport far side moved outside the 50, and it is not the**
+**bridge's wire.** #1518's `host-messenger.ts` hunk adds
+`isHolderCarryingCode` / `holdersRevisionForBusyCode` — worktree-delete
+holder-error handling — in a file the fork has never touched (not in the 545;
+auto-merges to theirs). The bridge re-verify was already mandatory; this does
+not change what it reads (session readiness, #1509), so it adds nothing to
+the price. Recorded so the next window does not re-derive it.
+
+**#1547 is the second product overlap with this branch's chat-transfer tool,**
+**and it is not a conflict.** Upstream now carries a *persisted, immutable*
+`ownerHostId` on every chat record and, when that owner is **unreachable**,
+opens the chat as a **read-only published copy** served by the Epic session
+host (`chat-open-tile-ref.ts`, new). The fork's `scripts/chat-transfer/move-chat.mjs`
+starts from the same premise — its header says *"`chat.hostId` is a for-life*
+*binding"* — and answers the same situation the other way: a **writable**
+**sibling chat** on the target, carrying the history forward (the move is a
+clone; the source is never written). Zero shared files (touch ∩ 545 = 0), and
+the tool never rewrites the field upstream now treats as immutable, so the
+merge does not break either. Worth one line to Elliot when the merge is run:
+after it, an unreachable owner's chat will render read-only in the gui-app
+*and* be movable with the tool — two answers to one need, and the
+[[chats-are-replicated-hostid-is-forever]] premise is now upstream's too.
+
+### The flake family fired on the tip — a fifth member, and this one is named
+
+Run `33228761908` on `f961c985e` (the 12:15 landing, docs-only): 13 of 14
+jobs green, `test (desktop darwin + packaging)` red. The job log — darwin is
+not NX-collapsed — names it:
+`src/electron-main/host/__tests__/host-lifecycle.test.ts` **(25 tests | 1**
+**failed)**: *"forced reload emits null for unchanged unreachable pid metadata*
+*and restores the same host id when it is reachable again"*.
+
+That is **not** the ticket's recorded darwin member
+(`host-management-channel.test.ts`) — a second darwin test, the family's
+**fifth** distinct member (two darwin tests, gui-app shards 1/2/3/4, with
+shard 4 twice). Provenance, measured not assumed: authors on `main` are
+Anurag Sharma (1) and Hardik Shingala (7), last touched 2026-08-03 by #913;
+the path is **not** in the fork's 545 since-base — upstream-inherited desktop
+code, the same provenance as the first darwin member. (Upstream's copy of the
+file has since moved — blob `fcbe89068` ours vs `8401e58e2` theirs — so the
+fork merge will replace it; whether that deflakes it is unknowable from here.)
+
+Standing practice executed: `gh run rerun --failed` at **16:19:24 AEST**;
+attempt 2 was `in_progress` at landing with darwin started 16:19:29. The row
+is in `docs/autobuild/ci-tests-flake.md` in this commit with the attempt-2
+read deferred to the next run (`actions/runs/33228761908/attempts/2/jobs`),
+exactly as the `b21d05c00` row was handled. The ticket's summary line and its
+ask (2) are updated to name both darwin tests; nothing else in it is touched.
+
+### The 4h token's fourth face — host close, no client 401, and the refresh is what closed it
+
+This run's `claude.exe` was created 16:15:04. Its first CLI call (`agent
+list --all --json`, ~16:16) **answered first time** — no 401. Its second
+(`agent role list --json`, 16:18) also answered, at 16:18:17. Between them,
+`host.log` carries the day's third `RPC WS: authentication rejected … "exp"`
++ `fatal close` at **16:18:15.138** — and the CLI's credentials file reads
+`savedAt` **16:18:15**, with the new token's `iat` **16:18:14**, `exp`
+**20:18:14**, a 4h life. So the ordering this window is: token minted 12:16
+by the 12:15 run's `whoami` → expired ~16:16 → `agent list` squeaked in
+(or was served on a few seconds' clock skew) → `role list` presented the
+stale bearer to the **host's** WS, the host closed it with `exp`, the CLI
+refreshed inside that same command and retried, and the caller saw a clean
+answer two seconds later.
+
+What this changes in the 12:15 reading: it is **not** two tokens. It is one
+bearer presented to two servers — the cloud API (`agent list`, which 401s and
+does not self-refresh) and the host's RPC WS (`role list`, which the host
+closes and the CLI *does* refresh from). Which face a run sees depends on
+**which command path first meets the expired token**, not on timing luck:
+04:15 (host close, then a clean call), 08:15 (client 401, then a host close
+24 s later), 12:15 (client 401, no host close — the refresh happened on the
+cloud path, so the host never saw a stale bearer), 16:15 (host close, no
+client 401 — the refresh happened on the WS path). The
+[[cli-token-expiry-matches-checkin-interval]] retry → `whoami` → retry
+sequence remains correct; this run needed none of it.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by claim id against the 08:15/12:15 ids, the 115-agent list keyed by id against the 12:15 snapshot, `host.log` counts since rotation with the level-anchored 429 method and a shared-read open, pile mtime attribution across the five sites, process sweep with dated creation times and three levels of parent attribution including the OpenClaw gateway's child, sleep/wake event query, VM power state); upstream fetch and the five-commit range read with `--stat`; merge re-derivation at the new tip with an old-tip control against the same our-side and ref labels normalised; the stage-OID diff, the path-list diff chained to the 08:15 saved file, the 61-file touch-set intersected against both the 50 and our 545; the host-transport hunk read; #1547 read against `move-chat.mjs`'s own header; the three parked-fix paths re-verified in the list; the red job's log read to the named test and that test's provenance measured (authors, last touch, membership in the 545, blob identity across the two tips); the token expiry read from three ends (host log, credentials `savedAt`, decoded `iat`/`exp`) |
+| Recovery | none needed — the 12:15 run finished cleanly (`exit 0`, 17 lines); its entry landed at 12:21 as `f961c985e` |
+| CI | `gh run rerun --failed` on `33228761908` at 16:19:24; landed pending |
+| This entry | the thirty-sixth; count sites 35 → 36 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | **one row** (`f961c985e`), the summary line, and ask (2) — the fifth member, named |
+| Push notification | **not sent** — the price and the ask are byte-identical for a third window; a named flake on a docs-only tree is ticket material, not a page |
+| Build work | **none, deliberately** — the only parked fix (the flake ticket's observability half) still touches `test.yml` and `nx.json` inside the 50 |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the third frozen window and the #1547 overlap; `checkin-entries-live-on-main` count → 36 and the standing-ask numbers (381 in / 507 ours); `cli-token-expiry-matches-checkin-interval` gains the fourth face and the one-bearer-two-servers correction; `fork-ci-has-never-run-gui-app` gains the fifth member |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@5e13f233b`: 381 in /
+   507 ours / **50** conflicted paths, every stage OID byte-identical for
+   three windows; pricing **five hand-merges + two policy calls**, unchanged.
+   Preconditions unchanged: resolve `clients/mobile/src/mobile-runner-host.ts`
+   as *theirs* (it is what satisfies `IRunnerHost.browserView` since #1491);
+   regenerate `bun.lock`; the post-merge *"re-verify the loopback bridge
+   dials"* step stays mandatory (#1458, #1475, #1509). Saying *"run it on a
+   candidate branch"* is enough. New this window, one line: after the merge
+   an unreachable owner's chat renders read-only (#1547) *and* is movable
+   with `move-chat.mjs` — decide whether both should exist.
+2. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (25,849 lines).
+3. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+4. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   `GUI_APP_RUNNER`, retiring `/`, the Teams app-package install (the
+   exempted shortcut), ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-29 12:15 — quiet hold: upstream did not move at all, the map is byte-identical for a second window, and the 4h token expiry showed a third face — a client 401 with no host-side close
 
