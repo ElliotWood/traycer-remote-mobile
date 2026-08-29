@@ -26,7 +26,7 @@ runs alternate:
 | `b21d05c00` | ❌ (run 33122275631) | `traycer-clients-gui-app shard 4` again — the family's first **repeat** member; `gh run rerun --failed` at 12:19 AEST, attempt 2 green (shard 4 passed 12:25:51 AEST). Filed by the 16:15 run; the 12:15 run that caught it ended before the rerun finished |
 | `1d5f3b88d` | ❌ (run 33147777425) | `traycer-clients-gui-app shard 3` — a **fourth** distinct shard; the failed step's log again names no test (NX-collapsed, read not assumed). `gh run rerun --failed` at 20:18:45 AEST by the 20:15 run; attempt 2 green (shard 3 passed 20:24:16 AEST), read at landing time from `actions/runs/33147777425/attempts/2/jobs` |
 | `f961c985e` | ❌ (run 33228761908) | `desktop darwin + packaging` — a **fifth** distinct member and a **second** darwin test: 1 of 25 in `src/electron-main/host/__tests__/host-lifecycle.test.ts` (*"forced reload emits null for unchanged unreachable pid metadata and restores the same host id when it is reachable again"*), named by the job log (darwin is not NX-collapsed). Upstream-inherited (authors Anurag Sharma / Hardik Shingala, last touched on `main` 2026-08-03 by #913; not in the fork's 545 since-base paths). All four gui-app shards green on attempt 1. `gh run rerun --failed` at 16:19:24 AEST by the 16:15 run; attempt 2 green (darwin passed 16:21:35 AEST), read by the 20:15 run from `actions/runs/33228761908/attempts/2/jobs` |
-| `fff118e2d` | ❌ (run 33238440979) | `traycer-clients-gui-app shard 2` — the shard-2 member's second appearance, and the log names it: `src/components/settings/panels/__tests__/providers-settings-panel.test.tsx` (74 tests \| **39 failed**) in 22,172 ms — the **same 39 tests by name** as run 32957853364 (the two `×` lists diffed: identical; 13 over 1 s and 26 under, in both). The assertion text is cut by Nx's replay cap in both logs. Passes **74/74 locally** on this tree (`fff118e2d`, 103.9 s, 20:24 AEST). Upstream-inherited (Hardik Shingala / Anurag Sharma, last touched on `main` 2026-08-05 by #976; not in the fork's 545 since-base paths; upstream has moved it ten times since — blob `a341e87ca` ours vs `b1509b9d1` theirs — so the fork merge replaces it). All other 13 jobs green on attempt 1. `gh run rerun --failed` at 20:20:31 AEST by the 20:15 run; attempt 2 green (shard 2 passed 20:26:26 AEST), read at landing. A two-file docs delta (this ticket + the ledger), still no code |
+| `fff118e2d` | ❌ (run 33238440979) | `traycer-clients-gui-app shard 2` — the shard-2 member's second appearance, and the log names it: `src/components/settings/panels/__tests__/providers-settings-panel.test.tsx` (74 tests \| **39 failed**) in 22,172 ms — the **same 39 tests by name** as run 32957853364 (the two `×` lists diffed: identical; 13 over 1 s and 26 under, in both). The assertion text is cut by Nx's replay cap in both logs. Passes **74/74 locally** on this tree (`fff118e2d`, 103.9 s, 20:24 AEST). Upstream-inherited (Hardik Shingala / Anurag Sharma, last touched on `main` 2026-08-05 by #976; not in the fork's 545 since-base paths; upstream has moved it ten times since — blob `a341e87ca` ours vs `b1509b9d1` theirs — so the fork merge replaces it). All other 13 jobs green on attempt 1. `gh run rerun --failed` at 20:20:31 AEST by the 20:15 run; attempt 2 green (shard 2 passed 20:26:26 AEST), read at landing. A two-file docs delta (this ticket + the ledger), still no code. **2026-08-30 00:15:** the exact CI invocation (`vitest run --config vitest.config.ts --shard=2/4`) run locally in `wt-guiapp-main` at `b88160082` → **264 files / 2904 tests, all passed**, the same set as CI's shard 2, in 901.58 s (import 642.36 s vs CI's 170.04 s) — a run 3.5× slower than CI's passed all 74, so speed alone does not select the 39. |
 
 Identical trees, seven red runs, five distinct failing members (two darwin tests, three gui-app shards), shard 4 twice and shard 2 twice — and shard 2's is the one member that is now **named and repeatable**: the same 39 of 74 in `providers-settings-panel.test.tsx` on both of its appearances, green on every rerun and locally.
 A flake family, not a regression. Prior recorded member: gui-app **shard 1**, on
@@ -53,9 +53,28 @@ desktop suite's output is small enough to fit under the cap.
 on both `run:` lines, replacing `--tui=false` — the two are mutually
 exclusive in Nx (exit 1 before any test runs; verified on this tree's
 `nx ^22.7.8`, which is upstream's too). Upstream made the same change in
-#951 (`test`, 2026-08-11) and #1552 (darwin, 2026-08-29). **Landed, not yet
-verified:** the proof is the next red shard's log carrying the vitest summary
-and the assertion text. Until one has been read under it, ask (1) is open.
+#951 (`test`, 2026-08-11) and #1552 (darwin, 2026-08-29).
+
+**Mechanism verified 2026-08-30 00:15 on a green pair.** The first Tests run
+under the flag (`33248191528` on `b88160082`) was green on attempt 1, so no
+red shard has been read under it yet — but its shard-2 job log against the
+previous run's green shard-2 log (attempt 2 of `33238440979`, `--tui=false`)
+is a controlled pair, and the API's per-line timestamps say *when* each
+line reached the log:
+
+| | `--tui=false` (job `99087680293`) | `--outputStyle=stream` (job `99089193089`) |
+| --- | --- | --- |
+| job log | 688 lines | 1,838 lines |
+| vitest per-file lines | **7** | **262** |
+| arrival | all seven within 15 ms at 10:26:22Z — replayed after the run | across 170 distinct seconds, 10:36:29Z → 10:40:31Z — live |
+| vitest summary | absent | `Test Files 264 passed (264)` / `Tests 2904 passed (2904)` / `Duration 254.00s (… import 170.04s, tests 145.89s …)` |
+
+So the buffered style was dropping 257 of 264 file lines and the summary on
+a **green** run — every shard log in the table looked like a killed process
+because that is what the old style shows for any gui-app shard. Under
+`stream` there is no replay and nothing to cap; a red shard's `×` lines and
+assertion text come from the same reporter on the same stream. The red-shard
+read is now confirmation, not the proof.
 
 **Where the shards actually run (measured 20:15):** GitHub-hosted 2-core
 `ubuntu-latest` — every gui-app job since 08-24 shows `runner_name`
@@ -81,7 +100,9 @@ Two independent halves; either alone helps:
 
 1. **Make shard failures observable** — vitest reporter output (or at
    minimum the failing file list) must survive NX into the job log.
-   **Landed in `3013bdd95`; verify on the next red shard.**
+   **Landed in `3013bdd95`; mechanism verified on a green pair 2026-08-30
+   00:15 (7 → 262 per-file lines, summary present, lines live). Confirm
+   the assertion text on the next red shard, then close this half.**
 2. **Deflake or quarantine the members** — the two darwin tests
    (`host-management-channel` and `host-lifecycle`, both upstream-inherited
    desktop code, not fork-authored), the named shard-2 member
@@ -91,7 +112,9 @@ Two independent halves; either alone helps:
 3. **Decide the runner** — either register `altra-vm-runner-demo-aue` to the
    fork and set `vars.GUI_APP_RUNNER`, or accept 2-core `ubuntu-latest` for a
    suite upstream sizes for 8 cores. The VM is running and this fork's CI
-   does not use it.
+   does not use it. Measured on the green shard 2 of `33248191528`:
+   `import 170.04s` of `Duration 254.00s` — two thirds of the shard is
+   module import on the 2-core box.
 
 Verify any fix against the runs in the table — same tree, so a rerun of
 those exact commits is a controlled experiment.
