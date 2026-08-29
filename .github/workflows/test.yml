@@ -172,8 +172,15 @@ jobs:
         run: |
           git fetch --depth=1 origin tag host-v1.1.5 \
             || git fetch --depth=1 https://github.com/traycerai/traycer.git tag host-v1.1.5
+      # `--outputStyle=stream` instead of `--tui=false`: Nx buffers the child's
+      # output and replays it AFTER the failure banner, capped, so a red gui-app
+      # shard has three times ended mid-write with no test named and twice cut
+      # off before the assertion text (docs/autobuild/ci-tests-flake.md).
+      # Streaming writes it straight to the step log in causal order. The two
+      # flags are mutually exclusive in Nx (exit 1 before any test runs), so
+      # this replaces rather than adds. Same change as upstream #951 / #1552.
       - name: Test
-        run: bunx nx run-many --target=test --projects="${{ matrix.project }}" --tui=false ${{ matrix.test_args }}
+        run: bunx nx run-many --target=test --projects="${{ matrix.project }}" --outputStyle=stream ${{ matrix.test_args }}
 
   # macOS job: the desktop workspace's packaging/signing-adjacent assertions
   # (prepack unit suite + the real electron-builder pack in test:packaging)
@@ -217,7 +224,7 @@ jobs:
             nx-${{ runner.os }}-@traycer-clients/desktop-
       - run: bun install --frozen-lockfile
       - name: Desktop unit tests (darwin-gated blocks included)
-        run: bunx nx run-many --target=test --projects="@traycer-clients/desktop" --tui=false
+        run: bunx nx run-many --target=test --projects="@traycer-clients/desktop" --outputStyle=stream
       - name: Real electron-builder packaging test
         run: bun run test:packaging
         working-directory: clients/desktop
