@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **thirty-six** entries in this
+everything came down, nothing went up. The **thirty-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **thirty-six**. Three count sites remain in this header: this
+on this file → **thirty-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,198 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the thirty-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the thirty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-29 20:15 — the flake family's shard-2 member is named and repeatable, the observability half of its ticket lands on `main`, the runner VM turns out to serve none of it, and upstream's own flake fix ends the frozen-map streak by one OID
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (65,945 lines at 20:17; rotation still 08-24 16:30) |
+| Genuine rate-limiting (level-anchored, whole-word `429`, **timestamp stripped first**, UUID-substring lines removed) | **0**. A first pass without stripping the timestamp read **2** — both `[2026-08-28 …:06.429]`, the millisecond field, the exact trap [[hostlog-429-grep-is-milliseconds]] names. All 45 raw whole-word hits in the file are millisecond fields |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claim ids as 08:15/12:15/16:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; compared by id), all holders idle; 0 of 115 registered agents `active`; `agent list --all --json` keyed by id against the 16:15 snapshot → **0 added, 0 removed, 0 changed** |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, nothing new |
+| Dirty trees attributable to an agent | **none new.** electric-stork's `scratch/` gained only this run's derivation files (merge-tree outputs, the six attempt-1 job logs, the local vitest run); `wt-guiapp-main`'s pile frozen at the same mtimes (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` and the list files 08-24 16:47); the build repo's three untracked paths unchanged (`clients/teams-bot/` 08-12 12:19, `clients/teams-help/` and `scratch/guiapp-measure/` 08-12 12:39); `wt-ci-fork` and `wt-push-subscribe` clean |
+| `main` vs `origin/main` at start | **0 / 0** @ `fff118e2d` — the 16:15 landing, the only movement on `main` since 12:15 |
+| CI on `main` @ `fff118e2d` (the tip at start) | **RED on attempt 1, 13/14 jobs** — Tests run `33238440979`, 16:25:49 → 16:31:43: `test (traycer-clients-gui-app shard 2)` failed 16:25:51 → 16:31:34; the other thirteen `success`; pre-commit, Secret scan, Real supervisor, Protocol Compatibility and CodeQL all `success`. A two-file docs delta (the flake ticket + this ledger) on a tree identical to `f961c985e`'s — the flake family's **seventh** red run, and this time the log **names the file** (below). `gh run rerun --failed` issued **20:20:31**; attempt 2 **green** — shard 2 passed 20:26:26, read at landing |
+| `CredentialLeaseReleasedError` storm | **27,164** at 20:17 (was 25,849 at 16:20) — +1,315 in 3h57m, ~333/hr, the watchdog rate holding; still one per ~11 s |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **thirteen** since rotation, **none new** — and no client 401 either. A fifth face (below): the token the 16:15 run's refresh minted (`iat` 16:18:14, `exp` 20:18:14) was still alive for both of this run's CLI calls (~20:16:30 and 20:17:51) |
+| Headless `claude -p` on the box | **1** — this run (pid 5952 ← `powershell.exe` 29356 running `scripts/autobuild-checkin.ps1` ← `svchost.exe` 2476, the scheduled task). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 06:45:12) both still up, unchanged — no new children since 16:15; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none today.** Newest explorer-parented process is still `chrome.exe` at **2026-08-28 11:50:51**; the Claude desktop app from 10:23:15 (pid 29588 and its nine children) is still resident. No Kernel-Power 42 or Power-Troubleshooter 1 events since 08-29 00:00 (a genuine zero, not an error); up since 2026-08-25 02:29:29 |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running — **and, measured this run, not serving this fork's CI** (below); the three sensormine VMs deallocated |
+
+### Two upstream commits, 19 files — and the frozen streak ends at three, by exactly one stage-3 OID
+
+`upstream/main` moved `5e13f233b` → `95cfe2a55` — two commits, no merges
+(**#1552 kill five CI flake classes at their races**, #1546 stabilize windowed
+transcript hydration), now **383** in / our **508** at `fff118e2d`
+(ours +1: the 16:15 landing). Touch-set: **19** files — 14 under
+`clients/gui-app` and `protocol/`/host persistence for #1546, and for #1552
+four desktop/cli test files plus **`.github/workflows/test.yml`**.
+Merge-base at both tips: still `8f21d506f`.
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` → **50**
+conflicted paths; the list (parsed to the first blank line) diffs against the
+16:15 saved `mt-1615.paths` **IDENTICAL**. Old-tip control, un-flagged output
+at `5e13f233b` and at `95cfe2a55`, both against the same our-side `fff118e2d`,
+ref labels normalised:
+
+| Derivation | Result |
+| --- | --- |
+| stage-OID diff, old-tip control vs new tip (127 stage lines at both tips) | **one line**: `.github/workflows/test.yml` stage 3 (theirs) `7037f252f` → `3b2d24d7` — #1552's hunk |
+| touch-set (19) ∩ the 50 | **1** — `test.yml` |
+| touch-set (19) ∩ our 545 since-base | **1** — `test.yml`, already a conflict path, so not a silent both-sides resolution |
+| the moved hunk vs the file's conflict blocks | **outside all three** (blocks at merged-file lines 24–44, 119–173, 223–243; the hunk lands at 289–295). Conflict markers **9 → 9**. Git auto-takes theirs there because the fork never touched those lines |
+| merged-tree OID | `5abec002e` → `faa9cba05` — the one hunk flowing through the auto-merged side |
+
+So the third-consecutive-frozen-window streak ends, but **the price does not
+move**: still **five hand-merges + two policy calls**, `macos.test.ts` still
+the ~20-line fifth, `mobile-runner-host.ts` still *theirs* for `browserView`,
+`remote-session.ts` still one hunk, the bridge re-verify still earned by
+#1458/#1475/#1509. And #1552's hunk is the very change this run made to the
+fork's own `test.yml` (next section), so after `3013bdd95` ours equals theirs
+on those lines and only the stage-2 (ours) OID differs from the 16:15 map.
+
+**#1552 does not touch either of the fork's darwin flake members.** Its five
+classes are `browser-view-manager`, `selection-authority-ipc`, the Chrome
+launcher script, `cli-binary`, and the darwin job's output style — not
+`host-management-channel` or `host-lifecycle`. Recorded so nobody reads
+"upstream fixed the darwin flakes" into it.
+
+### The flake family: shard 2's member is named, and it is the same 39 tests both times
+
+Run `33238440979` on `fff118e2d`: `traycer-clients-gui-app shard 2` red. The
+job log carries
+`❯ src/components/settings/panels/__tests__/providers-settings-panel.test.tsx (74 tests | 39 failed) 22172ms`
+and the thirty-nine `×` lines. Then the ticket's own prior shard-2 case,
+`244ef823` (run `32957853364`, 08-27), re-read from **`attempts/1/jobs`** —
+the run's default `jobs` is the *latest* attempt, all green after the rerun,
+which is why nothing earlier saw this — carries the **same file, 39 failed,
+21,882 ms**. The two `×` lists, stripped of durations and sorted, diff
+**identical**: 39 = 39. Thirteen of the 39 take ~1.1–1.35 s (a `waitFor`
+budget) and 26 fail in 73–177 ms (an immediate assertion), in both runs. One
+shared precondition, not thirty-nine coincidences.
+
+Same file run locally on `fff118e2d` in `wt-guiapp-main` at 20:24: **74/74
+pass**, 103.9 s wall (tests 18.2 s). So the failure is CI-conditioned — and
+whatever the condition is, it selects the same 39. Provenance measured:
+authors Hardik Shingala / Anurag Sharma, last touched on `main` 2026-08-05 by
+#976, **not** in the fork's 545 since-base paths; upstream has moved the file
+ten times since (blob `a341e87ca` ours vs `b1509b9d1` theirs) and the panel
+source it renders five times — the fork merge replaces both.
+
+**What actually stops this being diagnosed is the ticket's other half, and
+the ticket had it half wrong.** Every one of the seven red runs' failed jobs,
+read from `attempts/1`:
+
+| Run | Job | What the log carries |
+| --- | --- | --- |
+| 32682942738 (08-24) | gui-app shard 1 (the matrix entry whose name carries no suffix runs `--shard=1/4`) | ends mid-write, nothing named |
+| 32957853364 | darwin + **shard 2** | darwin names its test; shard 2 names the file and the 39 `×` lines, cut before the assertion text |
+| 32999100333 | shard 4 | ends mid-write, nothing named |
+| 33122275631 | shard 4 | ends mid-write, nothing named |
+| 33147777425 | shard 3 | ends mid-write, nothing named |
+| 33228761908 | darwin | names its test (`host-lifecycle`) |
+| 33238440979 | **shard 2** | names the file and the 39 `×` lines, cut before the assertion text |
+
+It is not "NX collapses the vitest reporter". Upstream wrote the mechanism
+into its own `test.yml` at #951 (2026-08-11): with `--tui=false` Nx still
+**buffers** the child's output and **replays it after the failure banner,
+capped** — a long gui-app run is cut mid-line before the summary, and on a
+bad day before the `×` lines, which *"reads exactly like a killed process …
+and was triaged as an OOM for a day"*. The darwin log survives because the
+desktop suite's output fits under the cap.
+
+**Landed on `main` as `3013bdd95`:** `--outputStyle=stream` on both
+`run:` lines, replacing `--tui=false`. Preconditions all measured before the
+edit: the two flags are mutually exclusive (our `nx ^22.7.8` — base, ours and
+upstream all pin the same — exits 1 with *"Arguments tui and outputStyle are
+mutually exclusive"*; the single flag runs `remote-bridge`'s target green);
+the fork's two lines were **unchanged from the merge base**, so the merge
+already auto-took upstream's `--outputStyle=stream` there (merged-file lines
+247 and 381, outside every conflict block); upstream itself has run `test`
+this way since #951 and the darwin job since #1552 today. Merge map re-derived
+against `95cfe2a55` after the commit: 50 paths identical, conflict markers in
+`test.yml` 9 → 9, only its stage-2 OID moved. **This is landed, not verified**
+— the proof is the next red shard's log carrying vitest's summary and the
+assertion text, and that needs a red shard. Until one has been read under it
+the ticket's ask (1) stays open with the commit named against it.
+
+**And the shards are not running where the ledger said.** Every gui-app job
+since 08-24 — including the 08-24 "first green" and all four shards this
+window — shows `runner_name` **`GitHub Actions N`** with label
+**`ubuntu-latest`**: GitHub-hosted, 2 cores. `vars.GUI_APP_RUNNER` → **404**;
+`actions/runners` → **0** on this repo and on every ElliotWood repo (the
+AltraCloud org's list is 403 to this token — whether the VM serves *that* is
+unmeasurable from here). Upstream runs the same shards on
+`ubuntu-latest-8-cores`. The 16:15 entry's *"the CI runner, expected (and it
+answered: all four shards scheduled and ran)"* was a misattribution — the
+shards ran because `00d7e870` made the label fall back to `ubuntu-latest`,
+not because the VM answered. The memory that carried the claim is corrected
+this run. Whether a 2-core box running a suite sized for 8 is the shared
+precondition behind the 39 is exactly the question the assertion text will
+answer.
+
+### The 4h token's fifth face — nothing at all
+
+The 16:15 run's WS-path refresh minted a token at **16:18:14** (`exp`
+**20:18:14**). This run's `claude.exe` was created 20:15:03; its `agent list`
+answered at ~20:16:30 and its `role list` at 20:17:51 — both inside that
+token's life, so neither the cloud API nor the host's RPC WS ever saw a stale
+bearer: no 401, no `fatal close`, `credentials.savedAt` still 16:18:15. A run
+whose CLI calls all finish before the expiry shows no face — and hands the
+00:15 run a token that will have been dead for ~4 h on its first call. The
+retry → `whoami` → retry sequence remains correct; this run needed none of it.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by claim id against the 08:15/12:15/16:15 ids, the 115-agent list keyed by id against the 16:15 snapshot, `host.log` counts since rotation with the level-anchored 429 method — re-derived after the millisecond trap fired on the first pass — and a shared-read open, pile mtime attribution across the five sites, process sweep with dated creation times and three levels of parent attribution including the OpenClaw gateway's child, sleep/wake event query, VM power state); upstream fetch and the two-commit range read with `--stat`; merge re-derivation at the new tip with an old-tip control against the same our-side and ref labels normalised, the one moved stage OID located against the file's conflict blocks; the seven red runs' failed jobs read from `attempts/1/jobs` and the two shard-2 `×` lists diffed; the named file run locally; its provenance measured (authors, last touch, membership in the 545, blob identity across the two tips); the runner assignment of every gui-app job read; `GUI_APP_RUNNER` and the runners list queried at repo, all-repos and org level; the Nx flag's acceptance and the pair's mutual exclusion executed on this tree's Nx; the merge map re-derived after the ci commit |
+| Recovery | none needed — the 16:15 run finished cleanly (`exit 0`, 13 lines); its entry landed at 16:25 as `fff118e2d` |
+| CI | `gh run rerun --failed` on `33238440979` at 20:20:31; attempt 2 green at 20:26:26, read at landing. The `f961c985e` row completed with its attempt-2 read (darwin passed 16:21:35) |
+| **Build work** | **`3013bdd95`** — `ci: stream vitest output through Nx so a red gui-app shard names its test`, the flake ticket's ask (1), 9 insertions / 2 deletions in `.github/workflows/test.yml`. Pushed with this entry; its own Tests run is the first under the new flag |
+| This entry | the thirty-seventh; count sites 36 → 37 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | the `fff118e2d` row; the `f961c985e` row's attempt-2 read; the `244ef823` row's shard-2 file named from `attempts/1`; the summary line; the observability section rewritten with the measured mechanism, the landed fix, and where the shards run; ask (1) marked landed-not-verified, ask (2) gains the named member, a new ask (3) for the runner |
+| Push notification | **not sent** — the fork-merge price and ask are unchanged; the ci commit is a one-flag observability change with upstream precedent and no verification yet; the runner finding is a question, not an outage (the VM may serve the org, which this token cannot read). All three are in the asks below |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the one-OID window and the ci commit's effect on the map; `checkin-entries-live-on-main` count → 37 and the standing-ask numbers (383 in / 509 ours); `fork-ci-has-never-run-gui-app` corrected — the runner claim withdrawn, the named member, `attempts/1` as the place to read a failure, the landed flag; `cli-token-expiry-matches-checkin-interval` gains the fifth face |
+
+### 🟠 Blocked on Elliot — carried, numbers current, one new
+
+1. **Fork-merge direction** — map at `upstream/main@95cfe2a55`: 383 in /
+   509 ours (after `3013bdd95`) / **50** conflicted paths, one stage-3 OID
+   moved this window and it lands outside its conflict blocks; pricing
+   **five hand-merges + two policy calls**, unchanged. Preconditions
+   unchanged: resolve `clients/mobile/src/mobile-runner-host.ts` as *theirs*
+   (it is what satisfies `IRunnerHost.browserView` since #1491); regenerate
+   `bun.lock`; the post-merge *"re-verify the loopback bridge dials"* step
+   stays mandatory (#1458, #1475, #1509). Saying *"run it on a candidate
+   branch"* is enough. Still one line from 16:15: after the merge an
+   unreachable owner's chat renders read-only (#1547) *and* is movable with
+   `move-chat.mjs` — decide whether both should exist.
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this fork's
+   CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or leave the
+   shards on 2-core `ubuntu-latest`, or deallocate it if it serves nothing
+   else. One word settles it; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (27,164 lines).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   retiring `/`, the Teams app-package install (the exempted shortcut),
+   ConvBot S1 grading.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-29 16:15 — quiet hold: five more upstream commits and the map is frozen for a third window; the flake family fires on the 12:15 landing with a fifth member, and the 4h token shows a fourth face
 
