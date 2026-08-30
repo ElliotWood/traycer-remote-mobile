@@ -236,7 +236,7 @@ refresh: the CLI that runs here is the installed upstream binary.
 | Build work | **none** — the two candidates this run's findings name are the installed CLI (twice over) and upstream's workflow (where a fork edit buys a conflict path). The `clock: null` step is a merge-time edit on files that do not exist merged yet |
 | This entry | the forty-second; count sites 41 → 42 in lockstep per the header's rule, verified against `grep -c` after splicing |
 | Flake ticket | untouched — a fifth green run under the flag adds no row; ask (1) still waits on a red shard |
-| Push notification | **not attempted** — the channel was shown inactive at 08:15 and item 4 below is still the ask; the new precondition is carried in item 1, where the merge decision already waits |
+| Push notification | **attempted, undelivered** — sent at 16:33 after the landing because a new merge precondition is the 08:15 kind of finding; the tool answered *"Mobile push not sent (Remote Control inactive)"*, the same reading as 08:15. Item 4 below is still the ask; the precondition is carried in item 1, where the merge decision already waits. (This row first read *not attempted*; corrected by the run itself, one row, same tree) |
 | Memory | `upstream-mobile-app-is-a-draft-pr` gains the 51 and the `clock: null` precondition; `cli-token-expiry-matches-checkin-interval` gains the tenth face, the fast-listing reading and the `whoami` teardown crash; `checkin-entries-live-on-main` count → 42 and the standing-ask numbers (401 in / 516 ours / 51); `fork-ci-has-never-run-gui-app` gains the fifth consecutive green and the push-path compile hole; new `pre-commit-compile-gate-hollow-on-push` |
 
 ### 🟠 Blocked on Elliot — carried, numbers current, one precondition added
