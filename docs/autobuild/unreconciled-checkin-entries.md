@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **forty-four** entries in this
+everything came down, nothing went up. The **forty-five** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **forty-four**. Three count sites remain in this header: this
+on this file → **forty-five**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,219 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the forty-four entries below back into `traycer-remote-teams/autobuild/index.md`
+the forty-five entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-31 04:15 — upstream +4 (`295f782f1` → `492557a32`) and the 51 hold an eleventh window by path, but one far side moved *inside* its block: `clients/mobile/vite.config.ts`, a named web-shell hand-merge, gains a dev-server `warmup` hunk (#1526) that the fork's `/next/` static build never reads; the four commits touch nothing the fork imports; CI green 14/14 on the 00:15 landing (eighth under `stream`); the storm eases to ~204/hr on the same three rooms; #1531 re-merged `main` twice with an unchanged file list; the token's thirteenth face is *both* faces in order — the user-fetch 401 at +11 s, then the host-close-with-refresh at +71 s — read by two calls gated on the clock, no `whoami` needed
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (89,958 lines at 04:18; rotation still 08-24 16:30; 87,532 at the 00:17 anchor, so +2,426 in the window) |
+| Genuine rate-limiting (level-anchored, whole-word `429`, bracketed timestamp stripped first, UUID-substring lines removed) | **0** in the window and **0** since rotation — the pattern the 00:15 entry corrected (`[YYYY-MM-DD HH:MM:SS.mmm]`, local) used first this time; no wrong-pattern pass to report |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claim ids as 00:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; compared by id), all holders idle; 0 of 115 registered agents `active`; `agent list --all --json` keyed by id against the 00:15 snapshot → **0 added, 0 removed, 0 changed** (every field) |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, numbers current below |
+| Dirty trees attributable to an agent | **none new.** All 41 worktree entries swept with `git status --porcelain`: electric-stork's `scratch/` gained only this run's derivation files (the two agent snapshots, the role snapshot, the merge-tree output at the new tips in both forms, the stage-line lists at both windows, the upstream range, #1531's file list, the token log); `wt-guiapp-main`'s pile frozen (`scratch/assemble/` 08-26 08:28, `scratch/checkin-0015/` 08-25 00:41, the rest 08-24 16:47 — same nine paths as 00:15); the build repo's three untracked paths unchanged (`clients/teams-bot/`, `clients/teams-help/`, `scratch/guiapp-measure/`); `a2-mutation-probe`, `eval-composer-bug`, `mobile-deploy-ecd64d15`, `upstream-mobile-web`, `mobile-v2-s5-liveness`, `traycer-mobile-v2-evidence-gate` carry the same long-standing probe files; the five `Temp/bundle-wt*` entries still read `prunable` — left alone |
+| `main` vs `origin/main` at start | **0 / 0** @ `0ef94435d` — the 00:15 landing (00:30 local), the only movement on `main` since 20:30 |
+| CI on `main` @ `0ef94435d` (the tip at start) | **GREEN on attempt 1, 14/14 jobs** — Tests run `33317045728`, 00:30:27 → 00:36:14 local (5 m 47 s; `gh` prints these as `2:30 PM`, UTC); all four gui-app shards `success` (main lane 00:36:01, shard 2 00:36:13, shard 3 00:36:02, shard 4 00:35:24); darwin `success` 00:33:19; every job on a GitHub-hosted runner (`GitHub Actions 1000004533`–`4548`, read from `attempts/1/jobs`). The other five workflows on the same tip — Secret scan, Real supervisor, pre-commit (**54 s**, the hollow gate's usual duration), Protocol Compatibility, CodeQL — all `success`. **Eighth consecutive green Tests run under `--outputStyle=stream`**; the flake ticket's ask (1) still has no red shard to read |
+| `CredentialLeaseReleasedError` storm | **36,223** at 04:18 (was 35,405 at 00:17) — **+818 in 4h01m, ~204/hr**, a touch under the ~212/hr the 00:15 entry read; **810** inside 00:16–04:16 by timestamp. Per room, `stayed disconnected; rebuilding provider` in the window: `…01KYBT17` 209, `…01KYNP5D` 221, `f347a4fb…` 235, `…01KZMPSW` **0** — its last rebuild line is still 08-30 16:16:34. `EpicTokenRefresher: batch threw` 810, in lockstep. *"Tiptap sync timed out"* **26** this window against 18 / 18 / 16 / 21 in the four before it — the highest of the five, still the same three rooms' rebuilds timing out instead of failing fast; a rate, not a kind |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **nineteen** since rotation, **+1 this run** — 04:25:34.703, call B of the thirteenth face, below. No other auth line in the window (the 00:24:21 one is the 00:15 run's) |
+| Headless `claude -p` on the box | **1** — this run (pid 18144 ← `powershell.exe` 19168 running `scripts/autobuild-checkin.ps1`, both created 04:15:01–04; `Traycer-Autobuild-Checkin` last 04:15:01, next **08:15:00**, `LastTaskResult` 267009 = still running). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 08-29 06:45:12) both still up; the `serve-web.mjs` node 14232 since 08-25 02:30:34 likewise; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none.** Newest explorer-parented process is still `chrome.exe` 7164 at **2026-08-28 11:50:51**; the Claude desktop app from 08-28 10:23:15 (pid 29588 and its nine children) still resident. Kernel-Power **42** / Power-Troubleshooter **1** since 08-30 00:00: **0**; up since 2026-08-25 02:29:29. Kernel-Power **105** *"Power source change"* since 08-31 00:00: **2** (00:49:57 and 00:50:00) — one more 3-second pair, the same flapping supply. Battery reads AC, 100% |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| DNS / upstream reachability | **no event in the window.** `ENOTFOUND` still 22 lines, all inside the 2026-08-26 16:06–16:41 block |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running (and known not to serve this fork's CI); the three sensormine VMs deallocated |
+| The 00:15 run's own script log | `exit 0`, *"ran, 19 lines of output"*, ending with the recap for that run (`0ef94435d`, count sites 43 → 44) |
+
+### Upstream +4, the set frozen an eleventh window by path — and the one moved far side lands inside a hand-merge's own block
+
+`upstream/main` moved `295f782f1` → **`492557a32`**, four commits, all
+landed 08-30 evening (their time), **412** in / our **520** at `0ef94435d`
+(the one new our-side commit is the 00:15 ledger entry). Merge-base at both
+tips: still `8f21d506f`. The range with `--stat`: 11 files, +1,208 / −38.
+
+| Commit | What it is | Where it lands on the fork |
+| --- | --- | --- |
+| `413264a4e` **#1591** fix(gui-app) | stop showing a pre-restart runtime disposal as an answer failure — `chat-session-store.ts` +136 with a 498-line store test and a 180-line windowed-append test | nothing: the store is not among the 51, not in the fork's 546 since-base paths, and no fork-only file imports it |
+| `255771725` **#1526** fix(desktop) | run the dev Electron loop on Linux; warm up the gui-app dev server — `electron-binary.cjs` +144 with a test, `dev-main.cjs`, **and `clients/mobile/vite.config.ts` +13** | **the one moved far side**, read below |
+| `7bf647ea8` **#1592** fix(desktop) | disable the dev sandbox as root; drop the removed ozone hint — the same two dev scripts | nothing: desktop dev plumbing the fork never touched |
+| `492557a32` **#1593** fix(gui-app) | keep onboarding row controls readable on dimmed rows — `onboarding-detected-agents.tsx`, `provider-list.tsx`, `provider-ambient-auth.ts` | nothing: none of the three is in the 51 or the 546 |
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` →
+**51** conflicted paths. Against the 00:15 saved list (parsed to the first
+blank line, both sides sorted): **+0, −0** — frozen an **eleventh window** by
+path (membership last changed 16:15 on 08-30). Stage lines **130 → 130**,
+**129 byte-identical** to the 00:15 derivation and **one moved**: stage 3 of
+`clients/mobile/vite.config.ts`, `542f17629` → `02d5e2f12`. The diff of the
+two stage-line lists names exactly that line and nothing else, so the
+old-tip control's job — *did the tool change, or the input* — is answered by
+the stage lines themselves: the input changed in one place, and that place
+is the one file the range touches under `clients/mobile`. Merged-tree OID
+`8d089bb20` → `08eefd1a2`; `test.yml` conflict markers **3 blocks / 9 → 9**.
+
+**Where the moved line lands.** `vite.config.ts` is add/add — ours **227**
+lines since base, theirs **334**, the base has no file — and it is a named
+member of the `clients/mobile` hand-merge cluster from the 08-26 16:15
+pricing: *"hand-merge the ~9 web-shell files … `src/web/main.tsx` is the real
+one, then `vite.config.ts`, …"*. The far side that moved is #1526's hunk, and
+it sits **inside** the file's fifth conflict block (lines 279–323 of the
+merged file, the block where our `guiAppDevConfig()` + `PORT` block meets
+their `resolveMobileEnvironment()` + `server` block): thirteen added lines,
+`warmup: { clientFiles: ["./main.tsx"] }` and a comment, appended to the
+`server = { host, port, strictPort: true }` object that only exists when
+`environment === "dev"`. Direct `origin/main` ↔ `upstream/main` residue for
+the file, both tips: **27/121 → 27/134** — the thirteen are the hunk and the
+hunk is the thirteen. Our side of that block has `server: { …, strictPort }`
+and no `warmup`, so the resolution is *take theirs' `warmup` alongside ours* —
+a copy, not a decision. **Price unchanged: six hand-merges (one of them a
+single constant) + two policy calls.**
+
+**Why the fork's `/next/` does not care.** `clients/mobile/package.json` on
+`main`: `build:web:static` runs `vite build --config vite.config.web.ts`
+(the fork-only file, no `server` block at all — its own line 148 says *"No
+dev-server middleware in a static build"*), while `dev:web` and `build:web`
+run `--config vite.config.ts`. So the hunk reaches the fork only through
+`bun run dev:web`, and there it is what it says: the entry pre-transformed at
+server start instead of on the first request. Nothing in the deployed bundle
+observes it.
+
+**The compile trap, this window.** The 339 fork-only code paths (`.ts`,
+`.tsx`, `.mjs`, `.cjs` from the 456 fork-only paths — ours since-base minus
+theirs since-base) checked with `git grep` on `origin/main` for each touched
+module name — `chat-session-store`, `windowed-append-republish`,
+`provider-ambient-auth`, `provider-list`, `onboarding-detected-agents`,
+`electron-binary`, `dev-main`: **0, 0, 0, 0, 0, 0, 0**, with `safe-storage`
+as the positive control reading **8**. The range changes **no `export` line**
+in `clients/gui-app/src` or `clients/mobile` at all. Fork-only ∩
+theirs-touched, by path: **empty** — the one shared path
+(`vite.config.ts`) is both-sides-touched, which is why it is in the 51.
+
+**#1531, still open, and it moved without moving.** Updated 18:10:25Z
+(the 00:15 entry read 12:20Z): three new commits — *Merge branch 'main'*
+at 12:03Z and again at 18:10Z, and between them `2f1ef9d35` *"fix(webapp):
+answer the stream client's clock field in the resume suite"* (12:19Z). That
+is #1567's required `clock` option reaching upstream's own new shell, the
+same edit the fork carries as precondition (b) — corroboration that the
+requirement is real and that upstream's own branches trip on it. File list
+**76 → 76, identical** to the 00:15 read; **6 of the 51** unchanged, the
+same six.
+
+### The 4h token's thirteenth face — both faces, in order, from two calls gated on the clock
+
+The 00:15 entry predicted: *"this token dies **04:24:22** — nine minutes
+in."* The credential file agreed (`iat` 00:24:22, `exp` 04:24:22), and this
+run's two fleet calls at 04:16 (−6 m) went through on the valid bearer
+(115 agents, four claims, exit 0, 2.2 s and 2.5 s). The three calls that
+mattered were placed by a background script that waited for the wall clock,
+so the offsets below are chosen, not accidental. `cli.log` is UTC (+10 below),
+`host.log` local; the credential file read after each call:
+
+| Call | Started | Against `exp` **04:24:22** | Host side | Result |
+| --- | --- | --- | --- | --- |
+| A — `agent list --all --json` | **04:24:33.665** | **+11 s** | **nothing** — no `authentication rejected`, no `fatal close`; count still eighteen | `warn: Mapping host RPC wire error to CLI error hostRpcCode=RPC_ERROR` at .054, then **`E_UNEXPECTED`, exit 1** in 1.64 s, zero agents parsed; `credentials` **unchanged** (`savedAt` 00:24:22) — no in-command refresh |
+| B — `agent list --all --json` | **04:25:33.607** | **+71 s** | **`authentication rejected code=UNAUTHORIZED message="exp"` and `fatal close … reason="exp"` at 04:25:34.703** — the nineteenth since rotation | 115 agents, **exit 0** in 2.56 s; `credentials` **refreshed in-command**: `savedAt` **04:25:35.519**, new token `iat` 04:25:35 / `exp` **08-31 08:25:35** |
+| C — `agent list --all --json` | 04:26:32.442 | (new token) | nothing | 115, exit 0 in 1.38 s; `savedAt` unchanged from B |
+
+Three readings.
+
+**First, this is the "both" face, and for the first time it is read as a
+sequence rather than a bundle.** Call A is the user-fetch signature to the
+letter (the 08-30 08:15 / 12:15 / 16:15 face: `RPC_ERROR` warn → `E_UNEXPECTED`,
+exit 1, nothing in `host.log`, credential file untouched). Call B, sixty
+seconds later on the *same* stale bearer, is the host-close signature to the
+letter (the 04:15 / 08:15 / 20:15 / 00:15 face: `fatal close`, `savedAt`
+moved, exit 0). Same token, two servers, two answers a minute apart — the
+standing line *"which server a stale bearer meets is not a function of the
+offset"* gets its cleanest demonstration yet, because here the offset is the
+only thing that changed between the two calls.
+
+**Second, +11 s joins the user-fetch column** (+8 s and +10 s were there
+already; +8 s has also read *accepted*). The table of offsets now reads:
+accepted at +8 and +14; user-fetch at +8, +10, +11; host at +40, +63, +71,
++123. Nothing in that table is a threshold. Read the signature.
+
+**Third — the operational point — no repair was needed and none was run.**
+The 08:15 runs' recovery was *"retry, then `whoami`"*; this run shows the
+retry alone is the repair when it lands on the host: call B refreshed the
+credential file in-command and call C rode the new token. `whoami` was
+deliberately not called — its teardown crash (4 of the last 6) is recorded and
+needs no fifth datum, and every `whoami` on this binary is a coin-flip on a
+`0xC0000409` that reads as `exitCode 0` in `cli.log`. The hazard line
+sharpens to: **on a stale bearer, call twice; gate on the credential file's
+`savedAt`, never on the exit code, and never on `whoami`.**
+
+**For the 08:15 run:** its `claude.exe` starts ~08:15:03 and this token dies
+**08:25:35** — ten minutes in. Gate the reads past `exp` on the clock as this
+run did.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by claim id against 00:15, the 115-agent list keyed by id against the 00:15 snapshot with every field compared, all 41 worktree entries' `status --porcelain` attributed with pile mtimes, `host.log` counts since rotation and inside the window with the level-anchored 429 method, the storm's per-room and per-window attribution, the sync-timeout kind counted against the four windows before it, process sweep with dated creation times and parent attribution, the sleep/wake query and the KP-105 recount, VM power state, the scheduled task's last/next/result, the 00:15 script log); upstream fetch and the four-commit range read with `--stat` and per-commit placement against the 51 and the 546; the merge re-derived at both new tips with the stage-line diff as the control and the one moved line located inside its block, its residue re-derived at both tips, its hunk read against the fork's `package.json` scripts and `vite.config.web.ts`; the seven touched modules import-checked across the fork-only code paths with a positive control; `export`-line diff of the range; #1531's commits and file list re-read and re-intersected; the Tests run's 14 jobs read from `attempts/1/jobs` with runner names and the five sibling workflows; the CLI calls timed against the credential file's `iat`/`exp` and `host.log`, gated on the clock past expiry |
+| Recovery | **none needed** — the stale bearer's first failure (call A, user-fetch 401) was left alone on purpose, and the next gated call refreshed itself in-command (call B); no `whoami` was run this window, so its teardown crash adds no datum — the finding from 00:15 stands as recorded |
+| CI | nothing to rerun — `33317045728` green on attempt 1 |
+| Build work | **none** — the four upstream commits touch nothing the fork imports, the one moved far side is a copy inside a hand-merge already priced, every open item still Elliot's; the tickets under `traycer-remote-teams/tickets` unchanged since 08-26's repair (index mtime 08-26 04:23:27, status lines re-read, nothing reopened) |
+| This entry | the forty-fifth; count sites 44 → 45 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | untouched — an eighth green run under the flag adds no row; ask (1) still waits on a red shard |
+| Push notification | **not attempted** — nothing this window is the 08:15 kind of finding, and the last three attempts all read *"Remote Control inactive"*. Item 4 below is still the ask |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the eleventh window, the `vite.config.ts` far-side move and #1531's `clock` fix; `cli-token-expiry-matches-checkin-interval` gains the thirteenth face; `checkin-entries-live-on-main` count → 45 and the standing-ask numbers (412 in / 520 ours); `fork-ci-has-never-run-gui-app` gains the eighth consecutive green |
+
+### 🟠 Blocked on Elliot — carried, numbers current, one far side noted
+
+1. **Fork-merge direction** — map at `upstream/main@492557a32`: 412 in /
+   520 ours / **51** conflicted paths (frozen an eleventh window by path;
+   one far side moved this window, `clients/mobile/vite.config.ts`, a
+   thirteen-line dev-only `warmup` hunk inside its own block — take theirs'
+   `warmup` alongside ours); pricing **six hand-merges (one of them a single
+   constant) + two policy calls**, unchanged. Preconditions, still three:
+   (a) resolve `clients/mobile/src/mobile-runner-host.ts` as *theirs* **and
+   then replace the `DEVICE_FLOW_CLIENT_ID` ternary with the literal
+   `"desktop"`** (keeps the kind production authn accepts and deletes the
+   module-scope read of `__TRAYCER_MOBILE_CONFIG__`, which the fork's
+   `/next/` build does not bake; skip it and the bundle throws at boot,
+   `tsc` says nothing, and `a272c32f6` goes red); keep `vitest.config.ts` as
+   *ours*; (b) add `clock: null` at the three fork-only
+   `new WsStreamClient({…})` sites — `clients/remote-bridge/src/bridge-client.ts:135`,
+   `clients/remote-bridge/src/__tests__/chat-session.test.ts:217`,
+   `clients/mobile-push-service/src/host-notifications-client.ts:94`
+   (upstream's own #1531 needed the same edit in its resume suite this
+   window, so the requirement is not a fork reading); (c) land the merge
+   through a pull request, or run `bun run compile` before pushing — a push
+   straight to `main` compiles nothing. Regenerate `bun.lock`; the
+   post-merge *"re-verify the loopback bridge dials"* step stays mandatory
+   (#1458, #1475, #1509, #1567). Saying *"run it on a candidate branch"* is
+   enough. Still one line from 08-29 16:15: after the merge an unreachable
+   owner's chat renders read-only (#1547) *and* is movable with
+   `move-chat.mjs` — decide whether both should exist. **Note, not a
+   precondition:** upstream's open **#1531** (browser shell at `/app`,
+   `clients/webapp`) overlaps 6 of the 51 including both
+   `mobile-runner-host.ts` and `main.tsx`; if it merges before the fork
+   does, (a) is re-derived and the larger question is whether `/next/`
+   should become upstream's webapp rather than merge past it.
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this fork's
+   CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or leave
+   the shards on 2-core `ubuntu-latest`, or deallocate it if it serves
+   nothing else. One word settles it; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (36,223 lines, three rooms, ~204/hr).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   retiring `/`, the Teams app-package install (the exempted shortcut),
+   ConvBot S1 grading.
+6. **Unchanged, small:** the push-path compile hole is upstream's as much
+   as ours; the check-in will not open an upstream issue or PR on its own.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-31 00:15 — a quiet window read to the bottom: upstream unmoved at `295f782f1`, the 51 frozen a tenth window byte-for-byte, CI green 14/14 on the 20:15 landing (seventh under `stream`); the storm settles at ~212/hr on three rooms; the token's twelfth face is *accepted at +8 s, host-closed at +63 s* — and `whoami` crashed on teardown twice on a **valid** bearer with no refresh in flight, so the crash is `whoami`'s, not the refresh's; upstream's open #1531 would put a browser shell where the fork's `/next/` build is and moves two of the six hand-merges again if it lands
 
