@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **forty-one** entries in this
+everything came down, nothing went up. The **forty-two** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **forty-one**. Three count sites remain in this header: this
+on this file → **forty-two**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,247 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the forty-one entries below back into `traycer-remote-teams/autobuild/index.md`
+the forty-two entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-30 16:15 — upstream's clock-skew commit adds a REQUIRED `clock` option that three fork-only `WsStreamClient` constructions do not pass, and the compile gate that would catch it runs against itself on every push to `main`; the map grows 50 → 51 by a test file whose fork side is a flake fix upstream has since made its own way; CI green 14/14 on the 12:15 landing; the token's tenth face repeats the ninth, and `whoami` crashed on teardown after answering
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (82,718 lines at 16:16; rotation still 08-24 16:30; 79,356 at the 12:16 anchor, so +3,362 in the window) |
+| Genuine rate-limiting (level-anchored, whole-word `429`, timestamp stripped first, UUID-substring lines removed) | **0** |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claim ids as 12:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; compared by id), all holders idle; 0 of 115 registered agents `active`; `agent list --all --json` keyed by id against the 12:15 post-repair snapshot → **0 added, 0 removed, 0 changed** (every field) |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, numbers below; the merge gains a **third precondition** this window |
+| Dirty trees attributable to an agent | **none new.** electric-stork's `scratch/` gained only this run's derivation files (five agent snapshots — the fourth is the failed call's 220-byte error body — the role snapshot, two merge-tree outputs in both forms with their stage and path lists, the touch-set, both since-base lists, the fork-only list, the fork-only importer list, a copy of this file); `wt-guiapp-main`'s pile frozen at the same mtimes (`assemble/` 08-26 08:28, `checkin-0015/` 08-25 00:41, `entry.md` and the list files 08-24 16:47); the build repo's three untracked paths unchanged (`clients/teams-bot/` 08-12 12:19, `clients/teams-help/` and `scratch/guiapp-measure/` 08-12 12:39); `wt-ci-fork` and `wt-push-subscribe` clean. **Correction to 12:15:** the stray `wt-checkin-0826` beside `wt-guiapp-main` is not a two-file directory — it holds `node_modules/`, `protocol/`, `scratch/`, `scripts/`, `nx.json`, `package.json`, `skills-lock.json` and the three `.md` files, all 08-26 00:18–00:30; still unknown to `git worktree list`, still a removed worktree's leftover, still untouched |
+| `main` vs `origin/main` at start | **0 / 0** @ `2f495d6d6` — the 12:15 landing (12:27:13), the only movement on `main` since 08:15 |
+| CI on `main` @ `2f495d6d6` (the tip at start) | **GREEN on attempt 1, 14/14 jobs** — Tests run `33288015787`, 12:27:18 → 12:33:08 (5 m 50 s); all four gui-app shards `success`; darwin `success`; every job on a GitHub-hosted runner (`GitHub Actions 10000044xx`, read from `attempts/1/jobs` with runner names). The other five workflows on the same tip — Secret scan, Real supervisor, pre-commit (50 s, see below), Protocol Compatibility, CodeQL — all `success`. **Fifth consecutive green Tests run under `--outputStyle=stream`**; the flake ticket's ask (1) still has no red shard to read |
+| `CredentialLeaseReleasedError` storm | **33,728** at 16:16 (was 32,382 at 12:16) — +1,346 in 4h00m, ~336/hr, the watchdog rate holding; still one per ~11 s |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **sixteen** since rotation, **none new** — this run's stale-bearer call died at the user-fetch server again; the tenth face, below |
+| Headless `claude -p` on the box | **1** — this run (pid 29432 ← `powershell.exe` 16840 running `scripts/autobuild-checkin.ps1` ← `svchost.exe` 2476, the scheduled task; `Traycer-Autobuild-Checkin` last 16:15:01, next 20:15:00, `LastTaskResult` 267009 = still running). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 08-29 06:45:12) both still up, unchanged; the `serve-web.mjs` node 14232 since 08-25 02:30 likewise; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none.** Newest explorer-parented process is still `chrome.exe` 7164 at **2026-08-28 11:50:51**; the Claude desktop app from 08-28 10:23:15 (pid 29588 and its nine children) is still resident. Kernel-Power 42 / Power-Troubleshooter 1 events since 08-30 00:00: **0**; up since 2026-08-25 02:29:29 |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| DNS / upstream reachability | **no event in the window.** `ENOTFOUND` count in the file is still 22 lines, all inside the 2026-08-26 16:06–16:41 block; the only WARN lines besides the storm are the four Tiptap rooms' *"stayed disconnected; rebuilding provider"* / *"Failed to rebuild"* pairs, ~250 of each per room in the window — once a minute, unchanged |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running (and known not to serve this fork's CI); the three sensormine VMs deallocated |
+| The 12:15 run's own script log | `exit 0`, *"ran, 17 lines of output"*, ending *"Push verified from both ends"* |
+
+### Upstream +4, the set grows 50 → 51, and the newcomer is a take-theirs
+
+`upstream/main` moved `ff4ab572d` → `107b33e86` — four commits, no merges:
+**#1567 feat(clients): detect system-clock skew and park streams instead
+of going terminal** (54 files, +2,923/−37), **#1569 feat(gui-app): ask
+which host before sweeping a multi-host task** (13, +1,806/−65), **#1570
+feat(protocol,shared,gui-app): cross-host terminal-agent roster** (42,
++2,601/−269) and **#1572 fix(gui-app): autofocus sidebar search** (2,
++53/−2) — now **401** in / our **516** at `2f495d6d6`. Touch-set: **110**
+files, +7,383/−373. Merge-base at both tips: still `8f21d506f`.
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` →
+**51** conflicted paths. Against the 12:15 saved list (parsed to the first
+blank line, both sides sorted): **+1, −0** — the newcomer is
+`clients/shared/host-transport/__tests__/ws-stream-client.test.ts`.
+Old-tip control at `ff4ab572d` against the same our-side `2f495d6d6`
+reproduces the **50** exactly, so the growth is this window's and #1567's.
+Stage lines **127 → 130**: the newcomer's three stages, plus **four stage-3
+(theirs) OIDs moved** — `remote-session.ts`, `ws-stream-client.ts`,
+`remote/create-remote-transport.ts` and `remote/__tests__/remote-session.test.ts`,
+every one inside the *host-transport — theirs wholesale, then re-run the
+alias rewrite* cluster. Merged-tree OID `8a87d8135` (the old-tip control
+reads `d446e9321`, not 12:15's `4263ab85c`, only because our side moved by
+the docs commit); `test.yml` conflict markers **9 → 9**. Touch-set ∩ the 51
+= touch-set ∩ our 546 since-base = **the same five host-transport files** —
+so **zero** paths are both-sides-touched and silently auto-merged this
+window.
+
+**The newcomer, priced.** Our side is `66a979403` (+38/−2): a
+`waitForSocketBeyond` helper replacing `await wait(30)` in the
+credential-provisioning reconnect loop — the flake fix that made that gate
+green. Theirs is #1567's +732/−4 on the same file, which rewrites **the same
+loop** with `nthSocket` + `pollUntil` for the same reason (*"do not bet on
+it landing inside 30ms"*), while leaving `await wait(30)` at two other sites
+in their file. One conflict block, 22 lines. Resolution: **theirs** — their
+fix supersedes ours in the one loop ours touched, and taking the file
+wholesale drops our now-unreferenced helper with it. The cluster's price
+holds; the map is 51 but still **six hand-merges (one a single constant) +
+two policy calls** — the newcomer costs nothing.
+
+### The compile trap, real this window: `clock` is required and three fork-only constructions do not pass it
+
+The 12:15 method, re-run: the 457 fork-only paths (ours since-base minus
+theirs since-base, by path; 294 `.ts`/`.tsx`) `git grep`ped on `origin/main`
+for imports of the **45** non-test modules the four commits touch → **62**
+importer lines (control unrestricted across `clients/` + `protocol/`:
+1,658, so the pattern binds). After discarding same-basename fork modules
+(`identity-registry/registry`, `identity-registry/types`, `clients/remote`'s
+own `./registry`), the real hits are four upstream modules and the fork
+packages that consume them:
+
+| Module | Fork-only importers | Changed in a way the fork feels? |
+| --- | --- | --- |
+| `clients/shared/auth/auth-validation` | `mobile-push-service` (`host-auth.ts`, `http-api.ts`), `clients/remote` (`hosts-endpoint.ts`) | **No.** `refreshOnceAbortable` and `validateAuthTokenIdentityAccessOnly` have byte-identical signatures at both tips; the result union only gains an optional `serverTime`, and the fork reads `.kind === "valid"` |
+| `protocol/host/registry` | `mobile-push-service`, `remote-bridge` ×2, `single-host-stream-connection.ts` | **No.** Additive minors only (`epicListTuiAgents@1.2`, `hostChatRecordsSubscribe@1.2`); `hostStreamRpcRegistry` keeps its shape |
+| `clients/shared/host-transport/host-messenger` | `remote-bridge` ×2 | **Untouched** in the range — a basename hit on a gui-app file |
+| `clients/shared/host-transport/ws-stream-client` | `remote-bridge` (`bridge-client.ts:135`, `__tests__/chat-session.test.ts:217`), `mobile-push-service` (`host-notifications-client.ts:94`) | **YES** — below |
+
+#1567 adds `readonly clock: ServerClockSkewSignal | null` to
+`WsStreamClientOptions` — **required, not optional, by design**: *"Required,
+not defaulted, for the same reason `evidence` and `clientIdentity` are: a
+new construction site has to answer the question. `null` means 'no tracker
+wired' and restores the pre-existing behaviour exactly."* Upstream's own
+CLI answers it with `clock: null` at three sites (`monitor.ts:236`,
+`worktree-delete.ts:133`, `credential-provisioning.ts:362`). The fork's
+three construction sites answer nothing, because they predate the question.
+After the priced *theirs wholesale* on the host-transport cluster,
+`remote-bridge` and `mobile-push-service` stop type-checking (TS2345,
+property `clock` missing).
+
+**What it does at runtime: nothing.** Both places the option is read —
+`parkIfClockSkewed("pre-dial-expiry")` and
+`parkIfClockSkewed("no-progress-unauthorized")` — sit behind `auth !== null`
+(the second inside `revalidateThenReconnect`, which only runs with an
+`auth`), and all three fork sites pass `auth: null` because the bridge and
+the push service own UNAUTHORIZED recovery themselves. So the missing
+`clock` is never dereferenced: vitest stays green, the bridge dials, the
+only instrument that sees it is `tsc`.
+
+**And the instrument that sees it runs against itself on every push to
+`main`.** The fork's compile gate is the pre-commit workflow's
+`workspace-checks` hook (`scripts/pre_commit_workspace_checks.sh`: `nx
+affected --targets=compile,build`). The workflow sets `NX_BASE` /
+`NX_HEAD` from `github.event.pull_request.*` only; on a `push` event both
+are empty, the script's CI branch is skipped, and its fallback picks
+`base_ref=origin/main` — which, on a checkout of a push to `main`, **is
+`HEAD`**. `nx affected --base=HEAD` affects nothing; the hook prints
+*Passed*. Corroboration from the one push in this file's window that
+changed client code: the push carrying `a272c32f6` (a `clients/mobile` test
+file) ran its whole pre-commit job in **50 s** (`33278768187`, 22:30:51 →
+22:31:41 UTC), and compiling `clients/mobile`'s 4,841-file program plus its
+`^compile` dependencies on a 2-core runner is minutes, not that. (The hook's
+stdout — the *"Affected workspace checks (base: …)"* line — is not in a
+green run's log; pre-commit only echoes output on failure, so the base
+cannot be read directly.) Upstream has the identical hole: their tip's
+`pre-commit.yml`, now a three-lane matrix, still keys `NX_BASE` off
+`pull_request` alone. **The PR path is real** — a pull request gets a
+genuine base and its compile lane would go red on the missing `clock`.
+
+**Why the gate fix is recorded, not built.** The repair is two lines —
+`NX_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}`
+and `NX_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}` (plus
+a guard for the all-zeros `before` of a branch-creation push) — but every
+line of the fork's `pre-commit.yml` sits inside one of upstream's two
+since-base hunks on that file (the job rename + matrix, and the step
+rewrite), so a fork edit anywhere in it turns a clean take-theirs into a
+52nd conflict path, for a gate the PR path already provides. It belongs
+upstream, where the hole is; filing it there is outward-facing and Elliot's
+call (item 6 below).
+
+### The 4h token's tenth face repeats the ninth; `whoami` crashed on teardown after answering
+
+The 12:15 entry predicted: *"this token dies **16:21:03** — six minutes in,
+so every early call lands inside the window; the first call after 16:21:03
+meets the stale bearer, and which server answers is whichever the command
+reaches first."* `cli.log` (UTC, +10 below) against `host.log` and the
+credential file:
+
+| Call | Started | Against `exp` **16:21:03** | Host side | Result |
+| --- | --- | --- | --- | --- |
+| 1 — `agent list --all --json` | 16:15:36.743 | −327 s | nothing | 115 agents, exit 0 in 1.1 s |
+| 2 — `agent list --all --json` | 16:15:56.928 | −306 s | nothing | 115 agents, exit 0 in **0.27 s** |
+| 3 — `agent list --all --json` | 16:16:32.477 | −271 s | nothing | 115 agents, exit 0 in **0.25 s** |
+| 4 — `agent role list --json` | 16:16:33.664 | −269 s | nothing | four claims, exit 0 in 1.3 s |
+| 5 — `agent list --all --json` | 16:19:05.347 | −118 s | nothing | 115 agents, exit 0 in 1.7 s |
+| 6 — `whoami` | 16:19:07.977 | −115 s | nothing | printed *Logged in as …* — then **`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76`**, process exit **0xC0000409** (−1073740791). `cli.log` recorded `CLI command completed exitCode 0`. `credentials` untouched (still-valid token, no refresh due) |
+| 7 — `agent list --all --json` | 16:19:09.766 | −113 s | nothing | 115 agents, exit 0 in 0.25 s |
+| 8 — `agent list --all --json` | **16:21:13.980** | **+10 s** | **nothing** — no `authentication rejected`, no `fatal close`; still sixteen | `warn: Mapping host RPC wire error … RPC_ERROR`, then **`Failed to fetch authenticated user '3e3d1309…': status 401` → `E_UNEXPECTED`, exit 1** in 0.6 s; `credentials` unchanged (12:21:04) — no in-command refresh |
+| 9 — `whoami` | 16:21:15.701 | +12 s | nothing | exit 0 in 1.0 s; **refreshed**: `savedAt` **16:21:16**, `lastMutation: rotate`, new token `iat` 16:21:15 / `exp` **20:21:15** |
+| 10 — `agent list --all --json` | 16:21:17.634 | (new token) | nothing | 115 agents, exit 0 in 0.7 s |
+
+Three readings. **First, the tenth face is the ninth** — the user-fetch
+server rejects a +10 s bearer with nothing on the host and no in-command
+refresh, `whoami` rotates, done. Two runs, same signature, so the rule's
+third clause is now a repeat rather than a single datum. **Second, calls 2,
+3 and 7 completed in 0.25–0.27 s with a bearer 2–5 minutes from expiry** —
+the fast listing is not an expiry artefact. It is consistent with a path
+that skips the user fetch (a cached listing), which is also the only
+surviving explanation of 04:15's +14 s "accepted" read; either way the
+duration is not evidence about the bearer and this file stops reading it as
+such. **Third, call 6 is new:** a libuv fail-fast on process exit, *after*
+the command's real work and *after* the CLI's own log wrote `exitCode 0`.
+The answer was correct, the credential file was untouched, the very next
+call was fine, and call 9 — the same command two minutes later — was clean.
+So it is a teardown race in the installed upstream binary, non-deterministic,
+invisible to `cli.log`, and visible only as a process exit code. Hazard
+worth one line: a script that gates on `whoami`'s exit code reads a failure
+after a correct answer. Recorded, not built — same reason as the 401
+refresh: the CLI that runs here is the installed upstream binary.
+
+**For the 20:15 run:** its `claude.exe` starts ~20:15:03 and this token dies
+**20:21:15** — six minutes in again; the same shape as this run and 12:15.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by claim id against 12:15, the 115-agent list keyed by id against the 12:15 post-repair snapshot with every field compared, `host.log` counts since rotation with the level-anchored 429 method, the DNS block located, the WARN kinds in the window grouped, pile mtime attribution across the five sites plus the stray directory re-listed and corrected, process sweep with dated creation times and parent attribution, sleep/wake event query, VM power state, the scheduled task's last/next/result, the 12:15 script log); upstream fetch and the four-commit range read with `--shortstat` per commit; merge re-derivation at the new tip with an old-tip control against the same our-side, the newcomer traced to its fork commit and its upstream commit and its one conflict block printed and read; the four moved stage lines attributed to their cluster; the compile trap checked as an import-graph question with a control, then followed through to the option's declaration, the three fork construction sites, upstream's own three answers, both runtime read sites and their `auth` guards, the fork's package `test`/`compile` scripts, `nx.json`'s target graph, every workflow file for a compile target, the hook script's base logic, the workflow's event contexts, and one push's job duration as corroboration; ten CLI calls timed from `cli.log` against `host.log` and the credential file's `iat`/`exp`, with the failed call's error body and the crashed call's stderr kept; `tsc --noEmit` run in `wt-guiapp-main` for `remote-bridge` (16 s) and `mobile-push-service` (14 s) as the pre-merge baseline — both exit 0 today |
+| Recovery | **one** — the stale-bearer 401 on call 8, repaired by `whoami` (call 9), listing re-read (call 10). Call 6's crash needed none: its answer was already delivered |
+| CI | nothing to rerun — `33288015787` green on attempt 1 |
+| Build work | **none** — the two candidates this run's findings name are the installed CLI (twice over) and upstream's workflow (where a fork edit buys a conflict path). The `clock: null` step is a merge-time edit on files that do not exist merged yet |
+| This entry | the forty-second; count sites 41 → 42 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | untouched — a fifth green run under the flag adds no row; ask (1) still waits on a red shard |
+| Push notification | **not attempted** — the channel was shown inactive at 08:15 and item 4 below is still the ask; the new precondition is carried in item 1, where the merge decision already waits |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the 51 and the `clock: null` precondition; `cli-token-expiry-matches-checkin-interval` gains the tenth face, the fast-listing reading and the `whoami` teardown crash; `checkin-entries-live-on-main` count → 42 and the standing-ask numbers (401 in / 516 ours / 51); `fork-ci-has-never-run-gui-app` gains the fifth consecutive green and the push-path compile hole; new `pre-commit-compile-gate-hollow-on-push` |
+
+### 🟠 Blocked on Elliot — carried, numbers current, one precondition added
+
+1. **Fork-merge direction** — map at `upstream/main@107b33e86`: 401 in /
+   516 ours / **51** conflicted paths (+1 this window, a test file that
+   resolves as theirs); pricing **six hand-merges (one of them a single
+   constant) + two policy calls**, unchanged. Preconditions, now three:
+   (a) resolve `clients/mobile/src/mobile-runner-host.ts` as *theirs* (it
+   satisfies `IRunnerHost.browserView`, `.fileSave` and `.systemSettings`;
+   ours has none) **and then put `DEVICE_FLOW_CLIENT_ID` back to
+   `"desktop"`** — production authn returns 400 for `"mobile"`, and the
+   08:15 test (`a272c32f6`) goes red if this step is skipped; (b) **NEW:
+   add `clock: null` at the three fork-only `new WsStreamClient({…})`
+   sites** — `clients/remote-bridge/src/bridge-client.ts:135`,
+   `clients/remote-bridge/src/__tests__/chat-session.test.ts:217`,
+   `clients/mobile-push-service/src/host-notifications-client.ts:94` —
+   upstream's CLI precedent; without it `remote-bridge` and
+   `mobile-push-service` fail `tsc` and nothing else notices; (c) **land the
+   merge through a pull request, or run `bun run compile` before pushing**
+   — a push straight to `main` compiles nothing (above). Regenerate
+   `bun.lock`; the post-merge *"re-verify the loopback bridge dials"* step
+   stays mandatory (#1458, #1475, #1509, and now #1567, which changed the
+   client the bridge constructs). Saying *"run it on a candidate branch"*
+   is enough. Still one line from 08-29 16:15: after the merge an
+   unreachable owner's chat renders read-only (#1547) *and* is movable with
+   `move-chat.mjs` — decide whether both should exist.
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this fork's
+   CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or leave
+   the shards on 2-core `ubuntu-latest`, or deallocate it if it serves
+   nothing else. One word settles it; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (33,728 lines).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   retiring `/`, the Teams app-package install (the exempted shortcut),
+   ConvBot S1 grading.
+6. **NEW, small:** the push-path compile hole is upstream's as much as
+   ours. If you want it filed there (a two-line `|| github.event.before` /
+   `|| github.sha` fallback on `NX_BASE` / `NX_HEAD`, with a guard for the
+   all-zeros `before`), say so — the check-in will not open an upstream
+   issue or PR on its own.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-30 12:15 — quiet hold: upstream's +2 move one far side by one script line and the map stays frozen an eighth window; #1555's 11,834-line transcript rewrite touches nothing the fork imports; CI green on the 08:15 landing, 14/14; and the token's ninth face — rejected at +8 s by the *other* server — retires the tolerance-window reading
 
