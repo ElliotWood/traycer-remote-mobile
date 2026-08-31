@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **forty-eight** entries in this
+everything came down, nothing went up. The **forty-nine** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **forty-eight**. Three count sites remain in this header: this
+on this file → **forty-nine**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,255 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the forty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
+the forty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-31 20:15 — upstream +6 inside this window, all six under `clients/gui-app` (34 files, +6,552 / −1,180, every one merged after the 16:15 fetch), and the 51 hold a FIFTEENTH window by path AND by stage content; the import check reads 11 of 34 touched modules on the fork and two of them reached by fork importers — `analytics.ts` (+2 members of an onboarding act-id union, four fork files that import `Analytics`/`AnalyticsEvent` and not the union) and `host-update-banner.tsx` (#1607's narrowed mount predicate, one fork-only test that seeds a staged fact, never the retained `idle` the predicate now drops) — both copies; the one thread into the map is #1603 importing `setMobileApp`/`isMobileApp` from `lib/mobile-app.ts`, one of the 51, and both names exist at the same lines on both sides, so the resolution is unchanged; upstream's own **#1588** — an OPEN, zero-file PR titled *"production signs device-flow sessions in as mobile (merge when prod authn accepts it)"* — is the source's written corroboration of precondition (a); **#1612** (mobile keyboard) overlaps 3 of the 51 including `src/web/main.tsx`; Tests twelfth consecutive green 14/14 and CodeQL green on attempt 1, `main` six-for-six on its tip without a rerun for the third run running, plus a `schedule`-event CodeQL on the previous tip also green; the storm at ~218/hr on the same three rooms; **two new** three-second supply-flap pairs (17:31, 18:37 — six in the day); and the token's seventeenth face, read on purpose past `exp`: host-close with in-command refresh on the first call at +48 s, exit 0 — the prepared second call never fired, for the fourth run running; and the background capture, with the console encoding set, diffed clean raw against this run's first snapshot (0 / 0 / 0, no `Γ` in any title, no cp437 pass needed)
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (99,591 lines at 20:20; rotation still 08-24 16:30; 97,140 at the 16:17 anchor, so +2,451 in the window) |
+| Genuine rate-limiting (level-anchored, whole-word, bracketed timestamp stripped first, UUID-substring lines removed) | **0** in the window and **0** since rotation |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claims as 16:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; the whole payload byte-identical, not just the ids), every holder `active: false`; **0 of 115** registered agents `active`; `agent list --all --json` keyed by id against the 16:15 first snapshot → **0 added, 0 removed, 0 changed** (every field), and against the 16:15 pre-push snapshot **0 / 0 / 0 once re-encoded through cp437** — read raw, that file still says 82 changed titles, every one `Γ`, the codepage artefact reproduced from disk rather than from a fresh capture |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, numbers current below |
+| Dirty trees attributable to an agent | **none new.** All **40** worktree entries swept with `git status --porcelain` (`git worktree list --porcelain \| grep -c '^worktree '` → 40; 39 admin directories + the main checkout, admin dir mtime still 2026-08-26 08:23:26): electric-stork's `scratch/` gained only this run's derivation files; the build repo's three untracked paths unchanged (`clients/teams-bot/`, `clients/teams-help/`, `scratch/guiapp-measure/`); `wt-guiapp-main`'s pile frozen — the same nine paths, same mtimes (`scratch/assemble/` 08-26 08:28, `scratch/checkin-0015/` 08-25 00:41, the rest 08-24 16:47); the probe piles in `a2-mutation-probe` (3), `eval-composer-bug` (18), `mobile-deploy-ecd64d15` (1), `upstream-mobile-web` (7), `mobile-v2-s5-liveness` (1), `traycer-mobile-v2-evidence-gate` (8) all long-standing; the five `Temp/bundle-wt*` entries still `prunable` (directories gone) — left alone |
+| `main` vs `origin/main` at start | **0 / 0** @ `2a2dcc3be` — the 16:15 landing, the only movement since 16:33 |
+| Tests on `main` @ `2a2dcc3be` | **GREEN on attempt 1, 14/14 jobs** — run `33364668856`, 16:33:21 → 16:39:17 local (5 m 56 s); all four gui-app shards `success` (main lane 16:38:59, shard 2 16:39:03, shard 3 16:39:17, shard 4 16:38:36); darwin `success` 16:36:18; every job GitHub-hosted (`GitHub Actions 1000004612`–`4629`, read from `attempts/1/jobs`). **Twelfth consecutive green Tests run under `--outputStyle=stream`**; the flake ticket's ask (1) still has no red shard to read |
+| CodeQL on the same tip | **`success` on attempt 1** — run `33364668818`, `Analyze (javascript-typescript)` 16:33:24 → 16:36:54 (3 m 30 s). Secret scan, Protocol Compatibility, Real supervisor and pre-commit all `success` on attempt 1 — the tip is **six-for-six without a rerun, for the third run running**. One more run exists that no push started: a **`schedule`-event CodeQL on the previous tip** `34d1bc67e` (`33363925592`, 16:22:19 → 16:25:13, `success`) — the workflow's own cron, eleven minutes before the 16:15 landing's push. No run newer than 16:33 local |
+| `CredentialLeaseReleasedError` storm | **39,712** at 20:20 (was 38,827 at 16:17) — **873 inside 16:16–20:16 by timestamp, ~218/hr**, against 856 / ~214/hr on the 16:15 read. Per room, `stayed disconnected; rebuilding provider` in the window: `…01KYBT17` 228, `…01KYNP5D` 224, `f347a4fb…` 237, `…01KZMPSW` **0** — its last rebuild line is still 08-30 16:16:34. `EpicTokenRefresher: batch threw` **873**, in lockstep. *"Tiptap sync timed out"* **16** this window against 17 / 18 / 8 / 26 / 18 in the five before it |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **twenty-two** since rotation at the 20:20 sweep, **+1 in the window** — the 16:30:53.521 line, which is the 16:15 run's own pre-push read. The pre-push read below made it **twenty-three**, at 20:31:42.730. |
+| Headless `claude -p` on the box | **1** — this run (pid 30532 ← `powershell.exe` 12264 running the check-in script under `svchost`, created 20:15:01–04; `Traycer-Autobuild-Checkin` last 20:15:01, next **09-01 00:15:00**, `LastTaskResult` 267009 = still running). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 08-29 06:45:12) both still up; the `serve-web.mjs` node 14232 since 08-25 02:30:34 likewise. The Claude desktop app is **still the 09:55:10 instance** (pid 35092 under `sihost.exe` + nine `--type` children, all 09:55:10–16) — no further cycle. Two `powershell.exe` from 08-26 23:01:26 / 23:05:57 (pids 15256 / 9772) with parents that no longer exist are also present — five days old, not this window's; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none.** Newest explorer-parented process is still `chrome.exe` 7164 at **2026-08-28 11:50:51**. Kernel-Power **42** since 08-31: **0**; up since 2026-08-25 02:29:28. Kernel-Power **105** *"Power source change"* since 08-31 00:00: **12** — the four pairs the 16:15 entry read (00:49, 05:47, 06:00, 12:03) **plus two new inside this window: 17:31:10 / 17:31:13 and 18:37:19 / 18:37:21**, both the same three-second shape. Battery reads AC (`BatteryStatus` 2), 100% |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| DNS / upstream reachability | **no event in the window.** `ENOTFOUND` still 22 lines (the lines carry no timestamp of their own — they are the tail of a multi-line error dump; the block is placed by the lines around it, 2026-08-26 16:06–16:41) |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running (and known not to serve this fork's CI); the three sensormine VMs deallocated |
+| The 16:15 run's own script log | `exit 0`, *"ran, 22 lines of output"*, ending with that run's recap |
+| Tickets (`traycer-remote-teams/tickets`) | untouched — index mtime still 08-26 04:23:27, the repair's write |
+
+### Upstream +6 inside the window; the 51 hold a fifteenth window by path and by stage content — and every touched file is back under `clients/gui-app`
+
+`upstream/main` moved `a7f8b488d` → **`c09d36d91`**, six commits, all six
+merged after the 16:15 run's derivation (its `merge-tree` file is stamped
+16:18): #1604 at 16:47:15 local, #1603 17:43:01, #1606 17:59:16, #1607
+18:04:28, #1608 18:27:59, #1605 19:09:56. So the 16:15 read was correct at
+its fetch and the window filled in behind it — the ordinary shape.
+**424** in / our **524** at `2a2dcc3be` (the one new our-side commit is the
+16:15 ledger entry). Merge-base at both tips: still `8f21d506f`. The range
+with `--stat`: **34 files, +6,552 / −1,180**, and unlike the 16:15 range
+every one is under `clients/gui-app/src` — nothing under `protocol/`,
+`clients/shared` or the CLI.
+
+| Commit | What it is | Where it lands on the fork |
+| --- | --- | --- |
+| `ae1623135` **#1604** feat | Sweep's host becomes a control inside the confirmation instead of a step in front of it (12 files, +2,868 / −779): a `sweep-host-*` family (chip, list, model, picker dialog) and a rewritten `sweep-worktrees-dialog` / `-flow` / `-review` | **9 of its modules do not exist on `main`**; the three that do (`sweep-worktrees-dialog.tsx`, the flow and the review) have **0** fork importers |
+| `32c0d03ae` **#1603** feat | the installed mobile app gets its own onboarding tour (13 files, +2,698 / −344): `onboarding-acts.ts` grows a `MOBILE_ONBOARDING_ACTS` set chosen by `isMobileApp()`, a phone diorama, a story script, an agent-guide pane, and `analytics.ts` gains two act ids | 7 of 13 absent on `main`; **imports `setMobileApp` / `isMobileApp` from `lib/mobile-app.ts`, one of the 51** — read below |
+| `ec0e55ec4` **#1606** fix | restore task-wide rate-limit switching (3 files, +289 / −45) | `use-task-profile-rate-limit-switch.ts` exists, 2 importers, **0** fork |
+| `f82c25181` **#1607** fix | suppress the retained-`idle` update banner (2 files, +70 / −2) | `host-update-banner.tsx` exists, 3 importers, **1 fork-only** — read below |
+| `47c52cbc1` **#1608** fix | keep a live steer split together when the skeleton predates it (2 files, +518 / −8): `transcript-list-rows.ts` + test | **both absent** on `main` |
+| `c09d36d91` **#1605** fix | push settings sections on the mobile list instead of replacing (2 files, +109 / −2): `settings-sidebar.tsx` + test | exists, 3 importers, **0** fork |
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` at the
+new their-tip: **51** conflicted paths. Against the 16:15 saved output
+(parsed to the first blank line, both sides sorted): **+0, −0**. The whole
+name-only output, labels normalised, is byte-identical to 16:15's except
+line 1 — the merged-tree OID, `7180c7901` → `e79b83653`. Stage lines
+**130 → 130**, sorted the same way: **byte-identical, zero moved**. (The
+first pass of this read produced **0** stage lines — `grep -P` refused the
+locale and `-E` does not know `\t`; the tab has to be a literal in the
+pattern. The 130 is the re-run; the method note is [[merge-tree-name-only-counts-warnings]]'s
+fifth mode.) `test.yml` conflict markers **3 blocks / 9 → 9**. Range ∩ 51
+(`comm -12` on the sorted lists): **empty**. Range ∩ the **388**
+fork-touched code paths since base (`.ts/.tsx/.js/.mjs` minus `.d.*`; the
+same filter without the `.d.*` exclusion reads 389, the extra being
+`clients/mobile/tools/build-sw.d.mts`): **empty** — and against all **546**
+fork-touched paths of any kind, also empty. No silent both-sides
+resolution.
+
+The map is **frozen a fifteenth window** by path and by stage content.
+Membership last changed 08-30 16:15, stage content last moved 08-31 04:15.
+Price unchanged: **six hand-merges (one a single constant) + two policy
+calls**.
+
+### The import check — 11 of 34 exist, two are reached, and both are copies; the one thread into the 51 changes nothing
+
+23 of the 34 touched files do not exist on `main` (the whole `sweep-host-*`
+surface, the phone diorama, the story script, the agent-guide pane, the
+mobile onboarding test, `transcript-list-rows.ts` and its test,
+`use-chat-run-settings-query.ts`, the rate-limit-switch test). Of the 11
+that do, importers derived **path-qualified** (the 16:15 entry's trap,
+applied from the start: the import specifier resolved against the
+importer's directory or the `@/` alias, then compared to the module path)
+against the 388 fork-touched and 360 fork-only `.ts/.tsx` paths:
+
+| Module | Importers on `main` | fork-touched / fork-only | What changed | Reading |
+| --- | --- | --- | --- | --- |
+| `gui-app/src/lib/analytics.ts` | 96 | **2 / 2** (`notification-focus-bridge.host-switch.test.tsx`, `local-host-gate.tsx` fork-only; `report-issue-capture-dialog.test.tsx`, `use-epic-export-artifacts-mutation.ts` fork-touched — the last one is itself one of the 51) | `+ "mobile-switcher"` and `+ "mobile-tasks"` in the onboarding act-id union and its allowed-values list (7 lines, all additive) | all four fork files import `Analytics` / `AnalyticsEvent`; none names the act-id type or the list. A copy |
+| `gui-app/src/components/home/host-update-banner.tsx` | 3 | **0 / 1** (`components/__tests__/host-update-cross-surface.test.tsx`) | the landing banner's mount predicate gains two exclusions: a retained `lastKnownKind` of `"idle"` or `"unknown"` no longer raises it when the controller has no concrete fact (12 / −2) | the fork-only test seeds `stagedVersion: "1.5.0"` with a registry source at `1.4.2` — a concrete staged fact on every path it renders; it never sets `lastKnownKind`, `"idle"` or `"unknown"` (grep **0**). The narrowed predicate cannot reach the state it seeds. A copy |
+| the other nine | 0–4 each | **0 / 0** | — | not reached |
+
+**The one thread into the map.** #1603's `onboarding-acts.ts` and three of
+its tests `import { isMobileApp | setMobileApp } from "@/lib/mobile-app"`,
+and `clients/gui-app/src/lib/mobile-app.ts` is one of the 51 (stages 2 and
+3, no base — a file both sides added). Both names are exported on **both**
+sides at the same lines (28 and 32); theirs additionally exports
+`MobileAppPlatform` / `setMobileAppPlatform` / `getMobileAppPlatform`,
+which the range does not use. Whichever way that path resolves, the two
+names #1603 needs are there. The resolution is unchanged, and the
+`__TRAYCER_MOBILE_CONFIG__` read that precondition (a) exists for does not
+appear in the range at all (grep **0**).
+
+### Upstream's open PRs, re-read: #1531 unmoved a fifth window, #1612 lands on three of the 51, and #1588 is the source saying what (a) says
+
+**#1531** (browser shell at `/app`): still OPEN, `updatedAt`
+2026-08-30T18:10:25Z — the **fifth** consecutive window at that timestamp
+— 76 files, 6 of the 51, file list byte-identical to the 04:15 read.
+Three more open PRs were read against the map this window because their
+titles name surfaces the fork owns:
+
+- **#1612** *fix(mobile): plugin-fed keyboard state* (14 files, updated
+  09:38Z): **3 of the 51** — `clients/mobile/capacitor.config.ts`, the iOS
+  `Package.resolved`, and `clients/mobile/src/web/main.tsx`. If it merges
+  before the fork does, `main.tsx`'s far side moves; the 16:15 list of six
+  hand-merges names it, so the price does not change but the read does.
+- **#1589** *epic sync overhaul* (100 files): `bun.lock` and
+  `clients/gui-app/package.json` — the two lockfile-shaped paths that are
+  regenerated on merge anyway.
+- **#1613** (WebRTC display plane, 100 files), **#1611**, **#1610**,
+  **#1614**: **0** of the 51.
+- **#1588** *feat(mobile): production signs device-flow sessions in as
+  mobile (merge when prod authn accepts it)* — OPEN since 08-30 09:36Z with
+  **zero files** (the API returns an empty file list; it is a placeholder
+  PR, not a diff). Its title is upstream stating, in writing, that
+  production authn does not yet accept the `mobile` client kind — the fact
+  the fork measured on 08-30 (400 for `mobile`, 200 on dev) and that
+  precondition (a) and `a272c32f6`'s guard rest on. Corroboration from the
+  source, not a change; when #1588 acquires a diff, prod has flipped and
+  (a)'s literal `"desktop"` becomes the thing to revisit.
+
+### Two new supply-flap pairs, and the storm holds
+
+Kernel-Power 105 fired **four** more times since the 16:15 read, as two
+pairs: 17:31:10 / 17:31:13 and 18:37:19 / 18:37:21 — the same three-second
+AC-to-battery-to-AC shape as the four pairs before them (00:49, 05:47,
+06:00, 12:03). Six pairs in the day is the most any day has read. Still
+cosmetic while the box holds AC at 100% with no Kernel-Power 42, and this
+entry moves it from *"did not pair in this window"* to a count that is
+climbing. The storm is flat-to-up: 873 lines / ~218 an hour on the same
+three rooms, `01KZMPSW` silent a second full day.
+
+### The seventeenth face
+
+The 16:15 run predicted this token dies **20:30:53**, from the JWT payload
+(`iat` 16:30:53), fifteen minutes into this run. This run's two working
+reads landed inside the valid window on the wall clock: `agent list`
+20:16:26 (3.48 s, 115 agents, exit 0), `agent role list` 20:16:30 (2.19 s,
+four claims) — `savedAt` untouched through both. No face was read by
+accident.
+
+The pre-push read was placed by the same clock-waiting background script as
+the last three runs, call B prepared behind a `savedAt` gate — this time
+with `[Console]::OutputEncoding` set to UTF-8 before the call, as the 16:15
+entry asked. Call A at **20:31:40.967, +48 s** after `exp`: `host.log`
+writes **`fatal close state=authenticated code=UNAUTHORIZED reason="exp"`
+at 20:31:42.730** — the **twenty-third** since rotation — and the CLI
+**refreshes in-command** (`savedAt` → 20:31:43.520; the new bearer reads
+`iat` 20:31:42, `exp` **2026-09-01 00:31:42**), returns all 115 agents,
+**exit 0** in 3.15 s; `cli.log` shows a plain started/completed pair
+(10:31:41.842 → 10:31:44.066 UTC) and no `warn` line. The gate read false
+and call B never fired.
+
+**What it adds:** the host column of the offset table gains **+48 s** (now
++40, +46, +48, +50, +63, +71, +123, +219). Nothing below +40 moved. The
+operational line is unchanged and this run used it as written: call, gate on
+`savedAt`, no `whoami` — and for the fourth run running, one call was the
+whole procedure. **The codepage fix held:** the background capture's file is
+52,700 bytes, the same size as this run's foreground read, and keyed by id
+against this run's first snapshot and the 16:15 first snapshot it reads
+**0 added, 0 removed, 0 changed** raw — no `Γ` in any of the 115 titles, no
+cp437 pass. The 16:15 entry's *"set the console encoding"* was the whole
+repair.
+
+**For the 00:15 run:** its `claude.exe` starts ~00:15:03 and this bearer
+(`iat` 20:31:42, read from the payload) dies **00:31:42** — fifteen minutes in again. Gate the reads past `exp` on
+the clock; one call may be the whole procedure, but keep the second
+prepared; set the console encoding in the background capture (done this
+run — the pre-push file diffs clean raw, no cp437 pass needed).
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by whole payload against 16:15, the 115-agent list keyed by id against both 16:15 snapshots with every field compared and the pre-push one re-encoded, all 40 worktree entries' `status --porcelain` with the wt-guiapp-main pile's nine paths and mtimes re-read, `host.log` counts since rotation and inside the window with the level-anchored 429 method, the storm's per-room and per-window attribution, the sync-timeout kind against the five windows before it, process sweep with dated creation times and parent attribution — this run's pid chain, the Claude desktop instance re-identified by pid, the KP-42 / KP-105 recount, VM power state, the scheduled task's last/next/result, the 16:15 script log); upstream fetch (+6, all six read with `--stat` and their PR merge times), the merge re-derived at the new their-tip with the name-only output diffed whole against 16:15's file (labels normalised) and the stage lines diffed after sorting (re-run after the tab-pattern false zero), the 34 touched paths intersected with the 51 and with the 388 / 546 fork-touched paths, the 34 checked for existence on `main` (11 / 23), importers derived path-qualified for all 11, the two reached modules read to their diffs and their fork importers read to what they use, `mobile-app.ts`'s exports compared on both sides, the range grepped for the mobile-config global; #1531 re-read with its file list diffed; #1612 / #1589 / #1613 / #1611 / #1610 / #1614 / #1588 file lists intersected with the 51; the Tests run's 14 jobs and the CodeQL job from `attempts/1/jobs` with runner names, and the scheduled CodeQL identified by event; the pre-push read placed by the clock and gated on `savedAt` |
+| Recovery | **none needed** — no red on the tip, no stranded agent, no dirty tree |
+| Build work | **none** — the six upstream commits touch nothing the fork must answer for before the merge; the map is frozen; every open item is still Elliot's; tickets index mtime unchanged since the 08-26 repair |
+| This entry | the forty-ninth; count sites 48 → 49 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | untouched — a twelfth green run under the flag adds no row; ask (1) still waits on a red shard |
+| Push notification | **not attempted** — nothing this window is the 08:15 kind of finding; the last three attempts all read *"Remote Control inactive"* |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the fifteenth window at `c09d36d91`, the `mobile-app.ts` thread, #1612's overlap and #1588; `authn-prod-rejects-mobile-client-kind` gains #1588 as upstream's own statement; `fork-ci-has-never-run-gui-app` gains the twelfth green and the scheduled CodeQL; `checkin-entries-live-on-main` count → 49; `cli-token-expiry-matches-checkin-interval` gains the seventeenth face; `merge-tree-name-only-counts-warnings` gains the tab-pattern false zero |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@c09d36d91`: 424 in /
+   524 ours / **51** conflicted paths (frozen a **fifteenth** window by
+   path and by stage content; stage content last moved 08-31 04:15,
+   `vite.config.ts`'s dev-only `warmup` copy); pricing **six hand-merges
+   (one of them a single constant) + two policy calls**, unchanged.
+   Preconditions, still three: (a) resolve
+   `clients/mobile/src/mobile-runner-host.ts` as *theirs* **and then replace
+   the `DEVICE_FLOW_CLIENT_ID` ternary with the literal `"desktop"`** (keeps
+   the kind production authn accepts and deletes the module-scope read of
+   `__TRAYCER_MOBILE_CONFIG__`, which the fork's `/next/` build does not
+   bake; skip it and the bundle throws at boot, `tsc` says nothing, and
+   `a272c32f6` goes red) — **upstream's open #1588 now says the same thing
+   in its title**; keep `vitest.config.ts` as *ours*; (b) add
+   `clock: null` at the three fork-only `new WsStreamClient({…})` sites —
+   `clients/remote-bridge/src/bridge-client.ts:135`,
+   `clients/remote-bridge/src/__tests__/chat-session.test.ts:217`,
+   `clients/mobile-push-service/src/host-notifications-client.ts:94`;
+   (c) land the merge through a pull request, or run `bun run compile`
+   before pushing — a push straight to `main` compiles nothing. Regenerate
+   `bun.lock`; the post-merge *"re-verify the loopback bridge dials"* step
+   stays mandatory (#1458, #1475, #1509, #1567). Post-merge line, not a
+   precondition (#1602): port `navigationPayloadForWorktreeDeletion` into
+   `clients/mobile-push-service/src/push-payload.ts`'s `worktree_deletion`
+   arm, or the phone opens Settings where the desktop opens the Task. Saying
+   *"run it on a candidate branch"* is enough. Still one line from 08-29
+   16:15: after the merge an unreachable owner's chat renders read-only
+   (#1547) *and* is movable with `move-chat.mjs` — decide whether both
+   should exist. **Notes, not preconditions:** upstream's open **#1531**
+   (browser shell at `/app`) overlaps 6 of the 51 including both
+   `mobile-runner-host.ts` and `main.tsx`, unmoved five windows; **#1612**
+   (mobile keyboard) overlaps 3 including `main.tsx`; if either merges
+   before the fork does, the affected far sides are re-derived. #1603's
+   mobile onboarding tour imports two names from `lib/mobile-app.ts` that
+   both sides already export — no new decision on that path.
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this fork's
+   CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or leave
+   the shards on 2-core `ubuntu-latest`, or deallocate it if it serves
+   nothing else. One word settles it; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (39,712 lines, three rooms, ~218/hr).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   retiring `/`, the Teams app-package install (the exempted shortcut),
+   ConvBot S1 grading.
+6. **Unchanged, small:** the push-path compile hole is upstream's as much
+   as ours; the check-in will not open an upstream issue or PR on its own.
+   The flapping power supply paired **twice** in this window (17:31,
+   18:37; six pairs in the day, the most yet); still cosmetic while the box
+   holds AC, but the count is now climbing rather than flat.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-31 16:15 — upstream +2 inside this window, and #1342 (session import, 101 files, +9,261) is the first range since 08-29 to leave `clients/gui-app` — it reaches `protocol/`, `clients/shared` and the CLI; the 51 hold a fourteenth window by path AND by stage content, and the import check reads its widest yet — 38 of the 67 touched modules exist on the fork and the range reaches 26 fork files through eight of them — and every one is a copy: three additive registry methods with no fork-side exhaustive map, one added segment kind behind narrow guards, two removed selectors whose only consumers move with theirs, two renamed record contracts with zero consumers; one parity note that is NOT a precondition — #1602 reroutes the `task_sweep` deletion notice and the phone's mirror of that arm will lag it after the merge; Tests eleventh consecutive green 14/14 and CodeQL green on attempt 1, `main` six-for-six on its tip without a rerun for the second run running; the storm holds at ~214/hr on the same three rooms; no new supply-flap pair; the ledger's carried "41 worktree entries" was a count read through an unrecorded method — 39 admin directories plus the main checkout is 40, and the admin directory has not been touched since 08-26; and the token's sixteenth face, read on purpose at +50 s past `exp`: host-close with in-command refresh on the first call, exit 0 — the prepared second call never fired, for the third run running; and the push-gate diff first read 82 changed agents, every one an em dash mojibaked through the OEM codepage by the background capture, and 0 once re-encoded
 
