@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **forty-six** entries in this
+everything came down, nothing went up. The **forty-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **forty-six**. Three count sites remain in this header: this
+on this file → **forty-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,269 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the forty-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the forty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-08-31 12:15 — upstream +4 inside this window and the 51 hold a thirteenth window by path AND by stage content — all nineteen touched files sit outside the map, four of the nine touched modules do not exist on the fork yet, and the import check reads its first non-zero (four fork tests import a module #1601 rewrote) without it becoming a precondition, because the rewrite hands back the same context object; Tests tenth consecutive green 14/14 and CodeQL green on attempt 1, so `main` is six-for-six on its tip without a rerun; the storm eases to ~214/hr on the same three rooms; a fourth three-second supply-flap pair; the Claude desktop app relaunched itself at 09:55 under its own updater with nobody at the keyboard; and the token's fifteenth face, read on purpose at +46 s past `exp`: host-close with in-command refresh on the first call, exit 0 — the prepared second call never fired, for the second run running
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (94,751 lines at 12:18; rotation still 08-24 16:30; 92,386 at the 08:21 anchor, so +2,365 in the window) |
+| Genuine rate-limiting (level-anchored, whole-word, bracketed timestamp stripped first, UUID-substring lines removed) | **0** in the window and **0** since rotation |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claim ids as 08:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; compared by id), all holders idle; 0 of 115 registered agents `active`; `agent list --all --json` keyed by id against the 08:15 first snapshot → **0 added, 0 removed, 0 changed** (every field), and against the 08:15 pre-push snapshot → 0/0/0; the second read at 12:16:33 against this run's own first → 0/0/0 again |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, numbers current below |
+| Dirty trees attributable to an agent | **none new.** All 41 worktree entries swept with `git status --porcelain`: electric-stork's `scratch/` gained only this run's derivation files; `wt-guiapp-main`'s pile frozen — the same nine paths, same mtimes (`scratch/assemble/` 08-26 08:28, `scratch/checkin-0015/` 08-25 00:41, the rest 08-24 16:47); the build repo's three untracked paths unchanged; the probe piles in `a2-mutation-probe`, `eval-composer-bug`, `mobile-deploy-ecd64d15`, `upstream-mobile-web`, `mobile-v2-s5-liveness`, `traycer-mobile-v2-evidence-gate` all long-standing; the five `Temp/bundle-wt*` entries still `prunable` (directories gone) — left alone |
+| `main` vs `origin/main` at start | **0 / 0** @ `15c9a149b` — the 08:15 landing, the only movement since 08:31 |
+| Tests on `main` @ `15c9a149b` | **GREEN on attempt 1, 14/14 jobs** — run `33339359886`, 08:31:12 → 08:36:53 local (5 m 41 s); all four gui-app shards `success` (main lane 08:36:21, shard 2 08:36:53, shard 3 08:35:50, shard 4 08:34:54); darwin `success` 08:33:43; every job GitHub-hosted (`GitHub Actions 1000004576`–`4589`, read from `attempts/1/jobs`). **Tenth consecutive green Tests run under `--outputStyle=stream`**; the flake ticket's ask (1) still has no red shard to read |
+| CodeQL on the same tip | **`success` on attempt 1** — run `33339360048`, `Analyze (javascript-typescript)` 08:31:12 → 08:34:47 (3 m 35 s, the same duration as the 08:15 rerun). With Secret scan, Protocol Compatibility, Real supervisor and pre-commit all `success`, the tip is **six-for-six without a rerun** — the ECONNRESET was one socket on one run, as the 08:15 entry filed it. No run newer than 08:31 local exists |
+| `CredentialLeaseReleasedError` storm | **37,979** at 12:18 (was 37,137 at 08:21) — **856 inside 08:16–12:16 by timestamp, ~214/hr**, down from the 08:15 read (~227/hr) and back near the 00:15 one (~212/hr). Per room, `stayed disconnected; rebuilding provider` in the window: `…01KYBT17` 225, `…01KYNP5D` 221, `f347a4fb…` 240, `…01KZMPSW` **0** — its last rebuild line is still 08-30 16:16:34. `EpicTokenRefresher: batch threw` **856**, in lockstep. *"Tiptap sync timed out"* **18** this window against 8 / 26 / 18 / 18 / 16 in the five before it — the 08:15 window's 8 was the low, not a trend |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **twenty** since rotation at the 12:18 sweep, **+0 in the window** — the last line is still 08:29:14.306, the 08:15 run's pre-push read. The pre-push read below made it **twenty-one**, at 12:30:01.721. |
+| Headless `claude -p` on the box | **1** — this run (pid 1188 ← `powershell.exe` 29228 running the check-in script, both created 12:15:01–03; `Traycer-Autobuild-Checkin` last 12:15:01, next **16:15:00**, `LastTaskResult` 267009 = still running). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 08-29 06:45:12) both still up; the `serve-web.mjs` node 14232 since 08-25 02:30:34 likewise. **The Claude desktop app is a new process**: pid 29588 (08-28 10:23) is gone and pid 35092 + eight children were created **09:55:10 today** — read below; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none.** Newest explorer-parented process is still `chrome.exe` 7164 at **2026-08-28 11:50:51** (the 09:55 Claude instance is parented by a pid that has since exited — the updater's shape, not a hand; below). Kernel-Power **42** since 08-31: **0**; up since 2026-08-25 02:29:29. Kernel-Power **105** *"Power source change"* since 08-31 00:00: **8** — the three pairs the 08:15 entry read (00:49, 05:47, 06:00) plus **one new pair this window**: 12:03:37/12:03:40. Four three-second flaps in just over eleven hours, same supply. Battery reads AC, 100% |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| DNS / upstream reachability | **no event in the window.** `ENOTFOUND` still 22 lines, all inside the 2026-08-26 16:06–16:41 block |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running (and known not to serve this fork's CI); the three sensormine VMs deallocated |
+| The 08:15 run's own script log | `exit 0`, *"ran, 19 lines of output"*, ending with that run's recap |
+| Tickets (`traycer-remote-teams/tickets`) | untouched — index mtime still 08-26 04:23:27, the repair's write |
+
+### Upstream +4 inside the window; the 51 hold a thirteenth window by path and by stage content — every touched file is outside the map
+
+`upstream/main` moved `492557a32` → **`b007bc4a6`**, four commits, all
+landed between 10:33 and 11:20 local today (after the 08:15 fetch at
+08:20): **416** in / our **522** at `15c9a149b` (the one new our-side
+commit is the 08:15 ledger entry). Merge-base at both tips: still
+`8f21d506f`. The range with `--stat`: **19 files, +946 / −98** — every one
+of them under `clients/gui-app/src`, and ten of the nineteen are tests.
+
+| Commit | What it is | Where it lands on the fork |
+| --- | --- | --- |
+| `cd446a8ab` **#1597** fix(gui-app) | show true chat activity times — `unified-chat-list.ts` +29 (two new exports, `cloudChatLastActiveAt` / `chatRowLastActiveAt`), `epic-sidebar-chat-tree.tsx` ±63, a test | nothing: `unified-chat-list.ts` **does not exist on `main`** (post-base upstream file); the sidebar tree is not among the 51 and not fork-touched |
+| `36378bc97` **#1598** fix(gui-app) | remove the typed worktree-sweep confirmation — `sweep-worktrees-dialog.tsx` −12, `sweep-worktrees-review.tsx` ±28, a test | nothing: `sweep-worktrees-review.tsx` **does not exist on `main`**; the dialog's two importers on `main` are upstream-inherited files |
+| `74c12de7c` **#1601** fix(gui-app) | contain epic-session crashes at the hosted-tile seam — **`epic-session-registry.ts` +64/−7** (its three contexts wrapped in a new `createStableDevContext` for HMR stability), a new `hosted-tile-body-boundary.tsx` (139) with a 303-line test, `stable-tile-surface-host.tsx` ±16, `chat-progress-icon.tsx` ±21, a 148-line HMR-stability test, a 63-line no-provider test, four small test edits | **the one that reaches fork code** — the registry is not among the 51 and not fork-touched since base, but it has **63 importers on `main`, four of them fork files**; read below |
+| `b007bc4a6` **#1600** fix(gui-app) | open modified links externally — `browser-link-routing-core.ts` +7, a test | nothing: the file **does not exist on `main`** |
+
+`git merge-tree --write-tree --name-only main upstream/main` at the new
+their-tip: **51** conflicted paths. Against the 08:15 saved output (parsed
+to the first blank line, both sides sorted): **+0, −0**. The whole
+name-only output is byte-identical to 08:15's except line 1 — the
+merged-tree OID, `ea11577d1` → `74b2f6d48`, the four commits arriving in
+the merged tree — and three lines that differ **only in the ref label**
+(this run derived from `main`, 08:15's from `origin/main`; the two are the
+same commit, 0/0, and the three lines are the two modify/delete notes and
+the one binary-file warning that print the label). That is
+[[merge-tree-name-only-counts-warnings]]'s *"normalise labels before blob
+diffs"* met on the name-only output itself. Stage lines **130 → 130**,
+sorted the same way: **byte-identical, zero moved**. `test.yml` conflict
+markers **3 blocks / 9 → 9**.
+
+The map is **frozen a thirteenth window** — and this one is stronger
+than the last two: upstream *moved* and the stage lines did not, which is
+what nineteen-touched-paths ∩ fifty-one = ∅ (`comm -12` on the two sorted
+lists: empty) predicts and the stage OIDs confirm. Membership last changed
+08-30 16:15, stage content last moved 08-31 04:15 (`vite.config.ts`).
+Price unchanged: **six hand-merges (one a single constant) + two policy
+calls**.
+
+**#1531 did not move**: still OPEN, `updatedAt` 2026-08-30T18:10:25Z —
+the same timestamp the 04:15 and 08:15 entries read — 76 files, 6 of the 51.
+
+### The import check's first non-zero — four fork tests import the module #1601 rewrote, and it is not a precondition
+
+Every window since 08-30 20:15 has run the same compile-trap check and
+read **0**: does any fork file import a module the range touched? This
+window it reads **4**, so the derivation is written out rather than
+summarised.
+
+Nine non-test modules touched. `git grep` on `main` under `clients/**`
+for `from '…/<name>'` across the nine names → **71** importer files
+anywhere on `main` (the positive control is inside the set:
+`epic-session-registry` alone has **63**, so the grep binds; four of the
+nine names read 0 because the file **is absent on `main`** — the
+`ABSENT` state, not a zero, [[measurements-need-three-states]]). Those 71
+intersected with:
+
+- the **388** fork-touched code paths since base (`git diff --name-only
+  8f21d506f main`, `.ts/.tsx/.mjs/.js`, `docs/` excluded) → **1**:
+  `clients/gui-app/src/components/layout/__tests__/desktop-dialog-host.test.tsx`,
+  importing `disposeAllOpenEpicSessions` and `getOpenEpicRegistry` —
+  **neither name appears anywhere in the range's diff**;
+- the **359** fork-only `.ts/.tsx` paths (`--diff-filter=A upstream/main
+  main` — a different cut from the 04:15 entry's 339 *"ours-since-base
+  minus theirs-since-base"*, so the two totals are not comparable) →
+  **3**: `__tests__/acceptance/managed-command-s5-sidebar.test.tsx`,
+  `__tests__/acceptance/managed-command-s8-s9-tile-ref-resources.test.tsx`,
+  `epic-canvas/sidebar/__tests__/managed-command-sidebar.test.tsx` — each
+  imports `EpicSessionContext` and renders `<EpicSessionContext.Provider>`
+  twice.
+
+All four go through `epic-session-registry.ts`, and `EpicSessionContext`
+is one of the three exports #1601 changed:
+
+```
+- export const EpicSessionContext = createContext<OpenEpicStoreHandle | null>(null);
++ export const EpicSessionContext = createStableDevContext(
++   "__TRAYCER_EPIC_SESSION_CONTEXT__",
++   () => createContext<OpenEpicStoreHandle | null>(null),
++ );
+```
+
+`createStableDevContext(key, create)` returns `create()` **directly when
+`import.meta.hot === undefined`** — vitest and every production build —
+and only under Vite HMR memoises the context on a `globalThis` key so a
+module re-evaluation does not mint a second, incompatible context. Its
+return type is `NonNullable<EpicSessionDevGlobals[K]>`, i.e. the context
+type itself. Same object shape, same `.Provider`, same generic. **The
+three fork tests compile and run unchanged after a merge; the fourth
+imports two names the range never touched.** Not a precondition; not a
+hand-merge; a copy. Recorded so the next run that reads non-zero here
+knows the number has been non-zero before and exactly what cleared it —
+the trap this check exists for ([[clean-merge-may-not-compile]]) is a
+changed *signature* under an unchanged *path*, and this range changed the
+constructor, not the signature.
+
+### The Claude desktop app went down for an update at 09:54 and came back the same version — nobody was at the keyboard
+
+The process row has carried *"the Claude desktop app (pid 29588 +
+children, 08-28 10:23) still resident"* for three days. This run it is
+gone, and `claude.exe` 35092 (the Store package,
+`WindowsApps\Claude_1.40609.0.0_x64__…`) plus eight children (crashpad, gpu, three renderers, three utilities) exist from
+**09:55:10** today, parent pid 11436 — a process that has since exited.
+Read, not inferred:
+
+- `%APPDATA%\Claude\logs\main.log`, **09:54:38**: `beforeQuitForUpdate
+  handler fired, going down for update`, then `GPU process gone:
+  { reason: 'crashed', exitCode: 34 }` during the teardown; the log's
+  last line, no later instance writes to it;
+- `C:\ProgramData\Claude\Logs\cowork-service.log`: `Service stop
+  requested` 09:55:08 → `Client connected: exe=claude.exe` 09:55:13, a new
+  VM session;
+- the updater's own lines through 01:24 today: `Staged version 1.40609.0
+  is still current`; `Get-AppxPackage` reads **v1.40609.0.0**, install
+  directory created 08-29 00:54. **Same version before and after** — the
+  updater cycled the app, it did not deliver one;
+- since 09:55:10 the AppX deployment log has fired id **471** every six
+  minutes (**25** by 12:18; **zero** in 08-20..08-30), failing with
+  `0x12C` to delete `WindowsApps\Deleted\Claude_1.14271.0.0_…` — the
+  leftover of a much older package the cycle tried to sweep. Cosmetic.
+
+**Why it earns a section:** an orphaned parent on a GUI process is
+exactly what a hand at the Start menu does NOT look like here — the 08-28
+launch this ledger did attribute to a person was **explorer-parented**
+([[logon-count-is-not-attendance]]) — and the app's own log names the
+actor. The attendance row's *"none"* stands on two independent reads, not
+on the absence of one. The Traycer desktop app, the artifacts and the
+epic were not touched: no `cloud repair` / `file sync` line in `host.log`
+since 08-26, tickets index mtime unchanged.
+
+### The fifteenth face, read on purpose at the pre-push re-check — host-close at +46 s, in-command refresh, one call again
+
+The 08:15 run predicted this token dies **12:29:15**, from `savedAt`
+(08:29:15.093). The bearer itself says `iat` 08:29:14, `exp` **12:29:14** —
+read from the JWT payload, one second earlier than `savedAt` + 4 h, the
+file write landing after the mint. This run's three working reads all
+landed inside the valid window on the wall clock: `agent list` 12:15:30
+(1.26 s, 115 agents, exit 0), the re-read 12:16:33 (0.89 s), `agent role
+list` 12:18:19 (1.15 s, four claims) — `savedAt` untouched through all
+three. No face was read by accident.
+
+The pre-push read *had* to run past `exp` (the push gate wants a fresh
+fleet reading and the token died mid-run), so it was placed by a
+background script that waited for the wall clock — the 04:15 run's
+mechanism — with call B prepared behind a `savedAt` gate. Call A at
+**12:30:00.330, +46 s** after the JWT's `exp`: `host.log` writes **`fatal
+close state=authenticated code=UNAUTHORIZED reason="exp"` at
+12:30:01.721** — the **twenty-first** since rotation — and the CLI
+**refreshes in-command** (`savedAt` → 12:30:02.452), returns all 115
+agents, **exit 0** in 2.71 s; `cli.log` shows a plain started/completed
+pair for it and no `warn` line. The gate read false and call B never fired.
+
+**What it adds:** the host column of the offset table gains **+46 s**
+(now +40, +46, +63, +71, +123, +219). The offsets where the *user-fetch*
+server answered (+8, +10, +11) and the one *accepted* read (+14) all sit
+below +40 and this read leaves that untouched — but it proves no boundary
+either: +8 has read both ways
+([[cli-token-expiry-matches-checkin-interval]]). The operational line is
+unchanged and this run used it as written: call, gate on `savedAt`, no
+`whoami` — and for the second run running, one call was the whole
+procedure. Keyed against this run's first snapshot: **0 added, 0 removed,
+0 changed, 0 active** — the idle reading held to the push.
+
+**For the 16:15 run:** its `claude.exe` starts ~16:15:03 and this bearer
+(`iat` 12:30:02, read from the payload) dies **16:30:02** — fifteen minutes
+in. Gate the reads past `exp` on the clock; one call may be the whole
+procedure, but keep the second prepared.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by claim id against 08:15, the 115-agent list keyed by id against both 08:15 snapshots with every field compared, then re-read at 12:16 and keyed again, all 41 worktree entries' `status --porcelain` with the wt-guiapp-main pile's nine paths and mtimes re-read, `host.log` counts since rotation and inside the window with the level-anchored 429 method, the storm's per-room and per-window attribution, the sync-timeout kind against the five windows before it, process sweep with dated creation times and parent attribution — this run's pid chain, the Claude desktop relaunch traced through three of its own logs and the AppX deployment log, the sleep/wake query, the KP-105 recount naming the new pair, VM power state, the scheduled task's last/next/result, the 08:15 script log); upstream fetch (+4, all four commits read with `--stat`), the merge re-derived at the new their-tip with the name-only output diffed whole against 08:15's file (labels normalised) and the stage lines diffed after sorting, the nineteen touched paths intersected with the 51, the nine touched modules checked for existence on `main` and for importers anywhere / fork-touched / fork-only, the one changed export read to its definition; side counts re-derived from the merge-base; #1531 re-read; the Tests run's 14 jobs and the CodeQL job from `attempts/1/jobs` with runner names |
+| Recovery | **none needed** — no red on the tip, no stranded agent, no dirty tree |
+| Build work | **none** — the four upstream commits touch nothing the fork must answer for, the map is frozen, every open item is still Elliot's; tickets index mtime unchanged since the 08-26 repair |
+| This entry | the forty-seventh; count sites 46 → 47 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | untouched — a tenth green run under the flag adds no row; ask (1) still waits on a red shard |
+| Push notification | **not attempted** — nothing this window is the 08:15 kind of finding; the last three attempts all read *"Remote Control inactive"* |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the thirteenth window at `b007bc4a6` and the first non-zero import read with its clearing; `fork-ci-has-never-run-gui-app` gains the tenth green and a first-attempt CodeQL green after the rerun; `checkin-entries-live-on-main` count → 47; `cli-token-expiry-matches-checkin-interval` gains the fifteenth face; `logon-count-is-not-attendance` gains the orphaned-parent-plus-own-log reading |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@b007bc4a6`: 416 in /
+   522 ours / **51** conflicted paths (frozen a **thirteenth** window by
+   path and by stage content; stage content last moved 04:15,
+   `vite.config.ts`'s dev-only `warmup` copy); pricing **six hand-merges
+   (one of them a single constant) + two policy calls**, unchanged.
+   Preconditions, still three: (a) resolve
+   `clients/mobile/src/mobile-runner-host.ts` as *theirs* **and then replace
+   the `DEVICE_FLOW_CLIENT_ID` ternary with the literal `"desktop"`** (keeps
+   the kind production authn accepts and deletes the module-scope read of
+   `__TRAYCER_MOBILE_CONFIG__`, which the fork's `/next/` build does not
+   bake; skip it and the bundle throws at boot, `tsc` says nothing, and
+   `a272c32f6` goes red); keep `vitest.config.ts` as *ours*; (b) add
+   `clock: null` at the three fork-only `new WsStreamClient({…})` sites —
+   `clients/remote-bridge/src/bridge-client.ts:135`,
+   `clients/remote-bridge/src/__tests__/chat-session.test.ts:217`,
+   `clients/mobile-push-service/src/host-notifications-client.ts:94`;
+   (c) land the merge through a pull request, or run `bun run compile`
+   before pushing — a push straight to `main` compiles nothing. Regenerate
+   `bun.lock`; the post-merge *"re-verify the loopback bridge dials"* step
+   stays mandatory (#1458, #1475, #1509, #1567). Saying *"run it on a
+   candidate branch"* is enough. Still one line from 08-29 16:15: after the
+   merge an unreachable owner's chat renders read-only (#1547) *and* is
+   movable with `move-chat.mjs` — decide whether both should exist. **Note,
+   not a precondition:** upstream's open **#1531** (browser shell at `/app`)
+   overlaps 6 of the 51 including both `mobile-runner-host.ts` and
+   `main.tsx`; if it merges before the fork does, (a) is re-derived and the
+   larger question is whether `/next/` should become upstream's webapp
+   rather than merge past it. **Also not a precondition:** #1601's
+   `epic-session-registry.ts` rewrite reaches four fork tests through
+   `EpicSessionContext` and hands them the same context object — a copy.
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this fork's
+   CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or leave
+   the shards on 2-core `ubuntu-latest`, or deallocate it if it serves
+   nothing else. One word settles it; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (37,979 lines, three rooms, ~214/hr).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   retiring `/`, the Teams app-package install (the exempted shortcut),
+   ConvBot S1 grading.
+6. **Unchanged, small:** the push-path compile hole is upstream's as much
+   as ours; the check-in will not open an upstream issue or PR on its own.
+   The flapping power supply has now paired four times in just over eleven
+   hours (00:49, 05:47, 06:00, 12:03) — intervals of 5 h, 13 min, 6 h, so
+   not shortening; still cosmetic while the box holds AC.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-31 08:15 — a docs-only push's CodeQL leg died at nine seconds on a runner-side ECONNRESET before init produced anything, the first CodeQL red in the streak and the rerun is the discriminator — green in 3 m 35 s on the identical commit; Tests ninth consecutive green 14/14 on the same commit; upstream unmoved and the 51 hold a twelfth window — paths byte-identical, 130 stage lines content-identical once both derivations are sorted the same way; the storm climbs back to ~227/hr; two more three-second supply-flap pairs; every CLI read landed before the 08:25:35 exp except the pre-push read, taken deliberately as the fourteenth face: host-close with in-command refresh on the FIRST call, at +219 s — one call was the whole procedure
 
