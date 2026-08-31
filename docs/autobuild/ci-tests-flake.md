@@ -27,8 +27,9 @@ runs alternate:
 | `1d5f3b88d` | ❌ (run 33147777425) | `traycer-clients-gui-app shard 3` — a **fourth** distinct shard; the failed step's log again names no test (NX-collapsed, read not assumed). `gh run rerun --failed` at 20:18:45 AEST by the 20:15 run; attempt 2 green (shard 3 passed 20:24:16 AEST), read at landing time from `actions/runs/33147777425/attempts/2/jobs` |
 | `f961c985e` | ❌ (run 33228761908) | `desktop darwin + packaging` — a **fifth** distinct member and a **second** darwin test: 1 of 25 in `src/electron-main/host/__tests__/host-lifecycle.test.ts` (*"forced reload emits null for unchanged unreachable pid metadata and restores the same host id when it is reachable again"*), named by the job log (darwin is not NX-collapsed). Upstream-inherited (authors Anurag Sharma / Hardik Shingala, last touched on `main` 2026-08-03 by #913; not in the fork's 545 since-base paths). All four gui-app shards green on attempt 1. `gh run rerun --failed` at 16:19:24 AEST by the 16:15 run; attempt 2 green (darwin passed 16:21:35 AEST), read by the 20:15 run from `actions/runs/33228761908/attempts/2/jobs` |
 | `fff118e2d` | ❌ (run 33238440979) | `traycer-clients-gui-app shard 2` — the shard-2 member's second appearance, and the log names it: `src/components/settings/panels/__tests__/providers-settings-panel.test.tsx` (74 tests \| **39 failed**) in 22,172 ms — the **same 39 tests by name** as run 32957853364 (the two `×` lists diffed: identical; 13 over 1 s and 26 under, in both). The assertion text is cut by Nx's replay cap in both logs. Passes **74/74 locally** on this tree (`fff118e2d`, 103.9 s, 20:24 AEST). Upstream-inherited (Hardik Shingala / Anurag Sharma, last touched on `main` 2026-08-05 by #976; not in the fork's 545 since-base paths; upstream has moved it ten times since — blob `a341e87ca` ours vs `b1509b9d1` theirs — so the fork merge replaces it). All other 13 jobs green on attempt 1. `gh run rerun --failed` at 20:20:31 AEST by the 20:15 run; attempt 2 green (shard 2 passed 20:26:26 AEST), read at landing. A two-file docs delta (this ticket + the ledger), still no code. **2026-08-30 00:15:** the exact CI invocation (`vitest run --config vitest.config.ts --shard=2/4`) run locally in `wt-guiapp-main` at `b88160082` → **264 files / 2904 tests, all passed**, the same set as CI's shard 2, in 901.58 s (import 642.36 s vs CI's 170.04 s) — a run 3.5× slower than CI's passed all 74, so speed alone does not select the 39. |
+| `2033ae2ba` | ❌ (run 33426074181) | `traycer-clients-gui-app shard 4` — the shard's **third** appearance, and the family's **first red under `--outputStyle=stream`**: the job log (job `99599830543`) names everything ask (1) said it would — `src/components/home/host-workspace-selector/__tests__/workspace-folders-refresh.test.tsx` > *"folder-mapping refresh affordance > re-derives on R while the picker is open"*, `AssertionError: expected +0 to be 1 // Object.is equality` with the expected/received diff and the code frame at `:117:7` (`fireEvent.keyDown(document.body, { key: "r" })` … `.toBe(1)` — a listener-registration race by shape), plus the full summary: `Test Files 1 failed \| 263 passed (264)`, `Tests 1 failed \| 2638 passed (2639)`, `Duration 304.29s (import 243.25s, tests 101.04s)` — **80% of the red shard is module import** on the 2-core box. Upstream-inherited (Hardik Shingala, #852/#878; fork last touched it 2026-08-01; upstream has rewritten it three times since — #1188, #1310, #1514 — so the fork merge replaces this file too). Not in the merge map's 51. All other 13 jobs green on attempt 1; a one-file docs delta (the 04:15 ledger entry). `gh run rerun --failed` at 08:25:12 AEST by the 08:15 run; attempt 2 green (shard 4 passed 08:29:16 AEST, 3 m 53 s), read by the same run from `attempts/2/jobs` |
 
-Identical trees, seven red runs, five distinct failing members (two darwin tests, three gui-app shards), shard 4 twice and shard 2 twice — and shard 2's is the one member that is now **named and repeatable**: the same 39 of 74 in `providers-settings-panel.test.tsx` on both of its appearances, green on every rerun and locally.
+Identical trees, eight red runs, five distinct failing members (two darwin tests, three gui-app shards), shard 4 three times and shard 2 twice — and two members are now **named**: shard 2's (the same 39 of 74 in `providers-settings-panel.test.tsx` on both of its appearances, green on every rerun and locally) and, as of 2026-09-01, shard 4's (`workspace-folders-refresh.test.tsx`, one test, named with assertion text on its first stream-era appearance).
 A flake family, not a regression. Prior recorded member: gui-app **shard 1**, on
 2026-08-24 (run 32682942738, green on attempt 2) — so gui-app shards have
 now flaked at 1, 2, 3 and 4.
@@ -98,23 +99,31 @@ saw.
 
 Two independent halves; either alone helps:
 
-1. **Make shard failures observable** — vitest reporter output (or at
-   minimum the failing file list) must survive NX into the job log.
-   **Landed in `3013bdd95`; mechanism verified on a green pair 2026-08-30
-   00:15 (7 → 262 per-file lines, summary present, lines live). Confirm
-   the assertion text on the next red shard, then close this half.**
+1. ✅ **CLOSED 2026-09-01 08:15 — make shard failures observable.**
+   Landed in `3013bdd95`; mechanism verified on a green pair 2026-08-30
+   00:15 (7 → 262 per-file lines, summary present, lines live). The
+   condition this half set for itself — *"confirm the assertion text on the
+   next red shard"* — was met by run `33426074181` (shard 4, the `2033ae2ba`
+   row): file, full test title, assertion with expected/received, code
+   frame and summary all present in the job log. Nothing further to do.
 2. **Deflake or quarantine the members** — the two darwin tests
    (`host-management-channel` and `host-lifecycle`, both upstream-inherited
    desktop code, not fork-authored), the named shard-2 member
    (`providers-settings-panel.test.tsx`, the same 39 of 74 both times, green
-   locally and on every rerun — its assertion text is what (1) will surface),
-   and whatever shards 1, 3 and 4 turn out to be once (1) has caught one.
+   locally and on every rerun), the named shard-4 member
+   (`workspace-folders-refresh.test.tsx` > *"re-derives on R while the
+   picker is open"*, caught 2026-09-01 — upstream-inherited and rewritten
+   upstream since, so the fork merge replaces it), and whatever shards 1
+   and 3 turn out to be. Note the pattern: every named member so far is
+   upstream-inherited and superseded by the pending fork merge — the merge
+   is also the deflake.
 3. **Decide the runner** — either register `altra-vm-runner-demo-aue` to the
    fork and set `vars.GUI_APP_RUNNER`, or accept 2-core `ubuntu-latest` for a
    suite upstream sizes for 8 cores. The VM is running and this fork's CI
    does not use it. Measured on the green shard 2 of `33248191528`:
    `import 170.04s` of `Duration 254.00s` — two thirds of the shard is
-   module import on the 2-core box.
+   module import on the 2-core box. Re-measured on the red shard 4 of
+   `33426074181`: `import 243.25s` of `Duration 304.29s` — **80%**.
 
 Verify any fix against the runs in the table — same tree, so a rerun of
 those exact commits is a controlled experiment.
