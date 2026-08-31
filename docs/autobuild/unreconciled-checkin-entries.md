@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **forty-nine** entries in this
+everything came down, nothing went up. The **fifty** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **forty-nine**. Three count sites remain in this header: this
+on this file → **fifty**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,382 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the forty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
+the fifty entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+## 2026-09-01 00:15 — upstream +4 inside this window and #1613 (WebRTC display plane, 148 files, +17,976) is the first range to hand the merge a NEW compile-time precondition: it adds `browser_human_needed` to `hostNotificationKnownPayloadSchema`, and the fork-only `push-payload.ts` switches over that union with no default and a non-nullable return — by its own docblock's design it stops compiling until the phone declares a destination — so the preconditions go three → **four**; the 51 hold a SIXTEENTH window by path but NOT by stage content — two far sides moved, both OUTSIDE their blocks (`protocol/package.json` gains three `exports` while its block is the `lint` script; the ws-stream-client test's `minor: 1 → 2` sits 950 lines above its redial block), copies both; the range also lands on `runner-host.ts`, fork-touched and auto-merged, and the merged blob equals *theirs* because upstream has carried the fork's `canPickNatively` hunk since #1054 (08-08) — a silent both-sides resolution that resolves to the same bytes; #1613 re-times the relay keepalive the loopback bridge dials through and joins the post-merge re-verify list as a fifth number; **#1618** (PDF preview) is new and lands on three lockfile-shaped paths of the 51; #1531 unmoved a sixth window; Tests thirteenth consecutive green 14/14 and CodeQL green on attempt 1, `main` six-for-six on its tip without a rerun for the fourth run running; the storm up to ~231/hr on the same three rooms; **two new** three-second supply-flap pairs (21:04, 22:31 — eight in the day, none since midnight); and the token's eighteenth face, read on purpose past `exp`: host-close with in-command refresh on the first call at +51 s, exit 0 — the prepared second call never fired, for the fifth run running — while the run's own capture script lost the past-exp snapshot to a PowerShell variable whose name differed from the path's only by case
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (102,062 lines at 00:27; rotation still 08-24 16:30; 99,591 at the 20:20 anchor, so +2,471 in the window) |
+| Genuine rate-limiting (level-anchored, whole-word, bracketed timestamp stripped first, UUID substrings stripped) | **0** in the window and **0** since rotation |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since |
+| Agents blocked / errored / stranded | **none** — `agent role list` returns the same four claims as 20:15 (`1346ba6c` / `5513a487` / `e1a7613f` / `26a8d330`; the payload byte-identical once its own `timestamp` field is stripped), every holder `active: false`; **0 of 115** registered agents `active`; `agent list --all --json` keyed by id against the 08-31 00:15 pre-push snapshot → **0 added, 0 removed, 0 changed** (every field), and the same 0 / 0 / 0 against the 20:15 first snapshot and the 20:15 pre-push capture |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried, numbers current below; the merge's price is unchanged but its **precondition list grew by one** this window |
+| Dirty trees attributable to an agent | **none new.** All **40** worktree entries swept with `git status --porcelain` (`git worktree list --porcelain \| grep -c '^worktree '` → 40; 35 directories present + the five `Temp/bundle-wt*` entries still `prunable`, directories gone; admin dir mtime still 2026-08-26 08:23:26): electric-stork's `scratch/` gained only this run's derivation files; the build repo's three untracked paths unchanged (`clients/teams-bot/`, `clients/teams-help/`, `scratch/guiapp-measure/`); `wt-guiapp-main`'s pile frozen — the same nine paths, same mtimes (`scratch/assemble/` 08-26 08:28, `scratch/checkin-0015/` 08-25 00:41, the rest 08-24 16:47); the probe piles in `a2-mutation-probe` (3), `eval-composer-bug` (18), `mobile-deploy-ecd64d15` (1), `upstream-mobile-web` (7), `mobile-v2-s5-liveness` (1), `traycer-mobile-v2-evidence-gate` (8) all long-standing — left alone |
+| `main` vs `origin/main` at start | **0 / 0** @ `577c30ebe` — the 20:15 landing, pushed 20:32:58, the only movement since |
+| Tests on `main` @ `577c30ebe` | **GREEN on attempt 1, 14/14 jobs** — run `33382906322`, 20:32:58 → 20:38:41 local (5 m 43 s); all four gui-app shards `success` (main lane 20:38:30, shard 2 20:38:40, shard 3 20:38:34, shard 4 20:38:35); darwin `success` 20:35:47; every job GitHub-hosted (`GitHub Actions 1000004630`–`4648`, read from `attempts/1/jobs`). **Thirteenth consecutive green Tests run under `--outputStyle=stream`**; the flake ticket's ask (1) still has no red shard to read |
+| CodeQL on the same tip | **`success` on attempt 1** — run `33382906442`, `Analyze (javascript-typescript)` 20:33:02 → 20:36:31 (3 m 29 s). Secret scan, Protocol Compatibility (`guarded-files-tripwire` `skipped`, as every push), Real supervisor and pre-commit all `success` on attempt 1 — the tip is **six-for-six without a rerun, for the fourth run running**. No run newer than 20:32 local on any branch |
+| `CredentialLeaseReleasedError` storm | **40,656** at 00:27 (was 39,712 at 20:20) — **924 inside 20:16–00:16 by timestamp, ~231/hr**, against 873 / ~218/hr on the 20:15 read. Per room, `stayed disconnected; rebuilding provider` in the window: `…01KYBT17` 235, `…01KYNP5D` 233, `f347a4fb…` 239, `…01KZMPSW` **0** — its last rebuild line is still 08-30 16:16:34. `EpicTokenRefresher: batch threw` **924**, in lockstep. *"Tiptap sync timed out"* **5** this window against 16 / 17 / 18 / 8 / 26 in the five before it — the quietest window for that kind since the storm began |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **twenty-three** since rotation at the 00:20 sweep, **+0 in the window** — the 20:31:42.730 line the 20:15 entry already counted as the twenty-third is the newest. The pre-push read below made it **twenty-four**, at 00:32:34.756 |
+| Headless `claude -p` on the box | **1** — this run (pid 8456 ← `powershell.exe` 6372 running the check-in script under `svchost`, created 00:15:01–03; `Traycer-Autobuild-Checkin` last 00:15:01, next **04:15:00**, `LastTaskResult` 267009 = still running). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 08-29 06:45:12) both still up; the `serve-web.mjs` node 14232 since 08-25 02:30:34 likewise. The Claude desktop app is **still the 09:55:10 instance** (pid 35092 under `sihost.exe` + nine `--type` children, all 09:55:10–16) — no further cycle. The two orphaned `powershell.exe` from 08-26 23:01:26 / 23:05:57 (pids 15256 / 9772) still present; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none.** Newest explorer-parented process is still `chrome.exe` 7164 at **2026-08-28 11:50:51**. Kernel-Power **42** since 08-31: **0**; up since 2026-08-25 02:29:28. Kernel-Power **105** *"Power source change"* on 08-31: **16** — the six pairs the 20:15 entry read **plus two new inside this window: 21:04:35 / 21:04:38 and 22:31:46 / 22:31:49**, the same three-second shape; **0 since midnight**. Battery reads AC (`BatteryStatus` 2), 100% |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| DNS / upstream reachability | **no event in the window.** `ENOTFOUND` still 22 lines (the 08-26 16:06–16:41 dump) |
+| VM (`az vm list -d`, this run, 15 s) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running (and known not to serve this fork's CI); the three sensormine VMs deallocated |
+| The 20:15 run's own script log | `exit 0`, *"ran, 16 lines of output"*, ending with that run's recap |
+| Tickets (`traycer-remote-teams/tickets`) | untouched — index mtime still 08-26 04:23:27, the repair's write |
+
+### Upstream +4 inside the window, and the range leaves `clients/gui-app` again — this time into `protocol/`, `clients/shared`, `clients/desktop`
+
+`upstream/main` moved `c09d36d91` → **`1fa23d6e4`**, four commits, all four
+merged after the 20:15 run's derivation (its `merge-tree` file is stamped
+20:17:08): #1615 at 22:26:05 local, #1617 22:49:46, **#1613 23:17:49**,
+#1614 23:27:09. **428** in / our **525** at `577c30ebe` (the one new
+our-side commit is the 20:15 ledger entry). Merge-base at both tips: still
+`8f21d506f`. The range with `--stat`: **175 files, +18,568 / −2,658** —
+119 under `clients/gui-app`, 23 under `protocol/src`, 22 under
+`clients/desktop`, 8 under `clients/shared`, 2 under `clients/mobile` (a
+dev doc and an iOS device script), plus `protocol/package.json`. 63 of the
+175 exist on `main`; 112 are new modules that arrive whole with theirs.
+
+| Commit | What it is | Where it lands on the fork |
+| --- | --- | --- |
+| `c09c8d0fb` **#1615** feat | nest the mobile artifacts list (5 files, +538 / −43) | `settings-sections.ts` exists; read in the import check below |
+| `0a62c02aa` **#1617** fix | keep agent names visible and tappable in A2A card headers (3 files, +18 / −8) | `agent-header-link.tsx` exists, gui-app-internal |
+| `e79301e97` **#1613** feat | **WebRTC display plane, DataChannel input, materialization-time tab placement** (148 files, +17,976 / −2,571): a browser-session surface end to end — `protocol/src/host/browser/contracts.ts`, `host-transport/{relay-liveness,rtt-deadlines,vantage}.ts`, a new notification kind `browser.human.needed` (feed minor **1.1 → 1.2**, list minor 2.1 → 2.2), desktop `browser-view-*` and lifecycle IPC, `RelaySocket` re-timed off a path estimator | **the one that matters** — three threads read below: the exhaustive switch, the two moved far sides, and the relay |
+| `1fa23d6e4` **#1614** fix | rename the *Link a phone* surface to *Link mobile app* (19 files, +36 / −36) | copy-only: one of its 19 hunks is the docstring in `runner-host.ts`, read below |
+
+`git merge-tree --write-tree --name-only origin/main upstream/main` at the
+new their-tip: **51** conflicted paths. Against the 20:15 saved output
+(parsed to the first blank line, both sides sorted): **+0, −0** — the
+path list is byte-identical. The merged-tree OID `e79b83653` →
+`fdb79d172`. Stage lines **130 → 130**, sorted the same way (literal tab
+in the pattern, per the 20:15 note): **two moved**, both stage 3 —
+
+| Path | Stage 3 (theirs) | What moved | Where its block is |
+| --- | --- | --- | --- |
+| `protocol/package.json` | `34081008e` → `0590917f9` | three new `exports` entries (`./host-transport/relay-liveness`, `rtt-deadlines`, `vantage`) in both the source and `dist` maps — additive, +15 lines | the block is the **`lint` script** (ours `eslint … --max-warnings 0` + a `lint:fix`; theirs `oxlint -c oxlint.config.ts --fix --deny-warnings .`) — the Oxlint policy call the 08-27 12:15 entry priced. The far side moved in the two `exports` maps (merged-blob lines 25 and 96); the block is at line 144. **A copy** |
+| `clients/shared/host-transport/__tests__/ws-stream-client.test.ts` | `431106cca` → `cfbd05222` | two hunks at lines 3033 / 3068: the mirrored `host.notifications.feed.subscribe` handshake literal `schemaVersion.minor` **1 → 2**, following the registry's new `latestMinor` (+8 / −6) | the block is the **redial-wait flake fix at line 3989** (ours `waitForSocketBeyond`, theirs `nthSocket` + `pollUntil`) — the same one block as at 20:15 (`grep -c '^<<<<<<<'` on the merged blob: 1 → 1). The far side moved ~950 lines above it. **A copy** — and the resolution is still theirs |
+
+`test.yml` conflict markers **3 blocks / 9 → 9**. Range ∩ 51 (`comm -12`
+on the sorted lists): **the two paths above** — the first non-empty
+intersection since the map was first drawn. Range ∩ the **386**
+fork-touched code paths since base: the test above plus
+`clients/shared/platform/runner-host.ts`; ∩ all **546** fork-touched paths
+of any kind: those two plus `protocol/package.json`. So one path is
+both-sides-touched *and* not in the 51 — the silent-resolution shape —
+and it is read next.
+
+The map is **frozen a sixteenth window by path**; stage content moved for
+the first time since 08-31 04:15, and both moves are copies. Price
+unchanged: **six hand-merges (one a single constant) + two policy calls**.
+What changed is the list of things that must be true before `tsc` passes
+on the merged tree — below.
+
+### `runner-host.ts` merges clean with both sides changed — because upstream has had the fork's hunk since 08-08
+
+`git diff 8f21d506f origin/main -- clients/shared/platform/runner-host.ts`
+is one hunk: `readonly canPickNatively: boolean` added to
+`IWorkspaceFoldersHost` (fork commit `8f9785fd8`, 08-24, the
+Teams-client-on-the-trunk landing). The range's hunk on the same file is
+the #1614 docstring rename at line 201 (*"Link a phone"* → *"Link mobile
+app"*). Different regions, so `merge-tree` auto-resolves — and the merged
+blob's OID is **`f707114e6`, identical to theirs**. That reads like the
+fork's hunk was dropped. It was not: `git log -S canPickNatively` on the
+upstream side finds it at `10c6744e9` **#1054, 2026-08-08** — the remote
+folder picker over `workspace.browseFolders` — sixteen days before the
+fork's commit carried the same lines in. Theirs has the member at line
+1418 with the same docblock; every implementer sets it on both sides
+(`desktop-runner-host.ts:798`, `mobile-runner-host.ts:213`,
+`mock-runner-host.ts:269` on theirs; 679 / 117 / 174 on ours), and theirs
+additionally *reads* it in `remote-folder-picker-dialog.tsx:427`. A silent
+both-sides resolution whose result is the right bytes. Not a precondition;
+recorded so the next reader of "merged == theirs on a fork-touched file"
+does not re-derive it.
+
+### Precondition (d): `browser_human_needed` breaks the phone's exhaustive route switch at merge time
+
+#1613 adds `hostNotificationBrowserHumanNeededPayloadSchema` —
+`{ kind: "browser_human_needed", epicId, chatId, sessionId, tabId, reason }`
+— as the eighth member of `hostNotificationKnownPayloadSchema`
+(`protocol/src/host/notifications/payloads.ts:345-354` on theirs), and
+`browser.human.needed` as a new row kind in `host-notifications.ts`. On the
+fork, `clients/mobile-push-service/src/push-payload.ts` is **fork-only**
+(absent on theirs) and its `routeFromKnownPayload` (lines 137-186) is
+`switch (known.kind)` over `HostNotificationKnownPayload`, seven `case`
+arms, **no `default`**, declared return `NotificationActivationRoute`. The
+package is `strict: true`. After the merge the switch is non-exhaustive,
+the end of the function is reachable, and `tsc` reports **TS2366** —
+*function lacks ending return statement and return type does not include
+'undefined'*. That is not an accident of the code; it is the file's stated
+contract (`push-payload.ts:132-135`: *"The switch is exhaustive over
+`HostNotificationKnownPayload["kind"]`, so a new arm in the protocol fails
+to compile here until it declares a destination — which is the point of
+restating the mapping rather than sharing a loose record."*). The same
+sweep found no other fork-only switch over that union (`merged-notifications.ts:1488`
+and `notification-row.tsx:359` in gui-app switch on it too, but both exist
+on theirs and take theirs' new arms with the merge).
+
+**What the arm should say.** Upstream's own `navigationPayloadFromKnown`
+routes the new kind to a **new route kind `browserSession`** (`{ epicId,
+sessionId, tabId }`, `clients/gui-app/src/lib/notifications/payload.ts`,
++159 / −35 in the range) that focuses the parked browser tile on the canvas —
+by `browserSessionTileId`, bound to the origin host — and falls back to
+opening the epic. The phone's route union lives in fork-only
+`notification-activation-envelope.ts:63` with four kinds (`approval`,
+`chat`, `interview`, `hostSurface`), and the `/next/` build has no browser
+tile to focus (`mobile-runner-host.ts` is *theirs* precisely because its
+`browserView` is the no-op face). The payload carries `chatId`, so the
+honest phone destination is the chat that asked for the human — the same
+shape as the `agent_stalled` arm two lines up:
+
+```ts
+case "browser_human_needed":
+  return { kind: "chat", epicId: known.epicId, chatId: known.chatId };
+```
+
+plus one row in `push-payload.test.ts` asserting the route and the replace
+key (`host:chat:<chatId>`-shaped through `chatOrEpicReplaceKey`). One arm;
+the decision is whether the phone should instead grow a fifth route kind
+it cannot yet render — this entry recommends it should not, until the
+phone has a browser surface to route into. **This cannot be pre-landed:**
+on today's `main` the literal is not a member of the union, so the same
+`case` is TS2678 before the merge and TS2366 without it after.
+
+Two neighbours of the same change, both copies: the phone's
+`host-notifications-client.ts` negotiates the feed through the shared
+`WsStreamClient` and will ask for `@1.2` after the merge (the test file
+above is the mirror of that literal), and `parseKnownHostNotificationPayloadForKind`
+gains its `browser.human.needed` → `browser_human_needed` mapping in
+shared protocol code — nothing fork-side restates that table.
+
+### #1613 re-times the relay the loopback bridge stands in for — a fifth number for the re-verify line
+
+`clients/shared/host-transport/remote/relay-socket.ts` (+40 / −4) now owns
+a `createRelayPathEstimator()` from the new
+`@traycer/protocol/host-transport/relay-liveness`: pong arrivals feed it,
+the awaiting-pong deadline becomes `min(estimator.deadlineMs(floor),
+RELAY_AWAITING_DEADLINE_CAP_MULTIPLE × floor)` (the new constant in
+`remote/config.ts`, `3`), the idle-pong check compares against
+`estimator.deadlineMs(RELAY_PONG_TIMEOUT_MS)` instead of the constant, and
+a `retireRun()` lands on close. The fork's loopback bridge
+(`scripts/remote-host-bridge/`, `5653043cc`) presents itself to the desktop
+as a `kind: "remote"` host — *"the fixed relay attach endpoint, plus a
+Noise-NK handshake"* (its README, lines 17–25) — so the desktop dials it
+through exactly this `RelaySocket`. No fork-touched file imports
+`remote/config` or `relay-socket` directly (the only importers are the
+`remote/` siblings), so nothing fails to compile; what changes is the
+keepalive timing on the wire the bridge test exercises. The post-merge
+line reads **#1458, #1475, #1509, #1567, #1613**.
+
+### The import check — 63 of 175 exist, nine reached by path and one through a barrel; one precondition, eight copies, and a merge-deleted quarter of the fork-only set
+
+Of the 63 range files that exist on `main`, 41 are non-test code modules.
+Three were read above; the other 38 had importers derived
+**path-qualified** (the specifier resolved against the importer's directory
+or the alias table — `@/` → `clients/gui-app/src`, `@traycer-clients/shared/*`,
+`@traycer-clients/desktop/*` → `clients/desktop/src`, `@traycer/protocol/*`
+→ `protocol/src/*` via the package's `./host/*` export; verified from the
+tsconfigs and `package.json` on `main`, not assumed) over 29,085 import
+lines in 4,186 files, then bucketed against the **386** fork-touched code
+paths and the **360** fork-only `.ts/.tsx` paths (`git diff --no-renames
+--diff-filter=A upstream/main origin/main`). One fact about that 360 the
+ledger has not carried: **79 of them are base files upstream deleted before
+`c09d36d91` and the fork never edited** — the merge removes them, so an
+import they hold is moot (72 are under `gui-app/src`; four appear as
+importers below and are discounted as *merge-deleted*).
+
+| Module | Importers on `main` | fork-touched / fork-only | What changed | Reading |
+| --- | --- | --- | --- | --- |
+| `protocol/src/host/notifications/payloads.ts` | 5 | **0 / 0 by path — reached through the `contracts` barrel** (`export *`, `contracts.ts:6-8`) by `push-payload.ts:1-5` | `hostNotificationKnownPayloadSchema` + `browser_human_needed` | **precondition (d)** — the second, independent derivation of the section above; no other fork file names `HostNotificationKnownPayload` (3 hits, all `push-payload.ts`) |
+| `protocol/src/host/notifications/host-notifications.ts` | 19 | **11 / 11** (`mobile-push-service` ×5, `remote-bridge/bridge-client.ts:6`, `shared/epic/{attention,host-notifications-feed,host-notifications-grouping}.ts` + test, `tools/print-wire-fixture.ts`) | + row kind `browser.human.needed`; V22 / V12 schemas; `hostNotificationsListDowngradeV21ToV10` **removed** → `V22ToV10` | every importer uses `HostNotificationEntry` or the released `@1.0` frame/entry schemas, all unchanged; a name sweep for every changed / added / removed identifier reads **0** in fork-touched ∪ fork-only; `attention.ts:85-96` switches on the kind **with a `default`**. Copy |
+| `protocol/src/host/registry.ts` | 84 | **6 / 6** (`host-notifications-client.ts:94`, `bridge-client.ts:127,136`, `chat-session.ts:16` + test, `single-host-stream-connection.ts:51`) | `host.notifications.list` 2.x `latestMinor` 1 → 2; `feed.subscribe` 1.x `latestMinor` 1 → 2 | additive; the registries are passed as values / generic types. Copy — **with a behavioural line below** |
+| `protocol/src/host/notifications/presentation.ts` | 3 | 1 / 1 (`push-payload.ts:78,98` + its test) | `formatHostNotificationPresentation` parameter V21 → V22, + one case | the fork passes the released `HostNotificationEntry`, assignable to the widened parameter. Copy |
+| `gui-app/src/lib/notifications/payload.ts` | 7 | 1 / 3 | `NotificationPayload` / `Kind` unions + `browserSession`; new parse / route cases | `push-service-envelope-contract.test.ts:25-28,39,106` uses `isNotificationPayloadRoutable` + the type as a tuple element — union widening, no exhaustiveness; the two `notification-focus-bridge.*.test.tsx` importers are merge-deleted. Copy |
+| `gui-app/src/stores/notifications/merged-notifications.ts` | 25 | 1 / 2 | non-exported `navigationPayloadFromKnown` + case | `native-notify-retry.test.tsx:46-68` `importActual`-spreads it and overrides `useMergedNotificationsActions` (untouched). Copy |
+| `gui-app/src/hooks/notifications/use-notification-activation.ts` | 12 | 1 / 1 (same file) | `notificationPayloadRequiresOriginHost` body gains `browserSession` | `native-notify-retry.test.tsx:42-44` full-mocks the untouched export. Copy |
+| `shared/host-transport/remote/config.ts` | 6 | 1 / 1 | + `RELAY_AWAITING_DEADLINE_CAP_MULTIPLE` | `remote-session.ts:45-56` imports ten pre-existing constants; `chunker.ts:1` is merge-deleted (upstream dropped it). Copy |
+| `shared/host-transport/remote/relay-socket.ts` | 1 | 1 / 0 | private path estimator; new import of `@traycer/protocol/host-transport/relay-liveness`; `RelaySocketOptions` unchanged | `remote-session.ts:82,610,1013` constructs it with unchanged options. Copy — and the new import is why `protocol/package.json`'s moved far side matters: `tsc` resolves it through the `@traycer/protocol/*` path either way, **runtime needs the `exports` line theirs adds** — a wholesale *ours* on that file (to keep the eslint script) would drop it; resolve the `lint` block only |
+| `gui-app/src/stores/notifications/host-notifications-store.ts` | 18 | 0 / 1 | feed entry → V22, feed frame → V12 | the one fork importer (`notification-focus-bridge.origin-ack.test.tsx:74`) is merge-deleted. Not reached |
+| the other 28 | 1–49 each | **0 / 0** | — | not reached |
+
+**The behavioural line, post-merge, not a precondition.** Both fork feed
+clients will negotiate `feed.subscribe@1.2` against a merged host (the
+handshake reads the registry's `latestMinor`) and then parse frames with
+the **released `@1.0` schema**: `host-notifications-client.ts:244` warns and
+drops the whole frame, `bridge-client.ts:555-556` returns silently. A
+snapshot carrying one `browser.human.needed` row is dropped entire. This is
+the same failure the fork already has for `host.operation.finished` under
+`@1.1` — **widened, not new** — and the repair is the one it already owes:
+parse with the negotiated minor's schema, or pin the subscribe to `@1.0`
+the way `watching-stream-registry.ts:30,35` already does for its own
+registry. Filed next to the #1602 port as the second post-merge line.
+
+### Upstream's open PRs, re-read against the 51: #1531 unmoved a sixth window, #1618 is new
+
+**#1531** (browser shell at `/app`): still OPEN, `updatedAt`
+2026-08-30T18:10:25Z — the **sixth** consecutive window at that timestamp
+— 76 files, byte-identical to the 20:15 saved list, **6 of the 51**
+(`bun.lock`, `lib/mobile-app.ts`, `router.tsx`, `mobile-runner-host.ts` +
+its test, `src/web/main.tsx`). **#1612** (mobile keyboard): `updatedAt`
+moved to 08-31T12:55:57Z, still 14 files, still **3 of the 51**
+(`capacitor.config.ts`, the iOS `Package.resolved`, `src/web/main.tsx`).
+**#1618** *feat(gui-app,protocol): PDF preview* — **new**, 62 files,
+updated 08-31T14:18:53Z — **3 of the 51**, all lockfile-shaped (`bun.lock`,
+`clients/gui-app/package.json`, root `package.json`); it also touches
+`protocol/src/host/registry.ts` and `clients/shared/host-transport/asset-stream-client.ts`,
+neither in the map. Of the rest: #1589 2 (`bun.lock`, gui-app
+`package.json`); long-open #1308 4 (`bun.lock`, `remote-session.ts` + its
+test, `protocol/package.json`), #1460 1 (`provider-ordering.ts`), #880 2;
+#1611 / #1610 / #1542 / #1575 / #1574 / #1560 / #1549 / #1537 / #1530 /
+#1478 / #1389 / #1362 / #1296 / #1295 / #889 / #219 / #154: **0**. **#1588**
+still OPEN, draft, **zero files**, unmoved since 08-30 09:36Z — upstream's
+placeholder for the day production authn accepts the `mobile` client kind.
+
+**Method note, filed because it cost a pass:** the PR file lists were
+saved by PowerShell with `Set-Content -Encoding UTF8`, which writes a BOM
+and CRLF. `sort | comm -12` against an LF list read **0 for every PR**,
+including the two whose overlap the 20:15 entry had already measured. The
+CR has to be stripped (and the BOM off line 1) before the intersection —
+the same family as the literal-tab and codepage notes: a zero from a byte
+you cannot see.
+
+### Two new supply-flap pairs, and the storm climbs
+
+Kernel-Power 105 fired **four** more times inside this window, as two
+pairs: 21:04:35 / 21:04:38 and 22:31:46 / 22:31:49 — the same three-second
+AC-to-battery-to-AC shape. **Eight pairs on 08-31**, two more than the
+20:15 entry's *"most any day has read"*, and none in the twenty-seven
+minutes since midnight. Still cosmetic while the box holds AC at 100% with
+no Kernel-Power 42. The storm is up: 924 lines / ~231 an hour on the same
+three rooms (873 / ~218 the window before), `01KZMPSW` silent a second full
+day; the sync-timeout kind, by contrast, reads its quietest window (5).
+
+### The eighteenth face
+
+The 20:15 run predicted this token dies **00:31:42**, from the JWT payload
+(`iat` 20:31:42), sixteen minutes into this run. This run's two working
+reads landed inside the valid window on the wall clock: `agent list`
+00:15:45 (2.09 s, 115 agents, exit 0), `agent role list` 00:20:00 (2.16 s,
+four claims) — `savedAt` untouched through both (20:31:43.520). No face
+was read by accident.
+
+The pre-push read was placed by the same clock-waiting background script
+as the last four runs, call B prepared behind a `savedAt` gate, console
+encoding set to UTF-8. Call A at **00:32:33.336, +51 s** after `exp`:
+`host.log` writes **`fatal close state=authenticated code=UNAUTHORIZED
+reason="exp"` at 00:32:34.756** — the **twenty-fourth** since rotation —
+and the CLI **refreshes in-command** (`savedAt` → 00:32:35.475; the new
+bearer reads `iat` 00:32:34, `exp` **2026-09-01 04:32:34**), returns
+52,537 bytes of agent list, **exit 0** in 3.33 s; `cli.log` shows a plain
+started/completed pair (14:32:34.175 → 14:32:36.617 UTC) and no `warn`
+line. The gate read false and call B never fired.
+
+**What it adds:** the host column of the offset table gains **+51 s** (now
++40, +46, +48, +50, +51, +63, +71, +123, +219). Nothing below +40 moved.
+The operational line is unchanged and this run used it as written: call,
+gate on `savedAt`, no `whoami` — and for the fifth run running, one call
+was the whole procedure.
+
+**What it lost, and why:** the capture itself. The script held the scratch
+path in `$S` and the CLI's output in `$s`, and PowerShell variable names
+are **case-insensitive** — the second assignment overwrote the first, so
+`Set-Content "$S\…"` was handed a 52 KB string as a directory and wrote
+nothing where the log went (the log's own path had been computed before
+the collision, which is why the log exists). The face is fully established
+without it — the host line, `savedAt`, the exit code, and a byte count
+identical to the 00:15 in-window read (52,537 both) — but the raw
+past-exp diff the 20:15 entry used to confirm the codepage fix could not be
+repeated this run. Not a token fact; a script fact. The next run's script
+must use names that differ by more than case.
+
+**For the 04:15 run:** its `claude.exe` starts ~04:15:03 and this bearer
+(`iat` 00:32:34, read from the payload) dies **04:32:34** — seventeen
+minutes in. Gate the reads past `exp` on the clock; one call may be the
+whole procedure, but keep the second prepared; set the console encoding in
+the background capture; and name the output variable something other than
+`$s`.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles by whole payload against 20:15 with the timestamp field stripped, the 115-agent list keyed by id against the 08-31 00:15 pre-push snapshot with every field compared and against both 20:15 snapshots, all 40 worktree entries' `status --porcelain` with the wt-guiapp-main pile's nine paths and mtimes re-read, `host.log` counts since rotation and inside the window with the level-anchored 429 method, the storm's per-room and per-window attribution, the sync-timeout kind against the five windows before it, process sweep with dated creation times and parent attribution — this run's pid chain, the Claude desktop instance re-identified by pid, the KP-42 / KP-105 recount incl. since-midnight, VM power state, the scheduled task's last/next/result, the 20:15 script log); upstream fetch (+4, all four read with `--stat` and their PR merge times), the merge re-derived at the new their-tip with the path list diffed against 20:15's and the stage lines diffed after sorting (two moved, each located against its conflict block in the merged blob), `test.yml` markers recounted, the 175 touched paths intersected with the 51 and with the 386 / 546 fork-touched paths, the 175 checked for existence on `main` (63 / 112), `runner-host.ts` read to its merged OID and the upstream commit that made it a copy, the notifications union diffed both sides and every fork-side switch over it located and classified by presence on theirs, upstream's own routing arm for the new kind read to the route type it needed, `relay-socket.ts` / `remote/config.ts` read against the bridge README's contract; importers derived path-qualified for the other 38 existing modules over 29,085 import lines (alias table verified from the tsconfigs and package exports), the fork-only set re-derived (360) and split into fork-added vs merge-deleted (281 / 79), the ten reached modules read to their diffs and each fork importer read to the names it uses, a name sweep for every changed identifier in the protocol modules, and the feed clients' parse path read to the frame schema they apply; every open upstream PR's file list intersected with the 51 (25 PRs, 24 lists — #1588 has no files — after the CRLF repair); the Tests run's 14 jobs and the other five workflows' jobs from `attempts/1/jobs` with runner names; the pre-push read placed by the clock and gated on `savedAt` |
+| Recovery | **none needed** — no red on the tip, no stranded agent, no dirty tree |
+| Build work | **none landed** — precondition (d) is a merge-time change (TS2678 before the merge, TS2366 without it after); the map is frozen by path; every open item is still Elliot's; tickets index mtime unchanged since the 08-26 repair |
+| This entry | the fiftieth; count sites 49 → 50 in lockstep per the header's rule, verified against `grep -c` after splicing |
+| Flake ticket | untouched — a thirteenth green run under the flag adds no row; ask (1) still waits on a red shard |
+| Push notification | **not attempted** — a new precondition is a merge-time fact for an attended merge, not the 08:15 kind of red; the last three attempts all read *"Remote Control inactive"* |
+| Memory | `upstream-mobile-app-is-a-draft-pr` gains the sixteenth window at `1fa23d6e4`, precondition (d), the two moved far sides, `runner-host.ts`, #1613 on the re-verify line and #1618; `fork-ci-has-never-run-gui-app` gains the thirteenth green; `checkin-entries-live-on-main` count → 50; `cli-token-expiry-matches-checkin-interval` gains the eighteenth face; `merge-tree-name-only-counts-warnings` gains the CRLF/BOM zero as a sixth mode |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@1fa23d6e4`: 428 in /
+   525 ours / **51** conflicted paths (frozen a **sixteenth** window by
+   path; stage content moved this window for the first time since 08-31
+   04:15 — two far sides, both outside their blocks, both copies); pricing
+   **six hand-merges (one of them a single constant) + two policy calls**,
+   unchanged. Preconditions, **now four**: (a) resolve
+   `clients/mobile/src/mobile-runner-host.ts` as *theirs* **and then replace
+   the `DEVICE_FLOW_CLIENT_ID` ternary with the literal `"desktop"`** (keeps
+   the kind production authn accepts and deletes the module-scope read of
+   `__TRAYCER_MOBILE_CONFIG__`, which the fork's `/next/` build does not
+   bake; skip it and the bundle throws at boot, `tsc` says nothing, and
+   `a272c32f6` goes red) — upstream's open #1588 says the same thing in its
+   title; keep `vitest.config.ts` as *ours*; (b) add `clock: null` at the
+   three fork-only `new WsStreamClient({…})` sites —
+   `clients/remote-bridge/src/bridge-client.ts:135`,
+   `clients/remote-bridge/src/__tests__/chat-session.test.ts:217`,
+   `clients/mobile-push-service/src/host-notifications-client.ts:94`;
+   **(d) — new this window — add a `case "browser_human_needed"` arm to
+   `routeFromKnownPayload` in
+   `clients/mobile-push-service/src/push-payload.ts` (recommended: the chat
+   route with the payload's `epicId` / `chatId`, the `agent_stalled` shape)
+   plus its test row; without it the merged tree is TS2366 in a package
+   whose CI job runs vitest, not `tsc`**; (c) land the merge through a pull
+   request, or run `bun run compile` before pushing — a push straight to
+   `main` compiles nothing, and (b) and (d) are both the kind of break only
+   the compiler sees. Regenerate `bun.lock`; the post-merge *"re-verify the
+   loopback bridge dials"* step stays mandatory and now reads **#1458,
+   #1475, #1509, #1567, #1613** — the last re-times the relay keepalive the
+   bridge is dialled through. Post-merge line, not a precondition (#1602):
+   port `navigationPayloadForWorktreeDeletion` into `push-payload.ts`'s
+   `worktree_deletion` arm, or the phone opens Settings where the desktop
+   opens the Task. Saying *"run it on a candidate branch"* is enough. Still
+   one line from 08-29 16:15: after the merge an unreachable owner's chat
+   renders read-only (#1547) *and* is movable with `move-chat.mjs` — decide
+   whether both should exist. **Notes, not preconditions:** upstream's open
+   **#1531** (browser shell at `/app`) overlaps 6 of the 51 including both
+   `mobile-runner-host.ts` and `main.tsx`, unmoved six windows; **#1612**
+   (mobile keyboard) overlaps 3 including `main.tsx`; **#1618** (PDF
+   preview) overlaps 3 lockfile-shaped paths; if any merges before the fork
+   does, the affected far sides are re-derived.
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this fork's
+   CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or leave
+   the shards on 2-core `ubuntu-latest`, or deallocate it if it serves
+   nothing else. One word settles it; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (40,656 lines, three rooms, ~231/hr and climbing).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19 13:16),
+   retiring `/`, the Teams app-package install (the exempted shortcut),
+   ConvBot S1 grading.
+6. **Unchanged, small:** the push-path compile hole is upstream's as much
+   as ours; the check-in will not open an upstream issue or PR on its own.
+   The flapping power supply paired **twice** more in this window (21:04,
+   22:31; eight pairs on 08-31, none since midnight); still cosmetic while
+   the box holds AC, but the count is climbing rather than flat.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-08-31 20:15 — upstream +6 inside this window, all six under `clients/gui-app` (34 files, +6,552 / −1,180, every one merged after the 16:15 fetch), and the 51 hold a FIFTEENTH window by path AND by stage content; the import check reads 11 of 34 touched modules on the fork and two of them reached by fork importers — `analytics.ts` (+2 members of an onboarding act-id union, four fork files that import `Analytics`/`AnalyticsEvent` and not the union) and `host-update-banner.tsx` (#1607's narrowed mount predicate, one fork-only test that seeds a staged fact, never the retained `idle` the predicate now drops) — both copies; the one thread into the map is #1603 importing `setMobileApp`/`isMobileApp` from `lib/mobile-app.ts`, one of the 51, and both names exist at the same lines on both sides, so the resolution is unchanged; upstream's own **#1588** — an OPEN, zero-file PR titled *"production signs device-flow sessions in as mobile (merge when prod authn accepts it)"* — is the source's written corroboration of precondition (a); **#1612** (mobile keyboard) overlaps 3 of the 51 including `src/web/main.tsx`; Tests twelfth consecutive green 14/14 and CodeQL green on attempt 1, `main` six-for-six on its tip without a rerun for the third run running, plus a `schedule`-event CodeQL on the previous tip also green; the storm at ~218/hr on the same three rooms; **two new** three-second supply-flap pairs (17:31, 18:37 — six in the day); and the token's seventeenth face, read on purpose past `exp`: host-close with in-command refresh on the first call at +48 s, exit 0 — the prepared second call never fired, for the fourth run running; and the background capture, with the console encoding set, diffed clean raw against this run's first snapshot (0 / 0 / 0, no `Γ` in any title, no cp437 pass needed)
 
