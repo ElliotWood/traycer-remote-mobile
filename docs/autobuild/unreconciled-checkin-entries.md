@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **fifty-six** entries in this
+everything came down, nothing went up. The **fifty-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **fifty-six**. Three count sites remain in this header: this
+on this file → **fifty-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,317 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the fifty-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the fifty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-02 04:15 — Tests on the 00:15 landing `ad0a7e38d` was RED on attempt 1 (run 33520784905) and **no test failed: the `desktop darwin + packaging` job never acquired a `macos-latest` runner** — created 00:38:54, zero steps, no runner name, no log blob (the log URL 404s `BlobNotFound`), cancelled by GitHub at **00:53:57, 15 m 3 s**, with its own annotation *"The job was not acquired by Runner of type hosted even after multiple attempts"* — while the other thirteen jobs went green in 23 s – 5 m 21 s and a sibling `macos-latest` job on the same tip (*Real supervisor*'s `CLI real-launchd rows`, created the same second) acquired a runner in **5 s**; `gh run rerun --failed` at 04:20:38 by this run, attempt 2 acquired a runner in **3 s** and went **green at 04:23:55** (darwin 3 m 11 s: unit tests 1 m 1 s, packaging 1 m 4 s) — the ticket gains a row and its tally reads ten reds, but this one is a **new silhouette, not a member**: a queue-acquisition cancel, the `queued-job-reads-as-cancelled` shape at 15 minutes instead of 24 hours; CodeQL and the other four workflows green on attempt 1; stream-era tally 20 runs, 17 green on attempt 1, three reruns all green; upstream +3 to `225d554bd` (#1645, #1646, #1637 — all merged inside the window, 23 files, 21 of them `clients/gui-app`) and **the map holds at 52 paths and 133 stage lines** — control derivation at `923e3d58d` reproduced the 00:15 list path-for-path and its 133 stage lines byte-for-byte (so the docs landing moved nothing on our side either), exactly two stage-3 OIDs moved (`bun.lock`, root `package.json` — #1646's two files, the regenerate cluster) and `comm -12` of the 23 against the 52 names the same two; every named hand-merge keeps its block count (3 / 1 / 37 / 3 / 3 / 1 / 4), preconditions (a) (b) (d) re-verified at the new tip, price unchanged at six hand-merges + two policy calls; open PRs 27 → 25 (the three merged; **#1647 new**, opened 04:16:22 — one minute after this run started — 3 files, **all three in the 52**, one of them `protocol/package.json`, the Oxlint-cluster hand-merge site; #1618 75 → 79 files, overlap still 3; #1531 77 / 6 unchanged); the storm at exactly one room and one rebuild a minute (239 in the window, 45 / 59 / 60 / 60 / 15 by hour, `Room metadata not initialized` still 3, `CredentialLeaseReleasedError` still frozen at 44,095, refresher 0, Tiptap timeouts 0 for the third window); KP-105 pair fifteen at 01:55:39/42 (twenty-five since 08-30); fleet byte-frozen (0 of 115 active, 0/0/0 keyed by id against the 00:15 past-exp capture, the four role claims field-identical); the first CLI call landing IN-WINDOW at 04:17:33 with no close and no refresh (the fourth run running); and the token's twenty-fifth face — read on purpose past the 04:37:29 `exp` by a clock-waiting watcher: host-close with in-command refresh on the FIRST call at **+50 s**, exit 0 in 4.11 s — the prepared second call never fired, for the TWELFTH run running, the fatal close the thirty-first since rotation, the past-exp capture again parsing identical to the in-window read on every field of every agent, and the new bearer dying **2026-09-02 08:38:21**
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (113,092 lines at 04:17; rotation still 08-24 16:30; 112,610 at the 00:16 anchor, so +482 since; 480 timestamped inside 00:15–04:14, all `[WARN]`) |
+| Genuine rate-limiting (level-anchored, whole-word, bracketed timestamp stripped first, UUID/ULID substrings stripped) | **0** in the window and **0** since rotation |
+| Last provider turn | unchanged — **2026-08-26 04:23:27 → 04:23:53**, chat `ee3843e4`, `finishing active turn`; nothing has run since. **0** `[INFO]` lines in the window — the 480 are the storm's 478 (239 rebuild pairs) plus the 00:15 run's two past-exp auth lines at 00:37:29.888/.889; the host's `[jwks] Persisted signing keys` line for this run's fresh RPC WS authentication is line **113,092**, untimestamped, beside the 04:17 call (the 00:15 run's two are 112,604 and 112,651) |
+| Agents blocked / errored / stranded | **none** — `agent role list --json` (04:17:36, 2.17 s, exit 0) returns the same four claims, every field (claimId, agentId, role, scope, claimedAt) identical to the 00:15 JSON (parsed and compared as objects: `identical: True`), every holder `active: false`; **0 of 115** registered agents `active`; `agent list --all --json` (04:17:33, 3.36 s incl. process start, 52,700 bytes) keyed by id against the 00:15 past-exp capture → **0 added, 0 removed, 0 changed** (every field); raw diff = the envelope `timestamp` only (`14:37:31.031Z` → `18:17:36.411Z`) |
+| Idle with work outstanding | the fork merge (Elliot) and ConvBot S1 grading (Elliot + VM) — both carried; the merge's map **held** this window (set and count; two regenerate-cluster far sides — below) |
+| Dirty trees attributable to an agent | **none.** All **40** worktree entries swept with `git status --porcelain` (35 directories present + the five `Temp/bundle-wt*` still prunable): every pile at its recorded count — build repo 3, a2-mutation-probe 3, eval-composer-bug 18, mobile-deploy 1, upstream-mobile-web 7, s5-liveness 1, evidence-gate 8, electric-stork 1 (`scratch/`) — and `wt-guiapp-main` **46** at the 04:18 sweep = the recorded 9 + the **23** derivation files the 00:15 run saved under its `scratch/` at 00:18–00:23 after its own sweep + this run's first 14 (mtimes 04:18): check-in debris, dated, no agent |
+| `main` vs `origin/main` at start | **0 / 0** @ `ad0a7e38d` — the 00:15 landing (entry 56, one file), pushed 00:38:4x, the only movement since |
+| Tests on `main` @ `ad0a7e38d` | **RED on attempt 1 — 13 of 14, and the fourteenth never ran** — run `33520784905`, created 00:38:53, concluded `failure` 00:53:58 (15 m 5 s). `test (desktop darwin + packaging)` job `99899196641`: created 00:38:54, `runner_name` **empty**, `steps` **0**, log **404 `BlobNotFound`**, conclusion **`cancelled`** at 00:53:57, annotation *"The job was not acquired by Runner of type hosted even after multiple attempts"*. The thirteen ubuntu jobs all green on attempt 1 from `attempts/1/jobs`: gui-app main lane `99899197277` 00:38:58 → 00:44:19, shard 2 `99899197071` → 00:44:19, shard 3 `99899196839` → 00:43:00, shard 4 `99899197432` → 00:44:10; the nine package suites 23 s – 1 m 8 s; runners `GitHub Actions 1000004791`–`4804`. **Rerun** (`--failed`) issued **04:20:38** by this run; attempt 2 → **`success` 04:23:55**: darwin job `99973819815` created 04:20:40, runner `GitHub Actions 1000004808` at **04:20:43** (3 s), done 04:23:54 (3 m 11 s; 15 steps, unit tests 04:21:41 → 04:22:42, packaging → 04:23:46). Stream-era tally: **20 Tests runs, 17 green on attempt 1, three reruns all green** — two flakes and now one queue cancel |
+| CodeQL on the same tip | **`success` on attempt 1** — run `33520784989`, 00:38:53 → 00:42:33 (3 m 40 s). Secret scan (→ 00:39:18), pre-commit (→ 00:39:47), Real supervisor (→ 00:40:00 — its `macos-latest` job is the control below) and Protocol Compatibility (→ 00:40:27) all `success` on attempt 1 — **five-for-six on attempt 1, six-for-six after the rerun** |
+| `CredentialLeaseReleasedError` storm | **44,095** at 04:16 — **unchanged from 00:16; 0 in the window** (the counter is dead, as the 00:15 entry predicted). `stayed disconnected; rebuilding provider` **239** inside 00:15–04:14, **all** `f347a4fb…`, the other three rooms **0**; by hour **45 / 59 / 60 / 60 / 15** (00:15–00:59, 01, 02, 03, 04:00–04:14 — the cadence is a shade over a minute, so one full hour reads 59), each followed 0.1–0.3 s later by *Failed to rebuild … No live request context retained* (**239**). `EpicTokenRefresher: batch threw` **0** — last line still **2026-09-01 20:14:57.416**. *"Tiptap sync timed out"* **0** (third consecutive zero). `Room metadata not initialized` **3**, unchanged (08-30 16:16:35, 09-01 12:59:04, 09-01 20:16:00) — `f347a4fb` has not left |
+| RPC WS fatal close (`UNAUTHORIZED reason="exp"`) | **thirty** since rotation at the 04:16 sweep, **+0 in the window** beyond the 00:15 run's own past-exp read at 00:37:29.889 (already counted as the thirtieth). This run's first call at 04:17:33 wrote **no** auth line — it landed in-window. This run's past-exp read below made it **thirty-one**, at 04:38:21.426. |
+| Headless `claude -p` on the box | **1** — this run (pid 3932 ← `powershell.exe` 24252 running `scripts/autobuild-checkin.ps1`, created 04:15:01–04; `Traycer-Autobuild-Checkin` last 04:15:01, next **08:15:00**, `LastTaskResult` 267009 = still running), plus this run's own clock-waiting watcher (`pwsh` 16196, launched 04:22:06 — expected). The OpenClaw gateway (node 13656, since 08-28 12:39:43) and its `memory-core` child (node 24820, since 08-29 06:45:12) both still up; the `serve-web.mjs` node 14232 since 08-25 02:30:34 likewise. The Claude desktop app is **still the 08-31 09:55:10 instance** (pid 35092 + **eight** `--type` children — nine at 00:15; one utility/renderer child has exited, the app itself has not). The two orphaned `powershell.exe` from 08-26 23:01:26 / 23:05:57 (pids 15256 / 9772) still present; nothing else autonomous |
+| Attendance (explorer-parented launches, dated) | **none.** Newest explorer-parented process is still `chrome.exe` 7164 at **2026-08-28 11:50:51**. Kernel-Power **42** since 00:00: **0**; up since 2026-08-25 02:29:28. Kernel-Power **105** in the window: one pair at **01:55:39/42**, below. Battery reads AC (`BatteryStatus` 2), 100% |
+| Host process | `traycer-host.exe` pid 21456 created **2026-08-25 16:17:01** — no restart |
+| DNS / upstream reachability | **no event in the window.** `ENOTFOUND` still 22 lines (the 08-26 16:06–16:41 dump), 0 dated 09-02 |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (unchanged since 08-19); `altra-vm-runner-demo-aue` running (and known not to serve this fork's CI); the three sensormine VMs deallocated |
+| The 00:15 run's own script log | `exit 0`, *"ran, 15 lines of output"*, finished 00:40, ending with its four instructions to this one (read CI on `ad0a7e38d` from `attempts/1/jobs`; gate past-exp reads on the clock and keep call B prepared; read the `f347a4fb` rebuild pairs and the room-metadata count instead of the dead counter; keep Bash commands ASCII) — all four followed |
+| Tickets (`traycer-remote-teams/tickets`) | untouched — index mtime still 08-26 04:23:27, the repair's write. The live ticket file on `main` (`ci-tests-flake.md`) **gains a row** for `ad0a7e38d` — a red run with no failing test — and its tally sentence advances to ten reds with the mechanism named; asks (2) and (3) stay Elliot's |
+
+### Red, with no test in it: the darwin job never acquired a runner
+
+Run `33520784905` on `ad0a7e38d`, whose tree differs from the previous
+green tip `c44aeccdb` by one docs file (the 00:15 ledger entry). Thirteen
+of fourteen jobs green on attempt 1 — the four gui-app lanes 4 m 2 s to
+5 m 21 s, the nine package suites 23 s to 1 m 8 s, every runner
+`GitHub Actions 1000004791` through `4804` on `ubuntu-latest`. The
+fourteenth, `test (desktop darwin + packaging)` on `macos-latest`, is the
+whole of the red, and it is not a test failure:
+
+| Field (`attempts/1/jobs`, job `99899196641`) | Reading |
+| --- | --- |
+| `created_at` / `started_at` | 00:38:54 / 00:38:54 |
+| `completed_at` | 00:53:57 — **15 m 3 s** |
+| `conclusion` | `cancelled` |
+| `runner_name` / `runner_id` | **empty** / 0 |
+| `steps` | **0** |
+| job log | **HTTP 404**, body `BlobNotFound` — no log was ever written |
+| check-run annotation | `failure` — *"The job was not acquired by Runner of type hosted even after multiple attempts"* |
+
+**The control is in the same run's neighbour, created the same second.**
+The *Real supervisor (macOS launchd integration)* workflow on the same tip
+runs `CLI real-launchd rows (macOS)` on the same `macos-latest` label: job
+`99899194015`, created **00:38:54**, runner `GitHub Actions 1000004788`
+acquired at **00:38:59** (5 s), green at 00:39:59. So hosted macOS capacity
+existed in that minute; one of two identical-label jobs got a runner and the
+other never did, and GitHub gave up on it at fifteen minutes with the
+annotation above. `githubstatus.com` carries no incident over 00:38–00:54
+local (the nearest, *Delays in commit processing*, opened 01:00 and closed
+02:01; Actions reads `operational`), and the 08-26 incident's own wording —
+*"stuck waiting for runner assignment … will be canceled within the hour"* —
+is the same mechanism in GitHub's words.
+
+This is the `queued-job-reads-as-cancelled` shape — `cancelled` meaning
+*never started*, not *somebody stopped it* — at **15 minutes** instead of
+the 24 hours that memory records for a label nothing answers, because this
+label IS answered and the acquisition simply failed. The discriminators were
+all in the data already: durations within one run (13 jobs ≤ 5 m 21 s, one
+at exactly 15 m 3 s), an empty `runner_name` with zero steps, a log URL
+that 404s rather than a log that ends mid-write, and the annotation.
+
+**Rerun.** `gh run rerun --failed` at **04:20:38** (this run; the
+`triggering_actor` reads ElliotWood — the gh credential, as always).
+Attempt 2 re-ran only the darwin job: `99973819815`, created 04:20:40,
+runner `GitHub Actions 1000004808` at **04:20:43** (3 s), fifteen steps,
+*Desktop unit tests (darwin-gated blocks included)* 04:21:41 → 04:22:42,
+*Real electron-builder packaging test* → 04:23:46, complete 04:23:54
+(3 m 11 s); run `success` at **04:23:55**. The thirteen attempt-1 jobs carry
+their attempt-1 timestamps under attempt 2, as expected.
+
+**What it does to the ticket.** A row for `ad0a7e38d` — the tenth red on an
+identical docs-only tree — with the mechanism stated so nobody reads it as
+a sixth failing member: it is the first red in the table with **no test in
+it**. The member list stays at five; the tally sentence now says ten reds
+and names the exception. Ask (3) (the runner decision) gains a fact rather
+than a change: the two darwin rows to date failed a test on a runner they
+had, this one never had a runner — a hosted-macOS acquisition variable that
+`vars.GUI_APP_RUNNER` would not touch either way.
+
+Under `--outputStyle=stream` the Tests workflow now reads **20 runs: 17
+green on attempt 1, three not — two flakes (shards 4 and 2) and this queue
+cancel — every rerun green.** CodeQL `33520784989` green on attempt 1
+(3 m 40 s), as were Secret scan (25 s), pre-commit (54 s), Real supervisor
+and Protocol Compatibility.
+
+### Upstream +3 — `225d554bd`; the map holds at 52, two regenerate-cluster far sides moved
+
+`upstream/main` moved `923e3d58d` → **`225d554bd`**, three commits, all
+merged inside this window (local, from `mergedAt`): #1645 *fix(gui-app):
+make the comment poll reachable, and release the transport on a worker
+fatal* (`dbabe0531`, 10 files, **01:12:49**, hdkshingala), #1646 *chore:
+update dependencies* (`29f6c18d1`, 2 files, **01:13:43**, hdkshingala) and
+#1637 *fix(gui-app): keep dispatched worktree intent visible* (`225d554bd`,
+11 files, **02:54:16**, Tanveer Gill — author date 09-01 09:54, so the
+commit reads older than its merge). **447** in / our **533** at
+`ad0a7e38d`. Merge-base unmoved at `8f21d506f`. Together **23 files**:
+`clients/gui-app` 21 (comments sidebar and hooks, epic-canvas tiles,
+`chat-session-store` / `chat-queue-reconciler` and their tests, the
+host-workspace selector, `spawn-epic-runtime-worker`,
+`host-method-policy-table.ts`), plus the root `package.json` and `bun.lock`.
+
+Derived against a control, not assumed:
+
+- `git merge-tree --write-tree --name-only origin/main upstream/main`:
+  **52 paths** (merged-tree OID `524363dda`). Control at the old tip
+  `923e3d58d`, same minute: **52** (OID `b12466eb4`), path list
+  **identical** to the 00:15 saved list (`diff` empty; the saved file
+  checked LF/ASCII first). Stage lines **133 / 133**, and the control's 133
+  are **byte-identical** to the 00:15 run's own full derivation — whose
+  ours was `c44aeccdb`, one docs commit behind — so the 00:15 landing moved
+  no stage-2 OID, as a one-file docs delta outside the 52 must not.
+- The sorted stage diff control → new is **exactly two stage-3 lines**:
+  `bun.lock` `3d09faa8d` → `51db385b6` and root `package.json`
+  `529798330` → `2a64b1653`. `comm -12` of the 23 against the 52 returns
+  **the same two** — #1646's two files, both already in the regenerate
+  cluster; the two derivations agree. Fork since-base (546 paths) ∩ the
+  23 = the same two, both already conflict paths — **no silent both-sides
+  resolution**. #1637's 11 and #1645's 10 touch **none** of the 52.
+- **Every named hand-merge keeps its block count** at the new tree:
+  `main.tsx` 3, `remote-session.ts` 1, `mobile-runner-host.ts` 37,
+  `macos.test.ts` 3, `test.yml` 3, `protocol/package.json` 1 (144–149),
+  `use-epic-export-artifacts-mutation.test.tsx` 4 (the quintet's new
+  member). None of the seven is among the 23.
+- **Preconditions re-verified at `225d554bd`:** (a) `git show
+  upstream/main:clients/mobile/src/mobile-runner-host.ts` lines 681–682
+  read `const DEVICE_FLOW_CLIENT_ID: DeviceClientId =` /
+  `__TRAYCER_MOBILE_CONFIG__.environment === "production" ? "desktop" :
+  "mobile";` — word for word. (b) `ws-stream-client.ts:132` still
+  `readonly clock: ServerClockSkewSignal | null;`. (d) the +3's added lines
+  contain none of `hostNotificationKnownPayloadSchema`,
+  `browser_human_needed`, `IRunnerHost`, `new WsStreamClient`, `task_sweep`,
+  `worktree_deletion` (grep 0). (c) unchanged.
+
+**Price line unchanged: six hand-merges (one a single constant) + two
+policy calls; preconditions still four.** Nothing this window is inside a
+hand-merge; the bridge re-verify list stays **#1458, #1475, #1509, #1567,
+#1613, #1589, #1639**.
+
+### Open PRs 27 → 25 — three merged, one new, and the newcomer sits on a named hand-merge
+
+Gone from the 27: #1637, #1645, #1646 — all three **merged** (above). The
+one newcomer is **#1647 *chore: update dependencies*** (hdkshingala, opened
+**04:16:22 local** — one minute after this run's `claude.exe` started —
+3 files): `bun.lock`, root `package.json`, **`protocol/package.json`** —
+**all three in the 52**. The first two are the regenerate cluster; the
+third is the Oxlint-cluster hand-merge site (block 144–149), whose far side
+#1629 already moved once outside the block (08-31 16:15). If #1647 merges
+with a change inside the block, a **named** hand-merge's far side moves;
+outside it, it is a copy like #1629's. The 08:15 run should read it either
+way.
+
+Movers (`updatedAt` after the 00:15 read, files re-derived paginated
+against the 52): **#1618** (PDF preview) 02:42:24 — 75 → **79** files
+(four added: `snapshot-hash-inline-diff.test.tsx`,
+`snapshot-diff-tile-body.test.tsx`, `use-workspace-file-open-externally.ts`,
+`format-byte-size.ts`), overlap still **3** (`bun.lock`,
+`clients/gui-app/package.json`, `package.json`); **#1531** (webapp shell)
+02:07:46 — 77 files, set unchanged, overlap **6**; **#1638** (Communication
+Graph search) 02:55:46 — 8 files, **0**. Unmoved raw: **#1308** 58 / 3,
+#1631 260 / 1, #1537 21 / 0, #1636 3 / 0, #889 289 (08-29), #1588 still
+the **zero-file draft** (updated 08-30 09:36) corroborating precondition (a).
+
+### The storm: one room, one rebuild a minute, and the dead counter stays dead
+
+The 00:15 entry retired `CredentialLeaseReleasedError` as a measure of the
+storm and said to read the `f347a4fb` rebuild pairs and the room-metadata
+count instead. This window, read that way: **239** rebuilds, all
+`f347a4fb`, **239** *Failed to rebuild … No live request context retained*
+0.1–0.3 s behind each, **45 / 59 / 60 / 60 / 15** by hour (the 01 hour
+reads 59 because the cadence is 60.1–60.3 s and one slot slips per hour
+or so); `EpicTokenRefresher: batch threw` **0**, last line still 20:14:57.416
+on 09-01; `CredentialLeaseReleasedError` **44,095**, frozen; *Tiptap sync
+timed out* **0** for the third consecutive window; `Room metadata not
+initialized` **3**, unchanged.
+
+The 00:15 entry's testable prediction — *"`f347a4fb` is not an artifact
+room and has never thrown the lease error under its own name, so this run's
+own calls should not move it"* — held again: this run's first authenticated
+call (04:17:33, the `[jwks]` line 113,092 beside it) sat between the
+04:17:27.960/28.190 pair and the 04:18:28.197/28.298 pair, and neither pair
+changed shape; 60 for the 03 hour, on schedule through 04:23. Attended
+restart remains the only fix on the table, carried below.
+
+### The flap's fifteenth pair
+
+Kernel-Power 105 at **01:55:39 / 01:55:42** — **twenty-five since the flap
+began at 08-30 06:53:49** (50 events, all paired). AC, 100 %, no KP-42, no
+reboot. Nothing downstream failed. Watch, don't chase.
+
+### The twenty-fifth face
+
+The 00:15 run predicted this bearer dies **04:37:29** (`iat` 00:37:29, read
+from the payload after its own past-exp refresh). Re-decoded at 04:17 this
+run: `exp` 1788287849 = 2026-09-02 04:37:29, credentials `savedAt`
+00:37:30.484 — the prediction held. This run's first call landed
+**in-window**: `agent list --all --json` at 04:17:33 (`cli.log`
+18:17:35.247 → 18:17:36.410Z), 52,700 bytes, exit 0, **no** `authentication
+rejected`, **no** `fatal close`, `savedAt` unmoved — the fourth run running
+whose opening read met a live bearer. `agent role list --json` at 04:17:36
+(18:17:37.452 → 18:17:38.650Z) likewise. The merge-tree, PR, CI and process
+sweeps touch no bearer.
+
+The past-exp read was placed by the same clock-waiting detached script as
+the last eleven runs (`pwsh` 16196, launched 04:22:06 to wait on the clock
+for 04:38:14), call B prepared behind a `savedAt` gate, console encoding
+set, the file derived through Python literals from the 00:15 script (three
+replacements — the `exp` string once, the run stamp eight times, the
+`host.log` hour filter once — each counted, the backtick filter grepped for
+in the derived file and no residual `0015` before launch).
+
+Call A at **04:38:18.580, +50 s** after `exp` (the script's own offset print; 49.6 s raw): `host.log` writes
+`authentication rejected … "exp" claim timestamp check failed` at
+04:38:21.425 and `fatal close state=authenticated code=UNAUTHORIZED
+reason="exp"` at **04:38:21.426** — the **thirty-first** since rotation — and
+the CLI refreshes in-command (`savedAt` → 04:38:22.082; the new bearer reads
+`iat` 04:38:21, `exp` **2026-09-02 08:38:21**), returns 52,700 bytes of agent
+list, **exit 0** in 4.11 s; `cli.log` shows a plain started/completed pair
+(18:38:20.680 → 18:38:22.643Z) and no `warn` line. The gate read false and
+call B never fired — the **twelfth** run running. The capture survived: the
+past-exp read parses identical to the in-window read on **every field of
+every agent** (0 added, 0 removed, 0 changed keyed by id) and differs raw
+only in the envelope `timestamp` (18:17:36.411Z → 18:38:22.644Z). The
+watcher (`pwsh` 16196) had exited by 04:38:25, as expected. `Room metadata
+not initialized` re-read after the call: still **3**, and
+`CredentialLeaseReleasedError` still 44,095 — this run's authenticated
+connections moved neither, and the room's rebuild pair kept its
+one-a-minute cadence straight through (04:37:31.720, 04:38:31.876).
+
+**What it adds:** the host column of the offset table gains a **+50 s** (now
++40, +46, +46, +47, +48, +48, +49, +49, +49, +50, +50, +51, +63, +71, +123,
++219 — sixteen readings, twelve inside +46…+63). The operational line is
+unchanged and this run used it as written: call, gate on `savedAt`, no
+`whoami` — one call the whole procedure.
+
+**For the 08:15 run:** its `claude.exe` starts ~08:15:03 and this bearer (`iat` 04:38:21, read from the payload) dies **2026-09-02 08:38:21** — twenty-three minutes in, the same shape as the last four runs. Gate the reads past `exp` on the clock;
+one call may be the whole procedure, but keep the second prepared. Also:
+read `f347a4fb`'s rebuild pairs and `grep -c 'Room metadata not initialized'`
+(3) for the storm; and check **#1647** — if it merged, re-derive the map
+and look at `protocol/package.json`'s block 144–149 specifically, because
+that is a named hand-merge's far side.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | fleet sweep (roles parsed and compared as objects against the 00:15 JSON, the 115-agent list keyed by id with every field compared against the 00:15 past-exp capture, all 40 worktree entries' `status --porcelain` with every pile matched to its recorded count and `wt-guiapp-main`'s growth attributed by mtime to the two check-ins, `host.log` counts since rotation and in-window with the level-anchored 429 method, per-room and per-hour storm attribution, the two non-storm lines in the window read, the `[jwks]` line positions read against the CLI calls, process sweep with dated creation times and parent attribution, KP-42/KP-105 recount, VM power state, scheduled task last/next/result, the 00:15 script log decoded from UTF-16); the red Tests run read from `attempts/1/jobs` job by job with runner names and durations, the cancelled job's `steps`/`runner_name`/log/annotation each read rather than inferred, the same-second `macos-latest` sibling job read as the control, `githubstatus.com` incidents and the Actions component read for the window, the rerun issued and attempt 2 read step by step; upstream fetch (+3), the merge re-derived at the new tip WITH a control derivation at the old tip in the same minute (52 vs 52 paths, 133 vs 133 stage lines, the control's stage lines diffed byte-for-byte against the 00:15 run's saved full derivation, the two movers cross-checked against `comm -12` of the 23 and against the fork's 546 since-base paths, every named hand-merge's block count re-read at the new tree, preconditions (a) (b) (d) re-read at theirs); all 25 open PRs pinned raw with `updatedAt`, the three departures resolved to merged with `mergedAt`, the newcomer and the three movers re-derived paginated against the 52; CodeQL and the other four read on the same tip |
+| Recovery | **one rerun** — `gh run rerun --failed` on `33520784905` at 04:20:38; attempt 2 green 04:23:55, read before landing |
+| Build work | **none** — every open item is still Elliot's; the merge is not an unattended action |
+| Flake ticket | **row added** for `ad0a7e38d` (the queue cancel, mechanism named; members unchanged at five); tally sentence advanced nine → ten with the exception stated — a two-file delta |
+| This entry | the fifty-seventh; count sites 56 → 57 in lockstep per the header's rule, verified against `grep -c` after splicing; the splice dry-run on a copy first |
+| Push notification | **not attempted** — nothing is stranded; the last three attempts all read *"Remote Control inactive"* |
+| Memory | `fork-ci-has-never-run-gui-app` records the red and the tally (20 runs, 17 on attempt 1, three reruns green); `queued-job-reads-as-cancelled` gains the fifteen-minute face with its discriminators; `upstream-mobile-app-is-a-draft-pr` gains the 52 at `225d554bd` and #1647 on the Oxlint hand-merge site; `checkin-entries-live-on-main` count → 57; `cli-token-expiry-matches-checkin-interval` gains the twenty-fifth face |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@225d554bd`: 447 in /
+   533 ours / **52** conflicted paths (held this window; two regenerate-
+   cluster far sides moved by #1646); pricing **six hand-merges (one of
+   them a single constant) + two policy calls**, unchanged. Preconditions,
+   **still four**: (a) resolve `clients/mobile/src/mobile-runner-host.ts`
+   as *theirs* **and then replace the `DEVICE_FLOW_CLIENT_ID` ternary with
+   the literal `"desktop"`** (re-verified at `225d554bd` lines 681–682 this
+   run) — keep `vitest.config.ts` as *ours*; (b) `clock: null` at the three
+   fork-only `new WsStreamClient({…})` sites (re-verified: still required
+   at `ws-stream-client.ts:132`); (d) the `browser_human_needed` arm in
+   `push-payload.ts` plus its test row; (c) land through a PR or run
+   `bun run compile` first — a push straight to `main` compiles nothing.
+   Regenerate `bun.lock`; the post-merge *"re-verify the loopback bridge
+   dials"* line reads **#1458, #1475, #1509, #1567, #1613, #1589, #1639**.
+   Post-merge lines, not preconditions: the #1602 `worktree_deletion`
+   port; the feed clients' released-schema parse under a negotiated
+   `@1.2`; `host-picker.tsx`'s unreachable state against #1611 with a
+   late-appearing endpoint; the save-blob quintet's policy sub-question
+   (carry our `started` arm into upstream's `SavedFile`, or re-apply the
+   honesty fix on top of theirs). **Notes:** #1531 77 files, overlap 6;
+   #1618 79, 3; #1631 260, 1; #1308 58, 3; **#1647 new** — 3 files, all in
+   the 52, one on the Oxlint hand-merge site. The merge still replaces the
+   named flake members (`providers-settings-panel.test.tsx` theirs
+   `670a3a6df`, `workspace-folders-refresh` theirs `00afdb10e`).
+2. **The runner VM** — `altra-vm-runner-demo-aue` is running and this
+   fork's CI does not use it: register it and set `vars.GUI_APP_RUNNER`, or
+   leave the shards on 2-core `ubuntu-latest`, or deallocate it. This
+   window's numbers: **three not-green in twenty** stream-era runs, this
+   tip's red a hosted-macOS acquisition failure that no runner variable of
+   ours touches. One word settles the VM; the ticket carries it as ask (3).
+3. **One attended desktop minute** — open the epic, reconcile this file per
+   *What to do now*; also restarts the credential lease behind the WARN
+   storm (**one room left of four**, one rebuild a minute, 239 this window).
+4. **Discord as the check-in's outbound channel** — unchanged; nothing
+   will post to `channel:1541301538851524649` until you say so there or here.
+5. **Unchanged:** VM start-or-stays-off (deallocated since 08-19), retiring
+   `/`, the Teams app-package install (the exempted shortcut), ConvBot S1
+   grading.
+6. **Unchanged, small:** the push-path compile hole is upstream's as much
+   as ours. The supply flap's fifteenth pair at 01:55, twenty-five since
+   08-30, all cosmetic so far; watch, don't chase.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-09-02 00:15 — Tests on the 20:15 landing `c44aeccdb` is GREEN on attempt 1 (run 33498470442, 20:38:48 → 20:44:46 local, 5 m 58 s, 14/14 — gui-app main lane 20:44:39, shard 2 20:44:45, shard 3 20:44:37, shard 4 20:44:12, darwin 20:41:32, every job GitHub-hosted), CodeQL and the other four workflows green on attempt 1 — six-for-six for the second tip running, and the stream-era tally reads 19 runs, 17 green on attempt 1, the two flakes both rerun green, so the flake ticket gets no row; upstream +6 to `923e3d58d` (#1612, #1639, #1640, #1641, **#1589**, #1644 — all six merged inside the window, 579 files) and **the map MOVES for the first time in twenty-one windows: 51 → 52 paths, 130 → 133 stage lines, 16 far sides moved** — #1589, the epic sync overhaul this ledger carried as *"9 of the 51"*, merged at 23:21:49 with 532 files and its ten paths in the 52 are the far sides that moved (the five host-transport files and their two tests, the export hook and its test, `bun.lock`, the root and gui-app `package.json`), #1612 moved `main.tsx` (+8 inside hunk 1), `capacitor.config.ts` and `Package.resolved`, and the one path that JOINED is `use-epic-export-artifacts-mutation.test.tsx` — a modify/modify with four marker blocks, the fork's `ab65ee682` save-blob honesty tests against #1589's rebuilt harness — so the save-blob quartet is a quintet; every hand-merge keeps its shape (main.tsx 3 blocks, remote-session.ts 1 block shifted +2, mobile-runner-host.ts 37, macos.test.ts 3, test.yml 3, protocol/package.json 144–149), precondition (a) re-verified at `923e3d58d` lines 681–682 and (b) at `ws-stream-client.ts:132`, price unchanged in count at six hand-merges + two policy calls; open PRs 33 → 27 (eight gone — three merged movers, five dependabot bumps CLOSED unmerged; three more opened AND merged inside the window; two new, #1646 `chore: update dependencies` on 2 of the 52); the storm at exactly one room and one rebuild a minute — 241 in the window, 60 / 60 / 60 by hour — and **the refresher lockstep is explained and over: `EpicTokenRefresher: batch threw` 0 in the window, last line 20:14:57.416, `CredentialLeaseReleasedError` frozen at 44,095**, because every one of those throws sat inside an ARTIFACT room's rebuild (two per rebuild — 478 = 2 × 239 last window, 120/hr = 2 × 60 all afternoon) and the last artifact room left at 20:16:00; Tiptap timeouts 0 again; `Room metadata not initialized` still 3; KP-105 pair fourteen at 20:22:05/08 (twenty-four since 08-30); fleet byte-frozen (0 of 115 active, 0/0/0 keyed by id against the 20:15 past-exp capture, the four role claims field-identical); the first CLI call landing IN-WINDOW at 00:15:43 with no close and no refresh (the third run running); and the token's twenty-fourth face — read on purpose past the 00:36:41 `exp` by a clock-waiting watcher: host-close with in-command refresh on the FIRST call at **+47 s**, exit 0 in 2.64 s — the prepared second call never fired, for the ELEVENTH run running, the fatal close the thirtieth since rotation, the past-exp capture again parsing identical to the in-window read on every field of every agent, and the new bearer dying **2026-09-02 04:37:29**
 
