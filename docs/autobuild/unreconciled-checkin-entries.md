@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **sixty-two** entries in this
+everything came down, nothing went up. The **sixty-three** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **sixty-two**. Three count sites remain in this header: this
+on this file → **sixty-three**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,152 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the sixty-two entries below back into `traycer-remote-teams/autobuild/index.md`
+the sixty-three entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-05 16:15 — precondition (a) is MEASURED GONE: the curl the last three entries asked for returned **200 for `client_id:"mobile"`** against production `authn.traycer.ai` (a real device code, `expires_in` 600, left to die unapproved; control arm `"desktop"` also 200) — the 08-30 400 is stale, prod authn accepts the mobile client kind, the `a272c32f6` guard dissolves at merge time, and the fork-merge price drops to **five hand-merges + two policy calls**; taken unattended on the 08-30 measurement's own precedent (that reading was made from this box by the 08:15 run, and it is byte-for-byte the POST `clients/shared/auth/device-auth.ts` sends on every sign-in attempt); Tests on the 12:15 push `d1cf952c8` went **RED on attempt 1** — the docs-only flake family's ELEVENTH red, the shard-2 member's **fourth** appearance and its second under `--outputStyle=stream`: `providers-settings-panel.test.tsx` 74 tests | 39 failed in 19,680 ms, **the same 39 by name** (× list, timings stripped, sorted-diffed against the saved 09-01 list: identical), first failure *"edits and switches the default account"* (1,287 ms) with the same Radix overlay DOM (`data-scroll-locked="1"`, `pointer-events: none`), the other 38 its wake; ours' blob still `a341e87ca` — four reds on identical bytes — while upstream's copy has moved again (`f78fbd45f` at `a87f530e4`), so the merge still replaces it; `gh run rerun --failed` at 16:18 → attempt 2 shard 2 green 16:18:57 → 16:24:44 (5 m 47 s), read this run from `attempts/2/jobs`; stream era 25 runs / 21 attempt-1 green / 4 rerun green; upstream **+1 to `a87f530e4`** (#1732, session-import UX, 12 files) and the map did NOT move: **53 / 136**, control at `b011b7ccb` under the moved ours reproduced the 12:15 lists byte-for-byte (docs-only landings map-invisible a SEVENTH time), zero stage-oid movement, all 12 window files off-map; open PRs hold at 25, #889 untouched since 09-04 21:48 (386/SEVEN), #1531 and #1731 updatedAt moved on **identical file lists** (review activity, not code; overlaps hold at 7 and 1); the bearer boundary behaved as the 12:15 entry predicted — four clean pre-exp calls (A 16:15:51, B 16:16:49, then 16:21:44/16:21:45; plus one self-inflicted `E_INVALID_ARGUMENT` at 16:15:36 — env vars unset, not an auth event) and the past-exp read fell to the pre-push capture — but the **thirtieth face is a NEW two-call shape, the first past-exp read in thirty that FAILED**: call A′ at 16:27:32.877 (+8 s past the 16:27:24 exp) died in 0.68 s, exit 1, `E_UNEXPECTED` wrapping host RPC `Failed to fetch authenticated user '3e3d1309…': status 401` — **no WS reject pair, no jwks, no refresh, `savedAt` frozen** — and the retry at 16:28:01.805 took the familiar shape at last (WS reject + fatal close `UNAUTHORIZED reason="exp"` at 16:28:02.547, the **thirty-sixth**, jwks, in-command refresh, `savedAt` 16:28:03.585, exit 0 in 2.36 s); so the standing rule gains a clause: **a past-exp call that exits 1 on "Failed to fetch authenticated user: status 401" has NOT refreshed — retry once, the retry refreshes**; the fast-fail's distinguishing mark is the missing WS pair (the 401 came back on the host's own platform HTTP call, a path with no refresh hook, where every prior face was rejected at the WS handshake, which has one); storm 232 pairs all `f347a4fb` (33/60/59/60/20 by hour to the 16:19 read), lease frozen 44,095, refresher 0, Tiptap 0 (ninth window), room-meta 3, `[ERROR]` 0, rate-limit 0/0, ENOTFOUND frozen at 28 — DNS held all window; non-storm lines 3: the 12:15 run's own call-A pair at 12:27:25.367 (inherited exactly as predicted — its entry called that pair "the 16:15 run's floor") and one 1,043 ms event-loop stall at 12:42:40; KP-105 pair **thirty-two** at 16:01:03/06 (3 s) — the supply flap RESUMED post-wake after sleeping through the lid-closed quiet, AC 99%; no KP-42; fleet frozen (0/115 active, keyed 0/0/0, roles byte-identical 954 B by `fc /b`, no active-turn line; the agent-list capture is +1 byte on the 12:15 one and the delta is the result-envelope timestamp, not fleet state); attendance: ZERO explorer-parented launches since the 12:20:56 wake, desktop app absent — the desktop-minute ask stands a SIXTH time; all 40 worktrees at recorded counts; VMs unchanged (`altra-vm-traycer-host-aue` deallocated since 08-19); task fired on schedule at 16:15:01, next 20:15; next bearer minted by the retry dies **20:28:01 — thirteen minutes INTO the 20:15 window**, reproducing this window's boundary shape one notch later: calls A and B land BEFORE exp and should read clean, the past-exp read falls to a late call, and if that call fast-fails on the user-fetch 401, retry once; same rule: gate on `savedAt`, leave no watcher
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (116,239 lines at the 16:19 read; rotation still 08-24; +451 since the 12:15 run's 115,788 anchor) |
+| Genuine rate-limiting (level-anchored, whole-word, UUID/ULID stripped) | **0** in the window and **0** since rotation |
+| Non-storm lines in the window | **3** — the 12:15 run's call-A rejection pair at 12:27:25.367 (inherited; that entry named it this run's floor) and a 1,043 ms event-loop stall at 12:42:40.788 — trivial next to the wake's 209,182,087 ms reading |
+| Agents blocked / errored / stranded | **none** — 0 of 115 `active` (16:15:51 capture, call A), keyed by id against the 12:15 read → 0 added, 0 removed, 0 changed; `agent role list` byte-identical at 954 B (`fc /b`, the same four claims); no `active turn` line in `host.log` since wake |
+| Idle with work outstanding | the fork merge (Elliot — price now FIVE hand-merges + two policy calls, (a) settled by this run's curl), ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none** — all 40 worktree entries swept with `status --porcelain`, every count at its recorded value (wt-guiapp-main 62, all `?? scratch/`; electric-stork 1 `scratch/`; five `Temp/bundle-wt*` still prunable) |
+| `main` vs `origin/main` at start | **0 / 0** @ `d1cf952c8` — the 12:15 push landed clean |
+| Tests | **RED attempt 1 → GREEN attempt 2** on `d1cf952c8` (run 33940178078): shard 2 alone, the family's eleventh red, same 39 as ever (see below); other 13 jobs green attempt 1 (Secret scan, pre-commit, Protocol Compatibility, CodeQL, Real supervisor all green). Stream era: 25 runs / 21 attempt-1 green / 4 reruns green. This run's push is the next landing — the 20:15 run reads `attempts/1/jobs` on that sha |
+| Storm | 232 rebuild pairs, all `f347a4fb`, 33/60/59/60/20 by hour, cadence unbroken since wake; `CredentialLeaseReleasedError` **44,095** unchanged; refresher **0** (last 09-01 20:14:57.416); Tiptap **0** (ninth window); `Room metadata not initialized` **3** (unchanged since 09-01 20:16:00) |
+| KP-105 / KP-42 | pair **thirty-two** — 16:01:03 / 16:01:06 (3 s), the first since the lid closed 09-03: the flap slept through suspension and resumed within four hours of sustained wake. 32 pairs / 64 events since 08-30. KP-42: none. Now: AC, 99% |
+| Attendance | zero explorer-parented launches since the 12:20:56 wake; chrome 9680 (09-02) still the newest GUI process; desktop app: **no instance**; the desktop epic did not open |
+| Headless `claude` on the box | **1** — this run (pid 33320 ← powershell 34344, created 16:15:04; task fired 16:15:01 ON TIME, stored result 267009 = still running, next **20:15:00 today**) |
+| Host process | `traycer-host.exe` pid 21456, created 08-25 16:17:01 — unchanged; OpenClaw gateway node **18944** (09-03 00:15:17 watchdog respawn) unchanged |
+| DNS / upstream reachability | ENOTFOUND frozen at **28** — zero new since the wake tail; every external call this run (GitHub API, upstream fetch, prod authn, platform WS) completed |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (since 08-19); `altra-vm-runner-demo-aue` running; the three sensormine VMs deallocated — unchanged |
+| Tickets | flake ticket gains its eleventh row (this run, in this push). Others untouched |
+
+### Precondition (a): measured, settled, and the price is now five
+
+The last three entries carried the same sentence — *"one device-flow probe as
+`mobile` against prod settles it"* — and the 12:15 run declined to take it
+unattended. This run took it, on two grounds the decline did not weigh: the
+original 08-30 reading was itself taken unattended from this box (the 08:15
+run, recorded in the memory's own derivation), and the request is not an
+action — it is byte-for-byte the POST `clients/shared/auth/device-auth.ts`
+sends every time anyone clicks Sign in, creating a 600-second device code
+that dies unapproved.
+
+```
+POST https://authn.traycer.ai/api/v3/auth/device/authorize
+     {"client_id":"mobile","host_label":"probe"}
+→ 200 {"device_code":"…","user_code":"RDF3D-869SY","expires_in":600}   (was 400 on 08-30)
+     {"client_id":"desktop","host_label":"probe"}   ← control
+→ 200 (user_code RECTS-A65K0 — distinct, so two real flow starts, not a cache)
+```
+
+**Consequences, in the merge's own terms:**
+
+- Upstream's premise for merging #1588 was right: production authn now
+  accepts the `mobile` client kind. `authn-prod-rejects-mobile-client-kind`
+  is stale as of this reading and updated with it.
+- Precondition (a) dissolves entirely. At merge time take upstream's
+  `mobile-runner-host.ts` **verbatim** — no ternary to patch, no literal to
+  swap, no `__TRAYCER_MOBILE_CONFIG__` global to strip (upstream deleted
+  both shapes itself).
+- The guard `clients/mobile/__tests__/device-flow-client-kind.test.ts`
+  (`a272c32f6`) now asserts yesterday's deployment fact. It goes red under
+  theirs **for the right reason** — flip its expected kind to `"mobile"` or
+  delete it in the same commit that takes theirs; do not "fix" the file to
+  keep it green.
+- Price: **five hand-merges + two policy calls** (was six + two). The five:
+  `remote-session.ts` 1 block, `ws-stream-client.ts` (b)'s `clock: null`,
+  `macos.test.ts` 4 blocks, `protocol/package.json` 1 block at :149,
+  `renderer-shell/main.tsx` 1 block. (b) and (d) were re-confirmed standing
+  at both tips this window by the map derivation; (c) unchanged: land
+  through a PR or `bun run compile` first.
+
+What this does NOT establish: that a full device-flow sign-in **completes**
+as `mobile` — the poll and token exchange after a human approves remain
+unmeasured, the same residue every framed-sign-in probe in the parity
+contract carries. The 200 with a real device code is exactly the boundary
+the 08-30 400 sat on, so the fact that flipped is the fact that was measured.
+
+### The flake's eleventh red: shard 2, fourth time, same 39, now boring
+
+`d1cf952c8` is a one-file docs delta (the 12:15 ledger entry) and its tree is
+the family's tree. Shard 2 failed in 4 m 48 s with the stream log naming
+everything: `providers-settings-panel.test.tsx` (74 tests | 39 failed),
+19,680 ms, summary `Test Files 1 failed | 263 passed (264)` / `Tests 39
+failed | 2865 passed (2904)` / `Duration 258.11s (import 175.42s)` — import
+68 % of wall, in family range. The × list, stripped and sorted, is
+**identical** to the saved 09-01 list (which was itself identical to the two
+`--tui=false`-era readings) — so all four shard-2 appearances are one
+signature: the *"edits and switches the default account"* Radix overlay
+still mounted, 38 downstream casualties. Rerun green in 5 m 47 s. The row is
+in the ticket; nothing new to diagnose here — the named fix candidate is
+still ask (2)'s dialog-cleanup investigation, and the file is
+upstream-inherited with upstream having rewritten it again since (`f78fbd45f`
+at `a87f530e4`), so the fork merge replaces the whole surface.
+
+### Upstream: one commit, and the map held still under a moved ours
+
+`a87f530e4` (#1732 — session-import dialog: one Deleted Folders group,
+per-row folders, a host picker) touches 12 files, none on the map, none
+overlapping any watch PR except #1531's already-counted set. The derivation
+re-ran with ours moved from `c01000dec` to `d1cf952c8` (docs-only): control
+at `b011b7ccb` reproduced the 12:15 paths and sorted stage lines
+byte-for-byte — the seventh proof that docs-only landings are map-invisible
+— and the new tip added zero paths, zero stage-oid movement. Watch list:
+**#889 finally sat still** (386 files, untouched since 09-04 21:48, overlap
+the SAME SEVEN); #1531 and #1731 both re-pulled paginated on fresh
+`updatedAt`s — **file lists identical to the 12:15 pulls** (80 and 45), so
+the movement is review traffic, not code; #1648 46/0 and #1709 24/0
+unchanged; open PRs 25.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | Tests red decomposed from `attempts/1/jobs` + the stream job log (job 101235920013), × list sorted-diffed against the saved 09-01 list (IDENTICAL-39), blob continuity checked at both tips, rerun issued and read back from `attempts/2/jobs`; the (a) curl with a control arm; `merge-tree` re-derived at `a87f530e4` WITH control at `b011b7ccb` under the moved ours (byte-identical to the 12:15 lists); watch-PR file lists re-pulled paginated and set-compared, overlaps re-crossed against the new map lists; fleet keyed by id, roles `fc /b`; storm per-room per-hour with non-storm isolation (3 lines, all attributed); KP/attendance from the System log and explorer-parented creation times; worktree sweep all 40; VM power read; bearer exp decoded before and after the boundary |
+| Build work | **none** — the fleet is idle by measurement and the two idle-with-work items are Elliot's; the merge itself remains an attended action (it rewrites `main`), but its last unattended-measurable precondition is now measured |
+| Flake ticket | eleventh row appended in this push |
+| This entry | the sixty-third; count sites 62 → 63 in lockstep; splice dry-run on a copy first, seams verified |
+| Push | two files (ledger + flake ticket), one commit; one Tests run on the new tip — the 20:15 run reads `attempts/1/jobs` on that sha |
+| Memory | `authn-prod-rejects-mobile-client-kind` updated STALE-CONFIRMED with the 200 reading and merge-time instructions; `upstream-mobile-app-is-a-draft-pr` moves to `a87f530e4`, map 53/136, (a) SETTLED, price five + two; `cli-token-expiry-matches-checkin-interval` gains the thirtieth face (the first past-exp FAIL: user-fetch 401 fast-fail with no refresh, retry refreshes; next exp **20:28:01**); `fork-ci-has-never-run-gui-app` era counts 25/21/4; `checkin-entries-live-on-main` count → 63 |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@a87f530e4`: **53**
+   conflicted paths / 136 stage lines (still); price **five hand-merges +
+   two policy calls** — precondition (a) is gone by measurement (this run's
+   200), so take `mobile-runner-host.ts` as theirs verbatim and retire the
+   `a272c32f6` guard in the same commit. (b) `clock: null` and (d) the
+   `browser_human_needed` arm stand; (c) land through a PR or
+   `bun run compile` first. Watch list: #889 at 386/SEVEN (quiet this
+   window), #1531 80/SEVEN, #1731 45/1, #1648 46/0, #1709 24/0.
+2. **The runner VM** — running, still unregistered for this fork's CI;
+   register + set `vars.GUI_APP_RUNNER`, or deallocate it. Upstream runs 20
+   free-runner shards (#1679) — read that before paying for registration.
+3. **One attended desktop minute** — the ask stands a SIXTH time. The
+   machine has been continuously awake since 12:20:56 with zero launches;
+   open the desktop epic, reconcile the ledger, restart the credential
+   lease behind the one-room WARN storm (232 more pairs this window; the
+   room has been rebuilding once a minute since 08-24, less only the sleep).
+4. **Discord outbound** — unchanged; nothing posts until you say so.
+5. **Unchanged:** VM start-or-stays-off, retiring `/`, the Teams app-package
+   install (the exempted shortcut), ConvBot S1 grading, the push-path
+   compile hole, cadence-through-sleep (your power-policy call, nothing owed
+   by the scripts). The supply flap is back (pair thirty-two, 16:01) —
+   still the known USB-C shape, still cosmetic at AC 99%.
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-09-05 12:15 — the cadence broke for the first time since the DNS era, and the cause was a closed lid, not a defect: the 00:15 run on 09-03 died six seconds in on a NEW face (`claude.exe` printed `Error: No messages returned from query` at 00:15:06 and then hung without exiting — the log carries the error block and NO verdict line, which the script writes unconditionally within milliseconds of the pipeline returning, so the pipeline never returned; not DNS, not a rate limit — the e0768e966 network probe was aboard and never triggered), the lid closed at 02:15:58 (`Kernel-Power` 42, Sleep Reason: **Button or Lid** — a human act at 2 a.m., the first KP-42 since 08-25 02:29:28, ending the up-streak at 8d23h46m), and the box slept 58h05m to a Thunderbolt-controller wake at 12:20:56 today — **fifteen windows passed without an entry** (the 00:15 corpse plus fourteen asleep), the longest gap since the ledger began, beating the DNS era's eleven; `StartWhenAvailable` did exactly its job and fired this run at 12:26:31, eleven minutes late, next run 16:15 TODAY — the cadence self-healed and no fix is owed (no script survives a closed lid); the twenty-ninth face is the deepest past-exp read ever taken: call A at 12:27:24.672, **+2d12h10m past the 00:17:16 exp** (prior record 3h37m), took the familiar shape at any depth — WS reject + fatal close `UNAUTHORIZED reason="exp"` at 12:27:25.367 (the thirty-fifth), jwks, in-command refresh, `savedAt` 12:27:26.305, exit 0 in 3.28s, clean in `cli.log` — depth-invariance established from 18s to 60h; Tests on `c01000dec` six-for-six GREEN on attempt 1 (run 33619593455, 14/14 in 5m48s; stream era 24 runs / 21 attempt-1 green / 3 reruns green, no ticket row); upstream **+57 to `b011b7ccb`** — the biggest window ever recorded (1228 files; EIGHT of the 29 open PRs merged: #1588 #1618 #1636 #1655 #1658 #1659 #1661 #1663, ~49 more opened-and-merged inside, #1729 reverting #1678 inside the same window) — and **the map MOVED after five still windows: 52 → 53 paths / 133 → 136 stage lines**, +1 conflicted path `clients/desktop/src/renderer-shell/main.tsx` (1 block), NINETEEN far sides moved including every #1659 file and `mobile-runner-host.ts`; control at `c674d21cb` under ours@`c01000dec` byte-for-byte (docs-only landings map-invisible, proven a sixth time); **precondition (a) CHANGED SHAPE — the ternary is GONE**: upstream `mobile-runner-host.ts:679` now reads literal `"mobile"` (#1588, whose title says *merge when prod authn accepts it* — it merged, implying prod authn now accepts the mobile client kind; if true the fork's replace-with-`"desktop"` guard dissolves and the price drops one hand-merge — NOT verifiable headless, verify before merging); (b) holds (`clock: ServerClockSkewSignal | null` at :132), (d) holds (nine files / fork grep 0); hand-merge blocks now 3/1/37/**4**/3/1/4 (`macos.test.ts` grew 3 → 4) plus the new path's 1; open PRs 29 → 25 (#1709 24/0, #1722 4, #1730 4, #1731 45/1 NEW; **#889 WOKE while the box slept: 349 → 386, +37 all desktop electron auth/IPC, overlap the SAME SEVEN, updated 09-04 21:48**; #1531 77 → 80 and overlap 6 → 7 via the new map path; #1648 46/0); storm 367 pairs all `f347a4fb` — 45/60/59/60/60/60/16 by hour to the last pre-sleep pair at 02:15:39, then a 58-hour hole, then resumption at 12:20:31.883 + 7 in the wake tail, the first three post-wake rebuilds failing on `ENOTFOUND collab.traycer.ai` (12:20:31–32, DNS not yet back; total 22 → 28) and self-healing — the exact wake-into-no-DNS shape e0768e966 was built for, reproduced at the host layer; lease frozen 44,095, refresher 0, Tiptap 0 (eighth window), room-meta 3, `[ERROR]` 0, rate-limit 0/0; non-storm lines 3 — the 20:15 run's call-B pair (inherited by THIS run since 00:15 never made a call) and the wake stall line (`maxDelayMs` 209,182,087 ms = the host's own 58h06m sleep reading); KP-105 pairs thirty (21:09:39/42, 3s) and thirty-one (00:12:59/13:00, 1s) in the awake head, then the flap stopped when the lid closed — 31 pairs since 08-30, AC 99%; fleet byte-frozen (0/115 active, 0/0/0 keyed by id vs 20:15, roles byte-identical 954 B, ambient profile authenticated/ok, no active turn in `host.log` since wake); attendance: two physical acts bracket the gap (lid close 09-03 02:15:58, dock wake 09-05 12:20:56) but ZERO explorer-parented launches since wake, desktop app absent, OpenClaw gateway respawned by its watchdog at 09-03 00:15:17 (node 18944 replacing 9908, eleven seconds after the check-in's claude died — same-minute, mechanism unestablished), all 40 worktrees at recorded counts — the desktop-minute ask stands a FIFTH time; VMs unchanged; next bearer minted by this run's call A dies **16:27:24 — twelve minutes INTO the 16:15 window**, a NEW shape: calls A and B (~16:15:45, ~16:17:20) both land BEFORE exp and should read clean, and the past-exp read falls to whichever call comes after 16:27:24 — likely the pre-push capture late in the run, else the 20:15 run's call A at ~+3h48m; same rule: gate on `savedAt`, keep the late call prepared, leave no watcher
 
