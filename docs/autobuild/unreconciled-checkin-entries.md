@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **sixty-five** entries in this
+everything came down, nothing went up. The **sixty-six** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **sixty-five**. Three count sites remain in this header: this
+on this file → **sixty-six**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,124 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the sixty-five entries below back into `traycer-remote-teams/autobuild/index.md`
+the sixty-six entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-06 04:15 — a clean window end-to-end, and the boundary rule proved twice: Tests on the 00:15 push `eb8dfc0b5` went **GREEN on attempt 1, six-for-six** (Tests run 33972089811, 14/14 jobs success from `attempts/1/jobs`, started 00:31:57; era 28/23/5; no ticket row — the twelfth red's rerun stands as the family's last word); upstream **+3 to `5a1382907`** (#1740 refresh the bundled CLI across RC updates; #1744 browser reload feedback + remote address input; #1743 **route chat archive and delete to the owning host** — the exact territory this epic's chat-transfer branch works, noted below; 40 window files) and the map held **53 / 136** with the control at `c3f733113` under the moved ours byte-for-byte (docs-only invisible a TENTH time), **ZERO far sides moved**, zero window files on the map — price holds **five hand-merges + two policy calls**; **the release train sat still for the first window since staging began**: `release-v1.3.0` unmoved at `bac6f6314`, no new tags, rc.2 remains the tip — pressure unchanged, still not acted; open PRs 26 → 28 with **nothing out** (#1740/#1743/#1744 merged without ever appearing in an open capture) and two in — #1745 landing-terminal worktrees 4/0, #1741 host-update activation 26/0, both crossed at zero overlap — while the watch list sat STILL end-to-end (every `updatedAt` predates the 00:15 pulls, no re-pull owed: #889 FROZEN 386/SEVEN a FOURTH window; #1531 80/SEVEN, #1731 45/1, #1648 46/0, #1709 24/0, #1736 draft 5/0); the thirty-third face: calls A (04:15:43, agent list, 52,699 B) and B (04:17:02, role list, LF 949 B) landed 14/13 min BEFORE the 04:29:59 exp and read clean, `savedAt` frozen at 00:29:59.590, and the past-exp read placed at **+46 s** per the once-proven rule **repaired in ONE call** — WS reject + fatal close `UNAUTHORIZED reason="exp"` 04:30:47.190 = the **thirty-ninth**, jwks both sides, in-command refresh, `savedAt` 04:30:47.863, exit 0 in 2.52 s, full 52,699 B capture keyed 0/0/0 against call A — **the rule is now twice-proven by design**, no fast-fail, no retry, `cli.log` line-clean this run; storm 232 pairs all `f347a4fb` (30/60/59/60/23 by hour to the 04:22:14 read), cadence unbroken, lease frozen 44,095, refresher 0, Tiptap 0 (twelfth window), room-meta 3, `[ERROR]` 0, rate-limit 0/0, ENOTFOUND frozen 28; **non-storm lines in the window: ZERO — the THIRD consecutive line-clean reading** (the 00:15 run's thirty-eighth pair at 00:29:58.899 sits in the seam before this window's 00:30 floor, attributed by its own entry); KP-105 **zero new pairs** (34 pairs / 68 events since 08-30 stands; the 09-05 20:34/22:01 pairs verified present under the same query before "zero" was recorded), no KP-42, AC 99 %; fleet frozen (0/115 active, keyed 0/0/0 against the 00:15 pre-push capture; roles DATA-identical, LF 949 B, same four claims); attendance zero explorer-parented launches since the 12:20:56 wake — all four survivors predate 09-03 — the desktop-minute ask stands a NINTH time; all 40 worktrees at recorded counts (sweep exit 128 attributed: the five `Temp/bundle-wt*` prunables have no directories); VMs unchanged; task fired ON TIME 04:15:01, next 08:15:00; next bearer (iat 04:30:47, TTL exactly 4 h) dies **08:30:47 — fifteen minutes forty-seven seconds INTO the 08:15 window**, the boundary marching a FIFTH notch and crossing the quarter-hour (12 → 13 → 14 → 15 → 15:47): calls A and B land BEFORE exp and read clean, the past-exp read is the pre-push capture placed >40 s past exp; rule twice-proven: gate on `savedAt`, never read inside (8 s, 37 s]; leave no watcher
+
+| Probe | Reading |
+| --- | --- |
+| `[ERROR]` in `host.log` since rotation | **0** (117,693 lines at the 04:22:14 read; rotation still 08-24; +486 since the 00:15 run's 117,207 anchor) |
+| Genuine rate-limiting (level-anchored, whole-word, UUID/ULID stripped) | **0** in the window and **0** since rotation |
+| Non-storm lines in the window | **ZERO at the 04:22:14 read** — third consecutive line-clean reading; the 00:15 run's thirty-eighth pair (00:29:58.899) falls in the seam before this window's 00:30 floor, attributed by that entry; the only post-read lines are this run's own thirty-ninth pair, attributed in the face section |
+| Agents blocked / errored / stranded | **none** — 0 of 115 `active` (04:15 capture, call A), keyed by id against the 00:15 pre-push capture → 0 added, 0 removed, 0 changed; `agent role list` data-identical (LF 949 B, same four claims); no `active turn` line in `host.log` |
+| Idle with work outstanding | the fork merge (Elliot — price five + two, release quiet this window) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none** — all 40 worktree entries swept with `status --porcelain`, every count at its recorded value (wt-guiapp-main 62 with `main` moved to `eb8dfc0b5` its only ref change, electric-stork 1, five `Temp/bundle-wt*` still prunable — the sweep's exit 128 is those five, directories gone, git's own `prunable` marker on each) |
+| `main` vs `origin/main` at start | **0 / 0** @ `eb8dfc0b5` — the 00:15 push landed clean |
+| Tests | **GREEN attempt 1, six-for-six** on `eb8dfc0b5` (Tests run 33972089811, 14/14 jobs success read from `attempts/1/jobs`, started 00:31:57; pre-commit, Real supervisor, Secret scan, Protocol Compatibility, CodeQL all success attempt 1). Era: 28 runs / 23 attempt-1 green / 5 reruns green. This run's push is the next landing — the 08:15 run reads `attempts/1/jobs` on that sha |
+| Storm | 232 rebuild pairs, all `f347a4fb`, 30/60/59/60/23 by hour to the 04:22:14 read, cadence unbroken; `CredentialLeaseReleasedError` **44,095** unchanged; refresher **0** (last 09-01 20:14:57.416); Tiptap sync-timeout **0** (twelfth window); `Room metadata not initialized` **3** (unchanged since 09-01 20:16:00) |
+| KP-105 / KP-42 | **zero new pairs** — 34 pairs / 68 events since 08-30 stands (the same query re-shown from 20:00 reproduced the known 20:34:31/34 and 22:01:42/45 pairs before "zero" was recorded — the absence is measured, not assumed). KP-42: none (the 09-03 02:15:58 sleep stands alone). Now: AC, 99 % |
+| Attendance | zero explorer-parented launches since the 12:20:56 wake; the four survivors are chrome (09-02 14:15), RSI/steam (09-02 09:56), ThrottleStop (08-27) — desktop app: **no instance** (pid 24260 `traycer.exe host start` is the standing supervisor from 08-25 16:17:01, not attendance) |
+| Headless `claude` on the box | **1** — this run (pid 38436 ← pwsh 16548, created 04:15:04; task `Traycer-Autobuild-Checkin` fired 04:15:01 ON TIME, stored result 267009 = still running, next **08:15:00**) |
+| Host process | `traycer-host.exe` unchanged (08-25 16:17:01); supervisor pid 24260 unchanged; OpenClaw gateway node **18944** (09-03 00:15:17 respawn) unchanged |
+| DNS / upstream reachability | ENOTFOUND frozen at **28** — zero new; every external call this run (GitHub API ×6, upstream fetch + ls-remote ×2, platform WS ×3) completed |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (since 08-19); `altra-vm-runner-demo-aue` running; the three sensormine VMs deallocated — unchanged |
+| Tickets | untouched — no ticket row owed (green attempt 1) |
+
+### Upstream: three merges, zero map contact, and the train paused at rc.2
+
+`5a1382907` is +3: #1740 (desktop refreshes the bundled CLI across RC
+updates), #1744 (browser reload feedback + remote address input), #1743
+(**route chat archive and delete to the owning host** — `use-epic-chat-mutations`,
+`chat-write-routing`, `use-chat-archive-support`, epic-replica runtime).
+40 files in the window, **0** on the map.
+
+The derivation re-ran with ours moved `36803293d` → `eb8dfc0b5` (docs-only):
+control at `c3f733113` reproduced the 00:15 paths and sorted stage lines
+**byte-for-byte** — the TENTH proof that docs-only landings are
+map-invisible — and the new tip changed **zero paths and zero stages**:
+still 53 / 136, the first zero-movement window since 09-05 20:15. Price
+**five hand-merges + two policy calls**, standing.
+
+**The release train sat still.** `release-v1.3.0` is unmoved at
+`bac6f6314`, no new tags arrived; `*-v1.3.0-rc.2` remains the tip of every
+train. After a window of same-day rc.2 + retroactive tag housekeeping +
+App Store prep, one quiet window reads as staging pause, not abandonment —
+pressure carried, not acted.
+
+**Worth a line for the epic:** #1743 routes chat archive/delete to the
+chat's *owning host* — the exact seam this ledger's own branch
+(`traycer/chat-transfer`: move a chat to another host carrying its
+history, loopback bridge, host picker) works from the fork side. Zero map
+overlap today, but upstream is now building host-aware chat routing of its
+own; at merge time the two implementations meet as a policy question, not
+a conflict marker. Recorded so the merge decision sees it.
+
+### The thirty-third face: the rule held its second by-design test
+
+Calls A (agent list, 04:15:43, full 52,699 B) and B (`agent role list`,
+04:17:02, LF 949 B) landed 14 and 13 minutes before the 04:29:59 exp and
+read clean, `savedAt` frozen at 00:29:59.590 — the pre-exp side unchanged
+across thirty-three faces. The past-exp read was placed at 04:30:45.940 —
+**+46 s past exp**, the same deliberate placement as 00:15's — and took
+the familiar repair in one call: WS reject + fatal close `UNAUTHORIZED
+reason="exp"` at 04:30:47.190 (the **thirty-ninth** since rotation), jwks
+persists either side, in-command refresh, `savedAt` 00:29:59.590 →
+04:30:47.863, exit 0 in 2.52 s, and the returned capture keys 0/0/0
+against call A's. No fast-fail, no retry branch taken, and `cli.log`
+carries zero error lines for this run — the first face with nothing to
+attribute. Two applications by design, two single-call repairs: the
+amendment graduates from once-proven to **twice-proven**. Next boundary:
+iat 04:30:47, TTL exactly 4 h, exp **08:30:47** — fifteen minutes
+forty-seven seconds into the 08:15 window, the march's fifth notch and the
+first past the quarter-hour. If the march holds shape, calls A and B read
+clean and the pre-push capture is the past-exp read, placed ≥08:31:30.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | Tests read from `attempts/1/jobs` (14 jobs enumerated, all success — no log pull owed on a green); `merge-tree` re-derived at `5a1382907` WITH control at `c3f733113` under the moved ours (byte-identical to the 00:15 paths AND sorted stage lines); all 40 window files crossed against the map (zero contact); #1745/#1741 file lists pulled and crossed (0/0); watch-list `updatedAt` compared against the 00:15 pulls (all prior — no re-pull, per the recorded rule); release branch and full tag namespace re-listed (the first probe used too narrow a glob and read zero tags — re-run with `refs/tags/*` before recording, the rc tags are component-prefixed); fleet keyed by id twice (call A vs 00:15 pre-push; past-exp capture vs call A); roles normalised then compared; storm per-room per-hour with non-storm isolation; KP query validated against the two known 09-05 pairs before recording zero; attendance from explorer-parented creation times; worktree sweep all 40 with the exit-128 attributed; VM power read; bearer gated on `savedAt` at every call |
+| Build work | **none** — the fleet is idle by measurement; parity-contract and fluent-tab-plan re-read at the brief's pointing and both carry STOP blocks (surfaces deleted 08-05, superseded by convergence); every open ticket is human-gated (T0c corporate approval, T3's human tap, T1b unstarted, T4 behind T0c) — nothing unattended-actionable |
+| This entry | the sixty-sixth; count sites 65 → 66 in lockstep; splice dry-run on a copy first, seams verified |
+| Push | one file (ledger only — no ticket row on a green), one commit; one Tests run on the new tip — the 08:15 run reads `attempts/1/jobs` on that sha |
+| Memory | `upstream-mobile-app-is-a-draft-pr` moves to `5a1382907` (53/136 held tenth control, zero far sides, release quiet at rc.2, #1743 chat-routing note, PRs 26→28); `cli-token-expiry-matches-checkin-interval` gains the thirty-third face (twice-proven) and the 08:30:47 exp; `fork-ci-has-never-run-gui-app` era 28/23/5; `checkin-entries-live-on-main` count → 66 |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@5a1382907`: **53**
+   conflicted paths / 136 stage lines; price **five hand-merges + two policy
+   calls** ((a) settled by the 16:15 curl; (b) `clock: null` and (d) the
+   `browser_human_needed` arm stand; (c) land through a PR or `bun run
+   compile` first). **This window: the release train paused at rc.2 —
+   branch and tags unmoved — and #1743 landed host-aware chat
+   archive/delete routing, the same seam as `traycer/chat-transfer`; at
+   merge these meet as a policy call.** Watch list: #889 at 386/SEVEN
+   (still, FOURTH window), #1531 80/SEVEN, #1731 45/1, #1648 46/0, #1709
+   24/0, #1736 draft 5/0; **new** #1745 4/0 and #1741 26/0 |
+2. **The runner VM** — running, still unregistered for this fork's CI;
+   register + set `vars.GUI_APP_RUNNER`, or deallocate it. This window went
+   green attempt 1, so the import-wall cost stayed invisible — the decision
+   is unchanged, not settled |
+3. **One attended desktop minute** — the ask stands a NINTH time. Awake
+   since 12:20:56 on 09-05, zero launches; open the desktop epic, reconcile
+   the ledger, restart the credential lease behind the one-room WARN storm
+   (232 more pairs this window; once a minute since 08-24, less only the
+   sleep) |
+4. **Discord outbound** — unchanged; nothing posts until you say so |
+5. **Unchanged:** VM start-or-stays-off, retiring `/`, the Teams app-package
+   install (the exempted shortcut), ConvBot S1 grading, the push-path
+   compile hole, cadence-through-sleep. The supply flap: quiet this window
+   (34/68 since 08-30 stands) — the known USB-C shape, cosmetic at AC 99 % |
+
+### Survival check on this entry
+
+Born under version control on `main`.
 
 ## 2026-09-06 00:15 — the family's twelfth red, and the release train cut rc.2 same-day: Tests on the 20:15 push `36803293d` went **RED on attempt 1** — the docs-only family's TWELFTH red, shard 2's FIFTH, **same 39 by name** (FAIL-line list sorted-diffed against the saved 09-01 list: identical; same first failure *"edits and switches the default account"* at 1,414 ms, `expected "vi.fn()" to be called at least once`, same Radix overlay DOM), ours' blob `a341e87ca` now FIVE reds on identical bytes while upstream's copy sat still at `f78fbd45f` (unmoved at both `696c694fa` and the new tip), import 230.06 s of 335.53 s wall = 69 %, family range — rerun fired 00:22:36, attempt 2 GREEN in 4 m 3 s (shard 2 job 101321052207, 00:22:41 → 00:26:44; era 27/22/5; ticket row twelve in this commit); upstream **+4 to `c3f733113`** (#1735 host explicit-downgrades — off the watch list at its recorded 0-overlap; #1737 **iPhone-only for the first App Store release**; #1738/#1739 a **new link-phone QR sign-in flow** — gui-app settings panel, CLI `link-phone`, `protocol/src/auth/link-login.ts`; 35 window files) and the map held **53 / 136** with the control at `696c694fa` under the moved ours byte-for-byte (docs-only invisible a NINTH time); **ONE far side moved**: the iOS `project.pbxproj` stage-3 (`6c7628bf5` → `4e6ce6a48`, #1737's), an add/add whose ours stage-2 `b30b2826b` is untouched — inside the clients/mobile block, not one of the five hand-merges, price holds **five + two**; **the release train accelerated**: `v1.3.0-rc.2` tags for cli/desktop/host cut same-day at `bac6f6314` = the `release-v1.3.0` branch tip carrying #1735 (branch moved `a87f530e4` → `bac6f6314`), three RETROACTIVE `v1.2.0-rc.1` tags at 08-19 commits (tag housekeeping), and #1737 is App-Store prep — pressure on the merge decision, still noted not acted; open PRs 26 → 26 (#1735 out, #1736 in — draft, onboarding-tour-by-viewport, 5 files, **0 on the map**; watch list: #889 FROZEN 386/SEVEN a THIRD window; #1531 `updatedAt` moved 00:02 AEST — thirteen minutes before this run fired — on an IDENTICAL 80-file list, overlap the same SEVEN, review traffic; #1731 moved 22:39 on an identical 45-file list, overlap 1; #1648 46/0 and #1709 24/0 still); the thirty-second face: calls A (00:16, agent list, 52,699 B) and B (00:19, role list) landed 13/10 min BEFORE the 00:29:12 exp and read clean, `savedAt` frozen at 20:29:14.121, one jwks persist during call A's WS connect with no reject pair (host-side key refresh on connect, precedented), and the past-exp read placed at +46 s per the 20:15 amendment **repaired in ONE call** — WS reject + fatal close `UNAUTHORIZED reason="exp"` 00:29:58.899 = the **thirty-eighth**, jwks, in-command refresh, `savedAt` 00:29:59.590, exit 0 in 2.48 s, full 52,700 B capture keyed 0/0/0 against call A — the first face where the amendment was applied by design and it held, no fast-fail, no retry; storm 230 pairs all `f347a4fb` (29/60/60/60/21 by hour to the 00:20:43 read), cadence unbroken, lease frozen 44,095, refresher 0, Tiptap 0 (eleventh window), room-meta 3, `[ERROR]` 0, rate-limit 0/0, ENOTFOUND frozen 28; **non-storm lines in the window: ZERO — the second consecutive line-clean reading** (the 20:15 run's thirty-seventh pair at 20:29:13 sits in the seam before this window's 20:30 floor, attributed by its own entry); KP-105 **two new pairs, both in-window** — thirty-three 20:34:31/34 and thirty-four 22:01:42/45, both 3 s wide, 34 pairs / 68 events since 08-30, no KP-42, AC 99 % — the flap is intermittent again, still cosmetic; fleet frozen (0/115 active, keyed 0/0/0 against the 20:15 post-exp capture; roles DATA-identical — the capture came back LF at 949 B against the recorded CRLF 954 B, five CR bytes, same four claims byte-for-byte after normalisation, so the `fc /b` convention needs the encoding pinned, recorded so the next run isn't spooked); attendance zero explorer-parented launches since the 12:20:56 wake — the desktop-minute ask stands an EIGHTH time (pid 24260 `traycer.exe host start` is the standing supervisor from 08-25, not the desktop app); all 40 worktrees at recorded counts; VMs unchanged; task fired ON TIME 00:15:01, next 04:15; next bearer (iat 00:29:59, TTL exactly 4 h) dies **04:29:59 — fourteen minutes fifty-nine seconds INTO the 04:15 window**, the boundary marching a fourth notch (12 → 13 → 14 → 15): calls A and B land BEFORE exp and read clean, the past-exp read falls to a late call; rule standing and now once-proven: gate on `savedAt`, place the past-exp read >40 s past exp, never immediately; leave no watcher
 
