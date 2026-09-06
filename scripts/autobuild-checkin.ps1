@@ -142,6 +142,17 @@ Do this:
    that just ran can appear hours old. Establish ordering from state that cannot
    lie (presence of `refs/original`, actual parent hashes), not from dates.
 
+8. THIS IS A ONE-SHOT RUN: ending your turn ends the process, and the exit
+   kills every background task, timer, and watcher with it. Nobody calls you
+   back. Five runs (08-24, 08-27, 08-28, 09-02, 09-06) died by ending their
+   turn "standing by" on something backgrounded, and 09-06's had its entire
+   entry drafted and its commit message staged when it died six minutes short
+   of its own timer. So: land what you have (splice -> commit -> push) BEFORE
+   placing any delayed read, word placeholder rows so the NEXT run can fill
+   them from cli.log/host.log/the credentials file, and if a wait is genuinely
+   required, wait in the FOREGROUND (a blocking sleep inside a tool call), not
+   by ending the turn.
+
 Do not wait for human input. Decide, act, and document what you decided.
 '@
 
