@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **sixty-eight** entries in this
+everything came down, nothing went up. The **sixty-nine** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **sixty-eight**. Three count sites remain in this header: this
+on this file → **sixty-nine**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,118 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the sixty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
+the sixty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-07 10:01 — the catch-up entry: FOUR windows, no entries — a hang, the ledger's first death-by-sleep, and two windows that never fired — and the dead 00:15 run did half of this entry's work before the box slept under it: 20:15 fired ON TIME 20:15:03 and hung with ZERO captures (no cli.log traffic, no scratch write, nothing after "check-in starting" — the hang fingerprint at its emptiest; `ExecutionTimeLimit` PT3H reaped it ~23:15); 00:15 fired ON TIME, repaired the dead bearer, pulled the shard-2 red's stream log, extracted the 39, TRIGGERED THE RERUN at 00:26:18 and saw it green at 00:31:02, re-derived the map at `73cb2db78` (53/136, control byte-for-byte) — then the BOX SLEPT at 00:35:42 (Kernel-Power 42 at :46) two minutes after its last capture, and the wake reaped it: the first run killed by sleep mid-flight; 04:15 and 08:15 NEVER FIRED (asleep 00:35 → 09:55:46; wake source = the Thunderbolt controller, NOT a human — zero explorer-parented launches after wake); THIS run is the missed-task-start catch-up, fired 10:01:34 (the task's stored 0x800710E0 = the reaped instance), and no window left a stranded entry to land — scratch AND wt-guiapp-main swept, the 00:15 run died pre-draft, so all four deaths are recorded here rather than posthumously; Tests: 34016639301 on `f3a107b72` attempt 1 RED — gui-app shard 2, the SAME 39 by name a SIXTH time (FAIL-line list sorted-diffed against the 16:15 list: identical — both normalise to git blob `7470fb701`, the raw files differing only in line endings; ours' blob `a341e87ca` a SIXTH red on identical bytes; first failure "edits and switches the default account" 1,435 ms with the same Radix overlay DOM; Duration 324.32 s, import 220.65 s = 68 % of wall, in family range) — attempt 2 green (shard 2 job 101502636355, 00:26:22 → 00:31:01, 4 m 39 s), the rerun FIRED BY THE DYING RUN: the family's first red repaired by a run that did not live to record it; era 30 runs / 24 attempt-1 green / 6 rerun-green; ticket row added; upstream +7 to `4fa18be1f` and THE MAP'S FIRST FAR-SIDE MOVEMENT: paths HELD 53 and stage count 136 — the control reproduced the 00:15 captures byte-for-byte, TWO valid derivations this entry — but ONE stage line moved: `clients/traycer-cli/src/service/platforms/__tests__/macos.test.ts` stage-3 (theirs) `8f24340` → `510fb7ab` (#1761 + #1763 touched a conflicted path; 132 window files, exactly that one on the map), so the price holds FIVE hand-merges + two policy calls BY COUNT while that path's merge is now against different theirs bytes; the release train did NOT follow: `release-v1.3.0` still `122ced28a` = rc.3, main now 7+ commits past its own release candidate; open PRs 32 → 29, SIX out THREE in — #1750 merged 18:51, #1756 merged 22:24, **#1752 and #1755 merged INSIDE the +7 window** (two watch entries became map inputs, already priced by this derivation), #1730 merged 10:06:01 SECONDS before this run's pull (merge commit postdates the fetched tip — next window's input), #1460 closed unmerged, #1757 in-and-out (arrived 00:04, closed unmerged); in: #1764/#1765/#1766; **#1751 GREW 186 → 193 files and still touches the SAME THREE map paths** (`ws-stream-client.ts`, its test, `remote-session.ts`); #1731 `updatedAt` moved on a byte-identical 45-file list a THIRD time; #889 frozen 386/SEVEN a SEVENTH window; faces 37–39: the thirty-seventh is the ledger's first ZERO-CALL face — the 16:19:38 bearer died 20:19:37 with the 20:15 run already hung, nothing placed, chain broken 3 h 57 m; the thirty-eighth is the 00:15 run's one-call repair at +3 h 57 m (pair FORTY-TWO 00:16:32.885, jwks, savedAt 00:16:33.823, 52,700 B keyed 0/0/0 — observed posthumously from cli.log + host.log + savedAt), whose bearer then died 04:16:33 UNREAD IN ITS SLEEP; the thirty-ninth is this run's +5 h 50 m repaired in ONE call (pair FORTY-THREE 10:06:31.616, jwks, savedAt 10:06:32.328, exit 0 in 4.32 s, 52,699 B keyed 0/0/0; roles data-identical LF 949 B) — depth-invariance now spans +3 h 57 m and +5 h 50 m without a counterexample; storm 500 pairs all `f347a4fb` across the QUAD window 16:30 → 10:29 with the ledger's first sleep-shaped cadence — 30/60/60/60/59/60/60/60/36 to 00:35:39, NINE HOURS ZERO (the host slept with the box), resumed 09:55:45 — the resume's first four rebuilds hit `getaddrinfo ENOTFOUND collab.traycer.ai` (09:55:45–:55, DNS not yet back at wake; ENOTFOUND 28 → 36 counted lines, all four attributed, cadence clean from 09:56:56) and the wake printed the family's biggest "stall": 33,603,824 ms = the sleep itself, measured by the event loop; lease frozen 44,095, refresher 0, Tiptap sync-timeout 0 across the quad window, room-meta 3, `[ERROR]` 0, rate-limit 0/0; non-storm SEVEN all attributed (pairs forty-two and forty-three, benign stalls 404 ms at 20:59:08 and 268 ms at 00:16:34, and the sleep-length stall); KP-105 TWO new pairs (17:19:54, 23:32:31 — the 3 s USB-C shape) → 43 pairs / 86 events since 08-30, AC 99 %, and this window's KP-42 is a REAL sleep, not the flap; attendance: ThrottleStop relaunched explorer-parented 19:34:38 Saturday evening (its 08-27 instance had exited) — Elliot touched the box, no Traycer desktop process appeared, storm cadence unbroken through 19:34 — the desktop-minute ask stands a TWELFTH time; fleet frozen 0/115 keyed 0/0/0 across BOTH hops (16:15 → 00:15 by re-running the dead run's own compare, 00:15 → 10:06 fresh), roles data-identical both hops; worktrees all 40 line-for-line at 00:15 counts; VMs unchanged; task next fires 12:15:00 — this run exits before it so the lock cannot skip it; next bearer (iat 10:06:32, TTL exactly 4 h) dies 14:06:32 — 1 h 51 m INTO the 12:15 window, the deepest mid-window expiry yet: the opening call lands PRE-exp, and the past-exp read belongs ≥14:07:12, a ~1 h 50 m wait — LAND THE ENTRY FIRST, then wait in the FOREGROUND only if budget allows; otherwise word the placeholder row for the 16:15 run to fill from cli.log/savedAt; rule: gate on savedAt, never read inside (8 s, 37 s], >40 s past exp, KEEP THE WAIT IN THE FOREGROUND; leave no watcher
+
+| Probe | Reading |
+| --- | --- |
+| The four windows | 20:15: hung at zero — log 76 B, no cli.log call 16:19:41 → 00:16:31, no scratch write; reaped ~23:15 (PT3H). 00:15: fired 00:15:05, worked 00:16 → 00:33:40 (bearer repair, shard-2 log + 39-name extraction, rerun trigger + green read, map derivation with control), box slept 00:35:42, reaped at wake. 04:15 / 08:15: no log file at all — the task never fired (asleep). 10:01:34: this run, the missed-start catch-up; lock cleared at 10:01:36 by the 3.5 h guard |
+| `[ERROR]` in `host.log` since rotation | **0** (120,193 lines at the 10:1x read; rotation still 08-24) |
+| Genuine rate-limiting (level-anchored, whole-word, UUID-stripped) | **0** in the window, **0** since rotation |
+| Non-storm lines in the QUAD window (16:30 → 10:29) | **SEVEN, all attributed** — WS pairs forty-two (00:16:32.885) and forty-three (10:06:31.616), stalls 404 ms (20:59:08, benign family) and 268 ms (00:16:34, 2 s after pair forty-two), and the 33,603,824 ms sleep-measurement stall at 09:55:45 |
+| Agents blocked / errored / stranded | **none** — 0 of 115 `active` (10:06 capture); keyed by id 00:15→10:06 AND 16:15→00:15 (the dead run's compare, re-run): 0 added / 0 removed / 0 changed both hops; `agent role list` data-identical (LF 949 B, same four claims); no `active turn` in `host.log` since 09-05 |
+| Idle with work outstanding | the fork merge (Elliot — now with the map's first far-side movement and main 7+ past rc.3) and ConvBot S1 grading (Elliot + VM) — both carried |
+| Dirty trees attributable to an agent | **none** — all 40 worktree entries swept `status --porcelain`, line-for-line at 00:15 counts; wt-guiapp-main's 62 are the recorded 08-25 → 09-02 scratch leftovers, none from 09-07 |
+| Tests | run 34016639301 on `f3a107b72`: attempt 1 RED (shard 2, the same 39 a SIXTH time), attempt 2 GREEN — rerun triggered 00:26:18 by the dying 00:15 run, shard 2 green 00:31:01. Era **30 / 24 / 6**. Ticket row added to `ci-tests-flake.md`. This push triggers the next run — the 12:15 run reads `attempts/1/jobs` on the NEW tip |
+| The four deaths | hang (20:15, zero placed), sleep mid-run (00:15 — Kernel-Power 42 at 00:35:46, first of its kind), task-never-fired ×2 (04:15, 08:15 — the "asleep" cause arriving as a pure scheduler miss); neither hang nor sleep touched fleet, ledger, or worktrees |
+| Storm | 500 rebuild pairs, all `f347a4fb`, 30/60/60/60/59/60/60/60/36/—/5/10 by hour — cadence broken only by the sleep itself (nine silent hours), resumed mid-minute at 09:55:45; `CredentialLeaseReleasedError` **44,095** unchanged; refresher **0**; Tiptap sync-timeout **0**; room-meta **3** (unchanged since 09-01) |
+| ENOTFOUND | 28 → **36** counted lines = FOUR `collab.traycer.ai` getaddrinfo failures, ALL in the ten seconds after wake (09:55:45–:55) before DNS returned — attributed, self-healed; zero elsewhere in the window |
+| KP-105 / KP-42 | **TWO new pairs** (17:19:54 + 3 s, 23:32:31 + 3 s) → **43 pairs / 86 events since 08-30**; AC 99 %, verdict unchanged (cosmetic). KP-42: **ONE — a real sleep** (00:35:46), the window's defining event, not the flap |
+| Attendance | ThrottleStop.exe relaunched 19:34:38 explorer-parented, dated (its 08-27 instance had exited) — Elliot was at the box Saturday evening; no Traycer desktop launch; nothing explorer-parented after the 09:55 wake (the wake was the Thunderbolt dock, not a person) — the desktop-minute ask stands a **TWELFTH** time |
+| Headless `claude` on the box | **1** — this run (pid 26772, created 10:01:37; task next fire **12:15:00** — this run lands and exits before it) |
+| Host process | `traycer-host.exe` 21456 unchanged (08-25 16:17:01) — it slept and resumed with the box; supervisor `traycer.exe` 24260 unchanged; OpenClaw gateway node 18944 unchanged |
+| VM (`az vm list -d`, this run) | `altra-vm-traycer-host-aue` **deallocated** (since 08-19); `altra-vm-runner-demo-aue` running; three sensormine VMs deallocated — unchanged |
+| Tickets | one row owed and written: the sixth shard-2 red, into `docs/autobuild/ci-tests-flake.md` (same commit as this entry) |
+
+### The four deaths, and the one new shape among them
+
+Three of the four causes were already in the catalogue. **20:15 is the
+recorded hang fingerprint at its emptiest** — the 12:15 hang (09-06) at
+least made its two opening captures; this one placed nothing at all, so
+its bearer window (face 37) is the first to die with zero calls. **04:15
+and 08:15 are the "asleep" cause arriving at the scheduler level** — no
+log file, no lock, nothing to diagnose but the power events. The new
+shape is **00:15: death by sleep, mid-run, after real work.** Modern
+Standby took the box at 00:35:42, two minutes after the run's last
+capture; the process was frozen, not killed, and the 09:55:46 wake
+handed it to the reaper. Everything it measured before 00:35 stands and
+this entry uses all of it: the bearer repair (face 38), the shard-2 red's
+39-name extraction, the rerun it triggered and read green, and a full
+map derivation with control. A run that dies mid-flight loses only its
+conclusions — its captures, if it writes them as it goes, are the next
+run's raw material. It wrote them as it went.
+
+### Upstream: the map's first far-side movement, and the release branch left behind
+
+Since the map existed, every derivation has held "ZERO far sides" — ours
+moved, theirs never touched a conflicted path. This window broke that:
+`4fa18be1f` (#1763) and `7d77ba74b` (#1761) both touched
+`clients/traycer-cli/src/service/platforms/__tests__/macos.test.ts`,
+one of the 53, and its stage-3 oid moved `8f24340` → `510fb7ab`. The
+counts did not move (53 paths / 136 stage lines, control byte-for-byte
+against the dead run's captures), so the price is numerically intact —
+but whoever hand-merges that file now merges against different upstream
+bytes than every prior reading of the map described. The mechanism that
+was always going to erode the map's shelf life has started.
+
+Meanwhile `release-v1.3.0` sat at `122ced28a` while main took seven
+more commits — rc.3 is no longer main's tip, and the "the release
+candidate IS the map's base" identity from 09-06 16:15 lasted one day.
+The pressure inverts: the longer the merge decision waits, the further
+the release candidate and the map's base drift apart.
+
+PR flow was the heaviest of any window: six out (four merged — two of
+them, #1752 and #1755, straight into the derivation window, so their
+files are already priced), three in, #1751 still growing (186 → 193)
+with its three map contacts intact, and #1730 merging four seconds
+before this run's pull — the next derivation's first input.
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | all four deaths established from primary state (wrapper logs, power events 42/107/1, task info, cli.log gap 16:19:41 → 00:16:31, lock mtime, process table) before any write; the dead run's map outputs validated by re-derivation (control byte-for-byte) rather than trusted; its fleet compare re-run, not assumed; Tests read from `attempts/1/jobs` AND `attempts/2/jobs`; the 39 sorted-diffed against the saved 16:15 list with line-ending normalisation; #1731 byte-checked a third time; #1751 crossed against the FRESH 53 paths; storm per-room per-hour with non-storm isolation over 18 h; KP query validated; bearer gated on `savedAt` at every call |
+| Build work | **none** — fleet idle by measurement both hops; every open ticket still human-gated; the quad window's yield is four death diagnoses, the flake row, and the map's far-side finding |
+| This entry | the sixty-ninth; count sites 68 → 69; splice dry-run on a copy first, seams verified |
+| Push | one commit, two files (this entry + the flake ticket row); triggers one Tests run on the new tip — the 12:15 run reads it |
+| Memory | `checkin-no-ops-have-two-causes` gains death-by-sleep and the scheduler-level miss; `cli-token-expiry-matches-checkin-interval` gains faces 37–39 and the 14:06:32 exp (deepest mid-window yet); `upstream-mobile-app-is-a-draft-pr` gains the far-side movement and rc.3-left-behind; `fork-ci-has-never-run-gui-app` era 30/24/6; `checkin-entries-live-on-main` count → 69 |
+
+### 🟠 Blocked on Elliot — carried, numbers current
+
+1. **Fork-merge direction** — map at `upstream/main@4fa18be1f`: **53**
+   paths / 136 stage lines, price **five hand-merges + two policy
+   calls** — with the first far-side movement (`macos.test.ts` theirs
+   changed under the map) and main now 7+ past rc.3. #1751 (193 files)
+   still holds three map paths. Watch: #889 386/SEVEN (seventh window),
+   #1531 80/SEVEN, #1731 45/1 (third byte-identical churn), #1648,
+   #1709, #1736, #1747, #1764, #1765, #1766
+2. **The runner VM** — running, still unregistered for this fork's CI;
+   register + set `vars.GUI_APP_RUNNER`, or deallocate it
+3. **One attended desktop minute** — stands a TWELFTH time; this window
+   Elliot launched ThrottleStop at the keyboard Saturday evening and the
+   desktop epic stayed shut; 500 more lease-storm pairs, now
+   sleep-gapped |
+4. **Discord outbound** — unchanged; nothing posts until you say so
+5. **Unchanged:** VM start-or-stays-off, retiring `/`, the Teams
+   app-package install (the exempted shortcut), ConvBot S1 grading, the
+   push-path compile hole. Cadence-through-sleep is no longer
+   hypothetical: the box slept 9 h and took two check-in windows with it
+   — if overnight sleep is the new pattern, the 00:15/04:15/08:15
+   windows die by default and the catch-up run carries them
+
+### Survival check on this entry
+
+Born under version control on `main`, in the same push as the flake
+ticket's sixth row. The dead 00:15 run's captures that fed it are in
+`scratch/` on the check-in worktree, named `*-0907-0015*`, derivation
+controls included.
 
 ## 2026-09-06 16:15 — the ledger's first double-death day, and both deaths left the fleet untouched: the 08:15 run died at 08:25:16 (exit 0, verdict "SUSPECT: only 1 lines of output") six minutes before its own 08:31:32 past-exp timer — it ended its turn saying "the background script will notify on completion", and in a one-shot `claude -p` the exit tears down the tree, waiter included: a NEW no-op shape, the turn-ending handoff to a background timer — its fully-measured entry stranded in scratch with face placeholders (the land script's placeholder guard held) and is landed by THIS run as the sixty-seventh, face rewritten to record the death; the 12:15 run fired ON TIME 12:15:05, made exactly its two opening captures (cli.log 12:16:09→12:16:41: call A json repairing the dead bearer — savedAt 12:16:11.391, WS pair FORTY at 12:16:10.679 — then call B), then went silent and was killed at ~15:15:05 by the task's `ExecutionTimeLimit` PT3H, no verdict line (the recorded hang fingerprint, now placed MID-run: it hung within ~2 minutes of starting, after its captures, before any scratch write), stale lock removed by this run at 16:15:03 (the 3.5 h guard working as designed); Tests owe nothing — the 08:15 push never happened so no new run fired; 33984463302 on `45cae19ef` RE-READ 14/14 success attempt 1 with all six workflows green (era stands 29/24/5); upstream +0 — `main` sat at `122ced28a` the whole double window — but the RELEASE TRAIN'S PAUSE ENDED: `release-v1.3.0` fast-forwarded `bac6f6314` → `122ced28a` (= main's own tip) and `*-v1.3.0-rc.3` tags cut there for cli/desktop/host at 09-05 12:47:41 -0700 = 05:47 AEST this morning (132 unique tag names; the three arrivals measured directly by fetch), so THE RELEASE CANDIDATE NOW IS THE MAP'S OWN BASE — the 53/136 fork-merge map is, verbatim, the map against rc.3, the strongest pressure yet on the merge decision; map: no derivation owed (both inputs unmoved at `45cae19ef` / `122ced28a`) and derived anyway as a determinism control — 53 paths / 136 sorted stage lines byte-for-byte against the 08:15 captures; price holds FIVE hand-merges + two policy calls; open PRs 27 → 32, FIVE in and none out — #1750 2/0, **#1751 186/THREE** (browser tabs on the Start Page re-landed; `ws-stream-client.ts`, its test, and `remote/remote-session.ts` ALL on the map — the first new watch entry with map contact since #1531), #1752 29/0, #1755 9/0, #1756 19/0 — while #889 sat frozen 386/SEVEN a SIXTH window, #1731 moved `updatedAt` on an IDENTICAL byte-checked 45-file list (review traffic, the recorded shape) and #1531/#1648/#1709/#1736/#1747 held still; the faces: the thirty-fourth DIED INCOMPLETE (pre-exp clean, read never placed — the 04:30:47 bearer died 08:30:47 unread), the thirty-fifth is the 12:15 run's deep read +3h45m repaired in ONE call (pair forty, jwks, savedAt 12:16:11.391, cli exit 0 in 2.5 s — depth-invariance again, observed entirely from host.log + cli.log + savedAt because the run left no report), the thirty-sixth is this run's: the 12:16 bearer died 16:16:11 mid-gap and call A at 16:19:35 = +3m24s past exp (>40 s by scheduling, not design) repaired in ONE call (pair FORTY-ONE at 16:19:37.512, jwks, savedAt 16:19:38.111, exit 0 in 4.2 s, 52,700 B capture keyed 0/0/0 against 08:15; roles data-identical LF 949 B) — the rule holds on both reads that actually happened; storm 470 pairs all `f347a4fb` across the DOUBLE window 08:30→16:29 (29/60/60/60/60/60/59/60/22 by hour to the 16:21:13 read) — cadence unbroken through both deaths, the host never noticed either one — lease frozen 44,095, refresher 0, Tiptap 0 (fourteenth window), room-meta 3, `[ERROR]` 0, rate-limit 0/0, ENOTFOUND frozen 28; non-storm FIVE, all attributed — pairs forty and forty-one (the two repairs, each with its jwks line) and one 257 ms event-loop stall at 12:38:01 from the 129-occurrence benign family, 23 s after the NVIDIA installer launched (timing noted, mechanism not claimed); ATTENDANCE — THE ZERO BREAKS after ten windows: Discord.exe at 10:38:02 and the NVIDIA 616.56 driver installer at 12:37:38, both explorer-parented with dated creation times — Elliot was AT the box — and the desktop epic still was not opened: no Traycer desktop process appeared and the lease-storm cadence never broke 10:38→15:52 (the restart the ask names would have broken it), so the desktop-minute ask stands an ELEVENTH time, sharpened: it has now survived actual presence; KP-105 came back LOUD — SEVEN new pairs today (08:44:44, 10:35:58, 11:33:06, 14:09:25, 14:21:59, 14:28:31, 15:52:42; all 3–4 s, the USB-C shape; query validated against the known 09-05 16:01/20:34/22:01 pairs before counting) → 41 pairs / 82 events since 08-30, the 14:09–14:28 cluster bracketing the presence window; no KP-42; AC 99 %, verdict unchanged (cosmetic); fleet frozen (0/115 active, keyed 0/0/0; roles data-identical); all 40 worktrees line-for-line at 08:15 counts (exit 128 = the five prunable `Temp/bundle-wt*`, attributed); VMs unchanged; task fired ON TIME 16:15:01, next 20:15:00; next bearer (iat 16:19:37, TTL exactly 4 h) dies 20:19:37 — 4m37s INTO the 20:15 window, the boundary's first RETREAT (the notch marched 12→13→14→15→15:47 on a chain anchored ~15 min into each window; today's two mid-gap repairs re-anchored it at 12:16 and 16:19), so the 20:15 run's opening call at the usual :16 lands PRE-exp and the past-exp read belongs ≥20:20:17; rule: gate on `savedAt`, never read inside (8 s, 37 s], place the past-exp read >40 s past exp, and KEEP THE WAIT IN THE FOREGROUND — a turn that ends on a background timer is a dead run reporting success; leave no watcher
 
