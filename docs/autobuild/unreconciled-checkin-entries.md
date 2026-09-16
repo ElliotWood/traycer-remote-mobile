@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **eighty-eight** entries in this
+everything came down, nothing went up. The **eighty-nine** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **eighty-eight**. Three count sites remain in this header: this
+on this file → **eighty-nine**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,29 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the eighty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
+the eighty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-17 08:15 — quiet window: upstream **+3**, **zero map contacts**, map holds **61 paths**; face 59 clean at +49 s (chain 62); era-52 (`39e04d2a5`) **6/6 green on attempt 1** (**52 / 40 / 12**)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **59** (chain **62**) | exp **08:21:16**, 6 m 16 s into the window; call first, decode second. Pre-exp A `agent list --all --json` **08:15:22** (**−5 m 54 s**) exit 0, 115 agents. Past-exp read by a backgrounded python sleep, `agent role list` started **08:22:05.003 = +49 s**: pair `authentication rejected` + `fatal close … reason="exp"` both 08:22:05.562 (host.log lines **23,983–23,984**), in-command refresh, savedAt → `2026-09-16T22:22:06.154Z`, exit 0 in 2.1 s. **NEXT: iat 08:22:06 / exp 2026-09-17 12:22:06 = 7 m 06 s into the 12:15 window.** Clean pre-exp before ~12:21:56, trap band 12:22:14–12:22:43, past-exp at or after 12:22:51 |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt) |
+| Upstream | **+3** `ac83783d7` → **`f35a06915`**: #1952 (task panels default to their agents' sole host), #1953 (worktree deletion progress + settings controls), #1954 (Codex retries as temporary informational feedback). 46 files differ from `ac83783d7`; **none is a map path** (`comm -12` against the merge-tree path set = empty) |
+| Merge map | `git merge-tree --write-tree --name-only origin/main upstream/main` = **61 paths**, `diff` against the same derivation at `ac83783d7` = identical. With zero contacts the census (**33 / 26 / 2**), stages, price (**NINE + two**) and hunks (**98 / 2,453**) carry by construction; not re-run |
+| Watched PRs | #1531 open (upd 09-12), #1880 open (upd 09-14), #1873 open (upd 09-16 22:15). Open count **36** (was 30 at 04:15) — not re-predicted |
+| CI | `39e04d2a5` (era-52): all six workflows **green on attempt 1**. Tally **52 / 40 / 12**. No flake row owed |
+| Host / storm | host.log live (23,976 lines at 08:16, last line 08:15:31 EpicTokenRefresher WARN); storm running |
+| Attendance | no new logon (explorer 12080 @ 09-16 09:20:24; last boot 09-16 03:31:39) |
+| Run note | this run's prompt arrived truncated after step 1's env block; it followed the standing check-in shape from the ledger |
 
 ## 2026-09-17 04:15 — quiet window: upstream **+5**, **zero map contacts**, map holds **61 paths**; face 58 clean at +49 s (chain 61); era-51 (`30d385878`) **6/6 green on attempt 1** (**51 / 39 / 12**)
 
