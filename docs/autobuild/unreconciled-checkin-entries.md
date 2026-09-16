@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **eighty-six** entries in this
+everything came down, nothing went up. The **eighty-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **eighty-six**. Three count sites remain in this header: this
+on this file → **eighty-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,29 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the eighty-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the eighty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-17 00:15 — watched **#1942 merged** (484 files, the shadcn lint sweep) and touched **four** map paths, but the path set holds: **61 / 155, census 33 / 26 / 2, price NINE + two**; the named `window-severity.ts` hand-merge grew **49 → 79** conflict lines (theirs moved to status tokens), hunks **98 / 2,453** (from 2,406); face 57 clean at +49 s (chain 60); era-49 (`91c846d91`) **6/6 green on attempt 1** (**49 / 38 / 11**)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **57** (chain **60**) | exp **00:19:36**, 4 m 36 s into the window, so the run called first and decoded second. Pre-exp A `agent list --all --json` **00:15:10.8** (**−4 m 25 s**) exit 0, 52,702 B; B `agent role list` 00:15:28.5 exit 0. Decode after: iat 20:19:36 / exp 00:19:36, savedAt raw `2026-09-16T10:19:36.182Z`, meta `mtimeFloorMs` 1789553976187, frozen through both calls. Past-exp read by a backgrounded python sleep, started **00:20:25.002 = +49.0 s**. Pair `authentication rejected` + `fatal close … reason="exp"` both **00:20:25.531** (host.log lines **23,468–23,469**). Refreshed inside the command: savedAt → `2026-09-16T14:20:26.200Z`, `mtimeFloorMs` 1789568426204, `lastMutation: rotate`, exit 0 in 1.8 s, 52,699 B. Keyed diff against the pre-exp read: **0 added / 0 removed / 0 changed** (the pre-exp file is 3 B larger only because it was captured through PowerShell). The nearest jwks persist is line 23,461, seven lines earlier and not this pair's. **NEXT: iat 00:20:26 / exp 2026-09-17 04:20:26 = 5 m 26 s into the 04:15 window.** Clean pre-exp before ~04:20:16, trap band 04:20:34–04:21:03, past-exp at or after 04:21:11. Call first, decode second |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt) |
+| Upstream | **+2** `1fa9f56ee` → **`f7895621e`**: #1947 (keyboard-aimed folder fix) and watched **#1942** "adopt @shadcn/lint, merge classes with cn" (**merged** 23:51 local). 484 files changed; map contacts are exactly four: `bun.lock`, `package.json`, `clients/gui-app/package.json`, `clients/gui-app/src/lib/rate-limits/window-severity.ts` |
+| Merge map (`scratch/derive-0917-0015.py`) | ctrl0 `877d9fff2`×`1fa9f56ee` reproduces entry eighty-six exactly: **61 / 155, 33 / 26 / 2**. The bridge arm `91c846d91`×`1fa9f56ee` matches ctrl0 byte for byte (the fork moved docs only). The new arm `91c846d91`×`f7895621e` has the same **61 paths** and census, with **4 stage moves**, all stage-3: `bun.lock` 83b602985 → b4aea6973, `package.json` 52f0bcc7a → 910ca03c7, `clients/gui-app/package.json` 33a958c6b → 9944b200d, `window-severity.ts` f3645698a → 1ba55869a. Price stays **NINE hand-merges + two policy calls**. The lockfile gets regenerated, both `package.json` files were already priced, and `window-severity.ts` is already a named hand-merge (the fork's `export *` shim against upstream's appended text-class function). #1942 swapped the hand-picked `red/amber/blue` shades for `destructive/warning/info` status tokens and rewrote the contrast comment, so the hand-merge now has to carry the token names into the shim's target |
+| Hunk sizing (`scratch/hunks-0917-0015.py`) | **98 hunks / 2,453 conflict lines** over 33 files (marker-inclusive 2,747), up from 98 / 2,406. Three rows moved: `bun.lock` 32/163 → **32/179**, `clients/gui-app/package.json` 1/5 → **1/6**, `window-severity.ts` 1/49 → **1/79** |
+| PR predictor (`scratch/predictor-0917-0015.py`, fork-modified set `fork-modified-2015.txt` = 546, reused) | Open PRs **38**, up from 36. Totals **20 map / 35 fork-modified across 9 / 13 PRs**, down from 24 / 39 because #1942 left. Still watched: **#1531** 7/15, **#1880** 4/4, **#1873** 1/2. **#1852** stays 0/0, which the predictor never lists. New but trivial: the dependabot batch #1894–#1900 (the three Capacitor bumps each touch one map path) |
+| CI | `91c846d91` (era-49): all six workflows **green on attempt 1**, Tests 35084497621 in 6 m 17 s. Tally **49 / 38 / 11**. No flake row owed |
+| Host / storm | host.log live (23,462 lines at 00:16:26); the lease-refresher WARN storm is running normally on its ~2-minute cadence |
+| Attendance | no new logon (explorer 12080 @ 09-16 09:20:24; last boot 09-16 03:31:39) |
 
 ## 2026-09-16 20:15 — the storm silence was a **pause, not a sign-in**: it resumed at 17:15:52 after 62 m 13 s, so the "errors stopping" signal is retired; face 56 clean at +49.5 s (chain 59); upstream **+9** to `1fa9f56ee` merged watched **#1918** and moved two theirs-blobs, map holds **61 / 155, census 33 / 26 / 2, price NINE + two**, hunks **98 / 2,406** (from 97 / 2,403); era-48 (`877d9fff2`) Tests att-1 RED = the shard-2 member's ninth appearance (**48 / 37 / 11**); the 16:15 run's stranded rows landed as `f28cf11d4`
 
