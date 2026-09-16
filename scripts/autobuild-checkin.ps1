@@ -158,6 +158,41 @@ Do not wait for human input. Decide, act, and document what you decided.
 
 "[$Stamp] check-in starting" | Out-File -FilePath $Log -Append
 
+# Say so when a window never fired, instead of leaving it to be found by hand.
+#
+# WHY: 2026-09-16 - Windows Update rebooted the box three times at 03:29-03:31
+# and nothing logged on until 09:20:24. This task is registered "Interactive
+# only", so 04:15 and 08:15 could not launch and left NO log of any kind - not
+# even the "starting" line above, which every other failure mode does write.
+# StartWhenAvailable is True and made up neither, because its make-up path
+# covers an unavailable COMPUTER, not an absent SESSION. Eight hours of
+# unattended build time vanished with nothing recording that it had; the gap
+# was only found because someone counted the files in this directory. The real
+# fix is an S4U principal and needs elevation - this makes the loss report
+# itself in the meantime, with the two facts that diagnose it. Never let this
+# block a run: the whole thing is best-effort.
+try {
+    $PrevLog = Get-ChildItem $LogDir -Filter 'autobuild-checkin_*.log' -ErrorAction Stop |
+        Where-Object { $_.Name -ne (Split-Path $Log -Leaf) } |
+        Sort-Object Name -Descending | Select-Object -First 1
+    if ($PrevLog) {
+        $PrevStamp = [datetime]::ParseExact(
+            ($PrevLog.BaseName -replace '^autobuild-checkin_', ''), 'yyyy-MM-dd_HHmm', $null)
+        $Gap = (Get-Date) - $PrevStamp
+        # Windows are 4h apart; anything past ~4.6h means at least one is gone.
+        if ($Gap.TotalHours -gt 4.6) {
+            $Missed = [math]::Round($Gap.TotalHours / 4) - 1
+            $Boot  = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).LastBootUpTime
+            $Logon = (Get-Process explorer -ErrorAction SilentlyContinue |
+                Sort-Object StartTime | Select-Object -First 1).StartTime
+            "[$Stamp] MISSED WINDOWS: ~$Missed since $($PrevLog.Name) (gap $([math]::Round($Gap.TotalHours,1))h) - last boot $Boot, interactive logon $Logon" |
+                Out-File -FilePath $Log -Append
+        }
+    }
+} catch {
+    "[$Stamp] missed-window check skipped: $_" | Out-File -FilePath $Log -Append
+}
+
 # Where the run's own output starts, so the completion line below can describe
 # what actually happened instead of only that something did.
 #
