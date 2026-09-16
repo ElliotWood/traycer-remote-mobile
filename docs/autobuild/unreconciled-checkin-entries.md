@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **eighty-four** entries in this
+everything came down, nothing went up. The **eighty-five** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **eighty-four**. Three count sites remain in this header: this
+on this file → **eighty-five**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,113 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the eighty-four entries below back into `traycer-remote-teams/autobuild/index.md`
+the eighty-five entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-16 16:15 — the storm onset came in **42 s early** and broke the timer reading three entries had built; face 55 clean at +50.5 s (chain 58); upstream **+4** moved 16 files and **not one of them touched the map**, so 61/155 held through a derivation rewritten from scratch rather than re-run; era-46 and era-47 both **6/6 green on attempt 1** (**47 / 37 / 10**); and the missed-window guard that landed at 12:41 was driven against both real historical losses, reproduced both, and had a wart fixed where it announced **"~0 missed windows"**
+
+Fleet **idle**, measured. `main` `0044c4e4c` → this entry's push. The run's own
+build yield is the guard fix; everything else is readings.
+
+|  |  |
+| --- | --- |
+| Bearer, face **55** | The tightest geometry the chain has handed forward (entry eighty-four: exp **16:17:55**, only **2 m 54 s** into the window) was walked **exactly as prescribed and it worked**. Payload re-decoded — *after* the opening call rather than before, because 2 m 54 s does not leave room for both and the pre-exp read is the perishable one; the decode then confirmed `iat` 12:17:55 / `exp` **16:17:55** against `savedAt` raw `2026-09-16T02:17:55.399Z`. Pre-exp call A `agent list --all --json` **16:15:38** (**−2 m 17 s**) exit 0, B `agent role list` **16:15:57** (−1 m 58 s) exit 0, `savedAt` frozen through both. Past-exp read placed by a **backgrounded** `python time.sleep` to 16:18:45 (foreground `sleep` is blocked; the turn kept deriving meanwhile) — started **16:18:45.506** = **+50.5 s**, inside the prescribed ≥16:18:40 and clear of the 16:18:03–16:18:32 trap band. Pair `authentication rejected` **16:18:46.036** + `fatal close … reason="exp"` **16:18:46.037** at host.log lines **23,006–23,007** — the **eighth** pair in this log, chain **58**. In-command refresh, `savedAt` → `2026-09-16T06:18:46.706Z`, meta `mtimeFloorMs` 1789539526769 / `lastMutation: rotate`, exit 0 in **1.76 s**, 52,699 B. **Eleven designed step-overs, zero fast-fails on any >40 s placement**; depth-invariance spans +40 s .. +40 h |
+| The jwks persist arrived **before** the pair, not after | `[jwks] Persisted signing keys … (4 key(s))` sits at line **23,005**, immediately *preceding* 23,006. Entry eighty-three recorded a pair with **no** persist and entry eighty-four one with the persist **following** at 22,779. All three are the same rule seen from three sides — the persist rides whichever connection first needs keys the host has not cached — and the ordering carries no information about the repair. Recorded so a future run does not read "persist at 23,005, pair at 23,006" as the keys having fixed the bearer |
+| 🔴 **Storm — the prediction missed, and the miss is the finding** | Entry eighty-four predicted the fourth calibration at **13:18:41.8** (+60 m 43.6 s after the 12:17:58.205 hydrate), from three prior readings that clustered at **+60 m 44.0 / 44.6 / 43.6 s** — a spread of 1.0 s across three boots, which is what made "the onset is a timer, not load" look safe. The actual first `EpicTokenRefresher` line after that hydrate is **13:17:59.539 = +60 m 01.3 s**, **42.3 s EARLIER** than predicted and **43 s off the cluster**. Three readings inside a second is not a timer; it is three draws that happened to agree. The honest statement is **~60 min ± ~1 min**, and the onset must never again be predicted to the second. The storm is **alive** (last line 16:13:39), so the epic is hydrated — the cold-boot rule (*storm 0 means NOT HYDRATED*) is not in play this window. The prescribed signal (errors **stopping** = an attended sign-in) reads negative a **twenty-sixth** window |
+| Agents blocked / errored / stranded | **none** — **115** agents, **0 `active`**, keyed **0 added / 0 removed / 0 changed** against `agents-2015-postexp3.json` (**2026-09-05 20:15**) and data-md5 `ec56bed7` **identical under one convention applied to both files**, not compared across entries. That is an **eleven-day** baseline, longer than any entry has used, and it is the stronger reading precisely because it reaches past every capture the recent entries compared against |
+| Genuine rate-limiting | **none** — level-anchored grep (`[WARN]`/`[ERROR]` carrying `429`, plus `rate limit` / `Too Many Requests`) returns **0** across the whole 23,007-line host.log. Not a substring count of `429` |
+| Idle with work outstanding | **three, all human-gated and all carried**: the fork merge (Elliot — far side +4, price unchanged), ConvBot S1 grading (Elliot + VM), and the **S4U principal** (needs an elevated prompt; `Access is denied` unelevated, proven in entry eighty-four to be the principal and not the registration) |
+| Host | supervisor pid **20784** / host pid **12512**, started 09:20:36 / :38 — **the same pair entry eighty-four recorded**, both alive. `[ERROR]` **0** across the whole log. **No `phase=` line after the 09:20:37 start**, so no crash and no revive this window |
+| Tests | **read from the runs API, not from memory**: era-46 `497448327` **6 / 6 green on attempt 1** (02:35:37Z) and era-47 `0044c4e4c` **6 / 6 green on attempt 1** (02:41:56Z) — era-47 is the 12:15 run's second push, which landed the missed-window guard and which no entry has yet recorded. Tally **45 / 35 / 10** → **47 / 37 / 10**. **No new red**, so `docs/autobuild/ci-tests-flake.md` is unchanged at twenty rows / fifteen red / six members / three named. This entry's push fires the era-48 run |
+| Upstream | **+4** first-parent `685e5bae7` → **`cfcc78297`**, **16 files**: #1927 (`fix(protocol,gui-app)`: Traycer routing does not govern provider-native subagents), #1935, #1932, #1931 |
+| Map derivation (ours `0044c4e4c`, theirs `cfcc78297`, THREE arms) | The derivation script from the 12:15 run **could not be found on disk**, so `scratch/derive-0916-1615.py` was **written from scratch** — which turns the control arm from a re-run into an **independent reproduction**. ctrl0 (`e3d1c4067`×`685e5bae7`) returns **61 paths / 155 sorted stage lines, census 33 three-stage / 26 add-add / 2 base+ours** — entry eighty-four's reading, reproduced by different code before the new arm was trusted. bridge (`0044c4e4c`×`685e5bae7`) **== ctrl0** on both paths and sorted stage lines, so ours' two script commits contributed nothing. new (`0044c4e4c`×`cfcc78297`) **== bridge, byte-for-byte, with ZERO stage moves** — the first window in this ledger's recent run where the far side moved and the map did not flinch at all. Window 16 files **∩ map = 0** |
+| Hunk sizing | **97 hunks / 2,403 conflict lines over 33** (marker-inclusive **2,694**) from `scratch/hunks-0916-1615.py`, also newly written. Because the new arm's stage lines are **byte-identical** to the bridge arm's, this table is a pure function of blobs already measured — but it was **re-derived rather than inferred**, and it lands on entry eighty-four's numbers exactly, from independent code. Price **NINE hand-merges + two policy calls**, unchanged |
+| PR predictor (REST, every file list paginated, intersected with both `paths-1615-new.txt` and the 546 `fork-modified-1615.txt`) | Open PRs **41**, up from 37 — four merged and eight opened — and the totals **did not move**: **22 map / 37 fork-modified** across **10 / 14** PRs, identical to entry eighty-four. **Every one of the eight new PRs scores 0 / 0.** #1918 (*chore: refresh in-range catalog dependencies*, 2 / 2) was updated at **06:22:05Z = 16:22 local — seven minutes INTO this run**, the **third consecutive window** in which a watched PR was edited within minutes of the fire. WATCH unchanged: **#1531** 7 / 15, **#1880** 4 / 4, **#1918** 2 / 2, **#1873** 1 / 2, **#1852** 86 f **0 / 0** |
+| 🟡 Preconditions at `cfcc78297` | (a) RETIRED **stands** — `clients/mobile/src/mobile-runner-host.ts:715` still `DEVICE_FLOW_CLIENT_ID: DeviceClientId = "mobile"`, **zero** `__TRAYCER_MOBILE_CONFIG__` reads in the runner host; (b) **STANDS** — `clock: ServerClockSkewSignal \| null` at `clients/shared/host-transport/ws-stream-client.ts:156`; (d) **STANDS** — `worktree_auto_cleanup` :419, `browser_human_needed` :447 in `protocol/src/host/notifications/payloads.ts`. **(c) is a gap, and is recorded as one rather than carried a fifth time.** Entries eighty-two, eighty-three and eighty-four all state "(c) STANDS" and **none of them names the file, the symbol or the grep**, so no run can falsify it — it has been re-asserted, not re-read. [[stale-facts-need-derivations]]. The next run that touches preconditions should either recover (c)'s derivation from an older entry and write the command down, or drop it |
+| Dirty trees attributable to an agent | **one, and it is zero-loss.** electric-stork carries `M scripts/autobuild-checkin.ps1` — **byte-identical** (CRLF-normalised `diff`: 0 lines) to what the 12:15 run landed on `main` as `0044c4e4c`. It is a leftover copy of a change that already shipped, on a branch (`traycer/chat-transfer` at `cd0842bbd`) that never carried it; discarding it loses nothing, and it is left alone rather than reverted because reverting another agent's working tree unasked is not this run's call. `wt-guiapp-main` 62 → **71** = **this run's own nine scratch files**, fully attributable. 35 worktrees, 0 prunable, none new |
+| Attendance | **no new logon** — explorer pid **12080** is still the **09:20:24** one entry eighty-four recorded, and every explorer-parented launch is still within 48 s of it (`chrome.exe` 4944 at 09:21:01). The later `chrome.exe` starts (11:50, 12:02, 13:36, 15:28) are **parented by chrome 4944, not explorer** — renderers, not hand launches, and the distinction is the whole reason the rule says explorer-parented. **`claude.exe` reads 2 and neither is a collision**: pid 5988 (16:15:03) is this session under the wrapper's `powershell.exe` 25256 (16:15:01), and pid **26832 (09:26:45, 469 s CPU, 352 MB)** is **Elliot's VS Code Claude Code extension** — parented by `Code.exe` 21020 (09:25:17), command line `…\.vscode\extensions\anthropic.claude-code-2.1.246…\claude.exe --permission-mode bypassPermissions`. An attended Claude session, opened six minutes after the logon and **still resident seven hours later** — but it is not a fleet agent (0 / 115 active) and it is **not** the Traycer desktop app. The desktop-minute ask stands a **twenty-sixth** window. The Security-log 4624 query returned nothing **unelevated**, so it is **unmeasured, not zero** [[measurements-need-three-states]] |
+| VM (`az vm list -d`) | unchanged — the same five states: `altra-vm-traycer-host-aue` **deallocated**, `altra-vm-runner-demo-aue` **running**, three sensormine **deallocated** |
+
+### The three readings that agreed, and why that was the weakest part of the chain
+
+Three boots put the lease-storm onset at +60 m 44.0 s, +60 m 44.6 s and
++60 m 43.6 s after their hydrate. A 1.0 s spread across three independent
+starts is an extremely strong-looking signal, and entry eighty-four drew the
+obvious conclusion — *"the onset is a timer, not load"* — and then did the
+right thing with it: it wrote the prediction down, to the tenth of a second,
+**before** the window it described.
+
+It missed by **42.3 s**. The onset landed at **+60 m 01.3 s**.
+
+The value of the miss is entirely in the prediction having been recorded in
+advance. Had entry eighty-five simply measured +60 m 01 s and filed it beside
+three +60 m 44 s readings, the natural move is to average them, or to call the
+outlier a scan artefact, and the "timer" belief survives one more window. The
+falsifiable form is what killed it in a single reading. The honest model is
+now **~60 minutes ± ~1 minute** — still useful for scheduling a watcher, never
+again quotable to the second.
+
+It is worth being precise about what did *not* change: the onset is still
+anchored to the **hydrate**, not to host start, not to sign-in and not to load.
+Four readings agree on that, and this window's reading strengthens it rather
+than weakening it. Only the claimed precision was wrong.
+
+### A guard that had never fired, driven against the two losses it was written for
+
+The 12:15 run landed `0044c4e4c` — a missed-window reporter — because eight
+hours of unattended build time had vanished with **nothing recording that it
+had**, and the gap was only found by counting files in a log directory. The
+code was written after the diagnosis and shipped the same window, so its
+**firing branch had never executed**. This run's own log is the negative
+control and it is correct: gap 12:15 → 16:15 is **4.0 h**, under the 4.6 h
+threshold, and the log carries only `check-in starting`.
+
+The positive side was driven against the ledger's own history:
+
+| Gap driven | Reports | The real event |
+| --- | --- | --- |
+| 00:15 → 12:15 = **12.0 h** | `~2` | 04:15 and 08:15, entry eighty-four's cause eleven |
+| 09-13 16:15 → 09-15 12:33 = **44.3 h** | `~10` | the ten windows lost to the sleep transition |
+| 04:15 → 12:15 = **8.0 h** | `~1` | a single lost window |
+| 12:15 → 16:15 = **4.0 h** | silent | this run |
+
+Both real historical losses reproduce exactly, from their own timestamps —
+which is the strongest available evidence that the reporter would have caught
+them at the time.
+
+**The wart the exercise found, and the one-line fix.** The branch is gated on
+`$Gap.TotalHours -gt 4.6` and *then* computes
+`$Missed = [math]::Round($Gap.TotalHours / 4) - 1`. Those two disagree: a gap
+of 4.6–5.4 h passes the gate and rounds to **zero**, so the log would print
+**`MISSED WINDOWS: ~0`** — a warning whose own content says nothing was wrong.
+That is this project's signature bug wearing a different hat, and the fix is
+to **gate on the count rather than on the threshold** — compute `$Missed`
+first, fire on `$Missed -ge 1`. The threshold was a proxy for the count; using
+the count directly removes the disagreement instead of retuning it. Re-driven
+after the edit: 12.0 h → `~2`, 44.3 h → `~10`, 8.0 h → `~1`, **4.8 h → silent**,
+4.0 h → silent; the file parses with 0 errors.
+
+*Skipped: a test file for this. [[ci-has-no-windows-leg]] — CI is ubuntu-only,
+so a PowerShell test would never run there, and a check that cannot fail in
+CI is a check nobody maintains. The five cases are recorded in the table above
+instead. Add one when a Windows leg exists.*
+
+### Done this run
+
+|  |  |
+| --- | --- |
+| Verification | the map derivation and the hunk table **rewritten from scratch** rather than re-run, so entry eighty-four's 61 / 155 / 33-26-2 / 97 / 2,403 is an independent reproduction rather than a replay; the fleet keyed against an **eleven-day-old** capture with the md5 convention applied to **both** files rather than compared across entries; the auth pair read from **host.log**, per entry eighty-four's method correction; rate-limiting grepped **level-anchored**; the second `claude.exe` identified by **command line and parent** before it could be filed as a collision; the later `chrome.exe` starts checked for their **parent** before being read as attendance; the Security-log silence recorded as **unelevated = unmeasured**; precondition (c) demoted from a carried "STANDS" to a **named gap** |
+| 🔴 Finding | the storm-onset prediction **falsified by its own next reading** — 42.3 s early against a three-reading cluster spanning 1.0 s. "Timer" is retired; the model is ~60 min ± ~1 min |
+| Build work | the missed-window guard **exercised for the first time** against both real historical losses (12.0 h → ~2, 44.3 h → ~10) and **fixed**: gate on `$Missed -ge 1` instead of `$Gap.TotalHours -gt 4.6`, removing a `MISSED WINDOWS: ~0` report in the 4.6–5.4 h band. One line plus its reasoning; five cases re-driven; parse clean |
+| Ticket work | `ci-tests-flake.md` needs **no row** — era-46 and era-47 are both 6 / 6 green on attempt 1, read from the runs API. Twenty rows / fifteen red / six members / three named, unchanged |
+| Carried | the fork merge, ConvBot S1 grading, and the S4U principal — all three need Elliot, and the S4U one needs an **elevated** shell specifically |
+| Next window's geometry | New bearer `iat` **16:18:46** / `exp` **2026-09-16 20:18:46** = **3 m 46 s** into the 20:15 window — tight again, though not as tight as this one's 2 m 54 s. Re-decode the payload, but **do the opening call first if the clock is already past ~20:17**: this run's ordering (call, then decode) is what made the pre-exp read at −2 m 17 s possible and is the right ordering whenever the room is under ~4 minutes. Clean pre-exp before **~20:18:36**; trap band **20:18:54–20:19:23**; past-exp reads at or after **20:19:31**, placed by a **backgrounded** wait |
+| This entry | the eighty-fifth; count sites eighty-four → eighty-five; splice dry-run on a copy first, real splice byte-compared; verified by `grep -c '^## 2026'`, never by the script's count |
 
 ## 2026-09-16 12:15 — TWO windows lost to a cause with no sleep in it: Windows Update rebooted the box three times at 03:29–03:31 and nothing logged on until 09:20:24, so the `Interactive only` task could not launch at 04:15 or 08:15 (cause **eleven**; `StartWhenAvailable` is True and made up NEITHER); face 54 repaired the bearer at **+7 h 54 m 28.8 s** inside one 4.46 s call that also carried the cold hydrate (chain 57); upstream **+14** to `685e5bae7` moved 379 files and the map byte-holds **61 / 155, census 33 / 26 / 2, price NINE + two, hunks 97 / 2,403 with every one of the 33 rows identical**; era-45 Tests att-1 RED / att-2 green (**45 / 35 / 10**) and its red is the flake family's **sixth distinct member, named and ticketed here** — a desktop test upstream **deleted**, so the merge deflakes it; #1862 and #1913 retire from the watch, #1918 joins and #1873 lands on a map path
 
