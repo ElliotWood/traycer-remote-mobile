@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **eighty-seven** entries in this
+everything came down, nothing went up. The **eighty-eight** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **eighty-seven**. Three count sites remain in this header: this
+on this file → **eighty-eight**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,28 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the eighty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
+the eighty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-17 04:15 — quiet window: upstream **+5**, **zero map contacts**, map holds **61 paths**; face 58 clean at +49 s (chain 61); era-51 (`30d385878`) **6/6 green on attempt 1** (**51 / 39 / 12**)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **58** (chain **61**) | exp **04:20:26**, 5 m 26 s into the window; call first, decode second. Pre-exp A `agent list --all --json` **04:15:11** (**−5 m 15 s**) exit 0; B `agent role list` 04:15:48.8 exit 0. Decode after: iat 00:20:26 / exp 04:20:26, savedAt raw `2026-09-16T14:20:26.200Z` frozen through both. Past-exp read by a backgrounded python sleep, started **04:21:15 = +49 s**: pair `authentication rejected` 04:21:15.588 + `fatal close … reason="exp"` 04:21:15.589 (host.log lines **23,719–23,720**), in-command refresh, savedAt → `2026-09-16T18:21:16.251Z`, exit 0. **NEXT: iat 04:21:16 / exp 2026-09-17 08:21:16 = 6 m 16 s into the 08:15 window.** Clean pre-exp before ~08:21:06, trap band 08:21:24–08:21:53, past-exp at or after 08:22:01 |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt) |
+| Upstream | **+5** `f7895621e` → **`ac83783d7`**: #1917 (pasted draft images by hash), #1951 (agent stops to the owning host), #1948 (MCP rows kept on refresh failure), #1945 (comm-graph office-view), #1949 (CLI `--expect-reply` hint). 269 files differ from `f7895621e`; **none is a map path** (`comm -12` of the diff against the merge-tree path set = empty) |
+| Merge map | `git merge-tree --write-tree --name-only origin/main upstream/main` = **61 paths**, `diff` against the same derivation at `f7895621e` = identical. With zero contacts the census (**33 / 26 / 2**), stages, price (**NINE + two**) and hunks (**98 / 2,453**) carry by construction; not re-run |
+| Watched PRs | #1531 open (upd 09-12), #1880 open (upd 09-14), #1873 open (upd 09-16 16:59). `gh pr list` open count **30** (was 38) — not re-predicted |
+| CI | `30d385878` (era-51): all six workflows **green on attempt 1**. Tally **51 / 39 / 12**. No flake row owed |
+| Host / storm | host.log live (23,713 lines, last line 04:15:26 EpicTokenRefresher WARN); storm running |
+| Attendance | no new logon (explorer 12080 @ 09-16 09:20:24; last boot 09-16 03:31:39) |
 
 ## 2026-09-17 00:15 — watched **#1942 merged** (484 files, the shadcn lint sweep) and touched **four** map paths, but the path set holds: **61 / 155, census 33 / 26 / 2, price NINE + two**; the named `window-severity.ts` hand-merge grew **49 → 79** conflict lines (theirs moved to status tokens), hunks **98 / 2,453** (from 2,406); face 57 clean at +49 s (chain 60); era-49 (`91c846d91`) **6/6 green on attempt 1** (**49 / 38 / 11**)
 
