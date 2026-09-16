@@ -179,9 +179,11 @@ try {
         $PrevStamp = [datetime]::ParseExact(
             ($PrevLog.BaseName -replace '^autobuild-checkin_', ''), 'yyyy-MM-dd_HHmm', $null)
         $Gap = (Get-Date) - $PrevStamp
-        # Windows are 4h apart; anything past ~4.6h means at least one is gone.
-        if ($Gap.TotalHours -gt 4.6) {
-            $Missed = [math]::Round($Gap.TotalHours / 4) - 1
+        # Windows are 4h apart, so the count is what decides, not the gap: a
+        # 4.6-5.4h gap rounds to zero missed windows and used to report
+        # "MISSED WINDOWS: ~0" - a warning announcing that nothing was wrong.
+        $Missed = [math]::Round($Gap.TotalHours / 4) - 1
+        if ($Missed -ge 1) {
             $Boot  = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).LastBootUpTime
             $Logon = (Get-Process explorer -ErrorAction SilentlyContinue |
                 Sort-Object StartTime | Select-Object -First 1).StartTime
