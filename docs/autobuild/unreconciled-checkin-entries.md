@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-one** entries in this
+everything came down, nothing went up. The **ninety-two** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-one**. Three count sites remain in this header: this
+on this file → **ninety-two**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,29 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-one entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-two entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-17 20:15 — quiet window: upstream **+5**, **zero map contacts**, map holds **61 paths** (stage OIDs identical); face 62 clean at +50 s (chain 65); era-55 (`dae4b9ae9`) **6/6 green on attempt 1** (**55 / 43 / 12**)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **62** (chain **65**) | exp **20:23:46**, 8 m 46 s into the window; call first, decode second. Pre-exp A `agent list --all --json` **20:15:16** (**−8 m 30 s**) exit 0, 115 agents, 52,699 B; B `agent role list` 20:15:58 exit 0; decoded after (iat 16:23:46 / exp 20:23:46), savedAt raw `2026-09-17T06:23:46.305Z` frozen through both. Past-exp read by a FOREGROUND sleep, `agent role list` started **20:24:36.780 = +50 s**: pair `authentication rejected` + `fatal close … reason="exp"` 20:24:37.348/.349 (host.log lines **24,740–24,741**), in-command refresh, savedAt → `2026-09-17T10:24:37.968Z`, exit 0 in 2.9 s, roles byte-identical to the pre-exp read. Nearest jwks persist line 24,730 (before the pair). **NEXT: iat 20:24:37 / exp 2026-09-18 00:24:37 = 9 m 37 s into the 00:15 window.** Clean pre-exp before ~00:24:27, past-exp at or after ~00:25:27 |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** (only the sender can be); host.log carries no `active turn` / `status=running` line |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt) |
+| Upstream | **+5** `7c21335f0` → **`756afcdc5`**: #1938 (host-local chat search), #1961 (stopped-host doctor logs), #1963 (CLI staged host updates), #1964 (provider models during pending availability), #1955 (draft-image follow-ups) — 47 paths. `comm -12` of that path delta against the merge-tree path set = **empty** |
+| Merge map | `git merge-tree --write-tree --name-only origin/main upstream/main` = **61 paths**, `diff` against `scratch/paths-0917-1615.txt` empty; the full conflict-stage block (`scratch/st-2015-0917.txt`) is byte-identical to the same block re-derived against `7c21335f0` — no OID moved. Census (**33 / 26 / 2**) and price (**NINE + two**) carry; hunks (**98 / 2,453**) not re-run (16:15's `.gitleaks.toml` block still unmeasured) |
+| Watched PRs | #1531 open (upd 09-12), #1880 open (upd 09-14), neither moved. Open count **32** (unchanged) |
+| CI | `dae4b9ae9` (era-55): all six workflows **green on attempt 1**. Tally **55 / 43 / 12**. No flake row owed |
+| Host / storm | host.log live (24,730 lines at 20:16, last line a `[jwks]` persist); storm running |
+| Attendance | no new logon (explorer @ 09-16 09:20:24) |
+| Run note | prompt truncated after step 1's env block again; steps read from `scripts/autobuild-checkin.ps1` |
 
 ## 2026-09-17 16:15 — upstream **+3** incl. watched **#1873 merged**; **one map contact** (`.gitleaks.toml` stage-3 move, already a conflict path), map holds **61 paths**; face 61 clean at +50 s (chain 64); era-54 (`403e14e67`) **6/6 green on attempt 1** (**54 / 42 / 12**)
 
