@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-three** entries in this
+everything came down, nothing went up. The **ninety-four** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-three**. Three count sites remain in this header: this
+on this file → **ninety-four**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,30 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-three entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-four entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-18 04:15 — upstream **+2**, **zero map contacts**, map holds **61 paths** (stage lines cmp-identical); era-57 (`1a2a6a15d`) Tests **red on attempt 1** = a **seventh** flake member, `about-details-dialog.test.tsx`, and the diagnosis moves: the snapshot had already settled, the **store update had not rendered** (**57 / 43 / 14**); face 64 clean at **+50 s** (chain **67**)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **64** (chain **67**) | exp **04:25:28**, 10 m 28 s into the window, exactly as 00:15 predicted (`savedAt` parsed from both schemas: `credentials.savedAt` = `2026-09-17T14:25:28.473Z`, `credentials.meta.json` `mtimeFloorMs` = `1789655128478` — both 00:25:28 local; `iat` 1789655128 / `exp` 1789669528). Call first, decode second. Pre-exp A `agent list --all --json` **04:16:05** (**−9 m 23 s**) exit 0, 115 agents, 52,699 B; B `agent role list` **04:23:12.801** (**−2 m 15 s**) exit 0 by 04:23:14.528, 949 B. Past-exp read, `agent role list` started **04:26:18.006 = +50 s**: pair `authentication rejected code=UNAUTHORIZED message="exp" claim timestamp check failed` + `fatal close state=authenticated code=UNAUTHORIZED reason="exp"` at 04:26:18.951/.952 (host.log lines **29,379-29,380**), in-command refresh, exit 0 by **04:26:20.590**, roles **byte-identical** to the pre-exp read (949 B both, LF-normalised; 4 claims). jwks persist line 29,381 **after** the pair (the prior one 29,238) - still says nothing either way about the repair. **NEXT: iat 04:26:19 / exp 2026-09-18 08:26:19 = 11 m 19 s into the 08:15 window.** Clean pre-exp before ~08:26:09, past-exp at or after ~08:27:09 |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** (only the sender can be), all `surface: gui` |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt). Measured this window rather than carried: `agent role list` shows **four role claims still held**, every holder `active: false` — `Upstream merge into main` (agent `ee3843e4`), `Mobile host switcher` (`aff63e24`), `Teams card design` (`3eaf2d25`), `Teams Help tab` (`384c05a4`). The first is the fork merge's own claim; the other three are pre-pivot surfaces (`clients/mobile`, teams-tab) deleted from `main` on 08-05, so those claims outlived their subjects and are stale rather than outstanding |
+| Upstream | **+2** `8b54e704b` → **`1176cc4a8`**: #1971 (browser session surfaces and settings), #1974 (redesigned guided tours / Getting-started guides / import act) — 160 paths. Both land in the **watched PRs' own territory** (#1974 ↔ #1880's joyride tours, #1971 ↔ #1531's browser shell) yet neither watched PR moved. `delta ∩ merge-tree path set` = **empty** |
+| Merge map | `git merge-tree --write-tree 1a2a6a15d 1176cc4a8` = **61 paths / 155 stage lines**, census (**33 three-stage / 26 add-add / 2 base+ours**) and price (**NINE + two**) carry; the stage-line list is **list-identical to the same command against the old tip `8b54e704b`** run as a control in the same script (`scratch/derive-0918-0415.py`), and the path set equals the saved `scratch/paths-0918-0015.txt` — no OID moved. Hunks (**98 / 2,453**) not re-run |
+| Watched PRs | #1531 open (browser webapp shell at /app), #1880 open (welcome modal / joyride tours), neither moved. Open count **27** (was 24) |
+| CI | `1a2a6a15d` (era-57): five workflows green on attempt 1; **Tests red** — `test (traycer-clients-gui-app shard 3)`, and the member is **new to the family**: `src/components/layout/dialogs/desktop/__tests__/about-details-dialog.test.tsx` > *"gates the failed-snapshot report action on capability and never forwards the raw error"*, `TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Report issue"` at `:54:28`. Same test title and same assertion as the shard-1 member (`logs-chooser-dialog.test.tsx`, the `6d267111e` row) in a **sibling file** — so the two are one shape on two shards. `gh run rerun --failed` at **04:18:36** by this run; **attempt 2 green** (shard 3 job `105326481659` 18:18:43Z -> 18:24:16Z, 5 m 33 s; att-1 red 14:25:54Z -> 14:30:38Z), read from `attempts/2/jobs`. Summary att-1: `Test Files 1 failed | 263 passed (264)`, `Tests 1 failed | 2510 passed (2511)`, `Duration 258.97s (import 193.76s)` - import **75 %** of wall. Tally **57 / 43 / 14**; flake family, derived not carried (`grep -E '^\| \`[0-9a-f]{8,9}\`' docs/autobuild/ci-tests-flake.md \| grep -c ❌`) → **20 red rows, 21 with this one**; **7 members, 4 named**; ticket row added |
+| Flake diagnosis (advances ask 2) | The `6d267111e` row guessed *"the capability-gated content had not arrived when the sync `getByRole` ran"*. The accessible-roles dump refines that to a **named step**: it lists exactly one `paragraph` (the `DialogDescription`, `max-w-[72ch] … *:[a]:underline`) and two `Close` buttons. The `unavailable` branch renders `<div><span>{message}</span><ReportIssueAction/></div>` — a **roleless** span — while the `loading` branch renders a second `<p>`. One paragraph therefore means the snapshot **had** settled to `unavailable` and its text was on screen; what was missing is only `ReportIssueAction`, whose entire gate is the synchronous `if (!reportIssueAvailable) return null`. So the failing step is `act(() => setState({reportIssueAvailable: true}))` **not having rendered**, not the awaited `getSnapshot` rejection. Four mechanisms eliminated by reading the tree, not by rerunning: (1) no other writer of `reportIssueAvailable` exists — all 19 non-test references are reads; (2) cross-file store leakage is impossible — `vitest.config.ts` sets `pool: "forks"` and leaves `isolate` at its default `true`; (3) no Radix async naming — this call site passes `presentation="link"`, a plain `<Button>Report issue</Button>`, not the tooltip-wrapped icon arm; (4) no async rehydrate clobber — the store is a bare `create(...)` with no `persist` middleware. The remaining suspect is the act-environment/`useSyncExternalStore` flush itself, which is also why it selects the two sibling dialog tests and nothing else. **Deliberately not patched, and the reason is the map:** the one-line fix (`await screen.findByRole` in place of the sync `getByRole` after the `act`) is correct and would land in both twins — but `ours` == `base` for all four blobs and **neither path is among the merge map's 61**, so editing them would convert two zero-conflict files into conflict paths and make the pending merge worse to buy a green tick a rerun already buys. Upstream has moved both blobs; the merge deletes the problem. Recorded for the post-merge deflake instead |
+| Host / storm | host.log live (**29,340** lines at 04:23, last line 04:15:42, the `CredentialLeaseReleasedError` / Tiptap-rebuild WARN pair); storm running |
+| Attendance | no new logon (explorer @ 09-16 09:20:24; boot 09-16 03:31:39 — both unchanged for a fifth consecutive window) |
+| Run note | `wt-guiapp-main` checked clean of tracked changes before landing (untracked `scratch/` only); no rows stranded |
 
 ## 2026-09-18 00:15 — upstream **+2**, **zero map contacts**, map holds **61 paths** (stage OIDs identical); era-56 (`aadb035c8`) Tests **red on attempt 1** = the shard-2 member's **tenth** appearance (green on rerun; **56 / 43 / 13**); face 63 clean at +50 s (chain 66)
 
