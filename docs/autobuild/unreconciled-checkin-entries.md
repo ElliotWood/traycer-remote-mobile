@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-two** entries in this
+everything came down, nothing went up. The **ninety-three** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-two**. Three count sites remain in this header: this
+on this file → **ninety-three**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,29 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-two entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-three entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-18 00:15 — upstream **+2**, **zero map contacts**, map holds **61 paths** (stage OIDs identical); era-56 (`aadb035c8`) Tests **red on attempt 1** = the shard-2 member's **tenth** appearance (green on rerun; **56 / 43 / 13**); face 63 clean at +50 s (chain 66)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **63** (chain **66**) | exp **00:24:37**, 9 m 37 s into the window; call first, decode second. Pre-exp A `agent list --all --json` **00:15:09** (**−9 m 28 s**) exit 0, 115 agents, 52,700 B; B `agent role list` 00:15:41 exit 0; decoded after (iat 09-17 20:24:37 matches 20:15's NEXT). Past-exp read, `agent role list` started **00:25:27.006 = +50 s**: pair `authentication rejected` + `fatal close … reason="exp"` 00:25:27.828/.828 (host.log lines **26,019–26,020**), in-command refresh, exit 0 by 00:25:29.379, roles byte-identical to the pre-exp read. jwks persist line 26,021 (AFTER the pair; the prior one 25,870). **NEXT: iat 00:25:28 / exp 2026-09-18 04:25:28 = 10 m 28 s into the 04:15 window.** Clean pre-exp before ~04:25:18, past-exp at or after ~04:26:18 |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** (only the sender can be) |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt) |
+| Upstream | **+2** `756afcdc5` → **`8b54e704b`**: #1968 (usage panel status-bar eye), #1969 (status bar draws every usage reading) — 32 paths. `comm -12` of that path delta against the merge-tree path set = **empty** |
+| Merge map | `git merge-tree --write-tree --name-only origin/main upstream/main` = **61 paths**, `diff` against `scratch/paths-0917-2015.txt` empty; the 155 conflict-stage lines (`scratch/stg-b.txt`, filtered from `scratch/st-0015-0918.txt`) `cmp`-identical to 20:15's — no OID moved. Census (**33 / 26 / 2**) and price (**NINE + two**) carry; hunks (**98 / 2,453**) not re-run |
+| Watched PRs | #1531 open (upd 09-12), #1880 open (upd 09-14), neither moved. Open count **24** (was 32): #1968/#1969 merged plus **nine Dependabot PRs (#1894–#1902) closed unmerged at 12:05Z** — not re-predicted |
+| CI | `aadb035c8` (era-56): five workflows green on attempt 1; **Tests red** — `test (traycer-clients-gui-app shard 2)`, `providers-settings-panel.test.tsx`, `Tests 39 failed \| 2865 passed (2904)`, `Test Files 1 failed \| 263 passed (264)`, `Duration 328.68s (import 224.13s)`, first failure *"edits and switches the default account"* with the Radix overlay DOM (`data-scroll-locked="1"`). Ours' blob still `a341e87ca`. `gh run rerun --failed` 00:16:30 by this run; attempt 2 green (shard 2 job `105239855774` 00:16:35 → 00:22:15, read by `gh run watch --exit-status` = 0). Tally **56 / 43 / 13**; flake family **18 red / 6 members / 3 named**; ticket row added |
+| Host / storm | host.log live (25,892 lines at 00:16, last lines the `CredentialLeaseReleasedError` WARN pair); storm running |
+| Attendance | no new logon (explorer @ 09-16 09:20:24; boot 09-16 03:31:39) |
+| Run note | prompt truncated after step 1's env block again; steps read from `scripts/autobuild-checkin.ps1` |
 
 ## 2026-09-17 20:15 — quiet window: upstream **+5**, **zero map contacts**, map holds **61 paths** (stage OIDs identical); face 62 clean at +50 s (chain 65); era-55 (`dae4b9ae9`) **6/6 green on attempt 1** (**55 / 43 / 12**)
 
