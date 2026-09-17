@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety** entries in this
+everything came down, nothing went up. The **ninety-one** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety**. Three count sites remain in this header: this
+on this file → **ninety-one**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,29 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-one entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-17 16:15 — upstream **+3** incl. watched **#1873 merged**; **one map contact** (`.gitleaks.toml` stage-3 move, already a conflict path), map holds **61 paths**; face 61 clean at +50 s (chain 64); era-54 (`403e14e67`) **6/6 green on attempt 1** (**54 / 42 / 12**)
+
+| Item | Reading |
+| --- | --- |
+| Bearer, face **61** (chain **64**) | exp **16:22:55**, 7 m 55 s into the window; call first, decode second. Pre-exp A `agent list --all --json` **16:15:28** (**−7 m 27 s**) exit 0, 115 agents, 52,699 B; B `agent role list` 16:15:47 exit 0; decoded after (iat 12:22:55 / exp 16:22:55), savedAt raw `2026-09-17T02:22:56.185Z` frozen through both. Past-exp read by a backgrounded python sleep, `agent role list` started **16:23:45.001 = +50 s**: pair `authentication rejected` + `fatal close … reason="exp"` both 16:23:45.694 (host.log lines **24,477–24,478**), in-command refresh, savedAt → `2026-09-17T06:23:46.305Z`, exit 0. Nearest jwks persist line 24,468 (not this pair's). **NEXT: iat 16:23:46 / exp 2026-09-17 20:23:46 = 8 m 46 s into the 20:15 window.** Clean pre-exp before ~20:23:36, past-exp at or after ~20:24:35 |
+| Agents blocked / errored / stranded | **none**: 115 agents, **0 `active`** (only the sender can be); host.log carries no `active turn` / `status=running` line |
+| Genuine rate-limiting | **none** |
+| Idle with work outstanding | **three, all waiting on a human, all carried**: the fork merge (Elliot), ConvBot S1 grading (Elliot + VM), and the S4U principal (needs an elevated prompt) |
+| Upstream | **+3** `150f2872e` → **`7c21335f0`**: #1873 (the `auto` permission mode — 232 files / +29,062 across the three), #1956 (protocol doc), #1960 (hover-card agent name). `comm -12` of the upstream path delta against the merge-tree path set = **`.gitleaks.toml` only** |
+| Merge map | `git merge-tree --write-tree --name-only origin/main upstream/main` = **61 paths**, identical to 12:15. Stage diff: exactly one OID moved — `.gitleaks.toml` stage 3 `95d2b4df1` → `a3d3bd64f`, a purely additive 9-line `[[allowlists]]` block (`scopeKey` in the auth-lifecycle r6f1 suite). It was already a conflict inside the Oxlint policy call; the new block unions in. Census (**33 / 26 / 2**) and price (**NINE + two**) carry; hunks (**98 / 2,453**) not re-run — may move by the one added block |
+| Watched PRs | **#1873 MERGED** (09-17 05:27Z) — drop from the watch; it touched no other map path. #1531 open (upd 09-12), #1880 open (upd 09-14). Open count **32** (was 35) — not re-predicted |
+| CI | `403e14e67` (era-54): all six workflows **green on attempt 1**. Tally **54 / 42 / 12**. No flake row owed |
+| Host / storm | host.log live (24,472 lines at 16:18, last line 16:18:17 EpicTokenRefresher WARN); storm running |
+| Attendance | no new logon (explorer @ 09-16 09:20:24; last boot 09-16 03:31:39) |
+| Run note | prompt truncated after step 1's env block again; steps read from `scripts/autobuild-checkin.ps1` |
 
 ## 2026-09-17 12:15 — quiet window: upstream **+2**, **zero map contacts**, map holds **61 paths**; face 60 clean at +49 s (chain 63); era-53 (`e5f9659b4`) **6/6 green on attempt 1** (**53 / 41 / 12**)
 
