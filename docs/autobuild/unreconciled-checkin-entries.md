@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-seven** entries in this
+everything came down, nothing went up. The **ninety-eight** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-seven**. Three count sites remain in this header: this
+on this file → **ninety-eight**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,160 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-seven entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-eight entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-19 16:15 — **the epic's own map of itself is 26 days stale**: `clients/mobile` was restored to `main` on 2026-08-24 (`8f9785fd8`, 99 files, **53 under `src`**) and the convergence note still records *"main **0** — the package is not in `clients/` at all"*, which is the sentence the parity goal has been reasoned from; one of its two named traps is retired by a caller that now exists, the other still holds; merge map unmoved at **61 / 155** against a new upstream tip whose only three contacts are the lockfile trio
+
+Fleet **idle**, checked rather than assumed: `agent list --all --json` returns
+**115** agents, `active` **false on all 115**, surface `gui` ×115, 108 local /
+7 remote. Nothing blocked, errored, rate-limited, or collided. `main` at
+**`cbf9b3068`** (era-62), all six checks green on attempt 1 — read in-window at
+12:38 by the window that pushed it, so this entry is that era's ledger row and
+owes no CI read. Tally **62 / 46 / 16** (eras / Tests green attempt 1 / red
+attempt 1); 46 + 16 = 62 holds. No flake row is owed — the table is red-only
+and era-62 is green — so the ticket's prose counts (23 red / 7 members /
+4 named) are unchanged.
+
+### The finding — a load-bearing fact that expired without anyone re-running it
+
+`epic-pivoted-to-upstream-convergence` (written 08-05, last amended 08-18) is
+the note every run uses to decide *where Teams parity work lives*. Its 08-18
+section states a three-way count of `clients/mobile/src` under version control:
+`main` **0**, `/next/` stack tip **53**, `archive/clients-mobile` **256**, and
+draws the conclusion the whole standing goal now rests on — that the two Teams
+shell files are *"on the `/next/` stack lineage (**NOT** on `main`, which has
+no `clients/mobile`)"*.
+
+Measured this window against `cbf9b3068`, not carried:
+
+| | files |
+| --- | --- |
+| `git ls-tree -r --name-only cbf9b3068 -- clients/mobile` | **99** |
+| `… -- clients/mobile/src` | **53** |
+| `… -- clients/teams-tab` | **0** |
+
+So the **53 is now on `main`** — the same 53, at the same shape (`src/web` 50,
+`mobile-runner-host.ts`, `index.ts`, `vite-env.d.ts`) — and only the
+`teams-tab` half of the 08-05 deletion is still deleted. The history is
+unambiguous: removed 2026-08-05 13:18 by `cb1edae3b` *"Remove clients/mobile and
+clients/teams-tab from main"*, restored **2026-08-24 04:39:16** by `8f9785fd8`
+*"clients: put the Teams client's own source on the trunk, and measure what it
+costs"*, then touched again by `a272c32f6` on 08-30. The note was amended on
+**08-18**, six days before the restore, and has been read as current ever since.
+
+This is [[stale-facts-need-derivations]] on the one file that exists to stop
+exactly this: the note's own closing advice is *"a 76KB gap table now names
+files that are not on the trunk"*, and while it was busy retiring that table its
+own trunk claim went the other way. A `git ls-tree` is the derivation; it costs
+one command and nobody ran it for 26 days.
+
+**What it changes.** `clients/mobile/src/web/teams-host.ts` (17,169 B) and
+`main.tsx` (15,087 B) — the two files the note calls the entire Teams-specific
+surface — are on the trunk, in CI, and editable by a normal push. The
+instruction *"start a Teams parity question there, not in the retired gap
+table"* no longer means "go find the `/next/` stack"; it means open the file.
+
+**What it does not change.** The deployed-side conclusion stands untouched: `/`
+still serves the archived PWA and `/next/` serves gui-app, and retiring `/` is
+still Elliot's call, not something building anything can close.
+
+### The two traps in that file, re-derived rather than carried
+
+The note records two things found in `teams-host.ts`'s neighbourhood on the
+stack. Against `main` today they have **diverged**, and reading them as a pair
+would have been wrong:
+
+- **`onTheme` had zero callers — RETIRED.** It now has one:
+  `clients/mobile/src/web/main.tsx:236`, under a comment at `:231` explaining
+  that it fires once on the initial context and again on every Teams theme
+  change. It is also consumer-tested — `external-link.test.ts:413` asserts the
+  call site contains `"onTheme:"`, which is the *caller* assertion the note
+  asked for, not another direct drive of the option.
+- **`data-teams-host` / `data-teams-theme` written and read by nobody — STILL
+  LIVE.** Both are set at `teams-host.ts:384–385`. A grep across all of
+  `clients/` for `data-teams` over `.ts`, `.tsx` and `.css` returns **seven**
+  hits: the two writes, and five reads that are all inside
+  `teams-host.test.ts:489–502`. No stylesheet selects on them, no component
+  reads them. Write-only outside its own test, exactly as filed.
+
+**Deliberately not fixed.** The lazy move on a write-only attribute is to delete
+it, and that is likely the wrong one here: a `data-teams-theme` on the root with
+no consumer is as easily an *unfinished* theme hook — which is parity work, the
+standing goal — as it is dead code. Deleting it unattended would quietly
+foreclose the question. Raised, not resolved; the one command that settles it is
+asking Elliot which he meant.
+
+### Merge map — holds, and this window's movement is the cheap kind
+
+Upstream `9d6923216` → **`a1a33095e`** (*chore: refresh in-range catalog
+dependencies (#2015)*), **+3** commits, 42 delta paths. Derived two-arm with the
+old tip as control (`scratch/derive-0919-1615.py`, ours `cbf9b3068`):
+
+- **61 paths / 155 stage lines**, census **33 three-stage / 26 add-add /
+  2 base+ours** — path set **identical** to the 09:59 map, nothing added,
+  nothing dropped.
+- **3 contacts, all stage-3-only, all of them the manifest/lockfile trio**:
+  `bun.lock`, `package.json`, `clients/gui-app/package.json`. The control arm
+  differs from the current arm by exactly those three stage-3 blobs and nothing
+  else. That is the cheapest movement this map can show — a dependency-catalog
+  refresh is *regenerate*, not resolve — and it is the opposite of the 09:59
+  window's six contacts, four of them `clients/shared/host-transport/`.
+- `cbf9b3068..a1a33095e` = **731**; `a1a33095e..cbf9b3068` = **582**.
+
+**New, and it connects to the finding above:** the add/add bucket has been
+carried as a bare count (26) for weeks. Decomposed, it is **25 ×
+`clients/mobile/*` + `clients/gui-app/src/lib/mobile-app.ts`** — i.e. the whole
+add/add half of this merge *is* the restored mobile client meeting upstream's
+own mobile-app work, and it exists on the map only because of the 08-24 restore.
+43 % of the conflict surface has a single cause and a single already-priced
+resolution (take-theirs / regenerate, from the 08-26 pricing). The remaining 33
+three-stage + 2 base+ours are the part that needs hands.
+
+### Readings
+
+- **Bearer: face 67, chain 70 — in-command refresh at +2 h 15 m 14 s past
+  `exp`.** Decoded from `credentials` at the top of the window *before* calling,
+  as the standing rule now requires: `iat` 10:01:58 / `exp` 14:01:58.
+  `agent list --all --json` at **16:17:11.983** → exit **0** in **5.63 s**,
+  **52,699 B**, empty stderr, no 401 surfaced; `credentials` rewritten
+  `savedAt` 16:17:16.966Z with a new `iat` 16:17:15 / `exp` 20:17:15. The token
+  had aged **6 h 15 m** unrefreshed because the 12:15 window's call landed
+  inside its life — the cadence only holds when every window probes.
+- **Duration does not discriminate a refresh.** 09:59 refreshed at +21 h 34 m in
+  **2.70 s**; this window refreshed at +2 h 15 m in **5.63 s**; 12:15 did *not*
+  refresh and took **2.49 s**. The only reliable tell is `credentials`' mtime
+  either side of the call, which is what was read here.
+- **host.log, under the rule-4 dominance probe shipped four hours ago — first
+  run in anger, and it reports the defect it was written for.** 52,957 lines;
+  top line **42.8 %**, top five **94.3 %** (12:15: 43.1 % / 94.4 %), all five
+  the credential-lease livelock split across rooms —
+  `EpicTokenRefresher: batch threw … CredentialLeaseReleasedError` plus the
+  Tiptap disconnect/rebuild pair in both their epic-scoped and generic forms. A
+  single-line threshold would still read clean. mtime 16:17, same minute as the
+  CLI call, so the host is alive under it.
+- **Watched PRs — the two-read rule confirmed on its second face, and it is not
+  PR-specific.** Upstream open **26** (was 27). Both `#1880` and `#1531`
+  returned `mergeable_state: "unknown"`, `mergeable: null`, `rebaseable: null`
+  on read 1 and resolved on read 2: `#1880` (76 commits / 187 files) **dirty,
+  mergeable false, rebaseable false**; `#1531` (90 commits / 85 files) the
+  same — **`rebaseable` has gone false on #1531 too**, where 09:59 recorded it
+  only as dirty + CHANGES_REQUESTED. REST *triggers* the computation and does
+  not wait for it; one read is a coin toss, two is a measurement.
+- VM still deallocated, day 31 — left alone, as before.
+
+### Needing you (unchanged, plus one)
+
+The fork merge, ConvBot S1 grading, and the **S4U principal + `WakeToRun`**
+(one elevated prompt, would have saved two of 09-18's six lost windows). New:
+**is `data-teams-host` / `data-teams-theme` a gap to wire or dead code to
+delete?** Both readings fit the evidence and only you know which was intended.
+Starting the VM remains your call; I didn't.
 
 ## 2026-09-19 12:15 — **the check-in's own health probe has been hollow for 70 entries**: `[ERROR] in host.log = 0` reads zero because this host has never logged at ERROR *at all* (163,773 WARN / 82 INFO / **0 ERROR** across 26 days and 34.8 MB), and under that clean reading a credential-lease **livelock** has been retrying four rooms once a minute since **2026-08-25 05:16:53** — 25.3 days, surviving a host restart, **zero** recoveries — while the entries quoted its own retry rate (*"+477 lines since the 04:15 anchor"*) as health *context*; era-61 (`7fa8ecda7`) Tests **green on attempt 1** (**61 / 45 / 16**), and era-60's rerun, which the 09:59 window filed but **never triggered** (`run_attempt: 1`), is triggered here
 
