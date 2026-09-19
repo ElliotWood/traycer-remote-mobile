@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Measure the upstream merge conflict surface.
 
     python scripts/merge-map.py <ours> <upstream> [control-upstream]
