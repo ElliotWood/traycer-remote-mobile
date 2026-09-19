@@ -48,7 +48,9 @@ function Check { param($Name, $Got, $Want)
 try {
     # 1. The real 2026-09-19 outage. Anchor is 09-18 08:15 (the last productive
     #    run); 12:15/16:15/20:15/00:15 ran and hit the weekly limit; 04:15 never
-    #    fired (S3 sleep); this run is the late catch-up for 08:15.
+    #    fired (S3 sleep); this run is the late catch-up for 08:15. Six slots
+    #    produced no work, and the expected answer is FIVE: the run serving a
+    #    slot late must not report itself absent.
     Add-Log '2026-09-18_0815' '(exit 0) - ran, 18 lines of output'
     foreach ($s in '2026-09-18_1215','2026-09-18_1615','2026-09-18_2015','2026-09-19_0015') {
         Add-Log $s '(exit 1) - NO-OP: RATE LIMITED - You''ve hit your weekly limit'
