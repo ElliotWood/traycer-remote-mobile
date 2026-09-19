@@ -196,12 +196,19 @@ eight appearances. What did **not** break is the identification: `Tests 39
 failed | 2865 passed (2904)` on both attempts, the **tenth** consecutive
 reading of exactly 39. Tally **67 / 48 / 19**. Full row filed in the ticket.
 
-**Stated as an open question rather than answered by assumption:** whether
-shard 2 is now *persistently* red rather than flaky. **Era-68 is the push
-carrying this correction** (its head, not `f499d6e94`, is what CI runs), and it
-tests a vitest-identical tree, so its attempt-1 result is the discriminator. If
-it is red too, this member has stopped being a flake and the tally's
-"red on attempt 1" column stops meaning what it has meant for 67 eras.
+**The open question was closed inside this same window.** It asked whether
+shard 2 had stopped being a flake and gone persistently red. Era-68
+(`fac720f5f` — the shebang fix plus this correction, a vitest-identical tree)
+came back **green on attempt 1 on all six workflows**: shard 2
+`14:36:33Z → 14:40:41Z` (4 m 08 s), shard 3 to `14:40:39Z` (4 m 06 s), and
+`pre-commit` green, which also confirms the shebang fix. Tally **68 / 49 / 19**.
+
+So the answer is **no** — the member is still a flake and the "red on attempt
+1" column keeps its meaning. **The narrower thing era-67 established survives,
+and it is the part worth carrying:** re-running the *same run* failed to clear
+this member, while a **fresh run on the same tree** cleared it immediately. A
+rerun and a re-push are not interchangeable for this family — every prior row
+had assumed they were.
 
 ### The token: the placement rule landed last window was used deliberately, and it held
 
