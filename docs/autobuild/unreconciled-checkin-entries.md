@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-nine** entries in this
+everything came down, nothing went up. The **one hundred** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-nine**. Three count sites remain in this header: this
+on this file → **one hundred**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,146 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-nine entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-20 00:15 — **the first reading where BOTH sides moved, and the merge surface did not**: upstream's last three commits moved **67** files, **all** in `clients/gui-app`, and **not one** of them is among the map's **18** `clients/gui-app` conflict paths — so the map's third consecutive identical reading (**61 paths / 155 stage lines / 33-26-2**) is the first that can support the claim the previous two only looked like they supported, that *waiting is not making this merge more expensive*; the derivation stops being a sed-edited copy of the previous window's dated script and lands as `scripts/merge-map.py`, whose first draft had a real defect the self-check caught; fleet **idle**, **0 active** of 115, nothing blocked or errored; the credential-lease livelock is **~26 days** old and still **four** rooms
+
+Fleet **idle**, read not assumed: `agent list --all --json` → **52,699 B**, **115**
+agents, every one `active: false`. `agent role list` → **949 B**, the same **four**
+claims as the last two windows, byte-identical across two reads this window.
+Nothing blocked, errored, rate-limited, or stranded. `main` `ac96ee89e` → this
+entry's own commit, which opens era-67.
+
+### 🟢 The finding: a stale-looking measurement finally became a live one, because the *control* changed shape
+
+The merge map has now been derived three times — 2026-09-19 09:59, 16:15, and
+this window — and every time it has come back **61 paths / 155 stage lines /
+census 33 three-stage, 26 add/add, 2 base+ours**, with a byte-identical path
+set. Two identical readings in a row is the shape that invites the ledger to
+write *"unmoved, so the merge is not drifting."* It did not earn that sentence,
+and the reason is worth stating precisely rather than as a caveat:
+
+**In both earlier readings only ONE side had moved.** `main` sat still at
+`cbf9b3068` while upstream advanced, so "the map is unchanged" was a statement
+about upstream alone. Worse, in both of those readings upstream's new commits
+**did** contact the map — at 16:15 the three contacts were the lockfile trio
+(`bun.lock`, `package.json`, `clients/gui-app/package.json`), all stage-3-only.
+An unchanged census with live contacts is a coincidence holding, not a
+structure holding.
+
+This window is the first with movement on **both** arms, and the contact count
+went the other way:
+
+| Arm | Commits | Paths moved | Paths touching the 61-path surface |
+| --- | --- | --- | --- |
+| upstream `a1a33095e` → `913f34366` | 3 | **67** | **0** |
+| ours `cbf9b3068` → `ac96ee89e` | 4 | 3 | **0** |
+| | | | stage lines identical: **True** (155 vs 155) |
+
+The ours-side arm is the uninteresting half and was measured anyway so the
+zero is a measurement rather than an assumption: the three paths are
+`docs/autobuild/unreconciled-checkin-entries.md`,
+`docs/autobuild/ci-tests-flake.md` and `scripts/autobuild-checkin.ps1` — this
+check-in's own bookkeeping, which is exactly why it cannot reach the surface.
+
+The upstream arm is the finding. **All 67 paths are under `clients/gui-app`,
+and the map holds 18 `clients/gui-app` conflict paths, and the intersection is
+empty.** The head commit is `913f34366` *feat(gui-app): mobile welcome-to-tour
+flow and phone layout for the tour (#2004)* — upstream actively building its
+**mobile** surface, 67 files deep, landing entirely **beside** the region this
+fork collides with. That is the first direct evidence that the conflict set is
+a frozen historical seam rather than a live front, and therefore the first
+reading from which *"delay is not accruing merge cost"* follows rather than
+merely fails to be contradicted.
+
+**The boundary, recorded in the row and not beneath it.** Three readings is
+three, not a trend, and one of the three is this one. "Not growing" is measured
+over **~14 hours and 3 upstream commits**; it is not a claim about the next
+month. The cheap falsifier is one command, now committed, and the next window
+should run it before repeating the sentence.
+
+### The 26 add/add are still one cause, and it reproduced exactly
+
+Re-derived rather than carried: the 26 add/add decompose as **25 ×
+`clients/mobile/*` + `clients/gui-app/src/lib/mobile-app.ts`**. That is **43 %**
+of the whole conflict surface produced by a single event — the 2026-08-24
+restore of `clients/mobile` (`8f9785fd8`) meeting upstream's own `mobile-app` —
+and it is already priced as take-theirs/regenerate. The hand-merge work remains
+the **33** three-stage plus **2** base+ours. Full area breakdown at this tip:
+`clients/mobile` 25, `clients/gui-app` 18, `clients/shared` 7,
+`clients/traycer-cli` 3, `clients/desktop` 2, and one each of
+`.github/workflows`, `.gitleaks.toml`, `bun.lock`, `nx.json`, `package.json`,
+`protocol/src`. ahead/behind **734 / 586**.
+
+### Landed: the derivation, because a sed-edited copy is how a stale tip gets carried
+
+`scripts/merge-map.py <ours> <upstream> [control-upstream]`. The previous three
+derivations were run from `scratch/derive-<date>.py`, each one made by `sed`-ing
+the tip constants of the last one. That ritual has exactly the failure mode this
+ledger keeps filing — a fresh-looking reading built on a constant nobody
+re-checked — and it is why the tips are now arguments. It reproduces the
+hand-derived numbers at this tip exactly.
+
+**Its first draft was wrong, and the self-check is what said so.** `git
+merge-tree --write-tree` exits **1** when it finds conflicts, so the draft's
+`subprocess.run(..., check=True)` raised on the single case the script exists to
+measure — a clean `selftest ok` followed immediately by a `CalledProcessError`
+on the real invocation. Filed because it is the mirror of the usual complaint:
+here the non-zero exit *was* the signal, and treating exit status as failure by
+reflex is as wrong as ignoring it. The self-check itself covers the load-bearing
+parser subtlety — merge-tree's stage block ends at the first **blank** line, and
+counting the informational lines after it overstates the surface.
+
+### Health, and one thing that is not health
+
+- **Host live**, last line `00:17:13`. Still **not** well: `CredentialLeaseReleasedError`
+  now stands at **25,325** occurrences in `host.log` alone, still **four** rooms,
+  still **zero** recoveries, day **~26**. In the host binary; this repo cannot
+  patch it. Counted over the whole file, never sampled with `tail`.
+- **The deployed check-in script was checked, not carried**: `scripts/autobuild-checkin.ps1`
+  and `scripts/autobuild-checkin.missed-windows.test.ps1` in the electric-stork
+  working copy are **byte-identical** to `main`'s. Every landed fix is delivered.
+- **CI owed nothing to this window, and the tally it was carrying is filed here
+  rather than in a head.** Era-66 (`ac96ee89e`) was read **green on attempt 1 on
+  all six** workflows in its own window (Tests `10:36:36Z → 10:42:22Z`, 5 m 46 s),
+  but that window had already pushed twice and a third push would have opened an
+  unread era, so the row was never written and the tally lived only in a
+  handover note. It is **66 / 48 / 18** (eras / Tests green on attempt 1 / Tests
+  red on attempt 1; 48 + 18 = 66, partition intact). This entry's commit opens
+  **era-67** and owes a read.
+
+### The token: the placement rule landed last window was used deliberately, and it held
+
+Four calls this window, and the geometry was decoded from `credentials` at the
+top rather than predicted from the last window's numbers:
+
+| Call | Placement vs `exp` 00:19:56 | Exit | Bytes | `credentials` rewritten? |
+| --- | --- | --- | --- | --- |
+| `agent role list` @ 00:15:55 | **−4 m 01 s** (inside life) | 0 | 949 | **no** |
+| `agent list --all --json` @ 00:16:08 | −3 m 48 s (inside life) | 0 | 52,699 | **no** |
+| `agent role list` @ 00:19:15 | −41 s (inside life) | 0 in 2 s | 949 | **no** |
+| `agent role list` @ **00:20:40.232** | **+44.2 s** | **0** in 3.482 s | 949 | **yes** — 00:20:42.797 |
+
+The last row is the point. The (8 s, 37 s] band hard-fails — 16:15 proved that
+deliberately and **lost a reading** to it — so the rule written into the
+check-in's own prompt at `6b4c7b555` says place any past-`exp` read at **≥ +40 s**.
+This is that rule's first use in anger: +44.2 s, clean exit, fresh token, no lost
+reading. The third row is also a small correction worth keeping — an earlier
+attempt at this probe was *intended* to be past `exp` and landed at −41 s
+because the wall clock had run ahead of the shell's own `date` reads between
+calls. **Decode, then place; do not arithmetic from a remembered offset.**
+
+**Next window's geometry, to be re-decoded and not trusted:** the new token is
+`iat` 00:20:40 / `exp` **04:20:40**, i.e. ~5.7 min into the 04:15 window — the
+same shape as this one, because the 4 h cadence and the 4 h token life are the
+same number. Opening call ~04:16 is inside life and will not refresh; the trap
+band is **04:20:48 – 04:21:17**; place any past-`exp` read at **≥ 04:21:20**.
 
 ## 2026-09-19 20:15 — **the bearer's dead band was hit head-on and cost this window a reading**: one command at **+28.1 s past `exp`** exited **1** with a surfaced `status 401` and did **not** rewrite `credentials`, while the *same command* at **+161.2 s** exited 0 with a fresh token — the (8 s, 37 s] hard-fail bracket reproduced deliberately for the first time, and the placement rule that has lived only in prose is now written into the check-in's own prompt; a third face in the same window (call **inside** the token's life → exit 0, **no** refresh) makes this the first window to show all three outcomes; fleet **idle**, **0 active** of 115, nothing blocked or errored; the credential-lease livelock is **25.6 days** old and still **four** rooms
 
