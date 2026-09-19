@@ -156,7 +156,52 @@ counting the informational lines after it overstates the surface.
   unread era, so the row was never written and the tally lived only in a
   handover note. It is **66 / 48 / 18** (eras / Tests green on attempt 1 / Tests
   red on attempt 1; 48 + 18 = 66, partition intact). This entry's commit opens
-  **era-67** and owes a read.
+  **era-67**.
+
+### 🔴 Correction to this entry, written after its own push: era-67 went red twice, and one of the reds is mine
+
+This entry was pushed as `505243649` and its CI was then read rather than
+assumed. Two separate reds, and they are not the same kind of thing.
+
+**`pre-commit` — a real defect, introduced by this entry's own commit.** The
+hook `check-shebang-scripts-are-executable` failed:
+`scripts/merge-map.py: has a shebang but is not marked executable!` — the new
+file carried `#!/usr/bin/env python3` with a `100644` mode bit. Fixed at
+**`f499d6e94`** by **deleting the shebang** rather than `chmod +x`: nothing
+invokes it as `./scripts/merge-map.py`, so the shebang was speculative, and
+dropping it does not depend on a mode bit set from Windows.
+
+This is worth more than the fix. The ledger has carried *"the pre-commit gate
+is hollow on a push to `main`"* since 2026-08-30, and that claim needs
+splitting, because **both halves showed their true shape in this one run**:
+
+| Half | This run | Meaning |
+| --- | --- | --- |
+| `build · compile · lint · format (nx affected)` | **Passed in 4.3 s** with a brand-new top-level file in the delta | hollow, confirmed harder than the old 27 s / 50 s readings |
+| the file-hygiene hooks (`--all-files`) | **one failed and reddened the push** | live, and a real gate |
+
+So **`pre-commit` red on a push to `main` is a defect to fix, not a flake to
+rerun; `pre-commit` green still proves no type-check ran.** The two must not be
+collapsed. ~20 consecutive docs-only eras never reached the hygiene hooks,
+which is why the first non-docs-only push in weeks found this in one shot.
+
+**Tests — the flake family, with two firsts.** Attempt 1 failed on
+**`shard 2` AND `shard 3` together**; all twenty-five prior rows in
+`docs/autobuild/ci-tests-flake.md` read *"all other 13 jobs green on attempt 1"*,
+so two members coinciding has never happened. The rerun was issued at 00:28:55,
+1 min after the red, per the era-63 convention — and **shard 2 failed attempt 2
+as well**, which falsifies the property the ticket has asserted since
+2026-08-29 (*"green on every rerun and locally"*) across that member's first
+eight appearances. What did **not** break is the identification: `Tests 39
+failed | 2865 passed (2904)` on both attempts, the **tenth** consecutive
+reading of exactly 39. Tally **67 / 48 / 19**. Full row filed in the ticket.
+
+**Stated as an open question rather than answered by assumption:** whether
+shard 2 is now *persistently* red rather than flaky. **Era-68 is the push
+carrying this correction** (its head, not `f499d6e94`, is what CI runs), and it
+tests a vitest-identical tree, so its attempt-1 result is the discriminator. If
+it is red too, this member has stopped being a flake and the tally's
+"red on attempt 1" column stops meaning what it has meant for 67 eras.
 
 ### The token: the placement rule landed last window was used deliberately, and it held
 
