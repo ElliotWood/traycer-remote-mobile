@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and one** entries in this
+everything came down, nothing went up. The **one hundred and two** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and one**. Three count sites remain in this header: this
+on this file → **one hundred and two**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,111 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and one entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and two entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-20 08:15 — **step 1 has asked for rate-limited agents for 101 entries, and the command the check-in names for it cannot answer the question**: `agent list-profiles claude` is the CACHED view and the cache is empty — it returns `rateLimitStatus:"unknown"`, `usageUpdatedAt:null` for **both** profiles, so reading it as "nobody is limited" is the same hollow probe as `[ERROR] in host.log = 0`; the command that does work, `agent profile-rate-limits`, carried a standing warning in this check-in's own prompt that it only replays a cached capture, and that warning is **FALSE** — two calls **5 s apart** returned `usageUpdatedAt` **5 s apart**, each equal to the call clock to the second (08:18:42, 08:18:47); under the live read the fleet is genuinely **not** rate-limited — ambient is `subscriptionType:"max"`, **5-hour 3 %**, **7-day 9 %** — while **Altra is `unauthenticated`**, not busy, so the standing "fail over to Altra" advice would move a blocked agent onto a profile that cannot sign in; era-70 green on attempt 1 on all six, tally **70 / 51 / 19**
+
+**The gap, and why 101 entries did not see it.** Step 1 of this check-in's own
+prompt asks for agents that are *"blocked, errored, rate-limited, or idle"*.
+`grep -c` over this file: **`profile-rate-limits` 0, `list-profiles` 0** — the
+two commands that measure the rate-limit clause have **never been called in
+any entry in this ledger**, while the words `rate-limit` appear **125** times
+and `rate-limited` **15**. The one recorded reading is frozen in the script's
+prose and dated **2026-08-01 08:30**, fifty days ago.
+
+**What `list-profiles` actually answers.** Run at 08:18:23:
+
+| Profile | `authStatus` | `rateLimitStatus` | `usageUpdatedAt` |
+| --- | --- | --- | --- |
+| `ambient` — "Terminal account", `isEffectiveLastUsed:true` | `unknown` | **`unknown`** | **`null`** |
+| `Altra` — `fc88ec7d-…` | **`unauthenticated`** | **`unknown`** | **`null`** |
+
+Step 2 names this command as *the* rate-limit check. It cannot fail: whatever
+the true state, both rows read `unknown`. That is [[hostlog-error-count-cannot-fail]]
+arriving at the fleet probe instead of the host log — a check whose clean
+answer is a property of the field, not of the system.
+
+**The warning that was backwards.** The prompt said `profile-rate-limits`
+*"returns the CACHED capture timestamp even though it advertises a fresh
+read - check the timestamp before trusting it"*, which is advice to distrust
+the only command that works. The discriminator is two calls in one window:
+
+```
+08:18:42  profile-rate-limits claude --profile ambient   usageUpdatedAt 1789856322451 → 08:18:42
+08:18:47  profile-rate-limits claude --profile fc88ec7d…  usageUpdatedAt 1789856327826 → 08:18:47
+```
+
+Two timestamps **5.4 s apart**, matching the **5 s** between the calls, each
+equal to its own call clock. A replayed capture returns the *same* timestamp
+twice; this returns the wall clock. And the contrast completes it: the genuinely
+cached command, `list-profiles`, answered `null` for the same field **19 s
+earlier**, so the cache was not merely stale — it was **empty**, and the live
+call is what populates it.
+
+**The reading itself — the first in this ledger.** `ambient`, the effective
+profile (111 of 115 agents are harness `claude`):
+
+|  | value |
+| --- | --- |
+| `subscriptionType` | **`max`** |
+| `fiveHour` | **3 %** used, resets **2026-09-20 12:40** |
+| `sevenDay` | **9 %** used, resets **2026-09-26 03:00** |
+| model-scoped `Fable` | 0 % |
+| `extraUsage` | disabled |
+
+So the answer to step 1's rate-limit clause is *no*, and for the first time
+that is measured rather than asserted.
+
+**Altra is not busy — nobody is signed in to it.** It answers
+`available:false, reason:"rate_limits_not_available"`, and `list-profiles`
+gives the cause one line up: `authStatus:"unauthenticated"`. The script's
+frozen advice said Altra was *"at 54 % of its 7-day and resets Aug 2"* — a
+reset date seven weeks past. This sharpens the standing note that Altra
+*"reports no capacity"*: the reason is authentication, not capacity, and it
+matters because step 2 sets Altra up as the failover. **An unblock action that
+followed the prompt would have moved a rate-limited agent onto a profile that
+cannot authenticate** — and, since `list-profiles` reports `unknown` rather
+than an error, would have looked like it worked.
+
+**Fixed where every future window reads it**, not in this entry:
+`scripts/autobuild-checkin.ps1` step 2 now names `profile-rate-limits` as the
+check, deletes the false cached-read warning and puts the 5 s discriminator in
+its place, records the `unauthenticated` finding, and says to derive
+`usedPercent` rather than quote the numbers above ([[stale-facts-need-derivations]]).
+The tool menu in step 1, the other place the wrong command was advertised, is
+corrected in the same diff — one guard where both callers route through.
+
+**Fleet, and the number that still cannot fail.** `agent list --all --json` →
+**115** agents, **0 active**. The id set is **byte-identical** to the
+2026-08-29 capture — 115 ids, zero delta in 22 days, all `active:false` in
+both. But the payload carries **no** per-agent `status`, `error`, `blocked`,
+`state` or `lastActive` field at all (keyword scan of the raw JSON: all zero;
+the single `status` is the RPC envelope's own), and `active` is true only for
+the *calling* agent, which this headless CLI is not. So *"0 active of 115,
+nothing blocked or errored"* — printed in this ledger for months — is **two**
+hollow readings, not one. The script already warns about the `active` half;
+the *"nothing blocked or errored"* half has no field behind it either, and
+should be read as "the list cannot say" until a transcript sweep replaces it.
+Nothing here says the fleet is *busy* — idle remains the right guess — only
+that the list is not what establishes it.
+
+**Bearer, placed rather than risked.** `credentials` decoded at **08:17:56**:
+`exp` **08:21:20**, matching the value carried forward from the 20:15 window
+exactly. All five authenticated calls were placed inside the token's life
+(08:16:48 → 08:18:47), the last **2 m 33 s** before `exp`. No 401, no lost
+reading, and the (8 s, 37 s] dead band was never entered. Next window's `exp`
+is four hours on: **12:21:20**, trap band **12:21:28–12:21:57**.
+
+**CI, era-70.** `b95a7421785e4c5c0f1072bee6839eec04ad2ab1` — queried by full
+40-char sha, six runs, **all `success` on `run_attempt: 1`**: Tests, pre-commit,
+Secret scan, CodeQL, Protocol Compatibility, Real supervisor. Tally
+**70 / 51 / 19**.
 
 ## 2026-09-20 04:15 — **the health row the ledger has printed for twenty-six days names one livelock and counts a different one, and the loop it names recovered on its own for ten days**: `CredentialLeaseReleasedError` is `EpicTokenRefresher` retrying **one epic**, with no rooms at all, while the "**four** rooms" belong to a *separate* loop (Tiptap provider rebuild) that logs the same root sentence **without** the error class — so the quoted number is **45 %** of the storm; and the per-day counts in `host.log.1` put the refresher at **exactly zero on every day from 09-02 to 09-11** while the Tiptap loop kept logging through all of them, so *"zero recoveries, day ~26"* is really **one recovery** and a current episode **8.1 days** old; separately `scripts/merge-map.py` printed ahead and behind **the wrong way round** and the 00:15 entry published the swapped pair — ours is **590 ahead / 734 behind**, not 734/586; fleet **idle**, **0 active** of 115, nothing blocked or errored; map holds **61 / 155 / 33-26-2** for a fourth reading, but **only our side moved**; era-69 green on attempt 1 on all six, tally **69 / 50 / 19**
 

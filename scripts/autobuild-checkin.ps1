@@ -66,7 +66,10 @@ Do this:
      & $T agent transcript --agent-id <id> # traycer_get_transcript. Prints a PATH,
                                            # not the text; read the file it names.
      & $T agent configure --help           # traycer_configure_agent
-     & $T agent list-profiles claude       # profile health
+     & $T agent profile-rate-limits claude --profile ambient
+                                           # profile health - LIVE read. The
+                                           # `list-profiles` cache answers
+                                           # "unknown"; see step 2.
      & $T agent send --help                # to re-authorise / answer an agent
 
    Two traps in `agent list --json`: `active` is true ONLY for the calling agent,
@@ -86,17 +89,29 @@ Do this:
    20:17:43 at +28.1 s (exit 1) against the same command at +161.2 s (exit 0, new
    token). So place the call, and if one does return that 401, wait past 40 s and
    repeat it rather than re-planning around a missing reading.
-2. Unblock them. Rate limits: check `agent list-profiles claude` and move the
-   agent to whichever profile is actually healthy - do NOT assume. As of
-   2026-08-01 08:30 the healthy one is `ambient` (5-hour 4%, 7-day 1%, resets
-   Aug 7); Altra (fc88ec7d-e3d7-45b1-b144-987f6b4ea727) is at 54% of its 7-day
-   and resets Aug 2, so the long-standing "move it to Altra" advice is
-   backwards. Note that `agent profile-rate-limits` returns the CACHED capture
-   timestamp even though it advertises a fresh read - check the timestamp
-   before trusting it. The syntax is
-   `agent profile-rate-limits claude --profile <ambient|id>`: the harness is a
-   POSITIONAL argument, and omitting it fails with "missing required argument
-   'harness'" rather than defaulting.
+2. Unblock them. Rate limits: the check is
+   `agent profile-rate-limits claude --profile <ambient|id>` - NOT
+   `agent list-profiles claude`. Measured 2026-09-20 08:18: `list-profiles`
+   is the CACHED view and the cache is empty, so it answers
+   `rateLimitStatus:"unknown"`, `usageUpdatedAt:null` for every profile - it
+   cannot report a rate limit at all, and reading it as "no limit hit" is the
+   same hollow probe as `[ERROR] in host.log = 0`. The older warning here said
+   `profile-rate-limits` only replays a cached capture; that is FALSE. Two
+   calls 5 s apart returned `usageUpdatedAt` 5 s apart, each equal to the call
+   clock to the second (08:18:42, 08:18:47) - it is a live read. Derive the
+   verdict, do not quote this file's numbers: `usedPercent` under `fiveHour`
+   and `sevenDay`, and `available` before either.
+   Both profiles, same run: `ambient` ("Terminal account",
+   `isEffectiveLastUsed:true`) is `subscriptionType:"max"`, 5-hour 3%, 7-day
+   9% - healthy, and the effective profile already. Altra
+   (fc88ec7d-e3d7-45b1-b144-987f6b4ea727) answers
+   `available:false, reason:"rate_limits_not_available"` with
+   `authStatus:"unauthenticated"` - it reports no capacity because nobody is
+   signed in to it, not because it is busy. So do NOT fail over to Altra: the
+   standing "move it to Altra" advice would move a blocked agent onto a
+   profile that cannot authenticate. Re-read both before acting.
+   Syntax: the harness is a POSITIONAL argument, and omitting it fails with
+   "missing required argument 'harness'" rather than defaulting.
    Questions they raised: answer from the artifacts, and record the reasoning.
 3. Keep execution SERIAL - one generator/evaluator pair at a time. Token budget
    is constrained.
