@@ -150,6 +150,108 @@ is four hours on: **12:21:20**, trap band **12:21:28–12:21:57**.
 Secret scan, CodeQL, Protocol Compatibility, Real supervisor. Tally
 **70 / 51 / 19**.
 
+### Four corrections and one new finding, all from after the entry above was written
+
+**1. The bearer DID refresh, so the "next window" line above is wrong.** That
+paragraph was written when the window's *planned* calls were done. A later,
+unplanned probe (`agent transcript`, item 3) ran at **+4 m 37 s** past `exp`,
+cleared the 40 s mark and refreshed in-command: new `iat` **08:25:57**, new
+`exp` **2026-09-20 12:25:57**. The next window is therefore **`exp` 12:25:57**,
+trap band **12:26:05 – 12:26:34**, past-`exp` reads at **>= 12:26:37** — not
+12:21:20. **Take the geometry from a decode after the window's LAST CLI call,
+not its last planned one.**
+
+**2. This push produced six `cancelled` rows from ONE push — a fourth face.**
+`a71bb507f` was landed in a single `git push origin main` and drew **twelve**
+runs: six `cancelled`, six live. That is the third face's signature (a second
+push superseding the first) and it is **not** that. All twelve read
+`created_at` **`2026-09-19T22:21:45Z`** — the same second, same `event: push`,
+same `head_branch` — and a second push cannot share the first's dispatch
+timestamp. GitHub dispatched each workflow **twice**; the concurrency group
+killed one of each pair.
+
+**The control is inside the run set.** Five workflows carry a concurrency group
+and each produced exactly one `cancelled` + one live row. **`Secret scan`
+carries none — and BOTH of its runs completed `success`.** Under a superseding
+second push, Secret scan's first run would have been cancelled too. It was not.
+So sort runs by `created_at` before reading `cancelled` as "superseded": one
+shared second means duplicate dispatch, and those rows owe **no** flake entry
+and **no** rerun. **Era-71 is green on attempt 1 on all six** — Tests completed
+`success` 08:27:48 — tally **71 / 52 / 19**.
+
+**3. "Until a transcript sweep replaces it" is not the cheap fix it sounds
+like.** The entry above proposed a transcript sweep as the honest replacement
+for *"nothing blocked or errored"*. Measured, not assumed:
+
+| | |
+| --- | --- |
+| Local transcript cache (`~/.traycer/epic-chat-transcripts`) | **0 files** — nothing is cached; every read is a round trip |
+| One `agent transcript --agent-id …` | **2.6 s**, exit 0, prints a **path** under `%TEMP%\traycer-chat-refs\…` |
+| 115 agents | ≈ **5 minutes** of CLI calls, plus 115 file reads |
+| What comes back | **prose**. The supervisor's own transcript is **518,244 B / 6,165 lines**; its latest embedded timestamps are **2026-08-31** |
+
+There is **no structured run-state field anywhere** — not in the list, and not
+in the transcripts either. A sweep would be five minutes of calls followed by a
+judgement call over 115 prose files, and it would still read what each agent
+*said*, not what it *is*. That does not make the hollow phrase acceptable; it
+means the honest fix is to **stop printing the claim**, not to buy it
+expensively. Say "the list cannot say".
+
+**4. 🟠 The P4 residue's stated blocker is FALSE, and the real one is worse.**
+The banner at the top of this ticket file (2026-09-18) retires *"rebuild and
+redeploy the `/next/` bundle"* as **not-actionable** for two reasons: the dead
+VM, and *"the rebuild would need `clients/mobile/vite.config.web.ts`, which
+left `main` on 08-05 in any case."* **The second reason is false, and was
+already false when written.** `clients/mobile` was restored to `main` on
+**08-24** (`8f9785fd8`) — 25 days before that banner:
+
+```
+git ls-files clients/mobile            → 99
+git cat-file -e main:clients/mobile/vite.config.web.ts → exists
+package.json: "build:web:static": "vite build --config vite.config.web.ts && node tools/build-sw.mjs"
+```
+
+This is the **third** artifact caught carrying the stale *"clients/mobile is
+gone"* premise, after convergence-architecture (09-19 16:15) and the parity
+contract. [[blockers-expire-silently]] — re-run the one command that would
+falsify a blocker before repeating it.
+
+**But the build does not succeed, and the reason is the finding.** Run on
+today's trunk, `bun run build:web:static` exits **1** — not on a missing file,
+but on a deliberate `requiredEnv` throw:
+
+```
+error during build: Error: TRAYCER_WEB_ORIGIN is required for the web build
+```
+
+`vite.config.web.ts` demands **six** variables — `TRAYCER_WEB_ORIGIN`,
+`TRAYCER_WEB_BASE`, `TRAYCER_WEB_HOST_ID`, `TRAYCER_WEB_HOST_LABEL`,
+`TRAYCER_WEB_HOST_WS_URL`, `TRAYCER_WEB_HOST_VERSION` — and **nothing on the
+trunk supplies any of them.** `git grep` over the tracked tree, excluding
+`node_modules`: five of the six appear in **exactly one file**, the config that
+demands them; `TRAYCER_WEB_BASE` appears in two, the other being
+`tools/build-sw.mjs`, which also *consumes* it. **Zero suppliers** — no script,
+no workflow, no `.env.example` (one exists, but for `clients/teams-bot`), no
+doc.
+
+**So the live `/next/` bundle is not reproducible from this repository.**
+Whoever built it supplied six values out of band and nothing recorded them —
+and one of them is the host id, which is [[host-id-is-undiscoverable]] by
+design. The residue is therefore **not** "blocked on the VM" as filed. It is:
+
+| | |
+| --- | --- |
+| app-package install | the **exempted** shortcut — unchanged |
+| the six build inputs | **missing from the trunk** — a real, actionable gap, and the VM's power state is irrelevant to it |
+| deploy | blocked on the deallocated VM — an attended decision, unchanged |
+
+The middle row is new and is the one a check-in can act on: committing a
+documented `.env.example` (or a `build:web:static` wrapper that names the six)
+needs no VM and no owner. **Not done this window** — the *values* are the
+owner's (origin, host id, ws URL), so an unattended session can record the
+**shape** but must not invent the contents. Filed here rather than started, so
+the next window picks it up with the measurement already made.
+
 ## 2026-09-20 04:15 — **the health row the ledger has printed for twenty-six days names one livelock and counts a different one, and the loop it names recovered on its own for ten days**: `CredentialLeaseReleasedError` is `EpicTokenRefresher` retrying **one epic**, with no rooms at all, while the "**four** rooms" belong to a *separate* loop (Tiptap provider rebuild) that logs the same root sentence **without** the error class — so the quoted number is **45 %** of the storm; and the per-day counts in `host.log.1` put the refresher at **exactly zero on every day from 09-02 to 09-11** while the Tiptap loop kept logging through all of them, so *"zero recoveries, day ~26"* is really **one recovery** and a current episode **8.1 days** old; separately `scripts/merge-map.py` printed ahead and behind **the wrong way round** and the 00:15 entry published the swapped pair — ours is **590 ahead / 734 behind**, not 734/586; fleet **idle**, **0 active** of 115, nothing blocked or errored; map holds **61 / 155 / 33-26-2** for a fourth reading, but **only our side moved**; era-69 green on attempt 1 on all six, tally **69 / 50 / 19**
 
 Fleet **idle**, read not assumed: `agent list --all --json` → **52,699 B**, **115**
