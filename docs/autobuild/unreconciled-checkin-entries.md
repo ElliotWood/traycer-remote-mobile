@@ -161,9 +161,17 @@ way to under-report it.
   08-18 retirement insisted: that is `agent role list`, not `--json`. **Four**
   claims held (upstream merge, mobile host switcher, Teams card design, Teams
   Help tab); the drop is one released claim, not a format change.
-- **CI: nothing owed.** Era-64 (`2f9400e7f`) was read green on attempt 1 across
-  all six checks in-window at 16:44; tally stands **64 / 47 / 17**. This
-  window's push opens era-65 for the next window to read.
+- **CI: era-65 read in-window, and it is red.** Era-64 (`2f9400e7f`) was green
+  on attempt 1 across all six at 16:44. This window's own push, `6b4c7b555`,
+  went **red on attempt 1** — `traycer-clients-gui-app shard 2`,
+  `providers-settings-panel.test.tsx`, **39 failed of 2,904**: the *eighth*
+  appearance of the family's first-named member and the eighth time it has lost
+  exactly 39, on a delta of two files neither of which is TypeScript. Rerun
+  issued **1 m 38 s after the red** and waited out in the foreground — attempt 2
+  green, all 14 jobs. Filed as a row on `ci-tests-flake.md` with the tally at
+  **65 / 47 / 18**, and one honest correction to that ticket: import was
+  **66.4 %** of wall, *below* the family's stated 68–88 % band, so the band is
+  recorded as 66–88 % rather than the reading being rounded into it.
 - **Merge map: not re-derived.** 16:15 derived it two-arm four hours ago at
   **61 paths / 155 stage lines** against `a1a33095e`, and nothing in this window
   touches `clients/`. Re-deriving on a docs-and-prompt push would spend the
