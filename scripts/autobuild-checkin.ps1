@@ -74,6 +74,18 @@ Do this:
    the defect the parity contract already records once. And `capabilities` is
    reported RELATIVE to the sender id you passed, so it describes the sender's
    reach, not the listed agent's. Run state comes from transcripts, not the list.
+
+   A THIRD trap, and it is the bearer rather than the list: the CLI token lives
+   four hours and this check-in runs every four hours, so a window's first call
+   lands near `exp` by construction. Decode it BEFORE you call - `token` in
+   `%USERPROFILE%\.traycer\cli\credentials` is a JWT; read its `exp` claim.
+   Inside the token's life the call simply works and does not refresh. More than
+   ~40 s past `exp` the CLI refreshes in-command and the call works. In between -
+   roughly 8 to 37 s past `exp` - it HARD-FAILS: exit 1, `status 401`,
+   `credentials` NOT rewritten, and that reading is lost. Measured 2026-09-19
+   20:17:43 at +28.1 s (exit 1) against the same command at +161.2 s (exit 0, new
+   token). So place the call, and if one does return that 401, wait past 40 s and
+   repeat it rather than re-planning around a missing reading.
 2. Unblock them. Rate limits: check `agent list-profiles claude` and move the
    agent to whichever profile is actually healthy - do NOT assume. As of
    2026-08-01 08:30 the healthy one is `ambient` (5-hour 4%, 7-day 1%, resets

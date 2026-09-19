@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-eight** entries in this
+everything came down, nothing went up. The **ninety-nine** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-eight**. Three count sites remain in this header: this
+on this file → **ninety-nine**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,138 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-eight entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-nine entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-19 20:15 — **the bearer's dead band was hit head-on and cost this window a reading**: one command at **+28.1 s past `exp`** exited **1** with a surfaced `status 401` and did **not** rewrite `credentials`, while the *same command* at **+161.2 s** exited 0 with a fresh token — the (8 s, 37 s] hard-fail bracket reproduced deliberately for the first time, and the placement rule that has lived only in prose is now written into the check-in's own prompt; a third face in the same window (call **inside** the token's life → exit 0, **no** refresh) makes this the first window to show all three outcomes; fleet **idle**, **0 active** of 115, nothing blocked or errored; the credential-lease livelock is **25.6 days** old and still **four** rooms
+
+Fleet **idle**, and read rather than assumed: `agent list --all --json` returns
+**115** agents, **0 active**, every one `surface: gui`. Nothing blocked, errored,
+rate-limited, or stranded. The only agent idle with work outstanding is
+`autobuild/conversational-bot`, still parked on **H1** — Elliot's one minute, as
+it has been. `main` `2f9400e7f` → this entry's own commit, which opens era-65.
+
+### 🔴 The finding: the check-in's four-hour cadence and the token's four-hour life are the same number, so every window aims itself at the dead band
+
+The bearer's behaviour past `exp` has been measured for sixty-seven faces and
+written up every time as a *reading*. It is not a reading. It is a **defect this
+check-in walks into by construction**: the CLI token lives exactly **4 h 0 m**
+(`iat` 16:17:15 / `exp` 20:17:15, decoded from `credentials` at the top of this
+window before any call), and the scheduled task fires every **4 h 0 m**. A
+window that refreshed its token at the moment it called last time will call
+again within seconds of `exp` this time. That is not bad luck; it is the
+cadence.
+
+This window walked into it, and the evidence is unusually clean, because all
+three outcomes happened **in one window, to two commands, three minutes apart**:
+
+| Call | Placement vs `exp` | Exit | Bytes | `credentials` rewritten? |
+| --- | --- | --- | --- | --- |
+| `agent list --all --json` @ 20:16:37.378 | **−37.8 s** (inside life) | **0** in 2.78 s | 52,699 | **no** |
+| `agent role list` @ 20:17:43.210 | **+28.1 s** | **1** in 1.83 s | 0 (stderr 113) | **no** |
+| `agent role list` @ 20:19:56.233 | **+161.2 s** | **0** in 3.87 s | 949 | **yes** — 20:19:58.154 |
+
+The failure is not a silent one and not a retry: stderr is the whole of
+
+```
+error: Failed to fetch authenticated user '3e3d1309-...': status 401 [code=E_UNEXPECTED]
+```
+
+— the CLI surfaced the 401 to the caller instead of refreshing through it, exit
+**1**, and `credentials` kept its 16:17:16.987 mtime. **The reading was simply
+lost.** Had that been the fleet read rather than a role list, this window's
+entire first instruction would have returned nothing, and the honest
+reconstruction — *"the CLI 401'd"* — is exactly the sentence that has, before
+now, been filed in this ledger as an outage.
+
+**The (8 s, 37 s] bracket had never been entered on purpose.** It was inferred
+from the shape of the failures either side of it; every window since has been
+placed to *avoid* it, which is why it stayed inferred. Landing in it here was an
+accident of a 52-second margin, and the accident is worth more than the
+avoidance: the bracket is real, it hard-fails rather than degrades, and the
+recovery is a plain repeat past 40 s — the third row above is the second row's
+command, unchanged, and it both succeeded and rotated the token.
+
+**Fixed where the next window will actually read it, not here.**
+`scripts/autobuild-checkin.ps1` already warns about two traps in
+`agent list --json`; the bearer is now the third, in the same paragraph, with
+the decode-before-you-call instruction and both measured placements. Twelve
+lines into the prompt every window is launched with, because a rule that lives
+only in a ledger entry is a rule the next unattended run does not have. The file
+parses (`Parser::ParseFile`, 0 errors) and the prompt is a **single-quoted**
+here-string (lines 38–194), so the backticks and the `\.traycer\` path in the
+new text stay literal — which is the one way this edit could have quietly
+corrupted the prompt it was improving.
+
+### The deployment convention, verified rather than inherited
+
+The standing note is that the scheduled task runs *this worktree's working copy*
+of `autobuild-checkin.ps1`, so its permanent `M` status **is** the deployment
+and a fix landed on `main` is not automatically delivered. That is a claim about
+two files being out of step, and it has been carried, not checked. Checked here:
+`git diff main -- scripts/autobuild-checkin.ps1` in the electric-stork worktree
+is **empty**, and the untracked
+`scripts/autobuild-checkin.missed-windows.test.ps1` there is **byte-identical**
+to `main`'s copy. So the branch's `M`/`??` is the branch lagging `main`, the
+`d232cf9e0` outage-detector fix **is** delivered, and the two copies were in
+step before this window — which is why the new paragraph is mirrored into the
+working copy in the same breath as landing it, and why that mirroring is
+reported here rather than assumed.
+
+### Livelock — unchanged, and the sampling that almost understated it
+
+`CredentialLeaseReleasedError` is still retrying once a minute. A `tail -3000`
+of `host.log` shows only **two** distinct rooms and would have been filed as
+*"narrowed from four to two"* — a real improvement, if it were true. It is a
+sampling artefact: 3,000 lines is about fourteen minutes and the four rooms
+retry on staggered cycles. Counted over the whole file instead:
+
+| Room | current `host.log` | rotated `host.log.1` |
+| --- | --- | --- |
+| `f347a4fb...5b09574` | 3,736 | 14,499 |
+| `artifact-room-...01KYNP5DBZ...` | 3,707 | 7,758 |
+| `artifact-room-...01KYBT17E2...` | 3,623 | 8,366 |
+| `artifact-room-...01KZMPSWT4...` | 3,583 | 5,629 |
+
+**Four rooms, all still live**, 14,649 retries in the current log alone, zero
+recoveries, day **25.6**. The dominance probe shipped at 12:15 reports it
+correctly (top five lines, all five this livelock). `host.log` mtime 20:16 — the
+host is alive underneath it. A repo-wide grep for `CredentialLeaseReleased`,
+`EpicTokenRefresher` and the Tiptap rebuild string across all `.ts`/`.tsx`
+returns **nothing**: the livelock is in the host binary, not in anything this
+repo can patch. It stays an escalation, and *"tail N lines"* is now a documented
+way to under-report it.
+
+### Readings
+
+- **Bearer: faces 68–70, chain 73.** All three in the table above. Face 68
+  (inside life, no refresh) is the control the "duration does not discriminate"
+  finding needed: **2.78 s without a refresh** here against 16:15's **5.63 s
+  with** one. Duration says nothing; `credentials` mtime says everything.
+- **Roles: 949 B, down from 1,134 B** — and the command form matters, as the
+  08-18 retirement insisted: that is `agent role list`, not `--json`. **Four**
+  claims held (upstream merge, mobile host switcher, Teams card design, Teams
+  Help tab); the drop is one released claim, not a format change.
+- **CI: nothing owed.** Era-64 (`2f9400e7f`) was read green on attempt 1 across
+  all six checks in-window at 16:44; tally stands **64 / 47 / 17**. This
+  window's push opens era-65 for the next window to read.
+- **Merge map: not re-derived.** 16:15 derived it two-arm four hours ago at
+  **61 paths / 155 stage lines** against `a1a33095e`, and nothing in this window
+  touches `clients/`. Re-deriving on a docs-and-prompt push would spend the
+  window's budget to reprint a number.
+- VM still deallocated, day 31 — left alone.
+
+### Needing you (unchanged)
+
+The fork merge, ConvBot S1 grading, the **S4U principal + `WakeToRun`** (one
+elevated prompt), and **is `data-teams-host` / `data-teams-theme` a gap to wire
+or dead code to delete?** — raised at 16:15, still the one question only you can
+answer. Starting the VM remains your call; I didn't.
 
 ## 2026-09-19 16:15 — **the epic's own map of itself is 26 days stale**: `clients/mobile` was restored to `main` on 2026-08-24 (`8f9785fd8`, 99 files, **53 under `src`**) and the convergence note still records *"main **0** — the package is not in `clients/` at all"*, which is the sentence the parity goal has been reasoned from; one of its two named traps is retired by a caller that now exists, the other still holds; merge map unmoved at **61 / 155** against a new upstream tip whose only three contacts are the lockfile trio
 
