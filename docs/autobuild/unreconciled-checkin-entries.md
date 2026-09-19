@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred** entries in this
+everything came down, nothing went up. The **one hundred and one** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred**. Three count sites remain in this header: this
+on this file → **one hundred and one**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,173 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and one entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-20 04:15 — **the health row the ledger has printed for twenty-six days names one livelock and counts a different one, and the loop it names recovered on its own for ten days**: `CredentialLeaseReleasedError` is `EpicTokenRefresher` retrying **one epic**, with no rooms at all, while the "**four** rooms" belong to a *separate* loop (Tiptap provider rebuild) that logs the same root sentence **without** the error class — so the quoted number is **45 %** of the storm; and the per-day counts in `host.log.1` put the refresher at **exactly zero on every day from 09-02 to 09-11** while the Tiptap loop kept logging through all of them, so *"zero recoveries, day ~26"* is really **one recovery** and a current episode **8.1 days** old; separately `scripts/merge-map.py` printed ahead and behind **the wrong way round** and the 00:15 entry published the swapped pair — ours is **590 ahead / 734 behind**, not 734/586; fleet **idle**, **0 active** of 115, nothing blocked or errored; map holds **61 / 155 / 33-26-2** for a fourth reading, but **only our side moved**; era-69 green on attempt 1 on all six, tally **69 / 50 / 19**
+
+Fleet **idle**, read not assumed: `agent list --all --json` → **52,699 B**, **115**
+agents, every one `active: false` — byte-identical to the 00:15 reading.
+`agent role list` → **949 B**, the same **four** claims. Nothing blocked,
+errored, rate-limited, or stranded. `main` `e831f5aa4` → this entry's own
+commit, which opens era-70.
+
+### 🔴 The finding: the health row is one sentence covering two loops, and the arithmetic in it is wrong in both halves
+
+Every entry since 2026-08-25 has closed with some form of *"the credential-lease
+livelock is N days old and still **four** rooms, **zero** recoveries"*. Counted
+properly — whole file, both files, never sampled — that sentence describes
+**two different loops** that share one message and nothing else:
+
+| Loop | Log shape | Scope | `host.log` | `host.log.1` |
+| --- | --- | --- | --- | --- |
+| **A** `EpicTokenRefresher` | `batch threw for epic=<uuid>: CredentialLeaseReleasedError: No live request context retained for user '<user>'` | **one epic** — this one. **No rooms** | 26,641 | 44,095 |
+| **B** Tiptap provider | `Tiptap room <id> stayed disconnected; rebuilding provider` + `Failed to rebuild Tiptap provider for room <id>: No live request context retained for user '<user>'` | **four rooms** (three `artifact-room-<this epic>-…`, one hex) | 16,491 + 16,487 | 36,252 + 36,249 |
+
+Three consequences, each measured:
+
+1. **The "four rooms" belong to B**, and B is not the loop the sentence names.
+   A's scope is an epic; it has no room dimension to have four of.
+2. **The quoted count covers 45 % of the storm.** `grep -c
+   CredentialLeaseReleasedError host.log` → **26,641** of **59,679** `[WARN]`.
+   B's rebuild failures end in the *same* sentence — *"No live request context
+   retained for user"* — and are invisible to that grep because only A prefixes
+   it with the error class. Anchoring on the root sentence instead gives
+   **43,128** (A + B's rebuild failures, one pass), and on the level gives all
+   **59,679**. This is
+   [[hostlog-429-grep-is-milliseconds]] in a second costume: the discriminator
+   chosen was a substring of one variant only.
+3. **`[ERROR]` is still 0 in both files** (37 + 45 `[INFO]`, 176,408 `[WARN]`,
+   **0** `[ERROR]`), so the hollow-probe finding of 2026-09-19 12:15 holds
+   unchanged.
+
+### 🔴 And the part that is not a taxonomy quibble: loop A *stopped*, for ten days, and the control was in the same file
+
+`host.log.1` spans 2026-08-24 16:30 → 2026-09-11 22:22. Counting both loops per
+calendar day inside it:
+
+| Day | A `EpicTokenRefresher` | B Tiptap |
+| --- | --- | --- |
+| 08-25 | 878 | 0 |
+| 08-26 | 3,534 | 1,731 |
+| 08-27 | 8,087 | 5,556 |
+| 08-28 | 7,915 | 5,506 |
+| 08-29 | 7,936 | 5,506 |
+| 08-30 | 6,989 | 5,042 |
+| 08-31 | 5,225 | 4,130 |
+| 09-01 | 3,531 | 3,276 |
+| **09-02** | **0** | 1,435 |
+| **09-03** | **0** | 136 |
+| **09-05** | **0** | 698 |
+| **09-06** | **0** | 1,436 |
+| **09-07** | **0** | 220 |
+| **09-08** | **0** | 341 |
+| **09-09** | **0** | 416 |
+| **09-11** | **0** | 823 |
+
+A's last line in that file is **2026-09-01 20:14:57**; its first line in the
+current file is **2026-09-12 01:17:15**. **Ten days and five hours, with the
+host up and logging.** That "up and logging" is not an assumption and not a
+separate probe — **column B is the control**, written by the same process to
+the same file on every one of those days. A stopped; B did not.
+
+So the two numbers the row has been carrying are both wrong:
+
+- **"zero recoveries"** → **one**, at 2026-09-01 20:14:57, unattended, lasting
+  10.2 days. What ended it was the host restart of **2026-09-11 22:39 local**
+  (the supervisor's own `phase=starting` line — and note that line is **UTC**
+  while every `[WARN]` is local, so reading them on one clock makes the rotated
+  file appear to overlap the current one by ten hours).
+- **"day ~26"** → 26.0 days is the age of the **first occurrence**. The current
+  episode began 2026-09-12 01:17:15 and is **8.1 days** old. The monotone
+  counter was measuring the distance to a fixed date, which cannot go down, so
+  it could not have reported the recovery even in principle.
+
+Still in the host binary; this repo still cannot patch it. What changes is what
+the row is allowed to say: **count on the level or the root sentence, name the
+loop, and date the episode rather than the first sighting.**
+
+### 🔴 `merge-map.py` printed ahead and behind backwards, and the ledger published it
+
+The script landed at 00:15 ends its report with a commit-distance pair. It asked
+git for `ours..upstream` first — which counts commits **upstream** has and ours
+lacks, i.e. how far ours is **behind** — and printed it under the label
+`ahead/behind`. The 00:15 entry copied that output into prose: *"ahead/behind
+**734 / 586**"*. Corrected: at that tip ours was **586 ahead / 734 behind**.
+
+**What identified it was this window's reading, not a re-read of the code.** The
+second number went 586 → **590** while upstream did not move at all, and 4 is
+exactly the number of commits *we* landed since. A number that grows when we
+commit is the ahead count; it was sitting in the behind slot.
+
+Fixed at the source rather than in the prose, since the prose is copied from it:
+`ahead_behind()` returns `(ours-only, upstream-only)` and the line now reads
+`ours is 590 ahead of / 734 behind upstream`, which has no silent orientation
+left to get wrong.
+
+**The self-check is asymmetric on purpose, and it was checked against the
+defect rather than assumed to cover it.** Orientation cannot be tested on a
+canned string — it is *which range you ask git for* — so the check builds a
+throwaway repo with **2** commits on ours and **1** on upstream. A symmetric
+fixture passes both orientations, which is precisely how this survived four
+readings. Reverting the two lines to their old order and re-running gives
+`AssertionError: (1, 2)`, exit 1; the fixed version prints `selftest ok`. The
+check discriminates, which is the only thing that makes it worth its fifteen
+lines ([[red-tests-can-be-non-discriminating]]).
+
+### The map holds a fourth time — and this window is **not** the 00:15 reading repeated
+
+`python scripts/merge-map.py e831f5aa4 913f34366 a1a33095e` → **61 paths / 155
+stage lines / 33 three-stage, 26 add/add, 2 base+ours**, areas unchanged
+(`clients/mobile` 25, `clients/gui-app` 18, `clients/shared` 7,
+`clients/traycer-cli` 3, `clients/desktop` 2, and one each of
+`.github/workflows`, `.gitleaks.toml`, `bun.lock`, `nx.json`, `package.json`,
+`protocol/src`).
+
+**The qualifier matters more than the number.** Upstream is **unchanged** at
+`913f34366` — no movement in the four hours since 00:15 — so the control row
+(*"3 commits moved 67 paths; 0 touch the surface"*) is a **replay of the
+previous window's measurement**, not a new one. What 00:15 earned by having both
+arms move is not re-earned here; only our arm moved, by four commits of this
+check-in's own bookkeeping. Recorded explicitly so the next window counts **one**
+both-sides reading and not four.
+
+### Era-69: green on attempt 1 on all six, and the tally is caught up
+
+`e831f5aa4` — the 00:15 window's fourth push, which closed era-67's open
+question — had never been read in a ledger entry. Read here from the runs API:
+**Tests** `14:43:44Z → 14:49:36Z` (**5 m 52 s**), and Secret scan, pre-commit,
+CodeQL, Protocol Compatibility and Real supervisor all `success` at
+`run_attempt: 1`. Tally **69 / 50 / 19** (50 + 19 = 69, partition intact). No
+flake row: `docs/autobuild/ci-tests-flake.md` records reds, and there was none.
+
+### The token: the ≥ +40 s rule, second use, and the next window's geometry
+
+Decoded from `credentials` at the top of the window rather than carried:
+`iat` 00:20:40 / `exp` **04:20:40**, exactly as 00:15 predicted.
+
+| Call | Placement vs `exp` | Exit | Bytes | `credentials` rewritten? |
+| --- | --- | --- | --- | --- |
+| `agent role list` @ 04:16:24 | −4 m 16 s (inside life) | 0 | 949 | **no** |
+| `agent list --all --json` @ ~04:16:5x | −3 m 4x s (inside life) | 0 | 52,699 | **no** |
+| `agent role list` @ **04:21:20.000** | **+40.0 s** | **0** in 3.892 s | 949 | **yes** — 04:21:21.983 |
+
+The last row was **placed, not hoped for**: the call slept until the target
+instant and fired at +40.0 s, clearing the (8 s, 37 s] hard-fail band by 3 s.
+Second use of the rule in anger, second clean result, no lost reading. A shell
+`date` read taken mid-window at 04:15:40 would have put the same call four
+minutes early — the geometry has to come from the token, not from elapsed-time
+arithmetic.
+
+**Next window's geometry, to be re-decoded and not trusted:** `iat` 04:21:20 /
+`exp` **08:21:20**, i.e. ~6.3 min into the 08:15 window. An opening call at
+~08:16 is inside life and will not refresh; the trap band is
+**08:21:28 – 08:21:57**; place any past-`exp` read at **≥ 08:22:00**.
 
 ## 2026-09-20 00:15 — **the first reading where BOTH sides moved, and the merge surface did not**: upstream's last three commits moved **67** files, **all** in `clients/gui-app`, and **not one** of them is among the map's **18** `clients/gui-app` conflict paths — so the map's third consecutive identical reading (**61 paths / 155 stage lines / 33-26-2**) is the first that can support the claim the previous two only looked like they supported, that *waiting is not making this merge more expensive*; the derivation stops being a sed-edited copy of the previous window's dated script and lands as `scripts/merge-map.py`, whose first draft had a real defect the self-check caught; fleet **idle**, **0 active** of 115, nothing blocked or errored; the credential-lease livelock is **~26 days** old and still **four** rooms
 
