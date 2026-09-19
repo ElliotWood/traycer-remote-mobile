@@ -252,6 +252,70 @@ owner's (origin, host id, ws URL), so an unattended session can record the
 **shape** but must not invent the contents. Filed here rather than started, so
 the next window picks it up with the measurement already made.
 
+### 🟢 Follow-through on item 4: the rebuild is not blocked at all, and it now has a recipe
+
+Item 4 above filed the missing build inputs and deliberately stopped there
+("filed rather than started"). It was worth one more step, because the shape of
+the gap turned out to be recordable without any owner input.
+
+**`clients/mobile/.env.example` now names the six** (`d757891af`), and the
+claim that six is the *complete* set is measured, not inferred from reading the
+config:
+
+```
+set -a && . ./.env.example && set +a
+MSYS_NO_PATHCONV=1 bun run build:web:static
+
+✓ built in 1m 12s          (exit 0)
+dist/web/  index.html  manifest.webmanifest  assets/  icons/  sw.js (16,537 B)
+[sw] precaching 52: /next/assets/…, /next/index.html, /next/manifest.webmanifest
+```
+
+**So "rebuild and redeploy the `/next/` bundle" splits cleanly, and only one
+half is blocked.** The rebuild is green from a clean trunk checkout *today*.
+What remains is the deploy — the deallocated VM, an attended decision — and the
+app-package install, which is the exempted shortcut. The 09-18 banner's
+"not-actionable" verdict covered both halves; it should cover only the second.
+
+**Two traps found while proving it, both of which produce a WRONG BUNDLE rather
+than an error**, and both now written into the example file:
+
+**1. `MSYS_NO_PATHCONV=1` is load-bearing, and this is a second face of a
+recorded trap.** MSYS rewrites POSIX-looking values when handing them to a
+Windows process — the recorded face is a CLI flag (`--base=/tab/`), but it
+fires through the **environment** too:
+
+```
+$ echo "[$TRAYCER_WEB_BASE]"                                    [/next/]
+$ TRAYCER_WEB_BASE=/next/ node -e 'console.log(process.env.TRAYCER_WEB_BASE)'
+C:/Program Files/Git/next/
+```
+
+Bash's own copy is correct, so **a check done in the shell cannot detect it** —
+only the child sees the rewrite. vite then emits a *warning* (`"base" option
+should start with a slash`) and **builds anyway**, producing a bundle whose
+manifest and precache list are rooted at `C:/Program Files/Git/next/`. That is
+precisely the `/nexticons/icon-192.png` 404 that `vite.config.web.ts`'s own
+comment warns takes the whole atomic precache down, *"reported as the worker
+did not install"*. A green build that ships a dead service worker.
+
+The control is in the run above: **with** `MSYS_NO_PATHCONV=1` the warning
+disappears, the precache list roots at `/next/`, and
+`grep -rl 'Program Files' dist/web/` returns **nothing**.
+
+**2. `TRAYCER_WEB_HOST_LABEL` must be quoted.** It normally contains a space.
+Unquoted, `. ./.env.web` splits it — and the build then fails with
+`TRAYCER_WEB_HOST_LABEL is required for the web build`, which points at a
+missing variable when the real fault is a quoting one. Caught only because the
+example file was actually run rather than just written; the first draft of it
+had this defect.
+
+**What is still not done, and why.** The example carries **placeholder** values.
+The real origin, host id, label, ws URL and version describe a specific
+deployment and are the owner's to supply — `TRAYCER_WEB_HOST_ID` especially,
+which is not discoverable from the repo or the API. An unattended window can
+record the shape; it must not invent the contents.
+
 ## 2026-09-20 04:15 — **the health row the ledger has printed for twenty-six days names one livelock and counts a different one, and the loop it names recovered on its own for ten days**: `CredentialLeaseReleasedError` is `EpicTokenRefresher` retrying **one epic**, with no rooms at all, while the "**four** rooms" belong to a *separate* loop (Tiptap provider rebuild) that logs the same root sentence **without** the error class — so the quoted number is **45 %** of the storm; and the per-day counts in `host.log.1` put the refresher at **exactly zero on every day from 09-02 to 09-11** while the Tiptap loop kept logging through all of them, so *"zero recoveries, day ~26"* is really **one recovery** and a current episode **8.1 days** old; separately `scripts/merge-map.py` printed ahead and behind **the wrong way round** and the 00:15 entry published the swapped pair — ours is **590 ahead / 734 behind**, not 734/586; fleet **idle**, **0 active** of 115, nothing blocked or errored; map holds **61 / 155 / 33-26-2** for a fourth reading, but **only our side moved**; era-69 green on attempt 1 on all six, tally **69 / 50 / 19**
 
 Fleet **idle**, read not assumed: `agent list --all --json` → **52,699 B**, **115**
