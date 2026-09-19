@@ -91,6 +91,31 @@ Do this:
 4. Verify claims rather than trusting reports. This epic has produced repeated
    "checks that report success while measuring nothing". Grep locates; it does
    not establish. Confirm deploys by checking a property only the new build has.
+
+   THE `[ERROR]` COUNT IN host.log IS ONE OF THOSE CHECKS. 70 entries reported
+   it as `0` and called that health. It is 0 because this host has never
+   logged at ERROR at all: across host.log + host.log.1 (26 days, 34.8 MB)
+   the level census is 163,773 WARN / 82 INFO / **0 ERROR**. A permanent
+   failure loop ran under that clean reading for 25 days. Worse, those same
+   entries quoted the line-count growth ("+477 since the 04:15 anchor") as
+   context - and 99.8% of that growth WAS the failure retrying.
+
+   So do not count a level. Count what DOMINATES, and name it:
+
+     $h = 'C:\Users\gigaf\.traycer\host\host.log'
+     Get-Content $h | ForEach-Object {
+         $_ -replace '^\[[\d\- :\.]+\]\s*','' -replace "'[^']*'",'X' `
+            -replace '[0-9a-f]{16,}','X' -replace '[0-9A-Z]{20,}','X'
+     } | Group-Object | Sort-Object Count -Descending |
+       Select-Object -First 5 Count,Name
+
+   Read the top FIVE as a group, not the top one. On 2026-09-19 the top line
+   was only 43.1% and the leading five were 94.4% - all five lines of one
+   failure, split across rooms. A single-line threshold would have read clean
+   on the exact defect it was written for. If the five together are >50% and
+   tell one story, that is the host's actual state and it belongs in the entry
+   whatever its level. A log that is 99% one warning is not a quiet log, it is
+   a stuck one.
 5. Write what you did into the epic artifacts so the next run and the human can
    both pick it up.
    BUT: you read those artifacts at the START of a turn that runs for a long

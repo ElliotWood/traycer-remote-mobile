@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **ninety-six** entries in this
+everything came down, nothing went up. The **ninety-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **ninety-six**. Three count sites remain in this header: this
+on this file → **ninety-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,148 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the ninety-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the ninety-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-19 12:15 — **the check-in's own health probe has been hollow for 70 entries**: `[ERROR] in host.log = 0` reads zero because this host has never logged at ERROR *at all* (163,773 WARN / 82 INFO / **0 ERROR** across 26 days and 34.8 MB), and under that clean reading a credential-lease **livelock** has been retrying four rooms once a minute since **2026-08-25 05:16:53** — 25.3 days, surviving a host restart, **zero** recoveries — while the entries quoted its own retry rate (*"+477 lines since the 04:15 anchor"*) as health *context*; era-61 (`7fa8ecda7`) Tests **green on attempt 1** (**61 / 45 / 16**), and era-60's rerun, which the 09:59 window filed but **never triggered** (`run_attempt: 1`), is triggered here
+
+Fleet **idle**, checked rather than assumed. `main` at **`7fa8ecda7`**, all six
+checks green on attempt 1. The CLI answered in **2.49 s, exit 0, 52,699 B**
+(`agent list --all --json`) against a token still **1 h 45 m short of expiry**
+(`iat` 10:01:58, `exp` 14:01:58, decoded from `credentials` at the top of the
+window, not predicted) — so this window has **no face**: nothing expired, the
+chain stays at **69**. The 12:15 window fired on schedule and the fixed
+missed-window detector correctly stayed silent (2.3 h since the 09:59 log, no
+slot lost).
+
+| Probe | Reading |
+| --- | --- |
+| Agents (`agent list --all --json`) | **115**, `active:false` on all 115 — which per rule 1 is *not* a liveness reading |
+| Agents blocked / errored / rate-limited | **none** |
+| Idle with work outstanding | **none new** |
+| `claude.exe` processes | this session only. No collision |
+| ~~`[ERROR]` in `host.log`~~ | **retired as a health probe — see below.** It has read `0` in **70** entries and is structurally incapable of reading anything else |
+| host.log, **dominant lines** (the replacement) | top 5 = **94.4%** of 49,702 lines, and all five are one failure |
+| Host process | pid **12512**, started **2026-09-16 09:20:38** — the livelock predates it by 22 days and **survived the restart** |
+
+### 🔴 The finding: the instrument, not the host
+
+The host defect below is upstream's and we cannot fix it. The defect that
+belongs to *this* check-in is that **70 entries certified health with a probe
+that could not fail.**
+
+Every entry since the table was introduced carries a row reading
+`` `[ERROR]` in `host.log` since rotation | **0** ``. Read as written, that is
+a measurement. It is not. The level census across both logs:
+
+| File | Span | Bytes | WARN | INFO | **ERROR** |
+| --- | --- | --- | --- | --- | --- |
+| `host.log.1` | 2026-08-25 02:30 → 09-11 22:22 | 24,742,764 | 116,729 | 45 | **0** |
+| `host.log` | 2026-09-11 22:22 → now | 10,075,751 | 47,044 | 37 | **0** |
+| | **26 days** | **34.8 MB** | **163,773** | **82** | **0** |
+
+**This host has never emitted a single `[ERROR]` line in its entire recorded
+history.** The probe returns 0 on a healthy host and 0 on a wedged one, so its
+70 consecutive `0`s carry no information — the exact failure mode rule 4 of the
+check-in script already warns about, turned on the check-in's own instrument.
+That is why it is fixed in the script in this push rather than only noted here.
+
+**The aggravating detail.** Those same rows annotate the log's *growth* as
+context — *"118,170 lines at the 08:19:26 read … +477 since the 04:15 run's
+117,693 anchor"*. That growth is not background. Measured over three sampled
+inter-window gaps, the share of new lines that are the livelock retrying:
+
+| Window | New lines | Livelock | Share |
+| --- | --- | --- | --- |
+| 09-17 00:15 → 04:15 | 239 | 237 | **99.2%** |
+| 09-18 08:15 → 12:15 | 3,133 | 3,131 | **99.9%** |
+| 09-19 08:15 → 12:15 | 1,848 | 1,845 | **99.8%** |
+| whole of `host.log` | 47,177 | 47,088 | **99.81%** |
+
+So the number the entries printed beside "0 errors", as reassurance, **was the
+failure's own heartbeat**. The health footnote and the defect were the same
+measurement, read with the sign flipped.
+
+### What the probe was hiding
+
+`EpicTokenRefresher: batch threw for epic=9c9ddaf0-…: CredentialLeaseReleasedError:
+No live request context retained for user '3e3d1309-…'`, in a fixed cycle:
+a Tiptap room reports `stayed disconnected; rebuilding provider` → the rebuild
+needs a token → the refresh throws because the credential lease was released →
+`Failed to rebuild Tiptap provider` → **exactly 60.0 s later, the same room
+again** (12:17:42.209 / 12:18:42.343 / 12:19:42.460, one room, three
+consecutive minutes).
+
+- **First occurrence `2026-08-25 05:16:53.277`** (`host.log.1` line 48), 2 h 46 m
+  after that log's own `phase=starting` line. **25.3 days** ago.
+- **Four rooms**, always the same four: three `artifact-room-9c9ddaf0-…` and one
+  bare-hash room, ~3,200 failures each in the current log alone.
+- **Zero recoveries.** Stated as a continuity fact rather than an absence-grep,
+  because a grep for a success string I had guessed would read `0` whether or
+  not the string exists (and the string is not in the host bundle — I checked):
+  the discriminating read is that **all four rooms appear on every one of the
+  six days the loop ran** — 4, 4, 4, 4, 4, 4. A room that reconnected would drop
+  out of the set. None ever does.
+- **It is not stale process state.** The host restarted 2026-09-16 09:20:38;
+  the loop resumed and is emitting now. `traycer host ensure` will not clear it.
+- It is **duty-cycled, not continuous** — 3,311 of the 10,201 minutes in the
+  current log — which is why the per-day counts swing 330 → 8,089. It tracks
+  whether a client is attached, not a timer. That variance is also why nobody
+  read the growth as a constant leak.
+
+**What it does *not* cost, measured rather than assumed.** The tempting
+conclusion is that artifact writes died with it — the livelock starts 08-25 and
+the artifact tree looks frozen at 08-26. That is wrong:
+`traycer-remote-teams/tickets/index.md` has mtime **2026-09-18 08:29**, three
+weeks inside the livelock. **Artifact file writes still land.** What is
+permanently broken is the four *live collaborative* rooms, and the honest cost
+of the last 25 days is those plus 34.8 MB of log that blinded the one probe
+pointed at it.
+
+Also surfaced by the same census, and also invisible at ERROR: **19 ×**
+`RPC WS: authentication rejected code=UNAUTHORIZED message="exp" claim
+timestamp check failed` with 19 matching `fatal close` — the CLI token-expiry
+face this ledger has tracked to chain 69, logged at WARN the whole time.
+
+### The fix — `scripts/autobuild-checkin.ps1`, rule 4
+
+The ERROR count is retired and replaced with a probe that counts what
+*dominates* rather than what matches a level: strip timestamps and ids, group,
+take the top five. **It was tested against this host before it was written
+down, and the test changed it** — the first draft said *"if the top line is
+>50%"*, and the top line here is **43.1%**, because the failure splits across
+four rooms. That draft would have read clean on the exact defect that motivated
+it — the ledger's own `structural checks pass well-formed wrong values` lesson,
+live. It now reads the top **five** as a group (**94.4%**), with the rule that
+five lines telling one story is a stuck log whatever their level.
+
+### CI — era-61 green, and an era-60 rerun that was filed but never fired
+
+**Era-61 `7fa8ecda7`**: Tests **green on attempt 1**, as were all six checks
+(Secret scan, pre-commit, Real supervisor, Protocol Compatibility, CodeQL,
+Tests) — read from the runs API, not inferred. Tally moves to
+**61 / 45 / 16** (eras / Tests green on att-1 / red on att-1); the partition
+still holds exactly (45 + 16 = 61). No flake row: the table is red-only.
+
+**Era-60 `d232cf9e0`**: the 09:59 window filed its row naming the shard-3 red,
+and its row ends without an attempt-2 outcome. The reason is not that the
+window ran out of time — `actions/runs/35408700158` still read
+**`run_attempt: 1`, `conclusion: failure`** at 12:23 today, so **the rerun was
+never triggered at all**. Filed ≠ reran; the row's silence was load-bearing and
+nearly carried forward as "green on rerun" by analogy with the ten before it.
+`gh run rerun --failed` issued **12:23 AEST** by this run — 12.1 h after the
+red — and **waited out in the foreground** per rule 8, not left as a
+placeholder: **attempt 2 green**, shard 3 job `02:24:56Z → 02:30:13Z`
+(**5 m 17 s**), all twelve jobs green. So the seventh member's second
+appearance reruns green like the twenty-two reds before it, and era-60 is
+reconciled in the same push that found it unreconciled. Upstream stands
+at **730** commits ahead of `main`; the merge map is **not** re-derived this
+window (the 09:59 derivation stands).
 
 ## 2026-09-19 09:59 — **six windows lost: four to Anthropic's *weekly* limit, two to S3 sleep** — and the check-in's own outage detector called the 25.7 h hole "~1", so it is fixed here with a self-check that fails against the old arithmetic; the bearer refreshed **21 h 34 m 49 s past exp** exactly as it does at +50 s (face **66**, chain **69**), retiring "<4 min room = call first"; upstream **+29** → `9d6923216` lands the map's **first non-zero contacts in five windows** (**6** paths, every one stage-3-only, four of them `host-transport`) while the map still holds **61 paths / 155 stage lines**; era-59 (`162a6421d`) Tests **red on attempt 1** and unreconciled for 25.7 h (**59 / 44 / 15**), rerun green here; the VM is deallocated on **day 31**
 
