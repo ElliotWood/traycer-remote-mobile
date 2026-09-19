@@ -171,23 +171,53 @@ Do not wait for human input. Decide, act, and document what you decided.
 # fix is an S4U principal and needs elevation - this makes the loss report
 # itself in the meantime, with the two facts that diagnose it. Never let this
 # block a run: the whole thing is best-effort.
+#
+# AMENDED 2026-09-19, after this check reported "~1" for a 25.7h outage that
+# cost SIX windows. Both of its terms were wrong, and in the same direction:
+#
+#  1. It anchored on the last log FILE. A run that starts and dies writes a
+#     log, so the four windows of 09-18 12:15..09-19 00:15 that hit Anthropic's
+#     WEEKLY limit - "check-in finished (exit 1) - NO-OP: RATE LIMITED" - each
+#     looked like a healthy predecessor. The work outage was 25.7h; the check
+#     measured 9.7h to the newest no-op and never saw the rest. Anchor on the
+#     last run that PRODUCED something ("- ran, "), which is the only thing
+#     this warning is about.
+#  2. It divided elapsed hours by four. That charges a late run's own lateness
+#     against the count: this run was a StartWhenAvailable catch-up 1h44m after
+#     its slot, so round(9.7/4)-1 lost a whole window. Count the scheduled
+#     SLOTS between the anchor and now instead - they are what was missed.
+#
+# Splitting "ran but produced nothing" from "never fired" is the point: they
+# have opposite fixes (wait out a provider limit vs. an S4U principal), and
+# the single number could not tell them apart.
 try {
-    $PrevLog = Get-ChildItem $LogDir -Filter 'autobuild-checkin_*.log' -ErrorAction Stop |
-        Where-Object { $_.Name -ne (Split-Path $Log -Leaf) } |
-        Sort-Object Name -Descending | Select-Object -First 1
+    $Logs = Get-ChildItem $LogDir -Filter 'autobuild-checkin_*.log' -ErrorAction Stop |
+        Where-Object { $_.Name -ne (Split-Path $Log -Leaf) }
+    $Seen = @{}
+    foreach ($f in $Logs) { $Seen[($f.BaseName -replace '^autobuild-checkin_', '')] = $true }
+    $PrevLog = $Logs | Sort-Object Name -Descending |
+        Where-Object { (Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue) -match '- ran, ' } |
+        Select-Object -First 1
     if ($PrevLog) {
         $PrevStamp = [datetime]::ParseExact(
             ($PrevLog.BaseName -replace '^autobuild-checkin_', ''), 'yyyy-MM-dd_HHmm', $null)
-        $Gap = (Get-Date) - $PrevStamp
-        # Windows are 4h apart, so the count is what decides, not the gap: a
-        # 4.6-5.4h gap rounds to zero missed windows and used to report
-        # "MISSED WINDOWS: ~0" - a warning announcing that nothing was wrong.
-        $Missed = [math]::Round($Gap.TotalHours / 4) - 1
-        if ($Missed -ge 1) {
+        $Now = Get-Date
+        # The grid is every 4h from 00:15, so walk it from the anchor's midnight.
+        $Slots = @()
+        $W = $PrevStamp.Date.AddMinutes(15)
+        while ($W -le $Now) {
+            if ($W -gt $PrevStamp) { $Slots += $W }
+            $W = $W.AddHours(4)
+        }
+        # The newest slot is the one THIS run is serving, late or not.
+        $Lost = @($Slots | Select-Object -SkipLast 1)
+        if ($Lost.Count -ge 1) {
+            $NoOp  = @($Lost | Where-Object { $Seen.ContainsKey($_.ToString('yyyy-MM-dd_HHmm')) }).Count
+            $Never = $Lost.Count - $NoOp
             $Boot  = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).LastBootUpTime
             $Logon = (Get-Process explorer -ErrorAction SilentlyContinue |
                 Sort-Object StartTime | Select-Object -First 1).StartTime
-            "[$Stamp] MISSED WINDOWS: ~$Missed since $($PrevLog.Name) (gap $([math]::Round($Gap.TotalHours,1))h) - last boot $Boot, interactive logon $Logon" |
+            "[$Stamp] MISSED WINDOWS: $($Lost.Count) since $($PrevLog.Name) - $NoOp ran but produced nothing, $Never never fired (gap $([math]::Round(($Now - $PrevStamp).TotalHours,1))h) - last boot $Boot, interactive logon $Logon" |
                 Out-File -FilePath $Log -Append
         }
     }
