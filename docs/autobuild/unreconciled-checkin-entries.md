@@ -181,6 +181,78 @@ is this epic's signature failure wearing the fix as a costume.
   `RPC WS: fatal close … UNAUTHORIZED "exp" claim` at **04:16:23** and a
   `[jwks]` re-fetch after it.
 
+### ADDENDUM, 40 minutes later — the repair has a NAMED TRIGGER, and it is `traycer agent send`. This run fired it, and it ate the 00:15 entry's artifact work
+
+The section above says `tickets/index.md`'s survival is **unmeasured** and to
+*"re-read it after the next repair."* The next repair happened **during this
+run, caused by this run**, so here is the measurement rather than the deferral.
+
+**The trigger, read off `host.log` rather than inferred.** This window sent a
+courtesy note to the `Teams card design` role-holder (`3eaf2d25-…`) about the
+no-card decision. 521 ms later the destroyer ran:
+
+```
+[04:34:19.033] ChatSession: opening epic=9c9ddaf0-… chat=3eaf2d25-…
+               openerConnection=agent-send-message:b2d873c2-…
+[04:34:19.554] EpicFileSync 9c9ddaf0-…: starting file sync hasDiskSync=true
+[04:34:19.559] EpicFileSync 9c9ddaf0-…: cloud repair starting trackedArtifacts=0
+[04:34:23.305] EpicFileSync 9c9ddaf0-…: cloud repair complete
+               liveArtifacts=210 writeCandidates=210 trackedArtifacts=210
+[04:34:26.503] EpicFileSync 9c9ddaf0-…: file sync ready trackedArtifacts=210
+```
+
+The `openerConnection` field **names the command**. This ledger has been
+calling the destroyer *"the next session to open the epic"* since 2026-08-26,
+which reads as a human opening the desktop app. It is not only that:
+**`traycer agent send` opens a chat, which starts `EpicFileSync`, which runs
+`cloud repair` with `writeCandidates=210`.** An unattended check-in that
+messages an agent — the exact thing this brief's step 2 asks for — is the
+opener. Two of this epic's artifact losses are now attributable to a check-in's
+own tool call rather than to a visit nobody logged.
+
+**And the survival rule falls out of a clean natural experiment**, one file,
+one repair, two edits made under different conditions:
+
+| Edit | Sync state when written | Survived the 04:34:19 repair? |
+| --- | --- | --- |
+| the `🛑 THE VM IS OFF` banner, written **20:26:22** | `file sync ready` at 20:24:41, `stopping` at 20:39:48 — **RUNNING** | ✅ **yes** — banner ×2, `deallocat` ×7, `2026-09-18` ×3 |
+| the 00:15 rebuild block (`248c2fb59`, the `/next/` derivation) | sync **STOPPED** since 20:39:48, next start 04:34:19 | 🛑 **no** — `grep -c 248c2fb59` → **0**, `2026-09-21` → 0 before this run's own write |
+
+Measured either side: **81,638 B** at 04:31, **79,521 B** after. Same file, same
+repair, opposite outcomes — so the repair is not indiscriminate and the blast
+radius is not "every artifact". **What decides it is whether `EpicFileSync` was
+RUNNING when the edit was made.** Between `stopping file sync` and the next
+`starting`, an artifact write is a dead write with a delay fuse: it looks
+perfect on disk, `grep` confirms it, and it dies at the next open.
+
+That also explains the 20:15 entry's puzzle — why a file that had *never* been
+hit before was destroyed while a session had it open — without needing the
+repair to be capricious.
+
+**The operating rule, for the next window:**
+
+1. Before editing an epic artifact, check `EpicFileSync` in `host.log`. If the
+   last line is `stopping file sync` / `file sync stopped`, **your edit will
+   not survive**. Write the ledger on `main` instead and stop there.
+2. If you must edit the artifact anyway, run one `traycer agent send` (or open
+   the epic) **FIRST**, wait for `file sync ready`, and edit after it. Doing it
+   in the other order destroys your own work, which is what happened here — the
+   00:15 additions were intact at 04:31 and gone at 04:35.
+3. Never treat a `grep` of a disk artifact as proof it is saved. It proves the
+   bytes are on disk, which is the state that dies.
+
+This run's own writes (`wpro-retail-run/index.md` 04:34:47,
+`tickets/index.md` 04:34:57) both landed **after** `file sync ready` at
+04:34:26, so they are inside a live window — which is the condition the table
+above says matters, and is still **unmeasured** until a repair tests it. The
+durable copy remains this file.
+
+**One cost worth naming so it is not repeated blind:** `agent send` without
+`--expect-reply` still **starts a provider turn** on the receiving agent
+(`ChatSession: starting provider turn … harness=claude model=opus[1m]` at
+04:34:20.383). A "no reply needed" note is not free — it spends the recipient's
+tokens, and this run sent two.
+
 ## 2026-09-21 00:15 — **the one piece of available work in this epic was blocked by the file written to unblock it, and doing it proved it was not worth doing**: three consecutive entries (09-18 08:15, 09-20 16:15, 09-20 20:15) filed *"rebuild the `/next/` bundle"* as the P4 residue's one item **gated on nothing**, and not one of them started it, because `clients/mobile/.env.example` — the file `d757891af` landed *to* make the build reproducible — states that the real values *"are the owner's to provide"* and that `TRAYCER_WEB_HOST_ID` *"is not discoverable from the repo or the API and must be read off the host itself"*; with the VM **deallocated 32 days** that second sentence closes the only door it names, so the item was simultaneously filed **actionable** and made **impossible**, by two lines of prose in the same repository; **both sentences are false** — all six `TRAYCER_WEB_*` values are baked into the deployed entry chunk as a **single literal**, and that chunk is committed here on `demo/upstream-mobile-next-dist`, so the outgoing deployment is its own source of truth: `git show demo/upstream-mobile-next-dist:index.html | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js'` then grep that chunk for ``authnBaseUrl:`…`…host:{…}``, with `ORIGIN` obtained by **inverting** the config's `${origin}/authn` rather than guessed; the literal is **byte-identical across dist commits `8341eeccb` / `34e876685` / `92b1503dc`**, so it has been stable since **08-11** and does not drift per build, and the recovered `hostId` **`3107fb3b-3215-4965-8654-d39173aae0e7`** is corroborated by a **second, independent** source — it appears as a live `hostId` in `agent list --all --json`, so this is not one artifact agreeing with itself; **the rebuild then ran green from a clean trunk checkout** at `a564ffa73` in an isolated scratch worktree (never the `main` checkout), `bun run build:web:static` → **exit 0**, precache **52**, every path under `/next/` (so MSYS did not mangle `base` — built from PowerShell, not `. ./.env.example`), and it **passes the gate that matters**: the baked config of the new entry chunk byte-compared to the outgoing one → **True**, i.e. the rebuild has **not** silently repointed the client, which is the one failure a green build cannot show you and is now written into `.env.example` as the standing gate; **and the payoff is the finding that the item was mis-sized in both directions at once** — **515 of 558** built assets are **byte-identical** to the outgoing dist (**92.3 %**), so the rebuild *reproduces* the deployment rather than advancing it, and the ticket's stated justification — b3d17333 + c3e599fa *"neither is in front of a user"* — **does not hold**, since both **predate** the 08-14 dist tip and `subEntityId` / `already-there` / `data-teams-host` each probe **1 in the old bundle and 1 in the new**, making a content probe structurally incapable of sizing this deploy gap (the trap `tickets/index.md` already warns about for `data-teams-theme`, arriving on the probe written to replace it); **one hypothesis raised and refuted rather than published**: the `/next/` stack is **87 commits ahead** of `main` (`autobuild/next-teams-focus-truth`), which looked like a rebuild-from-trunk **regressing** the client, but every runtime difference in `clients/mobile/src/web` is **Prettier re-wrapping** from the 08-25 hook commit and `ab65ee682` states it carried *"the last of our un-carried gui-app changes"* — note `git diff -w` **cannot** establish this, because re-wrapping moves tokens across line boundaries and `-w` is still line-based (it reported all **323** gui-app runtime files as differing), so the **minified bundle is the only honest comparator** and that is what the 92.3 % is measured on; **deliberately NOT done**: no dist commit was pushed — the deploy is an attended decision on a deallocated VM, and publishing a 92.3 %-identical rebuild into the branch the on-box pipeline fetches would put an unreviewed unattended build in the deploy path for no measured gain; host: the credential-lease storm is **live**, top five normalised lines **94.3 %** of **72,462** (42.7 % `EpicTokenRefresher` + the Tiptap rebuild loop — **two** loops, as 09-20 04:15 established, not one), last line **00:16:46**, level census **0 ERROR / 68,734 WARN**, and it stays **unactionable here** — it is in the host binary, not this repo; fleet **115 agents, 0 active**, nothing **blocked, errored or rate-limited**; ambient live: **`max`, 5-hour 0 %, 7-day 14 %** (capture clock matched the call clock, so a live read); landed `248c2fb59`; **two findings landed after the entry was written, both retiring a standing belief**: (1) **`main` is GREEN** — `ea874ce34` went green on **attempt 1** on all six workflows and **all 14** test jobs, `test (traycer-clients-gui-app shard 2)` **included**, so the era-77 red is **not** on main's tip; two attempts on one commit established *"reruns don't clear it"*, which is **not** the same claim as *"it survives into later commits"*, and the ledger had been carrying the stronger one — anchor a red on a **named commit**, never on "main"; the `@traycer-clients/desktop` job also passed on a **zero-TypeScript** commit, the exact shape said to provoke the backwards token-store watcher test; (2) **the credential-lease livelock is not as unpatchable as three entries have said** — the standing line is *"a repo-wide grep for `CredentialLeaseReleased` / `EpicTokenRefresher` returns nothing, it is in the host binary, this repo cannot patch it"*, and re-run the two halves answer **differently**: `EpicTokenRefresher` → **0 files** (the retry loop is genuinely host-binary), but `CredentialLeaseReleasedError` → **7 files**, **declared** at `protocol/src/auth/request-context.ts:69` and **thrown** at `:234`, `:243` and `clients/shared/auth/bearer-source.ts:69` — so the sentence 94.3 % of `host.log` is made of is thrown by **our** code and only *retried* by theirs; deliberately **not** upgraded to "therefore fixable here", which is the same unearned leap mirrored — whether the lease is released legitimately is **unmeasured**, and `request-context.ts:200-250` is where the next window should start
 
 ## 2026-09-20 20:15 — **the repair this file was built to survive fired again, on a different artifact, in the middle of this run — and the artifact's own revert detector read "not reverted" straight through it**: `traycer-remote-teams/tickets/index.md` measured **75,748 B** when this run read it at 20:15 and **~73,290 B** when the same run re-read it at **20:25**, with `grep -c '2026-09-18'` → **0** and `grep -ci 'deallocat'` → **0** — the entire `🛑 THE VM IS OFF` banner filed by the **2026-09-18 08:15** check-in, Azure activity-log derivation and all, was destroyed **while this session had the file open**; the header of *that* file carries a detector — *"if the table below does not carry a T1b row, this file has been reverted"* — and the **T1b row survived both versions**, so the detector reported healthy across the exact event it was written for, because it anchors on content from **08-03**, older than anything that was ever at risk; this is the **second** artifact to take the `liveArtifacts=210` repair (the first, `traycer-remote-teams/autobuild/index.md`, is why this file exists), which retires the idea that the repair is a historical event of 2026-08-26 — it is **live**, and the blast radius is *every* epic artifact, not the one that has already been hit; a **working** detector is `grep -c '2026-09' index.md` → 0 means rolled back past September; the banner was re-applied from a **fresh live `az` read** rather than copied forward, and re-applied **better**: **`altra-vm-traycer-host-aue` is `PowerState/deallocated`**, deallocated **2026-08-19 03:16:34 UTC** by `elliot.wood@altra.cloud` with **no `Start` after it**, now **32 days** — an **attended** decision that no check-in will take; separately an agent **holding a role** was found carrying an **expired liveness claim** and was corrected; **P4's residue is three items, not one**, and the first of them is **not blocked at all**; fleet **115 agents, 0 active**, four roles claimed, **nothing blocked, errored or rate-limited**; ambient live: **`max`, 5-hour 4 %, 7-day 14 %**; the 16:15 entry's load-bearing-working-tree hazard is **measured closed**
