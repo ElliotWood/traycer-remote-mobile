@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and six** entries in this
+everything came down, nothing went up. The **one hundred and seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and six**. Three count sites remain in this header: this
+on this file → **one hundred and seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,142 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and six entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-21 04:15 — **the class name in a log never names the throw site, and the entry four hours ago read one as if it did; separately, the epic's most expensive observed failure turned out to be four files from fixed and nobody had tried**
+
+The 00:15 entry closed by naming `protocol/src/auth/request-context.ts:200-250`
+as *"where the next window should start"*, on the finding that
+`CredentialLeaseReleasedError` → **7 files** in this repo, *"declared at
+`request-context.ts:69` and thrown at `:234`, `:243` and
+`clients/shared/auth/bearer-source.ts:69` — so the sentence 94.3 % of
+`host.log` is made of is thrown by **our** code and only retried by theirs."*
+
+**That inference is wrong, and the discriminator it skipped is the message.**
+Re-derived this run rather than quoted — the census first, over the whole file
+and not a `tail`:
+
+| | |
+| --- | --- |
+| `host.log` lines | **72,709** (14.8 MB, read 04:19) |
+| top line | **42.9 %** `[WARN] EpicTokenRefresher: batch threw for epic=9c9ddaf0-…: X: No live request context retained for user X` |
+| top **five** | **94.3 %** — the refresher plus the Tiptap rebuild pair, at epic-room and bare-room scope |
+| level census | **0 ERROR** / 68,980 WARN / 65 INFO |
+
+Now the three throw sites this repo actually owns, read rather than counted:
+
+| Site | The message it constructs |
+| --- | --- |
+| `request-context.ts:234` | `Credential lease for user 'X' is no longer valid` |
+| `request-context.ts:243` | `Cannot rotate credentials on released lease for user 'X'` |
+| `bearer-source.ts:69` | `No bearer available for user 'X'` |
+
+**None of them is `No live request context retained for user 'X'`**, and
+`git grep "No live request context" origin/main` returns hits in **this ledger
+only** — i.e. in text quoting the log. So what the log prints is `err.name`,
+which is set by the CLASS, on a throw the class's owner never sees. The class
+is ours. The throw is not. The 00:15 finding was right to retire *"a repo-wide
+grep returns nothing"* — `CredentialLeaseReleasedError` really is declared here
+— and then took one step too far, from *"the class is ours"* to *"the throw is
+ours"*, which is the same unearned leap it had just corrected in someone else's
+sentence, mirrored.
+
+**The obvious next probe is non-discriminating, and a control proves it rather
+than a shrug.** `grep -c -a` on `traycer-host.exe` (130 MB) returns **0** for
+`No live request context`, `CredentialLeaseReleasedError`, `EpicTokenRefresher`
+*and* `stayed disconnected; rebuilding provider` — lines the running host is
+emitting right now. Control: `authn.traycer.ai` → **0**, `Traycer` → **0**,
+while `host.log`'s own last lines are `[jwks] Persisted signing keys from
+https://authn.traycer.ai/api/jwks`. The JS payload is compressed inside the
+SEA, so a string grep of that binary can neither confirm nor deny anything and
+must not be reported either way ([[measurements-need-three-states]] — this is
+**unmeasured**, not absent). `install/*.cjs` and `install/node_modules` were
+also checked: no `@traycer/*` package ships there.
+
+**So the standing line survives, with a better reason.** The livelock is not
+patchable from this repository — not because a grep finds nothing, but because
+the sentence it is made of is constructed somewhere this repository does not
+contain. The next window should stop re-litigating this: the remaining
+question — *is the lease released legitimately?* — is **not answerable from
+here**, and `request-context.ts:200-250` is the wrong place to start, because
+the code there is not what runs.
+
+### The completion reply is wired — `a00854e77`
+
+With that closed, the window went to open tickets, and the most expensive one
+in the epic's record was **never blocked**. `wpro-retail-run` (2026-08-10): an
+intake assessment ran for hours on the VM, produced a usable answer, and
+nothing delivered it — *"Elliot had to come and ask for it."* It filed the fix
+as item 1 of 4, *"this is the whole defect, everything else is a workaround."*
+**No fix was written then, and none in the 42 days since.** Three files in this
+repo said so in their own words (`intake/start-assessment.ts:171`,
+`intake/__tests__/assessment-autonomy.test.ts:11`,
+`remote-bridge/src/index.ts:166`): *"the completion reply is still unwired."*
+
+`tickets/index.md` sized it, correctly, as *"a second store lookup, not a
+second mechanism"* — and that under-sized it by one thing, the only thing that
+was missing: **`bridge watch` had no completion event at all**. Its union is
+`approval.requested` / `interview.requested` / `resolved`, all of which are
+about someone WAITING. Everything else was already built and idle:
+`dispatch-assessment` captures the conversation reference at step 2 before
+anything that can fail *for exactly this*; `push-notifications` already routes
+chat-first through that reference; `send-via-adapter` already tags so a message
+is not silent in a channel. The gap was four files wide.
+
+`ChatStatus` already carries `runStatus: "idle" | "running" | "stopping"`, so
+the event is a **diff the tracker was already positioned to take**:
+
+| Decision | Why, and what the other choice costs |
+| --- | --- |
+| `finished` carries **no `kind`** | `WatchEventKind` means *waits on a person*; a finished run is the opposite. With a `kind` it would pass through every `kind === "approval.requested" ? … : …` ternary in the bot **as the interview case**, with no compiler complaint — and the bot's interview branch *throws*. |
+| id is `run.finished:<chatId>`, one per **chat** | The tracker is pure (no clock) and its memory is process-lifetime, so a counter resets on restart and lets the durable sent-set either **miss** a completion or **replay** a stale one. Cost: a second run in the same chat is not re-announced — which fails toward silence on a repeat rather than toward a false completion. |
+| entry into a `running` set **licenses** the event | A chat first seen `idle` was never seen to run. Firing on the level would announce a completion for **every chat in the epic** on each bridge restart. |
+| `stopping` is not finished | A cancellation still has to land; calling it done reports an answer that is not there. |
+| **no card**, text + `chatDeepLink` | `render-card.ts` maps events onto cards the read surface already owns and there is no *finished* card to own. Inventing one here is the second vocabulary that file's header forbids. The link is the same builder the intake ack used, so the two cannot disagree. |
+
+Gates, all re-run after the last edit: bridge **75 → 81** tests, bot **533 →
+543**, `compile` and `eslint --max-warnings 0` clean on both packages. The
+`running.delete` guard was **mutation-checked** — removing it reds two of the
+new tests (and, as the test comment records, leaves the first assertion
+passing, which is why three are written).
+
+**Deliberately NOT done, and this is the honest half:** nothing is deployed.
+The VM is deallocated **33 days**, the bot is dark, and this is code that has
+never run in front of a user. `clients/teams-help`'s sequence diagram keeps the
+reply drawn **dashed** (`seq-line-todo`) for that reason — it describes what is
+live, and its neighbours are solid *"because they are real and they happen"*.
+Solidifying it would assert a live capability on a machine that is off, which
+is this epic's signature failure wearing the fix as a costume.
+
+### Housekeeping, all three derived
+
+- **Artifact survival is still UNMEASURED, not survived.** `tickets/index.md`
+  is **81,638 B** with `grep -c '2026-09'` → **10**, so the 20:15
+  re-application and the 00:15 additions are both present. But `host.log`
+  holds **no** `cloud repair complete` after **2026-09-20 20:24:34** — the one
+  that ate it — and `EpicFileSync` has been stopped since 20:39:48. The file
+  has not yet met the event it must survive. Re-read it after the next repair.
+- **The 09-20 16:15 working-tree hazard is now cosmetic.** `$WorkDir`'s dirty
+  `scripts/autobuild-checkin.ps1` is **byte-identical** to `origin/main`'s
+  (`diff` → no output, 415 lines each), the untracked
+  `autobuild-checkin.missed-windows.test.ps1` is tracked on `main`, and the
+  branch's one unique commit `cd0842bbd` duplicates main's `68d9e87ca`. That
+  working tree is residue, not state: nothing is lost if it is reverted.
+- **Fleet: 115 agents, 0 active, nothing blocked, errored or rate-limited**;
+  four roles claimed (Upstream merge, Mobile host switcher, Teams card design,
+  Teams Help tab). `ambient` live: **`max`, 5-hour 3 %, 7-day 15 %**, capture
+  clock equal to the call clock to the second — a live read, not the
+  `list-profiles` cache. The CLI's own 4-hour token expired mid-window and
+  refreshed in-command at **+3 h 52 m** past `exp`, well clear of the
+  (8 s, 37 s] hard-fail band; `host.log` records the matching
+  `RPC WS: fatal close … UNAUTHORIZED "exp" claim` at **04:16:23** and a
+  `[jwks]` re-fetch after it.
 
 ## 2026-09-21 00:15 — **the one piece of available work in this epic was blocked by the file written to unblock it, and doing it proved it was not worth doing**: three consecutive entries (09-18 08:15, 09-20 16:15, 09-20 20:15) filed *"rebuild the `/next/` bundle"* as the P4 residue's one item **gated on nothing**, and not one of them started it, because `clients/mobile/.env.example` — the file `d757891af` landed *to* make the build reproducible — states that the real values *"are the owner's to provide"* and that `TRAYCER_WEB_HOST_ID` *"is not discoverable from the repo or the API and must be read off the host itself"*; with the VM **deallocated 32 days** that second sentence closes the only door it names, so the item was simultaneously filed **actionable** and made **impossible**, by two lines of prose in the same repository; **both sentences are false** — all six `TRAYCER_WEB_*` values are baked into the deployed entry chunk as a **single literal**, and that chunk is committed here on `demo/upstream-mobile-next-dist`, so the outgoing deployment is its own source of truth: `git show demo/upstream-mobile-next-dist:index.html | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js'` then grep that chunk for ``authnBaseUrl:`…`…host:{…}``, with `ORIGIN` obtained by **inverting** the config's `${origin}/authn` rather than guessed; the literal is **byte-identical across dist commits `8341eeccb` / `34e876685` / `92b1503dc`**, so it has been stable since **08-11** and does not drift per build, and the recovered `hostId` **`3107fb3b-3215-4965-8654-d39173aae0e7`** is corroborated by a **second, independent** source — it appears as a live `hostId` in `agent list --all --json`, so this is not one artifact agreeing with itself; **the rebuild then ran green from a clean trunk checkout** at `a564ffa73` in an isolated scratch worktree (never the `main` checkout), `bun run build:web:static` → **exit 0**, precache **52**, every path under `/next/` (so MSYS did not mangle `base` — built from PowerShell, not `. ./.env.example`), and it **passes the gate that matters**: the baked config of the new entry chunk byte-compared to the outgoing one → **True**, i.e. the rebuild has **not** silently repointed the client, which is the one failure a green build cannot show you and is now written into `.env.example` as the standing gate; **and the payoff is the finding that the item was mis-sized in both directions at once** — **515 of 558** built assets are **byte-identical** to the outgoing dist (**92.3 %**), so the rebuild *reproduces* the deployment rather than advancing it, and the ticket's stated justification — b3d17333 + c3e599fa *"neither is in front of a user"* — **does not hold**, since both **predate** the 08-14 dist tip and `subEntityId` / `already-there` / `data-teams-host` each probe **1 in the old bundle and 1 in the new**, making a content probe structurally incapable of sizing this deploy gap (the trap `tickets/index.md` already warns about for `data-teams-theme`, arriving on the probe written to replace it); **one hypothesis raised and refuted rather than published**: the `/next/` stack is **87 commits ahead** of `main` (`autobuild/next-teams-focus-truth`), which looked like a rebuild-from-trunk **regressing** the client, but every runtime difference in `clients/mobile/src/web` is **Prettier re-wrapping** from the 08-25 hook commit and `ab65ee682` states it carried *"the last of our un-carried gui-app changes"* — note `git diff -w` **cannot** establish this, because re-wrapping moves tokens across line boundaries and `-w` is still line-based (it reported all **323** gui-app runtime files as differing), so the **minified bundle is the only honest comparator** and that is what the 92.3 % is measured on; **deliberately NOT done**: no dist commit was pushed — the deploy is an attended decision on a deallocated VM, and publishing a 92.3 %-identical rebuild into the branch the on-box pipeline fetches would put an unreviewed unattended build in the deploy path for no measured gain; host: the credential-lease storm is **live**, top five normalised lines **94.3 %** of **72,462** (42.7 % `EpicTokenRefresher` + the Tiptap rebuild loop — **two** loops, as 09-20 04:15 established, not one), last line **00:16:46**, level census **0 ERROR / 68,734 WARN**, and it stays **unactionable here** — it is in the host binary, not this repo; fleet **115 agents, 0 active**, nothing **blocked, errored or rate-limited**; ambient live: **`max`, 5-hour 0 %, 7-day 14 %** (capture clock matched the call clock, so a live read); landed `248c2fb59`; **two findings landed after the entry was written, both retiring a standing belief**: (1) **`main` is GREEN** — `ea874ce34` went green on **attempt 1** on all six workflows and **all 14** test jobs, `test (traycer-clients-gui-app shard 2)` **included**, so the era-77 red is **not** on main's tip; two attempts on one commit established *"reruns don't clear it"*, which is **not** the same claim as *"it survives into later commits"*, and the ledger had been carrying the stronger one — anchor a red on a **named commit**, never on "main"; the `@traycer-clients/desktop` job also passed on a **zero-TypeScript** commit, the exact shape said to provoke the backwards token-store watcher test; (2) **the credential-lease livelock is not as unpatchable as three entries have said** — the standing line is *"a repo-wide grep for `CredentialLeaseReleased` / `EpicTokenRefresher` returns nothing, it is in the host binary, this repo cannot patch it"*, and re-run the two halves answer **differently**: `EpicTokenRefresher` → **0 files** (the retry loop is genuinely host-binary), but `CredentialLeaseReleasedError` → **7 files**, **declared** at `protocol/src/auth/request-context.ts:69` and **thrown** at `:234`, `:243` and `clients/shared/auth/bearer-source.ts:69` — so the sentence 94.3 % of `host.log` is made of is thrown by **our** code and only *retried* by theirs; deliberately **not** upgraded to "therefore fixable here", which is the same unearned leap mirrored — whether the lease is released legitimately is **unmeasured**, and `request-context.ts:200-250` is where the next window should start
 
