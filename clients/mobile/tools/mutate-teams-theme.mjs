@@ -155,8 +155,15 @@ const MUTATIONS = [
     file: MAIN,
     suite: "teams",
     what: "the entry point stops passing onTheme — THE SHIPPED DEFECT, verbatim: the shell decodes a theme that reaches nothing",
-    find: `  void initializeTeamsHost({\n    onTheme: (theme) => {\n      setHostThemeOverride(teamsThemeToResolved(theme));\n    },\n  }).then((state) => {`,
-    replace: `  void initializeTeamsHost({}).then((state) => {`,
+    // Matches the onTheme PROPERTY alone rather than the whole
+    // `initializeTeamsHost({...})` call. The original spanned the entire
+    // options object and so named every sibling callback by position: adding
+    // `onLinkOpener` and `onDeepLink` drifted it to zero matches, and the
+    // probe went on aborting at an unrelated control, so nobody learned that
+    // the mutation this file exists for had stopped being applied. Anchored
+    // on the one property it removes, further siblings cannot drift it again.
+    find: `    onTheme: (theme) => {\n      setHostThemeOverride(teamsThemeToResolved(theme));\n    },\n`,
+    replace: ``,
     mustRedden: "passes an onTheme handler to initializeTeamsHost",
   },
   {
