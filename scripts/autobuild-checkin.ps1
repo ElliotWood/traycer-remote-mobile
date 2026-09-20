@@ -159,8 +159,40 @@ Do this:
    tell one story, that is the host's actual state and it belongs in the entry
    whatever its level. A log that is 99% one warning is not a quiet log, it is
    a stuck one.
-5. Write what you did into the epic artifacts so the next run and the human can
-   both pick it up.
+5. Write what you did into `docs/autobuild/unreconciled-checkin-entries.md` on
+   `main` FIRST, and push it, BEFORE touching an epic artifact. That file is
+   the durable copy. The artifacts are not.
+
+   WHY, AND THE RULE THAT DECIDES IT (measured 2026-09-21 04:34, by a run that
+   destroyed the previous run's artifact work with its own tool call):
+
+     `EpicFileSync ... cloud repair complete ... writeCandidates=210` WRITES
+     the cloud's copy of all 210 artifacts OVER the disk. An edit the cloud
+     does not hold is deleted - no error, no diff, and the repair line reads
+     as routine. An edit survives ONLY if `EpicFileSync` was RUNNING when you
+     made it. Between `stopping file sync` and the next `starting`, a write to
+     an artifact is a DEAD WRITE WITH A DELAY FUSE: it is on disk, `grep`
+     confirms it, and it dies at the next open.
+
+     THE TRIGGER IS YOUR OWN `agent send`. `host.log` names it:
+     `ChatSession: opening ... openerConnection=agent-send-message:<id>`,
+     then `starting file sync` 521 ms later, then the repair. Step 2 above
+     asks you to message agents, so an ordinary check-in IS the opener. Two
+     of this epic's artifact losses are a check-in's own tool call.
+
+   So, before editing any artifact:
+
+     Select-String -Path C:\Users\gigaf\.traycer\host\host.log `
+       -Pattern 'EpicFileSync' | Select-Object -Last 3
+
+   Last line `stopping file sync` / `file sync stopped` -> DO NOT EDIT the
+   artifact; the ledger on `main` is the whole record for this run. Last line
+   `file sync ready` -> edit now, and say in your entry that survival is
+   UNMEASURED until a repair tests it. If you need a window, send one agent
+   message FIRST and edit after `file sync ready` - never the other way round.
+   (`agent send` without `--expect-reply` still starts a provider turn on the
+   recipient and spends their tokens. It is not a free notification.)
+
    BUT: you read those artifacts at the START of a turn that runs for a long
    time, and other agents edit them WHILE you work. A whole-file Write of a
    copy you read an hour ago succeeds silently and destroys everything since -
