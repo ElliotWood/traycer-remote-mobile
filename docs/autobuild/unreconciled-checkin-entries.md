@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and three** entries in this
+everything came down, nothing went up. The **one hundred and four** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and three**. Three count sites remain in this header: this
+on this file → **one hundred and four**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,7 +44,7 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and three entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and four entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
@@ -78,7 +78,7 @@ That entry recorded `Pre-write size: **191,722 B**` for `traycer-remote-teams/au
 
 So the check could not have returned anything else, and the reason is in the header six lines above the entry that posed it: *"**do not write check-in entries there**"*. The 12:15 run correctly did not write to that artifact; it then asked whether its write had survived. Both of its branches presuppose a write that never happened, which is [[measurements-need-three-states]] arriving at a survival check — **absent** was not on the ballot.
 
-**The survival question it meant to ask has a different subject, and that one passes.** This file is the only copy, it lives on `main` where the repair cannot reach it, and the 12:15 entry plus its addendum are present: **1,374,617 B, 105 entries**, `main` == `origin/main` at `e6b81a6a7`. **The `main` copy is the survival mechanism** — there is no artifact-side reading to take, and future entries should stop scheduling one.
+**The survival question it meant to ask has a different subject, and that one passes.** This file is the only copy, it lives on `main` where the repair cannot reach it, and the 12:15 entry plus its addendum are present: **1,374,617 B, 103 entries**, `main` == `origin/main` at `e6b81a6a7`. **The `main` copy is the survival mechanism** — there is no artifact-side reading to take, and future entries should stop scheduling one.
 
 ### Fleet, and what the list still cannot tell you
 
