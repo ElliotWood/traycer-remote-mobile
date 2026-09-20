@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and four** entries in this
+everything came down, nothing went up. The **one hundred and five** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and four**. Three count sites remain in this header: this
+on this file → **one hundred and five**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,80 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and four entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and five entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-20 20:15 — **the repair this file was built to survive fired again, on a different artifact, in the middle of this run — and the artifact's own revert detector read "not reverted" straight through it**: `traycer-remote-teams/tickets/index.md` measured **75,748 B** when this run read it at 20:15 and **~73,290 B** when the same run re-read it at **20:25**, with `grep -c '2026-09-18'` → **0** and `grep -ci 'deallocat'` → **0** — the entire `🛑 THE VM IS OFF` banner filed by the **2026-09-18 08:15** check-in, Azure activity-log derivation and all, was destroyed **while this session had the file open**; the header of *that* file carries a detector — *"if the table below does not carry a T1b row, this file has been reverted"* — and the **T1b row survived both versions**, so the detector reported healthy across the exact event it was written for, because it anchors on content from **08-03**, older than anything that was ever at risk; this is the **second** artifact to take the `liveArtifacts=210` repair (the first, `traycer-remote-teams/autobuild/index.md`, is why this file exists), which retires the idea that the repair is a historical event of 2026-08-26 — it is **live**, and the blast radius is *every* epic artifact, not the one that has already been hit; a **working** detector is `grep -c '2026-09' index.md` → 0 means rolled back past September; the banner was re-applied from a **fresh live `az` read** rather than copied forward, and re-applied **better**: **`altra-vm-traycer-host-aue` is `PowerState/deallocated`**, deallocated **2026-08-19 03:16:34 UTC** by `elliot.wood@altra.cloud` with **no `Start` after it**, now **32 days** — an **attended** decision that no check-in will take; separately an agent **holding a role** was found carrying an **expired liveness claim** and was corrected; **P4's residue is three items, not one**, and the first of them is **not blocked at all**; fleet **115 agents, 0 active**, four roles claimed, **nothing blocked, errored or rate-limited**; ambient live: **`max`, 5-hour 4 %, 7-day 14 %**; the 16:15 entry's load-bearing-working-tree hazard is **measured closed**
+
+### The role-holder was asserting a live VM that has been off for a month — and the original measurement was sound
+
+`Teams Help tab` (`384c05a4-…`, one of four claimed roles) closed its last turn with *"Everything from the last turn stands: the fix is live on the VM (`bot.cjs` sha `b52e4cfb`, byte-identical to my build, `"--permission-mode", permissionMode]` present in the deployed bytes, service active, healthz 200)."*
+
+**The deploy was real.** `git log -1 875281d5` → **2026-08-10 11:05 +1000**. The VM was deallocated **2026-08-19 03:16:34Z** — **nine days later**. So nothing about the original work is in question: `bot.cjs` is intact on a disk that is not running.
+
+What failed is the **carry-forward**. "Still deployed" and "still live" are different claims, and the closing line merges them; a liveness read **expires**, and re-asserting it in a new turn without re-measuring is the same hollow green as this log's `[ERROR] = 0`. The cost is concrete rather than theoretical — the agent's own first next-step is *"Start a fresh assessment and confirm it runs past the first tool call without asking"*, which is **unrunnable**: the permission-mode fix applies at dispatch and there is no process to dispatch. Its other two next-steps (the AI prefill, the proactive completion reply) are fork-owned code in `clients/teams-help` + `clients/teams-bot` and are **not** blocked.
+
+Corrected by `traycer agent send --to 384c05a4-…` with the live `az` reading, the nine-day arithmetic, and the per-item blocked/not-blocked split, marked no-reply-needed so it does not spend a turn acknowledging.
+
+### P4's residue is three items, and filing them as one hid available work for 27 days
+
+The destroyed banner filed *"rebuild and redeploy the `/next/` bundle"* as a single **not-actionable** item, reasoning that *"the rebuild would need `clients/mobile/vite.config.web.ts`, which left `main` on 08-05 in any case."* **False, and re-derived rather than quoted:**
+
+```
+git ls-tree -r origin/main --name-only | grep -c '^clients/mobile/'             → 100
+git ls-tree -r origin/main --name-only | grep -c 'clients/mobile/vite.config.web.ts' → 1
+git ls-tree -r origin/main --name-only | grep -c 'clients/mobile/.env.example'      → 1
+git ls-tree -r origin/main --name-only | grep -c '^clients/teams-tab/'         →   0
+```
+
+`clients/mobile` was restored **2026-08-24** by `8f9785fd8`; `teams-tab` is genuinely gone. The **real** rebuild blocker was the six unsupplied `TRAYCER_WEB_*` variables, filed in `0896c0764` and **fixed** by `d757891af` (`clients/mobile/.env.example`).
+
+| P4 residue | State | Gated on |
+| --- | --- | --- |
+| rebuild the `/next/` bundle | ✅ **actionable now, builds green** | nothing |
+| deploy it | 🛑 blocked | the deallocated VM — **attended** |
+| app-package install | 🛑 blocked | the **exempted** shortcut |
+
+Only the middle row is what the VM banner is about. The standing goal — Teams client parity with the mobile PWA — is blocked at **deploy**, not at build, and `az vm start -g altra-rg-traycer-aue -n altra-vm-traycer-host-aue` is the whole of the attended decision.
+
+### The 16:15 hazard is closed, measured — the dirty working tree is no longer load-bearing
+
+That entry retargeted the scheduled task and warned its own fix creates the inverse trap. Both halves verified this run:
+
+| Check | Reading |
+| --- | --- |
+| Task `-File` | `C:\repo\wt-guiapp-main\scripts\autobuild-checkin.ps1` |
+| `wt-guiapp-main` branch / tracked state | `main`, clean (only untracked `scratch/`) |
+| `diff origin/main:scripts/autobuild-checkin.ps1` vs `$WorkDir` copy | **0 changed lines**, 415 lines both |
+| `scripts/autobuild-checkin.missed-windows.test.ps1` on `origin/main` | **present** |
+| `missed-windows.test.ps1` run | **6/6 ok** |
+
+So `$WorkDir`'s `M scripts/autobuild-checkin.ps1` is now a **stale copy of work already on `main`**, not the only copy of anything — `git checkout -- scripts/` there is safe today and was not yesterday. Left in place rather than reverted: reverting it would put the *old* 09-09 bytes in that worktree, which is strictly worse than a redundant-but-current copy.
+
+### Host: the two-loop livelock is running, day ~26, and the level census still cannot see it
+
+Dominant-line count over the **whole** of `host.log` (never `tail -N`), 72,216 lines:
+
+| Share | Line |
+| --- | --- |
+| 42.6 % | `[WARN] EpicTokenRefresher: batch threw for epic=9c9ddaf0-…: CredentialLeaseReleasedError: No live request context retained for user X` |
+| 19.9 % | `[WARN] Tiptap room artifact-room-9c9ddaf0-…-X stayed disconnected; rebuilding provider` |
+| 19.5 % | `[WARN] Failed to rebuild Tiptap provider for room artifact-room-…-X: …` |
+| 6.2 % | `[WARN] Tiptap room X stayed disconnected; rebuilding provider` |
+| 6.1 % | `[WARN] Failed to rebuild Tiptap provider for room X: …` |
+
+**Top five = 94.4 %**, top one only **42.6 %** — a single-line threshold still reads clean. Level census **68,533 WARN / 37 INFO / 0 ERROR**, so the retired `[ERROR] = 0` row would still report health. Host is **live** (last line 20:17:47, mtime current). A repo-wide grep for `CredentialLeaseReleasedError` / `EpicTokenRefresher` over `.ts` + `.tsx` returns **nothing** — host binary, **this repo cannot patch it**; re-derived this run rather than carried.
+
+### Fleet, and why nothing was launched
+
+115 agents, **0 active**. Four roles claimed, all four holders' transcripts read to their tails: `Upstream merge into main` (merge rests with Elliot), `Mobile host switcher` (both jobs delivered), `Teams card design` (*"Nothing pending on my side"*), `Teams Help tab` (corrected above). **None blocked, errored or rate-limited** — so step 1 of the check-in had no rescue to perform, and the one intervention available was a correction, not a launch.
+
+`main` remains **RED** on `test (traycer-clients-gui-app shard 2)` — `providers-settings-panel.test.tsx`, **39 of 74**, a Radix modal left open `aria-hiding` the page. Not re-run and not fixed, both deliberately: two attempts already established reruns are not the lever, and the file is upstream-owned (`#967`, `#976`), so a fork edit buys a conflict path into the upstream merge for a defect that is not ours.
 
 ## 2026-09-20 16:15 — **the unattended check-in has been running out of uncommitted working-tree state for eleven days, and every health signal it emits is downstream of the file that was at risk**: the scheduled task's `-File` pointed into `$WorkDir`, whose branch `traycer/chat-transfer` is **538 behind `main`** and last took a commit to this script on **09-09** (`cd0842bbd`), so the **six** script commits that landed on `main` between 09-16 and today 08:21 — `0044c4e4c` + `ea61c192d` + `d232cf9e0` (the entire missed-window detector), `cbf9b3068` (retiring the `[ERROR]=0` probe), `6b4c7b555` (the token dead band), `a71bb507f` (this morning's rate-limit fix) — reached the scheduler **only** because each run edited that worktree's copy in place and landed the same bytes through `wt-guiapp-main`; the resulting dirty file measured **byte-identical** to `origin/main`'s, which is exactly why it never read as a hazard, and it was **load-bearing**: one `git checkout -- scripts/` in that worktree would have reverted the every-four-hours unattended run by **eleven days** and six improvements **with no symptom at all**, because **a script that is merely OLD fails nothing** — the same shape as this log's own `[ERROR] = 0` and its missing-test-file; fixed at the root rather than by re-copying, and the 12:15 entry's `PENDING` is answered as a **third state its two branches did not include**; fleet **idle**, **0 active** of 115, nothing blocked, errored or rate-limited; ambient live: **`max`, 5-hour 10 %, 7-day 13 %**; era-75 (`e6b81a6a7`) green on attempt 1 on all six, tally **75 / 56 / 19**
 
