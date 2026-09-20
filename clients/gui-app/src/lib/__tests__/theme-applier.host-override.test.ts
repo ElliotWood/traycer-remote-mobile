@@ -2,6 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThemeMode } from "@/stores/settings/settings-store";
 
 /**
+ * NOT named `theme-applier.test.ts`, and that is deliberate - do not "tidy" it
+ * back. `upstream/main` carries its OWN 151-line `theme-applier.test.ts`
+ * (`describe("theme applier")`: custom accent, contrast, built-in restore),
+ * absent from our merge base, so the two are an ADD-ADD conflict on one file
+ * name with ZERO overlapping cases. Measured 2026-09-21: restoring this file
+ * under the colliding name took the upstream merge surface from 61 paths to
+ * 62, and the instinct on an add-add is to resolve it by keeping one side -
+ * which silently deletes either their accent coverage or all 11 rows below.
+ * Under this name both files simply merge, and nothing has to be chosen.
+ *
  * `theme-applier.ts` owns the `<html>` theme cascade and installs itself at
  * module load off module-level state (`systemTheme`, `hostThemeOverride`), so
  * every test here re-imports it under `vi.resetModules()` rather than sharing
