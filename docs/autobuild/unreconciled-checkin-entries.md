@@ -125,6 +125,35 @@ FAIL clients/desktop/src/electron-main/auth/__tests__/file-token-store.test.ts:3
 
 **Filed, not fixed — deliberately.** `clients/desktop` is upstream code (`#556` introduced the store, `#836` the repair that gave §4 its watcher, `#811` the home sandbox), and the fork's merge with upstream is already the epic's expensive open item. Rewriting an upstream test here buys a green that was never in doubt and adds a conflict path to that merge. **The fix belongs upstream**: either delete the test with §4's stub era, or invert it to await one `TokenStoreChange` and assert the revision. Recorded here so the next red on this job is recognised in one read instead of re-derived.
 
+### Addendum II — `main` is RED and this run could not clear it: an open modal is `aria-hidden`-ing the page out from under 39 tests
+
+**State at close: `main` (`8b8c089e4`, era-77) fails `Tests` on `test (traycer-clients-gui-app shard 2)`, on attempts 1 AND 2.** This is **not** the era-76 desktop flake and **not** the known shard-2 timeout family — there are **zero** `Test timed out` lines. Reruns do not clear it. Said plainly because the alternative is a ledger that records a green nobody has.
+
+**The control makes this strange, and the control is the point.** era-76 (`bdeafafeb`) ran shard 2 at 06:34 and reported **264 files, 2910 tests, 2910 passed**. era-77 ran **the same 264 files and the same 2910 tests** at 06:45 and again at 06:57, and reported **39 failed | 2871 passed** both times. The diff between those two commits is **docs-only** — no TypeScript, no lockfile, no workflow. Same code, same test set, green then reproducibly red eleven minutes later.
+
+**The mechanism is in the DOM the failure printed, not in the assertions.** Every failure is in one file, `providers-settings-panel.test.tsx` (74 tests, 39 failed), and the dump shows:
+
+```
+<body data-scroll-locked="1" style="pointer-events: none;">
+  <span data-radix-focus-guard="" ... />
+  <section ...><header aria-hidden="true" data-aria-hidden="true">
+```
+
+That is **a Radix modal left open** — body scroll-locked, pointer events off, everything outside the modal `aria-hidden`. Both failure shapes follow from it directly, and neither is about the thing it names:
+
+| Failure text | Count | What it actually means |
+| --- | --- | --- |
+| `Unable to find an accessible element with the role "button" and name "Link account"` | 21 | the page is `aria-hidden`, so **no** role query can match — the button is present and unreachable |
+| `expected "vi.fn()" to be called at least once` / `1 times, but got 0` | 13 | the click landed on `pointer-events: none` |
+
+**The distribution confirms it and rules out the obvious rival.** If an earlier test had simply poisoned everything after it, the failures would be a contiguous tail. They are not: the first failure is at index **27 of 74**, and tests *after* it still pass. **The failures select on query type, not position** — role-based and click-based cases fail, everything else passes, which is precisely the footprint of an `aria-hidden` + `pointer-events:none` page lock rather than of ordering damage.
+
+**Not established, and stated as such:** *why* the modal is left open at 06:45 and was not at 06:34, on identical code. A local reproduction was attempted and abandoned — the vitest forks pool fails to start a worker on this Windows checkout (`Failed to start forks worker`, before any test runs), which is an environment fault and **not** evidence about the test either way. So: mechanism **measured**, trigger **unmeasured**. Not "intermittent" — that word would smuggle in a claim about the trigger that nothing here supports.
+
+**Filed, not fixed, same reasoning as Addendum I and with the same cost in mind.** `providers-settings-panel.test.tsx` is upstream code (`#967` overhauled the pane, `#976` added the rail filter); a local fix buys a green on a fork whose upstream merge is already the epic's expensive open item. The upstream fix is an `afterEach` that closes/unmounts the dialog, or asserting through the modal's own container rather than the document.
+
+**Left red deliberately, and the next run should not spend its window on reruns.** Two attempts is enough to establish that rerunning is not the lever. **Pushing this entry makes era-78, which will red on the same shard** — that is expected, not a new finding.
+
 ## 2026-09-20 12:15 — **the trunk's Teams theme seam has never had a test, and the probe built to guard it spent that whole time aborting on a control that does not exist**: `setHostThemeOverride` is the entire mechanism behind `teams-host.ts`'s *"theme IS applied now"* — the second source for the light/dark signal, the thing that stops a dark-Teams user on a light OS getting a light tab — and it reached `main` in `8f9785fd8`, the 08-24 restore, while its **252-line, 11-case** test did not; `git log main -- <path>` is **empty**, so this was never a deliberate removal, and `main`'s copy of the source is **byte-identical** to the 14 branches that still carry the test (one blob, `eb3ea5e9`, on all of them); nothing failed, because **a missing test file fails nothing** — CI has been green on a seam with zero coverage; `mutate-teams-theme.mjs` names that very file as its `applier` **control**, vitest exits **1** on zero matched files, and the probe read that as *"the applier suite is RED before any mutation"* and aborted, skipping **all 12** mutations, **six** of them the applier's — it aborted loudly and non-zero exactly as designed, and still could not tell a **missing** control from a **failing** one; **MUT-8 had drifted independently**, its pattern spanning the whole `initializeTeamsHost({...})` call and so naming every sibling by position, so adding `onLinkOpener` and `onDeepLink` took it to zero matches — the probe's own match-exactly-once guard would have caught it on the run it never reached; both repaired, and the probe now reads **12/12 caught by their named test, 0 survivors**, both controls green; scoped by root cause rather than symptom — **27** test files are on that branch and not on `main`, and for **26** of them the subject is absent from `main` too, leaving **exactly one** that arrived as source-without-test; separately the 08:15 entry's own fix has a side effect it did not record — `list-profiles` is **write-through, not permanently empty**, and four hours on it replayed that window's capture as `ok`/`authenticated`; fleet **idle**, **0 active** of 115, nothing blocked or errored; ambient live: **`max`, 5-hour 13 %, 7-day 11 %**; era-73 green on attempt 1 on all six, tally **73 / 54 / 19**
 
 **The cache the previous fix fills, and the shape of the trap it leaves.** The
