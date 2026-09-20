@@ -130,6 +130,37 @@ trunk; checked per file, exactly one was.
 restored suite and the re-anchored MUT-8. The mutation tool is a probe and not
 a gate, so nothing in CI runs it — the 11 restored cases are what CI gains.
 
+**Addendum, measured after the entry was pushed — the sweep this generalises
+to, and the one thing it found.** The per-file check above was run against a
+single branch. Repeated across **every** local branch: the union of test files
+under `clients/` is **1,625**, `main` carries **1,443**, so **182** exist on a
+branch and not on the trunk. Filtered by the same rule — *is the subject on
+`main`?* — that collapses to **exactly one**:
+`clients/teams-bot/src/read-surface/read-surface-handler.test.ts`.
+
+**And it is NOT the same defect, which is the point of checking.** For
+`theme-applier` the source was byte-identical across `main` and all 14
+branches, so the test was simply left behind. Here the source **differs** —
+`main:df065593` against `autobuild/conversational-bot:86cc5abb` — so that test
+was written against a handler `main` does not have, and restoring it would
+assert against a version of the module that does not exist on the trunk. It is
+live branch work, not a dropped file. **Left alone deliberately**; a window
+that had pattern-matched on "test on a branch, source on main" would have
+landed it.
+
+What the sweep does leave on the record: `read-surface-handler.ts` is the T2
+read surface's entry point (421 lines, exports `createReadSurfaceHandler`) and
+has **no direct test on `main`**, while **12** sibling modules in the same
+directory do. The tickets table calls T2 *"Built + tested"*. That is true of
+the surface's parts and not of the handler that assembles them — and the one
+test that names it belongs to a branch whose copy has already diverged, so the
+coverage cannot simply be merged over.
+
+**CI, era-74 `3ac38262b`:** green on attempt 1 on all six. Tally
+**74 / 55 / 19**. This is the first tree in this stretch that is not
+docs-only — it adds a 252-line vitest file under `clients/gui-app` — so the
+`Tests` green is the one that actually exercised the change.
+
 ## 2026-09-20 08:15 — **step 1 has asked for rate-limited agents for 101 entries, and the command the check-in names for it cannot answer the question**: `agent list-profiles claude` is the CACHED view and the cache is empty — it returns `rateLimitStatus:"unknown"`, `usageUpdatedAt:null` for **both** profiles, so reading it as "nobody is limited" is the same hollow probe as `[ERROR] in host.log = 0`; the command that does work, `agent profile-rate-limits`, carried a standing warning in this check-in's own prompt that it only replays a cached capture, and that warning is **FALSE** — two calls **5 s apart** returned `usageUpdatedAt` **5 s apart**, each equal to the call clock to the second (08:18:42, 08:18:47); under the live read the fleet is genuinely **not** rate-limited — ambient is `subscriptionType:"max"`, **5-hour 3 %**, **7-day 9 %** — while **Altra is `unauthenticated`**, not busy, so the standing "fail over to Altra" advice would move a blocked agent onto a profile that cannot sign in; era-70 green on attempt 1 on all six, tally **70 / 51 / 19**
 
 **The gap, and why 101 entries did not see it.** Step 1 of this check-in's own
