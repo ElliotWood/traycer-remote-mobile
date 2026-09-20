@@ -28,7 +28,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,7 +49,10 @@ const SUITES = {
       "run",
       "--config",
       "vitest.config.ts",
-      "src/lib/__tests__/theme-applier.test.ts",
+      // NOT `theme-applier.test.ts` - that name belongs to upstream's own
+      // suite for this module, and ours was renamed off it to retire an
+      // add-add merge conflict. See the header of the file below.
+      "src/lib/__tests__/theme-applier.host-override.test.ts",
     ],
   },
   teams: {
@@ -252,6 +255,27 @@ function abort(message) {
   console.error(`ABORT: ${message}`);
   console.error("Source restored. This is NOT a pass.");
   process.exit(2);
+}
+
+// A suite file that does not EXIST makes vitest exit 1 on zero matched files,
+// which arrives here as an ordinary red and gets reported as "the suite is RED
+// before any mutation" - a true sentence about the wrong cause, and one that
+// sends the reader to debug a suite rather than to restore a file. That is not
+// hypothetical: it aborted all 12 mutations on 2026-09-20 when the applier
+// suite was absent from `main`, and again on 2026-09-21 when that suite was
+// renamed. Distinguish the two before running anything.
+for (const [name, suite] of Object.entries(SUITES)) {
+  for (const arg of suite.args) {
+    if (!/\.test\.tsx?$/.test(arg)) continue;
+    const file = resolve(suite.cwd, arg);
+    if (!existsSync(file))
+      abort(
+        `the ${name} suite names a test file that does not exist: ${arg}\n` +
+          `  (looked in ${suite.cwd})\n` +
+          `  This is a MISSING control, not a failing one - restore or rename ` +
+          `the file rather than debugging the suite.`,
+      );
+  }
 }
 
 // The control. A probe whose baseline is red measures nothing, and every
