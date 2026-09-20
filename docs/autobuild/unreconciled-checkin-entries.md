@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and two** entries in this
+everything came down, nothing went up. The **one hundred and three** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and two**. Three count sites remain in this header: this
+on this file → **one hundred and three**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,91 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and two entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and three entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-20 12:15 — **the trunk's Teams theme seam has never had a test, and the probe built to guard it spent that whole time aborting on a control that does not exist**: `setHostThemeOverride` is the entire mechanism behind `teams-host.ts`'s *"theme IS applied now"* — the second source for the light/dark signal, the thing that stops a dark-Teams user on a light OS getting a light tab — and it reached `main` in `8f9785fd8`, the 08-24 restore, while its **252-line, 11-case** test did not; `git log main -- <path>` is **empty**, so this was never a deliberate removal, and `main`'s copy of the source is **byte-identical** to the 14 branches that still carry the test (one blob, `eb3ea5e9`, on all of them); nothing failed, because **a missing test file fails nothing** — CI has been green on a seam with zero coverage; `mutate-teams-theme.mjs` names that very file as its `applier` **control**, vitest exits **1** on zero matched files, and the probe read that as *"the applier suite is RED before any mutation"* and aborted, skipping **all 12** mutations, **six** of them the applier's — it aborted loudly and non-zero exactly as designed, and still could not tell a **missing** control from a **failing** one; **MUT-8 had drifted independently**, its pattern spanning the whole `initializeTeamsHost({...})` call and so naming every sibling by position, so adding `onLinkOpener` and `onDeepLink` took it to zero matches — the probe's own match-exactly-once guard would have caught it on the run it never reached; both repaired, and the probe now reads **12/12 caught by their named test, 0 survivors**, both controls green; scoped by root cause rather than symptom — **27** test files are on that branch and not on `main`, and for **26** of them the subject is absent from `main` too, leaving **exactly one** that arrived as source-without-test; separately the 08:15 entry's own fix has a side effect it did not record — `list-profiles` is **write-through, not permanently empty**, and four hours on it replayed that window's capture as `ok`/`authenticated`; fleet **idle**, **0 active** of 115, nothing blocked or errored; ambient live: **`max`, 5-hour 13 %, 7-day 11 %**; era-73 green on attempt 1 on all six, tally **73 / 54 / 19**
+
+**The cache the previous fix fills, and the shape of the trap it leaves.** The
+08:15 entry concluded that `list-profiles` *"cannot fail: whatever the true
+state, both rows read `unknown`"*. That is true of a **cold** cache and not of
+the command. Three reads this window, in order:
+
+```
+12:16:32  list-profiles          ambient ok / authenticated   usageUpdatedAt → 08:18:42
+                                 Altra   unknown              usageUpdatedAt → 08:18:47
+12:17:21  profile-rate-limits    ambient (live)               usageUpdatedAt → 12:17:21
+12:17:26  profile-rate-limits    Altra   (live)               usageUpdatedAt → 12:17:26
+12:17:41  list-profiles          ambient ok / authenticated   usageUpdatedAt → 12:17:21
+                                 Altra   unknown / unauthenticated  →        12:17:26
+```
+
+The first read returned **the 08:15 window's own two live calls**, to the
+second, **four hours** after they were made, with no staleness marker — and
+returned them as `rateLimitStatus:"ok"`, `authStatus:"authenticated"`. So the
+hollow-probe risk is not the `unknown` the last entry found; `unknown` is
+visibly useless and nobody would act on it. It is **`ok`**, which looks
+authoritative and which the recommended fix **manufactures**: every window that
+now correctly runs `profile-rate-limits` leaves behind a cache that reads
+healthy for the next one. The discriminator is not the field's value but
+**`usageUpdatedAt` against the wall clock**, and the third read proves the
+mechanism rather than asserting it — both stamps moved to *this* window's calls.
+[[stale-facts-need-derivations]] with the stale fact inside the tool.
+
+**The seam, and why a green suite said nothing about it.** `teams-host.ts`
+carries a long note that the theme *is* applied now, through a seam the file
+had previously called missing. That note is correct: `setHostThemeOverride` is
+on `main`, `main.tsx` calls it on both channels (the `?theme={theme}` URL
+parameter before first paint, the SDK handshake for later changes), and the
+manifest carries the parameter. Every end is present. What is absent is any
+test of the seam **on the trunk** — the 11 cases live only on branches, and
+`git ls-files | grep theme-applier` on `main` returns the source alone. This is
+[[both-ends-green-seam-untested]] where the seam is not a wire format but a
+file that was simply not copied.
+
+**What the probe could not say.** The abort message was *"the applier suite is
+RED before any mutation"*. Run directly, that suite answers `No test files
+found, exiting with code 1` — a **filter that matched nothing**, which the
+probe's exit-code check cannot distinguish from a genuine failure. It is
+[[structural-checks-pass-well-formed-wrong-values]] inverted: a well-formed
+*failure* standing in for an absence. The probe was right to stop and right to
+exit non-zero; the gap is that "red" and "not there" are one state to it.
+
+**The measured result.** After restoring the file and re-anchoring MUT-8 on the
+`onTheme` property alone (`onTheme:` occurs exactly once in `main.tsx`, so
+further siblings cannot drift it again):
+
+```
+control (unmutated) applier ... green
+control (unmutated) teams   ... green
+MUT-1 … MUT-12 each caught by its named test
+12/12 caught by their named test, 0 survivors
+```
+
+The restored suite is therefore **discriminating, not merely present** — five
+applier mutations are each caught by a *different* named case, which is the
+check [[red-tests-can-be-non-discriminating]] asks for. Standalone the file is
+11/11; run with its 42 neighbours in `src/lib/__tests__/` it is 43 files / 432
+tests green, so it does not contaminate them despite installing its own
+`matchMedia`.
+
+**Why this is one file and not twenty-seven.** The branch/`main` test-file diff
+is 27 entries, which reads like a restore that dropped a package's tests. It is
+not: for **26** of them the *subject* is also absent from `main` — they test
+upstream's responsive `gui-app` work (`mobile-*`, `switcher-*`,
+`use-virtual-keyboard-inset`) that this fork has not merged, matching the
+standing note that the 768px responsive client is upstream's and **0** on fork
+`main`. A file-set diff is not a coverage gap until the subject is on the
+trunk; checked per file, exactly one was.
+
+**Landed on `main` in one push** as `31206195f`, both halves together: the
+restored suite and the re-anchored MUT-8. The mutation tool is a probe and not
+a gate, so nothing in CI runs it — the 11 restored cases are what CI gains.
 
 ## 2026-09-20 08:15 — **step 1 has asked for rate-limited agents for 101 entries, and the command the check-in names for it cannot answer the question**: `agent list-profiles claude` is the CACHED view and the cache is empty — it returns `rateLimitStatus:"unknown"`, `usageUpdatedAt:null` for **both** profiles, so reading it as "nobody is limited" is the same hollow probe as `[ERROR] in host.log = 0`; the command that does work, `agent profile-rate-limits`, carried a standing warning in this check-in's own prompt that it only replays a cached capture, and that warning is **FALSE** — two calls **5 s apart** returned `usageUpdatedAt` **5 s apart**, each equal to the call clock to the second (08:18:42, 08:18:47); under the live read the fleet is genuinely **not** rate-limited — ambient is `subscriptionType:"max"`, **5-hour 3 %**, **7-day 9 %** — while **Altra is `unauthenticated`**, not busy, so the standing "fail over to Altra" advice would move a blocked agent onto a profile that cannot sign in; era-70 green on attempt 1 on all six, tally **70 / 51 / 19**
 
