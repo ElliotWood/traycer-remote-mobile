@@ -54,6 +54,34 @@ deleting this one before reconciliation deletes the only copy.
 
 ## 2026-09-20 20:15 — **the repair this file was built to survive fired again, on a different artifact, in the middle of this run — and the artifact's own revert detector read "not reverted" straight through it**: `traycer-remote-teams/tickets/index.md` measured **75,748 B** when this run read it at 20:15 and **~73,290 B** when the same run re-read it at **20:25**, with `grep -c '2026-09-18'` → **0** and `grep -ci 'deallocat'` → **0** — the entire `🛑 THE VM IS OFF` banner filed by the **2026-09-18 08:15** check-in, Azure activity-log derivation and all, was destroyed **while this session had the file open**; the header of *that* file carries a detector — *"if the table below does not carry a T1b row, this file has been reverted"* — and the **T1b row survived both versions**, so the detector reported healthy across the exact event it was written for, because it anchors on content from **08-03**, older than anything that was ever at risk; this is the **second** artifact to take the `liveArtifacts=210` repair (the first, `traycer-remote-teams/autobuild/index.md`, is why this file exists), which retires the idea that the repair is a historical event of 2026-08-26 — it is **live**, and the blast radius is *every* epic artifact, not the one that has already been hit; a **working** detector is `grep -c '2026-09' index.md` → 0 means rolled back past September; the banner was re-applied from a **fresh live `az` read** rather than copied forward, and re-applied **better**: **`altra-vm-traycer-host-aue` is `PowerState/deallocated`**, deallocated **2026-08-19 03:16:34 UTC** by `elliot.wood@altra.cloud` with **no `Start` after it**, now **32 days** — an **attended** decision that no check-in will take; separately an agent **holding a role** was found carrying an **expired liveness claim** and was corrected; **P4's residue is three items, not one**, and the first of them is **not blocked at all**; fleet **115 agents, 0 active**, four roles claimed, **nothing blocked, errored or rate-limited**; ambient live: **`max`, 5-hour 4 %, 7-day 14 %**; the 16:15 entry's load-bearing-working-tree hazard is **measured closed**
 
+### The destroying event is named, not inferred — and the re-application is UNMEASURED, not saved
+
+`host.log` holds exactly **two** repair lines, and they bracket the loss:
+
+```
+[2026-09-20 20:24:27.206] [INFO] EpicFileSync 9c9ddaf0-…: cloud repair starting
+                                 trackedArtifacts=0 pendingWatcherEvents=0
+[2026-09-20 20:24:34.363] [INFO] EpicFileSync 9c9ddaf0-…: cloud repair complete
+                                 liveArtifacts=210 writeCandidates=210
+                                 bodyUnavailable=0 pendingPathSkips=0 trackedArtifacts=210
+```
+
+Read at **20:15** = 75,748 B with the 09-18 banner; repair completes **20:24:34**;
+re-read at **20:25** = ~73,290 B with `grep -c '2026-09-18'` → 0. So this is not
+"the file changed under me" — it is `writeCandidates=210` doing exactly what
+[[cloud-repair-overwrites-disk-edits]] documents, at a named second, to an
+artifact that had never been hit before. Note `trackedArtifacts=0` at **start**
+and `210` at **complete**: the watcher held nothing, so nothing on disk was ever
+a candidate to go **up**.
+
+**Status of the re-applied banner, stated in the three states rather than two:**
+the file is now **78,591 B**, mtime **20:26:22**, carrying the re-applied banner
+(×1), the `clients/mobile` correction (×1) and `deallocated` ×4 — but **no repair
+has run since that write**, so this is **unmeasured**, *not* survived. The next
+run must re-read it after the next `cloud repair complete` before claiming it
+held. The durable copy is this file, which is why the entry was pushed to `main`
+first and the artifact written second.
+
 ### The role-holder was asserting a live VM that has been off for a month — and the original measurement was sound
 
 `Teams Help tab` (`384c05a4-…`, one of four claimed roles) closed its last turn with *"Everything from the last turn stands: the fix is live on the VM (`bot.cjs` sha `b52e4cfb`, byte-identical to my build, `"--permission-mode", permissionMode]` present in the deployed bytes, service active, healthz 200)."*
