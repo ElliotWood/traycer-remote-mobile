@@ -26,6 +26,7 @@ import {
   stagingRootFromEnv,
 } from "./intake/attachment-staging";
 import { isKnownTimeZone } from "./intake/deadline";
+import { chatDeepLink } from "./intake/deep-link";
 import { DurableProactiveStore } from "./proactive/proactive-store";
 import { rememberProactiveTarget } from "./proactive/remember-target";
 import { pushWatchEvent } from "./proactive/push-notifications";
@@ -400,6 +401,20 @@ async function main(): Promise<void> {
                   adapter,
                   inboundAuthConfig.audience,
                   (appeared) => proactiveCardFor(appeared, Date.now()),
+                  // The SAME builder and the SAME config the intake ack used,
+                  // so the completion reply cannot point somewhere else than
+                  // the "Watch progress" link sitting above it in the thread.
+                  (finished) =>
+                    chatDeepLink(
+                      {
+                        tabBaseUrl:
+                          process.env.TRAYCER_TEAMS_TAB_URL?.trim() ?? "",
+                        teamsAppId:
+                          process.env.TRAYCER_TEAMS_APP_ID?.trim() ?? "",
+                      },
+                      finished.epicId,
+                      finished.chatId,
+                    ),
                 ),
                 now: Date.now,
                 onWarn: (message, detail) => {

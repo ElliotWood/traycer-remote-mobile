@@ -8,8 +8,10 @@
  * stops at its first tool call and waits for a tap from someone who has been
  * told to come back later. Observed live on 2026-08-09 — an assessment sat on
  * "Waiting on you: Bash — Search filesystem for smv4-related files" having
- * done no work, and because the completion reply is still unwired, nothing
- * said so.
+ * done no work, and because the completion reply was unwired at the time,
+ * nothing said so. The reply is wired now (`bridge watch` emits `finished`);
+ * the permission mode is still what decides whether there is anything to
+ * report.
  *
  * These assert on the ARGV the bot hands the bridge, because that is the whole
  * mechanism: `--permission-mode` either reaches the bridge or it does not.

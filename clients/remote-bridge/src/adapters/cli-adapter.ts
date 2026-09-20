@@ -185,7 +185,8 @@ export async function runTranscript(
 /**
  * Long-running: polls every tracked chat every `WATCH_POLL_MS` and prints one
  * {@link WatchEvent} JSON line per CHANGE — `appeared` when something starts
- * waiting on a human, `resolved` when it stops — until SIGINT/SIGTERM.
+ * waiting on a human, `resolved` when it stops, `finished` when a run ends —
+ * until SIGINT/SIGTERM.
  *
  * It previously printed every pending approval on every tick, which made
  * "someone is newly blocked" and "someone is still blocked" the same line

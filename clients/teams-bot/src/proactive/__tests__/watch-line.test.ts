@@ -80,4 +80,74 @@ describe("fields the send path depends on are required", () => {
     );
     expect(result.kind).toBe("event");
   });
+
+  it("accepts a finished event, so a completed run can be replied to", () => {
+    const result = parseWatchLine(
+      JSON.stringify({
+        type: "finished",
+        eventId: "run.finished:chat-1",
+        epicId: "epic-1",
+        chatId: "chat-1",
+        chatTitle: "Wipro retail",
+      }),
+    );
+    expect(result).toEqual({
+      kind: "event",
+      event: {
+        type: "finished",
+        eventId: "run.finished:chat-1",
+        epicId: "epic-1",
+        chatId: "chat-1",
+        chatTitle: "Wipro retail",
+      },
+    });
+  });
+
+  it("accepts a finished event with no chat title, which is a real case", () => {
+    // An untitled chat still finished, and dropping the event because the
+    // title is null would lose exactly the run nobody named.
+    const result = parseWatchLine(
+      JSON.stringify({
+        type: "finished",
+        eventId: "run.finished:chat-1",
+        epicId: "epic-1",
+        chatId: "chat-1",
+        chatTitle: null,
+      }),
+    );
+    expect(result.kind).toBe("event");
+  });
+
+  it("strips a stray `kind` rather than carrying it onto a finished event", () => {
+    /*
+     * `kind` names the two things that WAIT on a person. A finished run
+     * carries none, and if one survived parsing it would flow through every
+     * `kind === "approval.requested" ? … : …` branch in this package as the
+     * INTERVIEW case — silently, since those are ternaries and not switches.
+     *
+     * zod strips unknown keys by default, which is the behaviour relied on
+     * here rather than assumed: this asserts the parsed event, not that the
+     * line was rejected.
+     */
+    const result = parseWatchLine(
+      JSON.stringify({
+        type: "finished",
+        kind: "approval.requested",
+        eventId: "run.finished:chat-1",
+        epicId: "epic-1",
+        chatId: "chat-1",
+        chatTitle: null,
+      }),
+    );
+    expect(result).toEqual({
+      kind: "event",
+      event: {
+        type: "finished",
+        eventId: "run.finished:chat-1",
+        epicId: "epic-1",
+        chatId: "chat-1",
+        chatTitle: null,
+      },
+    });
+  });
 });

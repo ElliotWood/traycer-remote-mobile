@@ -19,7 +19,9 @@ import type { StoredConversationReference } from "../../state/conversation-refer
 import {
   approvalAppearedSchema,
   resolvedSchema,
+  runFinishedSchema,
   type ApprovalAppeared,
+  type RunFinished,
   type WatchEvent,
 } from "../watch-line";
 
@@ -60,6 +62,16 @@ function resolved(eventId: string, epicId: string): WatchEvent {
     eventId,
     epicId,
     chatId: "chat-1",
+  });
+}
+
+function finished(epicId: string): RunFinished {
+  return runFinishedSchema.parse({
+    type: "finished",
+    eventId: "run.finished:chat-1",
+    epicId,
+    chatId: "chat-1",
+    chatTitle: "Wipro retail",
   });
 }
 
@@ -330,5 +342,83 @@ describe("an epic with no bound conversation", () => {
     expect(h.sends.length).toBe(0);
     expect(h.store.hasSent("e1")).toBe(false);
     expect(h.warnings.length).toBe(1);
+  });
+});
+
+describe("a finished run reaches the person who asked for it", () => {
+  /*
+   * `wpro-retail-run`: an assessment ran for hours, produced a usable answer,
+   * and nothing delivered it. The conversation reference was captured at
+   * intake for exactly this and nothing consumed it.
+   */
+  it("sends, and records the send so the next tick does not repeat it", async () => {
+    const store = new FakeStore(["epic-1"]);
+    const h = harness(store, succeeds);
+
+    const first = await pushWatchEvent(h.deps, finished("epic-1"));
+    expect(first).toEqual({ kind: "sent", eventId: "run.finished:chat-1" });
+
+    // The bridge's own memory is process-lifetime; a restart re-announces.
+    // This durable set is the half that survives it.
+    const second = await pushWatchEvent(h.deps, finished("epic-1"));
+    expect(second).toEqual({
+      kind: "duplicate",
+      eventId: "run.finished:chat-1",
+    });
+    expect(h.sends.map((s) => s.event.type)).toEqual(["finished"]);
+  });
+
+  it("does not mark a failed completion as sent", async () => {
+    /*
+     * The ordering rule this file exists for, applied to the event it matters
+     * most for: an approval that fails to send is re-raised on the next
+     * appearance, but a run finishes ONCE. Marking a failed send as sent
+     * loses the answer permanently and silently — the original defect, now
+     * with the delivery path in place.
+     *
+     * Mutation: move `recordSent` above the `send`. This fails.
+     */
+    const store = new FakeStore(["epic-1"]);
+    const h = harness(store, failsWith(429));
+
+    const result = await pushWatchEvent(h.deps, finished("epic-1"));
+    expect(result.kind).toBe("failed");
+    expect(store.sentEventIds()).toEqual([]);
+    // Retryable, and the retry is what delivers it.
+    expect(store.boundEpics()).toEqual(["epic-1"]);
+  });
+
+  it("prefers the conversation that started the assessment over the epic route", async () => {
+    // The whole point of keying the reference by chat id: the answer goes
+    // back to whoever asked, not to whichever conversation happens to hold
+    // the epic.
+    const store = new FakeStore(["epic-1"]);
+    const asked: ProactiveTarget = {
+      reference: { ...REFERENCE, conversation: { id: "conv-asked" } },
+      boundAt: 2,
+    };
+    const h = harness(store, succeeds);
+    const targets: string[] = [];
+    const deps: PushDeps = {
+      ...h.deps,
+      resolveTarget: () => asked,
+      send: async (target) => {
+        targets.push(target.reference.conversation.id);
+      },
+    };
+
+    await pushWatchEvent(deps, finished("epic-1"));
+    expect(targets).toEqual(["conv-asked"]);
+  });
+
+  it("drops rather than swallows when there is nowhere to reply", async () => {
+    // Not recorded as sent: a route bound later still delivers the answer.
+    const store = new FakeStore([]);
+    const h = harness(store, succeeds);
+
+    const result = await pushWatchEvent(h.deps, finished("epic-unbound"));
+    expect(result).toEqual({ kind: "no-route", epicId: "epic-unbound" });
+    expect(store.sentEventIds()).toEqual([]);
+    expect(h.warnings).toHaveLength(1);
   });
 });

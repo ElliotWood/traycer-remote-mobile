@@ -45,7 +45,12 @@ import type {
   Entity,
 } from "@microsoft/agents-activity";
 import type { StoredConversationReference } from "../state/conversation-reference-store";
-import type { AppearedEvent, WatchEvent } from "./watch-line";
+import type {
+  AppearedEvent,
+  ResolvedEvent,
+  RunFinished,
+  WatchEvent,
+} from "./watch-line";
 import type { SendProactive } from "./push-notifications";
 import type { ProactiveTarget } from "./proactive-store";
 import { buildMentionedText, type MentionEntityOut } from "../teams/mention";
@@ -131,6 +136,44 @@ export function appearedLead(event: AppearedEvent): {
 }
 
 /**
+ * The completion reply — the thing `wpro-retail-run` is about.
+ *
+ * An assessment started from Teams ran for hours, produced a usable answer,
+ * and told nobody; Elliot came and asked for it. Everything needed to say so
+ * was already built — the conversation reference is captured at intake
+ * before anything that can fail, and the send path below has been waiting
+ * for an event. The missing piece was the bridge saying "it stopped".
+ *
+ * TAGGED, unlike `resolvedText`. That one is a courtesy withdrawal of a
+ * demand; this is the answer somebody asked for, and it is the one message
+ * in this file a person is actually waiting on. An untagged completion in a
+ * channel arrives silently, which is the defect with an extra step.
+ *
+ * NO CARD, deliberately. `render-card.ts` maps events onto cards the read
+ * surface already owns, and there is no "finished" card to own — inventing
+ * one here is exactly the second vocabulary that file's header forbids. The
+ * link is the whole payload, and it is the same `chatDeepLink` the intake
+ * ack already sent, so the two agree by construction.
+ *
+ * `link` may be `null` — no tab URL is configured, which is the current
+ * deployment. Then the message still goes: "it finished" with no link beats
+ * silence, and beats a dead button.
+ */
+export function finishedLead(
+  event: RunFinished,
+  link: string | null,
+): { readonly lead: string; readonly trail: string } {
+  const what = event.chatTitle === null ? "your assessment" : event.chatTitle;
+  return {
+    lead: "",
+    trail:
+      link === null
+        ? ` — ${what} has finished. Open it to read the result.`
+        : ` — ${what} has finished. Read the result: ${link}`,
+  };
+}
+
+/**
  * What the correction says when something stops waiting.
  *
  * Plain text, no card, no tag. The card above it cannot be refreshed —
@@ -138,7 +181,7 @@ export function appearedLead(event: AppearedEvent): {
  * request for a decision that was already made elsewhere from being the last
  * thing on screen.
  */
-export function resolvedText(event: WatchEvent): string {
+export function resolvedText(event: ResolvedEvent): string {
   return event.kind === "approval.requested"
     ? "That approval has been handled — nothing needed from you now."
     : "That interview has been answered — nothing needed from you now.";
@@ -172,6 +215,12 @@ export function createAdapterSend(
   adapter: CloudAdapter,
   agentAppId: string,
   renderCard: RenderProactiveCard,
+  /**
+   * The chat's deep link, or `null` when no tab URL is configured. Injected
+   * rather than built here for the reason `deep-link.ts` states: the bot and
+   * the tab are separately deployed and the link is configuration.
+   */
+  chatLink: (event: RunFinished) => string | null,
 ): SendProactive {
   return async (target: ProactiveTarget, event: WatchEvent): Promise<void> => {
     await adapter.continueConversation(
@@ -180,6 +229,24 @@ export function createAdapterSend(
       async (context: TurnContext): Promise<void> => {
         if (event.type === "resolved") {
           await context.sendActivity(MessageFactory.text(resolvedText(event)));
+          return;
+        }
+        if (event.type === "finished") {
+          const { lead, trail } = finishedLead(event, chatLink(event));
+          const mentioned = buildMentionedText(
+            target.mention ?? null,
+            lead,
+            trail,
+          );
+          // Text only — see `finishedLead` on why there is no card. Same
+          // two-halves-on-one-activity rule as the tagged branch below: a
+          // mention entity without the matching `<at>` markup renders as
+          // literal text and notifies nobody.
+          const activity = MessageFactory.text(mentioned.text);
+          if (mentioned.entities.length > 0) {
+            activity.entities = mentioned.entities.map(toActivityEntity);
+          }
+          await context.sendActivity(activity);
           return;
         }
         const { lead, trail } = appearedLead(event);

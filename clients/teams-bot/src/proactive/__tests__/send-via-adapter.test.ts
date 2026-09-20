@@ -6,7 +6,8 @@
  * runs, and drops the field. This asserts it did not.
  */
 import { describe, expect, it } from "vitest";
-import { toConversationReference } from "../send-via-adapter";
+import { finishedLead, toConversationReference } from "../send-via-adapter";
+import { runFinishedSchema } from "../watch-line";
 import type { StoredConversationReference } from "../../state/conversation-reference-store";
 
 const STORED: StoredConversationReference = {
@@ -49,5 +50,54 @@ describe("the bot -> agent rename", () => {
      */
     const reference = toConversationReference(STORED);
     expect(reference.user).toEqual({ id: "user-1" });
+  });
+});
+
+describe("what a finished run says", () => {
+  const finished = runFinishedSchema.parse({
+    type: "finished",
+    eventId: "run.finished:chat-1",
+    epicId: "epic-1",
+    chatId: "chat-1",
+    chatTitle: "Wipro retail",
+  });
+
+  it("names the chat and carries the link, because this IS the lock-screen preview", () => {
+    /*
+     * `wpro-retail-run`: "the deliverable ended up somewhere the requester
+     * does not look". A completion that does not say WHERE is the same
+     * failure one step later.
+     */
+    expect(finishedLead(finished, "https://tab.example/#/x")).toEqual({
+      lead: "",
+      trail: " — Wipro retail has finished. Read the result: https://tab.example/#/x",
+    });
+  });
+
+  it("still speaks when no tab URL is configured", () => {
+    /*
+     * The current deployment. `chatDeepLink` returns null rather than a link
+     * that goes nowhere, and a completion withheld for a missing link is the
+     * original defect preserved by a cosmetic one.
+     *
+     * Mutation: return early on `link === null`. This fails.
+     */
+    expect(finishedLead(finished, null)).toEqual({
+      lead: "",
+      trail: " — Wipro retail has finished. Open it to read the result.",
+    });
+  });
+
+  it("does not render a null chat title as the word null", () => {
+    const untitled = runFinishedSchema.parse({
+      type: "finished",
+      eventId: "run.finished:chat-2",
+      epicId: "epic-1",
+      chatId: "chat-2",
+      chatTitle: null,
+    });
+    expect(finishedLead(untitled, null).trail).toBe(
+      " — your assessment has finished. Open it to read the result.",
+    );
   });
 });

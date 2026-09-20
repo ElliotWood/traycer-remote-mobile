@@ -94,7 +94,39 @@ export type WatchEvent =
       readonly description: string | null;
       readonly requestedAt: number;
     })
-  | (WatchEventCommon & { readonly type: "resolved" });
+  | (WatchEventCommon & { readonly type: "resolved" })
+  /**
+   * A run that was going is no longer going — `running`/`stopping` → `idle`
+   * on a chat whose subscription is live.
+   *
+   * NOT a `WatchEventCommon`, and the missing field is the point: `kind` is
+   * typed as the two things that WAIT ON A PERSON, and a finished run is the
+   * opposite of that. Bolting it into that union would make every existing
+   * `kind` switch — the bot's card renderer and its resolved-correction text
+   * among them — silently acquire a third case they were written without.
+   *
+   * WHY THE BRIDGE AND NOT THE CONSUMER, again: completion is a TRANSITION,
+   * and a consumer polling `chat.status` sees only a level. "Idle" is
+   * indistinguishable from "idle since before you started watching", so a
+   * consumer that fired on the level would announce a completion for every
+   * chat in the epic the moment it connected.
+   *
+   * The id is `run.finished:<chatId>` — one per chat, not one per run. A
+   * counter would reset on restart and a clock is not available here (this
+   * module is pure by construction), and either would let a durable
+   * de-duplication set either miss a completion or announce a stale one. The
+   * cost is that a SECOND run in the same chat does not re-announce; that is
+   * the right trade for the case this exists for — an intake assessment is
+   * one chat, one run, one answer — and it fails toward silence on a repeat
+   * rather than toward a false completion.
+   */
+  | {
+      readonly type: "finished";
+      readonly eventId: string;
+      readonly epicId: string;
+      readonly chatId: string;
+      readonly chatTitle: string | null;
+    };
 
 /**
  * Derived, never minted.
@@ -116,6 +148,11 @@ export function interviewEventId(chatId: string, blockId: string): string {
   return `interview.requested:${chatId}:${blockId}`;
 }
 
+/** One per chat, deliberately — see the `finished` member of {@link WatchEvent}. */
+export function runFinishedEventId(chatId: string): string {
+  return `run.finished:${chatId}`;
+}
+
 /**
  * Turns consecutive observations of chat status into an event stream.
  *
@@ -128,6 +165,13 @@ export class WatchEventTracker {
     string,
     { readonly kind: WatchEventKind; readonly chatId: string }
   >();
+  /**
+   * Chats observed mid-run. Entry here is what licenses a `finished` event:
+   * a chat first seen `idle` was never seen to run, so it has not finished
+   * on our watch and announcing one would be a completion for work that
+   * ended before anyone was listening.
+   */
+  private readonly running = new Set<string>();
 
   /**
    * @param observed Every chat whose status was successfully read THIS tick.
@@ -136,6 +180,10 @@ export class WatchEventTracker {
    */
   diff(epicId: string, observed: readonly ChatStatus[]): readonly WatchEvent[] {
     const events: WatchEvent[] = [];
+    // Held back until after the resolved sweep below, so a tick that both
+    // clears an approval and ends the run reads in the order it happened:
+    // "that approval has been handled", then "it finished".
+    const finished: WatchEvent[] = [];
     const pendingNow = new Set<string>();
     const usableChats = new Set<string>();
 
@@ -143,6 +191,22 @@ export class WatchEventTracker {
       // Unknown, not empty. See the header.
       if (!status.connected) continue;
       usableChats.add(status.chatId);
+
+      // `stopping` is not finished — a cancellation still has to land, and
+      // calling it done would report an answer that is not there yet.
+      if (status.runStatus === "idle") {
+        if (this.running.delete(status.chatId)) {
+          finished.push({
+            type: "finished",
+            eventId: runFinishedEventId(status.chatId),
+            epicId,
+            chatId: status.chatId,
+            chatTitle: status.title,
+          });
+        }
+      } else {
+        this.running.add(status.chatId);
+      }
 
       for (const approval of status.pendingApprovals) {
         const eventId = approvalEventId(status.chatId, approval.approvalId);
@@ -204,6 +268,6 @@ export class WatchEventTracker {
       });
     }
 
-    return events;
+    return [...events, ...finished];
   }
 }

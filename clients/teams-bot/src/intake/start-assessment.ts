@@ -167,10 +167,16 @@ export function createStartAssessment(config: StartAssessmentConfig) {
      * someone is sitting in front of and wrong for this one. An assessment is
      * dispatched by a salesperson who has just been told the work is running
      * and to come back later; supervised means it stops at its FIRST tool call
-     * and waits for a tap from someone who has left. Nothing tells them —
-     * the completion reply is still unwired — so the run is stranded silently
-     * and indefinitely. Observed live: an assessment sat on "Waiting on you:
+     * and waits for a tap from someone who has left. Nothing told them — the
+     * completion reply was unwired — so the run was stranded silently and
+     * indefinitely. Observed live: an assessment sat on "Waiting on you:
      * Bash — Search filesystem for smv4-related files" having done nothing.
+     *
+     * THE COMPLETION REPLY IS NOW WIRED (`bridge watch`'s `finished` event →
+     * `proactive/push-notifications.ts`, routed by the reference
+     * `dispatch-assessment` captures below). That closes the silence at the
+     * END of a run; it does not make `supervised` correct for this one, which
+     * is about the run never STARTING.
      *
      * Scoped deliberately to this call rather than changed in the bridge's
      * default: every OTHER caller here is a person in a conversation, and for

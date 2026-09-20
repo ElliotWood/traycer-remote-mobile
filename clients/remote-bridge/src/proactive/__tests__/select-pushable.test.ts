@@ -83,7 +83,9 @@ describe("both blocking kinds push", () => {
       events: [approval("c1", "a1"), interview("c2", "b1")],
       alreadySent: EMPTY,
     });
-    expect(plan.push.map((e) => e.kind)).toEqual([
+    // `in` rather than `e.kind`: the union carries a `finished` member with
+    // no `kind`, deliberately — see `adapters/watch-events.ts`.
+    expect(plan.push.map((e) => ("kind" in e ? e.kind : null))).toEqual([
       "approval.requested",
       "interview.requested",
     ]);

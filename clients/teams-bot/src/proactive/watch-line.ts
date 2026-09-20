@@ -95,14 +95,32 @@ export const resolvedSchema = z.object({
   kind: watchEventKindSchema,
 });
 
+/**
+ * A run that was going has stopped — the event this bot exists to deliver for
+ * an intake assessment, and the one it was missing.
+ *
+ * NO `kind`, matching the bridge: `watchEventKindSchema` is the two things
+ * that WAIT ON A PERSON, and a finished run is the opposite of waiting.
+ * Giving it a `kind` would let it through every `kind === "approval.requested"
+ * ? … : …` branch in this package as the interview case, silently.
+ */
+export const runFinishedSchema = z.object({
+  ...eventCommon,
+  type: z.literal("finished"),
+  chatTitle: z.string().nullable(),
+});
+
 export const watchEventSchema = z.union([
   approvalAppearedSchema,
   interviewAppearedSchema,
   resolvedSchema,
+  runFinishedSchema,
 ]);
 
 export type ApprovalAppeared = z.infer<typeof approvalAppearedSchema>;
 export type InterviewAppeared = z.infer<typeof interviewAppearedSchema>;
+export type ResolvedEvent = z.infer<typeof resolvedSchema>;
+export type RunFinished = z.infer<typeof runFinishedSchema>;
 export type WatchEvent = z.infer<typeof watchEventSchema>;
 /** The two `appeared` members — the ones that can produce a notification. */
 export type AppearedEvent = ApprovalAppeared | InterviewAppeared;

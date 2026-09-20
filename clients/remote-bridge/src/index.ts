@@ -162,8 +162,10 @@ program
    * It exists because `supervised` — correct for a chat someone is sitting in
    * front of — silently strands one nobody is watching. An assessment
    * dispatched from Teams stops at its first tool call and waits for a tap
-   * from a person who has been told to come back later, and (until the
-   * completion reply is wired) is never told it stopped.
+   * from a person who has been told to come back later. `watch` now emits a
+   * `finished` event when a run ends, so a completed run does report itself —
+   * but a chat stranded before its first tool call never runs and so never
+   * finishes, which is why this option still matters.
    *
    * Validated against the list rather than passed through: an unrecognised
    * mode would otherwise reach the host inside a settings tuple and be

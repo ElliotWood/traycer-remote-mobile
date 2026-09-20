@@ -21,6 +21,7 @@ import {
   WatchEventTracker,
   approvalEventId,
   interviewEventId,
+  runFinishedEventId,
   type WatchEvent,
 } from "../watch-events";
 
@@ -210,7 +211,9 @@ describe("the two blocking kinds stay distinguishable", () => {
       `appeared:${approvalEventId("c-1", "x")}`,
       `appeared:${interviewEventId("c-1", "x")}`,
     ]);
-    expect(events.map((e) => e.kind)).toEqual([
+    // `in` rather than `e.kind`: the union now carries a `finished` member
+    // with no `kind` at all, and that is deliberate — see `watch-events.ts`.
+    expect(events.map((e) => ("kind" in e ? e.kind : null))).toEqual([
       "approval.requested",
       "interview.requested",
     ]);
@@ -233,5 +236,102 @@ describe("the two blocking kinds stay distinguishable", () => {
         ]),
       ),
     ).toEqual([`resolved:${approvalEventId("c-1", "a-1")}`]);
+  });
+});
+
+describe("a run that finishes", () => {
+  it("emits finished on the running → idle tick, and only that tick", () => {
+    /*
+     * The defect this exists for: an assessment started from Teams runs for
+     * minutes or hours, finishes, and nobody is told. `wpro-retail-run`
+     * records the live instance — the answer was produced and the requester
+     * had to come and ask for it.
+     *
+     * Mutation: emit on `runStatus === "idle"` without the `running.delete`
+     * guard. The first assertion still passes and the third fails — which is
+     * why the third is here. A level test announces a completion every tick
+     * for the rest of the chat's life.
+     */
+    const tracker = new WatchEventTracker();
+
+    expect(
+      ids(tracker.diff(EPIC, [status({ chatId: "c-1" })])),
+    ).toEqual([]);
+    expect(
+      ids(tracker.diff(EPIC, [status({ chatId: "c-1", runStatus: "idle" })])),
+    ).toEqual([`finished:${runFinishedEventId("c-1")}`]);
+    expect(
+      tracker.diff(EPIC, [status({ chatId: "c-1", runStatus: "idle" })]),
+    ).toEqual([]);
+  });
+
+  it("says nothing about a chat that was already idle when watching began", () => {
+    // A bridge restart re-reads every chat in the epic. Firing on the level
+    // would announce a completion for each of them, for work that finished
+    // before anyone was listening.
+    const tracker = new WatchEventTracker();
+    expect(
+      tracker.diff(EPIC, [
+        status({ chatId: "c-1", runStatus: "idle" }),
+        status({ chatId: "c-2", runStatus: "idle" }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("does not call a stopping run finished", () => {
+    // A cancellation still has to land. Reporting it as done would tell the
+    // requester there is an answer waiting when there is not.
+    const tracker = new WatchEventTracker();
+    tracker.diff(EPIC, [status({ chatId: "c-1" })]);
+    expect(
+      tracker.diff(EPIC, [status({ chatId: "c-1", runStatus: "stopping" })]),
+    ).toEqual([]);
+    expect(
+      ids(tracker.diff(EPIC, [status({ chatId: "c-1", runStatus: "idle" })])),
+    ).toEqual([`finished:${runFinishedEventId("c-1")}`]);
+  });
+
+  it("stays silent for a disconnected chat, which is unknown rather than idle", () => {
+    // Same guard as `resolved`: a dropped subscription reports the last frame
+    // the bridge saw, so treating it as idle would announce a completion for
+    // a run that is still going.
+    const tracker = new WatchEventTracker();
+    tracker.diff(EPIC, [status({ chatId: "c-1" })]);
+    expect(
+      tracker.diff(EPIC, [
+        status({ chatId: "c-1", runStatus: "idle", connected: false }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("carries the chat title, so the reply can name what finished", () => {
+    const tracker = new WatchEventTracker();
+    tracker.diff(EPIC, [status({ chatId: "c-1", title: "Wipro retail" })]);
+    const [event] = tracker.diff(EPIC, [
+      status({ chatId: "c-1", title: "Wipro retail", runStatus: "idle" }),
+    ]);
+    expect(event).toEqual({
+      type: "finished",
+      eventId: "run.finished:c-1",
+      epicId: EPIC,
+      chatId: "c-1",
+      chatTitle: "Wipro retail",
+    });
+  });
+
+  it("reports the approval's resolution before the run's end", () => {
+    // Order is the message order in Teams: "that approval has been handled",
+    // then "it finished". The reverse reads as a completion that still wants
+    // something from you.
+    const tracker = new WatchEventTracker();
+    tracker.diff(EPIC, [
+      status({ chatId: "c-1", pendingApprovals: [approval("a-1")] }),
+    ]);
+    expect(
+      ids(tracker.diff(EPIC, [status({ chatId: "c-1", runStatus: "idle" })])),
+    ).toEqual([
+      `resolved:${approvalEventId("c-1", "a-1")}`,
+      `finished:${runFinishedEventId("c-1")}`,
+    ]);
   });
 });
