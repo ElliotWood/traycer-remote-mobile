@@ -7,9 +7,25 @@
 # exhaust tokens overnight, and the /loop wakeup dies with it.
 #
 # Remove with:  schtasks /delete /tn "Traycer-Autobuild-Checkin" /f
+#
+# THE SCHEDULER READS THIS FILE FROM `C:\repo\wt-guiapp-main`, NOT FROM $WorkDir.
+# Retargeted 2026-09-20 16:15. Until then the task's -File pointed into $WorkDir,
+# whose branch (`traycer/chat-transfer`) last took a commit to this script on
+# 09-09 and is 538 behind `main` - so the six improvements that landed between
+# 09-16 and 09-20, the missed-window detector among them, reached the unattended
+# scheduler ONLY as uncommitted working-tree state. That state was load-bearing
+# and nothing said so: one `git checkout -- scripts/` there would have silently
+# reverted the every-four-hours run by eleven days, and the run would still have
+# looked healthy, because a script that is merely OLD fails nothing.
+#
+# Consequence to respect when editing: $WorkDir stays the work area (a run must
+# not churn the `main` checkout), so editing $WorkDir's copy of THIS file now
+# changes nothing about what runs. Land script edits on `main` - the task picks
+# them up on the next window with no copy step.
 
 $ErrorActionPreference = 'Continue'
 
+# The work area - deliberately NOT where this script is read from; see above.
 $WorkDir = 'C:\Users\gigaf\.traycer\worktrees\elliotwood__traycer-remote-mobile\traycer-traycer-remote-mobile-electric-stork'
 $LogDir  = Join-Path $WorkDir 'logs'
 $Claude  = 'C:\Users\gigaf\.local\bin\claude.exe'

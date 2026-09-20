@@ -52,6 +52,61 @@ after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
 
+## 2026-09-20 16:15 — **the unattended check-in has been running out of uncommitted working-tree state for eleven days, and every health signal it emits is downstream of the file that was at risk**: the scheduled task's `-File` pointed into `$WorkDir`, whose branch `traycer/chat-transfer` is **538 behind `main`** and last took a commit to this script on **09-09** (`cd0842bbd`), so the **six** script commits that landed on `main` between 09-16 and today 08:21 — `0044c4e4c` + `ea61c192d` + `d232cf9e0` (the entire missed-window detector), `cbf9b3068` (retiring the `[ERROR]=0` probe), `6b4c7b555` (the token dead band), `a71bb507f` (this morning's rate-limit fix) — reached the scheduler **only** because each run edited that worktree's copy in place and landed the same bytes through `wt-guiapp-main`; the resulting dirty file measured **byte-identical** to `origin/main`'s, which is exactly why it never read as a hazard, and it was **load-bearing**: one `git checkout -- scripts/` in that worktree would have reverted the every-four-hours unattended run by **eleven days** and six improvements **with no symptom at all**, because **a script that is merely OLD fails nothing** — the same shape as this log's own `[ERROR] = 0` and its missing-test-file; fixed at the root rather than by re-copying, and the 12:15 entry's `PENDING` is answered as a **third state its two branches did not include**; fleet **idle**, **0 active** of 115, nothing blocked, errored or rate-limited; ambient live: **`max`, 5-hour 10 %, 7-day 13 %**; era-75 (`e6b81a6a7`) green on attempt 1 on all six, tally **75 / 56 / 19**
+
+### The fix, and the trap it creates — both landed
+
+`Set-ScheduledTask` now points `-File` at `C:\repo\wt-guiapp-main\scripts\autobuild-checkin.ps1`, the checkout that tracks `main`. Nothing else changed and nothing else needed to: `$WorkDir`, `$LogDir`, `$Claude` and the lock path are **absolute and hardcoded**, and the script contains **no `$PSScriptRoot`**, so where the file is read from is independent of where the run works. Logs and `.checkin.lock` keep landing in the same directory the missed-window detector reads, which is what makes this behaviour-preserving rather than a migration.
+
+| Check after retargeting | Reading |
+| --- | --- |
+| `Parser::ParseFile` on the new target | **0 errors** |
+| `autobuild-checkin.missed-windows.test.ps1` | **6/6 ok** |
+| Task `State` | `Running` — the in-flight 16:15 instance (this one) unaffected |
+| `NextRunTime` | `2026-09-20 20:15:00` — grid intact |
+| `$WorkDir` / `$LogDir` in the new target | unchanged, same absolute paths |
+
+**The trap the fix introduces is written into the script's own header, not left to be discovered.** `$WorkDir` deliberately stays the work area — a run must not churn the `main` checkout — so a future run editing **`$WorkDir`'s** copy of the check-in script now changes **nothing about what runs**, which is the precise inverse of the situation that made this entry. The header says so at the top, next to the `schtasks /delete` line where anyone touching the task will read it.
+
+**Why this was invisible for eleven days.** `[[checkin-worktree-is-behind-main]]` already recorded *"the scheduled task runs electric-stork's working copy"* — the fact was known and filed as an inconvenience. What nobody wrote down is that the working **copy** was uncommitted and diverged-by-538, i.e. that the correctness of the unattended run rested on a `git status` line reading `M scripts/autobuild-checkin.ps1`. A fact stated as a location ("it runs from there") and the same fact stated as a dependency ("its only current copy is untracked there") have different urgencies, and only the second one gets fixed.
+
+### Answering the 12:15 entry's PENDING — and it is neither of the two answers offered
+
+That entry recorded `Pre-write size: **191,722 B**` for `traycer-remote-teams/autobuild/index.md` and asked this run to re-read it after a `cloud repair complete`, offering two readings: the entry **survived**, or the repair **deleted** it.
+
+**Measured now: `191,722 B`, mtime `2026-08-26 04:23:27`.** Unchanged — and that mtime is, to the second, the repair event **this file's own header** already records (`2026-08-26 04:23:26–29`, `liveArtifacts=210`). The artifact has not been written by anything for **25 days**.
+
+So the check could not have returned anything else, and the reason is in the header six lines above the entry that posed it: *"**do not write check-in entries there**"*. The 12:15 run correctly did not write to that artifact; it then asked whether its write had survived. Both of its branches presuppose a write that never happened, which is [[measurements-need-three-states]] arriving at a survival check — **absent** was not on the ballot.
+
+**The survival question it meant to ask has a different subject, and that one passes.** This file is the only copy, it lives on `main` where the repair cannot reach it, and the 12:15 entry plus its addendum are present: **1,374,617 B, 105 entries**, `main` == `origin/main` at `e6b81a6a7`. **The `main` copy is the survival mechanism** — there is no artifact-side reading to take, and future entries should stop scheduling one.
+
+### Fleet, and what the list still cannot tell you
+
+115 agents, **0 `active`** — including the caller, `isSelf:true`. That is the defect the parity contract records: `active` is unreadable as run state for *any* agent, so "idle" here rests on the inbox being empty (`No recent inbox messages`) and on nothing in the ticket file naming an outstanding question, not on the flag.
+
+Live rate-limit read, `agent profile-rate-limits claude --profile ambient`: `available:true`, `subscriptionType:"max"`, **5-hour 10 %**, **7-day 13 %**; `usageUpdatedAt` equal to the call clock to the second (`06:30:58.636Z` against a `06:30:58.656Z` response), which is the third independent confirmation that this read is live and the retired `list-profiles` warning stays retired.
+
+### The livelock: confirming the 04:15 split rather than re-finding it
+
+The 04:15 entry's correction holds under a whole-file dominant-line census, and is worth restating because the census is the check that would have caught the original error:
+
+| Dominant line (normalised, whole file) | Count | Share |
+| --- | --- | --- |
+| `EpicTokenRefresher: batch threw for epic=9c9ddaf0…: CredentialLeaseReleasedError: No live request context…` | 30,299 | **42.5 %** |
+| `Tiptap room artifact-room-9c9ddaf0…-X stayed disconnected; rebuilding provider` | 14,138 | 19.9 % |
+| `Failed to rebuild Tiptap provider for room artifact-room-9c9ddaf0…-X: No live request context…` | 13,855 | 19.5 % |
+| `Tiptap room X stayed disconnected; rebuilding provider` | 4,450 | 6.2 % |
+| `Failed to rebuild Tiptap provider for room X: No live request context…` | 4,422 | 6.2 % |
+| **top five together** | | **94.3 %** |
+
+Two loops sharing one root sentence, exactly as 04:15 established — the refresher is **45 %** of the storm, not all of it. Steady at **~240–350/h** across the last twelve hours, last line `16:27:53`. **A host restart does not clear it**: the per-day counts run `09-12` → `09-13`, nothing on `09-14` (host down), then **330 on 09-15** against a process that only started at `23:20:43` — a fresh host re-entered the loop inside its first forty minutes. The desktop GUI **is** running (`traycer` pid 20784 since 09-16 09:20), so "GUI closed" does not explain it either, and `getTaskCollabTokens` — the 08-05 ticket's signature — returns **0**. CLI auth is healthy (`whoami` → `gigaflare_elliot@hotmail.com`). Unfixed and not fixable from here; it is a host credential condition, and it is why artifact-side anything is moot.
+
+### Not done, deliberately
+
+1. **The `/next/` rebuild and redeploy** — still **not-actionable** rather than pending: the VM is `deallocated`, **day 32**, by an owner action nothing on the trunk asks to reverse.
+2. **`traycer/chat-transfer` is left 538 behind with its dirty file intact.** Now that the scheduler no longer reads it, that state is inert; reconciling it is a merge decision, not a check-in one, and doing it unattended would be the churn the fix was meant to stop.
+3. **`TRAYCER_TEAMS_APP_ID`**, the **app package**, and **`autobuild/conversational-bot`** — unchanged, all three still Elliot's.
+
 ## 2026-09-20 12:15 — **the trunk's Teams theme seam has never had a test, and the probe built to guard it spent that whole time aborting on a control that does not exist**: `setHostThemeOverride` is the entire mechanism behind `teams-host.ts`'s *"theme IS applied now"* — the second source for the light/dark signal, the thing that stops a dark-Teams user on a light OS getting a light tab — and it reached `main` in `8f9785fd8`, the 08-24 restore, while its **252-line, 11-case** test did not; `git log main -- <path>` is **empty**, so this was never a deliberate removal, and `main`'s copy of the source is **byte-identical** to the 14 branches that still carry the test (one blob, `eb3ea5e9`, on all of them); nothing failed, because **a missing test file fails nothing** — CI has been green on a seam with zero coverage; `mutate-teams-theme.mjs` names that very file as its `applier` **control**, vitest exits **1** on zero matched files, and the probe read that as *"the applier suite is RED before any mutation"* and aborted, skipping **all 12** mutations, **six** of them the applier's — it aborted loudly and non-zero exactly as designed, and still could not tell a **missing** control from a **failing** one; **MUT-8 had drifted independently**, its pattern spanning the whole `initializeTeamsHost({...})` call and so naming every sibling by position, so adding `onLinkOpener` and `onDeepLink` took it to zero matches — the probe's own match-exactly-once guard would have caught it on the run it never reached; both repaired, and the probe now reads **12/12 caught by their named test, 0 survivors**, both controls green; scoped by root cause rather than symptom — **27** test files are on that branch and not on `main`, and for **26** of them the subject is absent from `main` too, leaving **exactly one** that arrived as source-without-test; separately the 08:15 entry's own fix has a side effect it did not record — `list-profiles` is **write-through, not permanently empty**, and four hours on it replayed that window's capture as `ok`/`authenticated`; fleet **idle**, **0 active** of 115, nothing blocked or errored; ambient live: **`max`, 5-hour 13 %, 7-day 11 %**; era-73 green on attempt 1 on all six, tally **73 / 54 / 19**
 
 **The cache the previous fix fills, and the shape of the trap it leaves.** The
