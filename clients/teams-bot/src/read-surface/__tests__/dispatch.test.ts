@@ -11,7 +11,11 @@ import {
   startTestJwksServer,
   type TestJwksServer,
 } from "../../auth/__tests__/test-jwks-server";
-import { dispatchCommand, type DispatchDeps } from "../dispatch";
+import {
+  dispatchCommand,
+  rememberRouteForTurn,
+  type DispatchDeps,
+} from "../dispatch";
 import { dispatchActionInvoke, HANDLED_ACTION_VERBS } from "../dispatch-action";
 import { ANSWER_VERB, SEND_VERB } from "../cards";
 import { InMemoryEpicBindingStore } from "../epic-binding-store";
@@ -316,6 +320,52 @@ describe("read-surface/dispatch — routing and identity gating", () => {
     expect(body).not.toContain("nonzero_exit");
     // And it still says something useful — the expiry is recognised.
     expect(body).toContain("expired");
+  });
+
+  describe("rememberRouteForTurn — the caller the proactive route never had", () => {
+    const REF = { conversation: { id: "conv-1" } };
+    const USER = { id: "29:alice", name: "Alice" };
+
+    async function run(
+      principal: ResolvePrincipal,
+      bound: boolean,
+    ): Promise<unknown[][]> {
+      const calls: unknown[][] = [];
+      const epicBindings = new InMemoryEpicBindingStore();
+      if (bound) await epicBindings.set("conv-1", "epic-1");
+      const deps: DispatchDeps = {
+        ...makeDeps({
+          resolvePrincipal: principal,
+          spawnFn: neverSpawns,
+          epicBindings,
+        }),
+        rememberProactiveTarget: (...args) => {
+          calls.push(args);
+        },
+      };
+      await rememberRouteForTurn(deps, "conv-1", REF, USER);
+      return calls;
+    }
+
+    it("binds the conversation's epic to this turn's reference for a mapped principal", async () => {
+      expect(await run(resolvesTo(aliceP), true)).toEqual([
+        ["epic-1", REF, USER],
+      ]);
+    });
+
+    it("binds nothing when the conversation has no epic", async () => {
+      expect(await run(resolvesTo(aliceP), false)).toEqual([]);
+    });
+
+    it("an unmapped principal cannot redirect the epic's approvals to itself", async () => {
+      expect(await run(resolvesTo(unmappedP), true)).toEqual([]);
+    });
+
+    it("an unavailable principal binds nothing", async () => {
+      expect(
+        await run(async () => ({ kind: "unavailable", reason: "x" }), true),
+      ).toEqual([]);
+    });
   });
 });
 

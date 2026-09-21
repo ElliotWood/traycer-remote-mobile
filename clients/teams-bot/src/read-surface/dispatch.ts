@@ -129,6 +129,40 @@ function failureCard(failure: ReadSurfaceFailure): Attachment {
 }
 
 /**
+ * The CALLER `rememberProactiveTarget` never had. `6fb005114` ("the proactive
+ * path had every piece and no caller") and `1d0ae570d` wired the callback
+ * into these deps, but nothing invoked it, so `proactive-targets.json` was
+ * never written and every approval outside an assessment-launched chat was
+ * dropped with "no Teams conversation bound".
+ *
+ * Runs AFTER the turn, so the turn that binds the epic also binds the route.
+ * Gated exactly like a read: a conversation whose principal is unavailable
+ * or refused must not be able to redirect the epic's approvals to itself,
+ * since those cards carry the owner's prompts.
+ *
+ * ponytail: route is per EPIC, last accepted speaker wins. Under the demo
+ * principal every Teams user resolves to the one owner, so this is only as
+ * safe as that scope cut; T1b's per-user principal is the upgrade path.
+ */
+export async function rememberRouteForTurn(
+  deps: DispatchDeps,
+  conversationId: string,
+  reference: unknown,
+  user: { readonly id: string; readonly name: string } | null,
+): Promise<void> {
+  const remember = deps.rememberProactiveTarget;
+  if (remember === undefined || conversationId.length === 0) return;
+  const epicId = await deps.epicBindings.get(conversationId);
+  if (epicId === null) return;
+  const identity = await deps.resolvePrincipal();
+  if (identity.kind === "unavailable") return;
+  if (deps.registry.resolveTenant(identity.principal).kind === "refused") {
+    return;
+  }
+  remember(epicId, reference, user);
+}
+
+/**
  * Returns one OR MORE cards. `chat <id>` renders the status card plus one
  * actionable approval card per pending approval, so a blocked agent can be
  * answered from the same reply — that is the product's whole promise and it

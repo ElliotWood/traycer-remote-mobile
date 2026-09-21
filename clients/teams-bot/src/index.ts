@@ -376,10 +376,9 @@ async function main(): Promise<void> {
                  * which is both more precise and more obviously correct than
                  * "whichever conversation holds the epic".
                  *
-                 * It also means this works with NO epic route bound: the
-                 * handler-side binding lives on another branch, and without
-                 * this fallback the whole path would notify nowhere until
-                 * that landed.
+                 * It also means this works with NO epic route bound. The
+                 * handler-side binding is `rememberRouteForTurn`, run after
+                 * every message turn in a conversation bound to an epic.
                  *
                  * No `mention` on the chat route — that store's shape is
                  * shared with the reply-target store and deliberately carries

@@ -20,7 +20,11 @@ function chatLabelOf(chat: FocusedChat): string {
   const title = chat.title?.trim() ?? "";
   return title.length > 0 ? title : chat.chatId.slice(0, 8);
 }
-import { dispatchCommand, type DispatchDeps } from "./dispatch";
+import {
+  dispatchCommand,
+  rememberRouteForTurn,
+  type DispatchDeps,
+} from "./dispatch";
 import { dispatchActionInvoke } from "./dispatch-action";
 import { logInfo, logWarn } from "../logger";
 import { stripMentions, type MentionEntity } from "../intake/mention";
@@ -59,6 +63,13 @@ class ReadSurfaceHandler extends ActivityHandler {
     this.deps = deps;
     this.onMessage(async (context, next) => {
       await this.handleMessage(context);
+      const from = context.activity.from;
+      await rememberRouteForTurn(
+        this.deps,
+        context.activity.conversation?.id ?? "",
+        context.activity.getConversationReference(),
+        from?.id && from.name ? { id: from.id, name: from.name } : null,
+      );
       await next();
     });
   }
