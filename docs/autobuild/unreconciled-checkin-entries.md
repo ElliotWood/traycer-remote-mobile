@@ -91,10 +91,17 @@ returned 115 agents.
 `host.log.1`, **75,742 lines** — ran at **70.9% top-five, all one story**:
 `EpicTokenRefresher … CredentialLeaseReleasedError` **34,049** plus the Tiptap
 rebuild family on the same two artifact rooms (5,149 / 5,112 / 4,761 / 4,645).
-The new host has logged **zero** lease errors. Hold that lightly: it is ~10
-minutes against a ~1–2/min cadence, so the next window is what confirms it.
-**Cost of the rotation:** the previous `host.log.1` (09-11 era, 24 MB) is gone —
-extract evidence *before* running `ensure`.
+The new host has logged **zero** lease errors, and by the end of this run that
+is a measurement rather than a hope: the rate immediately before the crash was
+**9 in the final ten minutes** (79 in the final eighty), and **25 minutes after
+the restart the new log holds 0 lease errors and 0 Tiptap rebuilds in 48 total
+lines** — roughly 25 expected, none observed. **This refutes a claim this ledger
+has carried for eleven days.** The storm began at **2026-09-12 01:17:15** and
+entries since have recorded that *"an attended sign-in is the only closer"*. It
+was not: a host restart closed it, because the storm is a host that holds the
+epic rooms with **no live credential lease**, and the fix is to get a host that
+has one. Nobody signed in. **Cost of the rotation:** the previous `host.log.1`
+(09-11 era, 24 MB) is gone — extract evidence *before* running `ensure`.
 
 **The 04:15 window was also lost, to something else.** Its log is two lines:
 claude exited 1 having written **zero bytes to stdout and stderr both** (the
@@ -116,6 +123,7 @@ now with a cleaner fingerprint: **zero bytes, exit 1**.
 | Roles claimed | **4**, the same four, none over this run's surface |
 | Rate limits (live `profile-rate-limits`) | `ambient`: `max`, **5-hour 3% / 7-day 45%**. Altra still `rate_limits_not_available` (unauthenticated) — not a failover target |
 | `EpicFileSync` | still stopped; this file remains the record |
+| CI | the two pushes went **red then green on the same defect**: `5ae1caf42` lost `gui-app shard 2` on attempt 1 (the known flake — `providers-settings-panel.test.tsx`, **exactly 39** for the eleventh consecutive reading, suite grown to 2910, import 67.3%), and the push that filed its row (`5a469e752`) came back **14/14 green on attempt 1** on a tree differing by that row alone. No rerun was issued; filed in `docs/autobuild/ci-tests-flake.md` and closed there. **That file's tally is now a floor** — `eec325028`, `1cc192f83` and `65200046d` were red on 09-22 and never filed |
 | Next CLI token `exp` | **12:18:10** — three minutes *into* the 12:15 window. Call before ~12:18:00, and treat **12:18:18–12:18:47** as the hard-fail band |
 
 **Toward the standing goal:** unchanged, and unchanged for the same reason as
