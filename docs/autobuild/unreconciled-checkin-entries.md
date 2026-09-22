@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and sixteen** entries in this
+everything came down, nothing went up. The **one hundred and seventeen** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and sixteen**. Three count sites remain in this header: this
+on this file → **one hundred and seventeen**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,15 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and sixteen entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and seventeen entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-23 00:15 — **nothing moved; the one missed window (09-22 20:15) was claude's own OAuth session expiring, and it recovered by itself.** The wrapper's detector logged `MISSED WINDOWS: 1 … 1 ran but produced nothing`; that log's body is the one line `Failed to authenticate: OAuth session expired and could not be refreshed`, exit 1 (cause four). No action fixed it, and this run authenticated normally. **Fleet:** 115 agents, **0 active**; the last provider turn in `host.log` is still **09-21 04:46:49**. Nothing is blocked, errored or rate-limited, and no agent was messaged. **Rate limits (live `profile-rate-limits`):** the first `ambient` read failed `E_UNEXPECTED "WebSocket frame timed out after 15000ms"` at 00:19:29; the retry 30 s later returned `available:true`, `max`, **5-hour 1% / 7-day 44%**. Altra still answers `rate_limits_not_available` (unauthenticated), so it is not a failover target. **Host:** alive, **75,495** lines; the top five normalised lines are **94.4%** and are one story, the `EpicTokenRefresher` / Tiptap-rebuild `CredentialLeaseReleasedError` storm (44.8 / 19.1 / 18.7 / 5.9 / 5.9). `EpicFileSync` last logged `file sync stopped` at 09-21 05:01:49, so no artifact was edited and this file is the record. **Other `claude` processes** (09-17, 09-20, 09-22 21:32 and 22:50 starts) predate this window and were left alone. **Toward the standing goal:** unchanged. What remains needs a human or a billed action: a real Teams install, T1b SSO, the attended upstream merge, and a deploy to the deallocated VM.
 
 ## 2026-09-22 16:15 — **nothing moved, and this header's three count sites were stale: they read 109 and 110 while the file held 115.** The last five entries each added a heading and left the header alone. This entry makes the count **116**, and all three sites now say so. Derive with `grep -c '^## 2026'` on this file. **Fleet:** 115 agents, **0 active** (`agent list --all --json`, filter on `.active`). Nothing is blocked, errored or rate-limited, and no agent was messaged. **CI:** `4a6dcdf17` is green on all six workflows. **Host:** alive, last line 16:17:19, the same `EpicTokenRefresher` `CredentialLeaseReleasedError` loop, **74,976** lines. `EpicFileSync` is still stopped (last line 09-21 05:01:49), so this file is still the record. **Toward the standing goal:** unchanged. The 12:15 run checked every open ticket once, and what remains needs a human or a billed action: a real Teams install, T1b SSO, the attended upstream merge, and a deploy to the deallocated VM. Later runs should re-check only what changes: fleet activity, CI on the new tip, and host liveness.
 
