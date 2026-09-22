@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and seventeen** entries in this
+everything came down, nothing went up. The **one hundred and eighteen** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and seventeen**. Three count sites remain in this header: this
+on this file → **one hundred and eighteen**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,85 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and seventeen entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and eighteen entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-23 08:15 — **the traycer host had been dead for eight hours and nothing was ever going to restart it**; the fix was a call that already existed and nobody was making, and it also cleared a 34,049-line storm
+
+The window opened onto `E_HOST_NOT_RUNNING` on its first `agent list`. The host
+exited **code=1 at 04:19:34** after a seven-day run (`attempt=ad2dcc92`, up since
+09-15 23:20Z) and stayed dead until this run revived it at **08:17:51** — the
+supervisor wrote `phase=crashed` and then **no `phase=starting`**, which is the
+whole defect: `host.log` holds two crashes and only one was ever followed by a
+restart. For eight hours every `traycer agent` command this check-in's own
+prompt instructs a run to make would have failed, and nothing recorded it.
+**Landed `42fe61461` on `main`:** the check-in now calls `traycer host ensure`
+before launching claude. That call already existed; nothing was calling it.
+Measured idempotent **before** relying on it — against the live host it printed
+`host already ready`, kept pid 21084 and left `host.log` byte-identical — which
+mattered, because a restart is **not** free (it rotates `host.log` and
+re-hydrates the artifact rooms). The log line keys on the words `already ready`,
+**not on the exit code, which is 0 either way**; self-check
+`scripts/autobuild-checkin.host-ensure.test.ps1` replays all three strings
+`ensure` actually printed today and asserts the script still keys on the phrase
+and still does not key on `$LASTEXITCODE`, and mutating the phrase turns it red.
+
+**Do not blame the token for the crash.** The line directly above
+`phase=crashed` is `RPC WS: fatal close … UNAUTHORIZED reason="exp"`, and it is
+a red herring of the most tempting kind: it fires **once per check-in window by
+construction** (4 h token vs 4 h cadence), **34 times in that log, and the host
+survived every one**. Likewise `stderrTail=` on the crash line quotes the
+process's last stderr write, which for a seven-day host is its own *startup*
+line from eight days earlier — it reads like a startup failure and is not one.
+Why it exited is **not** diagnosed here.
+
+**Verify a revive by effect, not by `ensure`'s exit code** — and expect the
+first call to fail: `agent list` timed out (`WebSocket frame timed out after
+15000ms`) while the cold host hydrated the epic artifact rooms (2–3 MB seeds,
+3,070 ms event-loop stall, 31 clients). That timeout is warm-up. The retry
+returned 115 agents.
+
+**The restart cleared the storm, provisionally.** The pre-crash log — now
+`host.log.1`, **75,742 lines** — ran at **70.9% top-five, all one story**:
+`EpicTokenRefresher … CredentialLeaseReleasedError` **34,049** plus the Tiptap
+rebuild family on the same two artifact rooms (5,149 / 5,112 / 4,761 / 4,645).
+The new host has logged **zero** lease errors. Hold that lightly: it is ~10
+minutes against a ~1–2/min cadence, so the next window is what confirms it.
+**Cost of the rotation:** the previous `host.log.1` (09-11 era, 24 MB) is gone —
+extract evidence *before* running `ensure`.
+
+**The 04:15 window was also lost, to something else.** Its log is two lines:
+claude exited 1 having written **zero bytes to stdout and stderr both** (the
+wrapper redirects `2>&1`, so this is not a capture gap). That rules out the
+documented causes — a rate limit, a network death and an OAuth expiry all emit
+text, and the OAuth reading is positive rather than inferred: the token in play
+at 04:15 still had **75 minutes** left and was refreshed at **05:30:03**, *after*
+the failure. The box was awake (no Kernel-Power 42/107) and both event logs are
+**clean of Warning-or-worse across 03:50–05:40** — verified as real coverage,
+not an empty read, by confirming 22 informational events in the same span. This
+is the already-catalogued *killed with the box awake, cause unmeasurable* shape,
+now with a cleaner fingerprint: **zero bytes, exit 1**.
+
+| Probe | Reading |
+| --- | --- |
+| Agents (`agent list --all --json`) | **115**, **0 active** (after one warm-up timeout) |
+| Last provider turn (`host.log.1`) | **2026-09-21 04:45:24** — nothing has run in two days, and for eight hours of that it was impossible |
+| Agents blocked / errored / rate-limited | **none** |
+| Roles claimed | **4**, the same four, none over this run's surface |
+| Rate limits (live `profile-rate-limits`) | `ambient`: `max`, **5-hour 3% / 7-day 45%**. Altra still `rate_limits_not_available` (unauthenticated) — not a failover target |
+| `EpicFileSync` | still stopped; this file remains the record |
+| Next CLI token `exp` | **12:18:10** — three minutes *into* the 12:15 window. Call before ~12:18:00, and treat **12:18:18–12:18:47** as the hard-fail band |
+
+**Toward the standing goal:** unchanged, and unchanged for the same reason as
+the last several windows — what remains needs a human or a billed action (a real
+Teams install, T1b SSO, the attended upstream merge, a deploy to the deallocated
+VM). This run spent its window on the thing that was silently zeroing every
+*other* run's ability to do agent work at all.
 
 ## 2026-09-23 00:15 — **nothing moved; the one missed window (09-22 20:15) was claude's own OAuth session expiring, and it recovered by itself.** The wrapper's detector logged `MISSED WINDOWS: 1 … 1 ran but produced nothing`; that log's body is the one line `Failed to authenticate: OAuth session expired and could not be refreshed`, exit 1 (cause four). No action fixed it, and this run authenticated normally. **Fleet:** 115 agents, **0 active**; the last provider turn in `host.log` is still **09-21 04:46:49**. Nothing is blocked, errored or rate-limited, and no agent was messaged. **Rate limits (live `profile-rate-limits`):** the first `ambient` read failed `E_UNEXPECTED "WebSocket frame timed out after 15000ms"` at 00:19:29; the retry 30 s later returned `available:true`, `max`, **5-hour 1% / 7-day 44%**. Altra still answers `rate_limits_not_available` (unauthenticated), so it is not a failover target. **Host:** alive, **75,495** lines; the top five normalised lines are **94.4%** and are one story, the `EpicTokenRefresher` / Tiptap-rebuild `CredentialLeaseReleasedError` storm (44.8 / 19.1 / 18.7 / 5.9 / 5.9). `EpicFileSync` last logged `file sync stopped` at 09-21 05:01:49, so no artifact was edited and this file is the record. **Other `claude` processes** (09-17, 09-20, 09-22 21:32 and 22:50 starts) predate this window and were left alone. **Toward the standing goal:** unchanged. What remains needs a human or a billed action: a real Teams install, T1b SSO, the attended upstream merge, and a deploy to the deallocated VM.
 
