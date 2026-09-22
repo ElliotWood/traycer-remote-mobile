@@ -29,6 +29,7 @@ $ErrorActionPreference = 'Continue'
 $WorkDir = 'C:\Users\gigaf\.traycer\worktrees\elliotwood__traycer-remote-mobile\traycer-traycer-remote-mobile-electric-stork'
 $LogDir  = Join-Path $WorkDir 'logs'
 $Claude  = 'C:\Users\gigaf\.local\bin\claude.exe'
+$Traycer = 'C:\Users\gigaf\.traycer\cli\bin\traycer.exe'
 
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
 
@@ -365,6 +366,35 @@ while (-not (Test-ApiReachable) -and $Waited -lt 1800) {
 if ($Waited -gt 0) {
     "[$Stamp] api unreachable at start; waited $([math]::Round($Waited/60))m before launching" |
         Out-File -FilePath $Log -Append
+}
+
+# Restart the traycer host if it died, because nothing else will.
+#
+# WHY: 2026-09-23 04:19:34 the host exited code=1 after a 7-day run and STAYED
+# dead. The 08:15 window opened onto `E_HOST_NOT_RUNNING` on its first call -
+# every `traycer agent` command a check-in is told to make had been failing for
+# 8 hours, and nothing recorded that. The supervisor writes `phase=crashed` and
+# then NO `phase=starting`; the logon task's restart-on-failure never arms. Two
+# crashes now sit in host.log and only one was followed by a restart.
+#
+# `host ensure` is the whole fix and it already existed - nothing was calling
+# it. Measured idempotent 2026-09-23 08:20 against the live host: it printed
+# "host already ready", kept pid 21084, and left host.log byte-identical, so
+# running it every window costs nothing. A restart is not free - it rotates
+# host.log and re-hydrates the artifact rooms (3 s of event-loop stall, 31
+# clients) - which is exactly why this must not fire when the host is up.
+#
+# Do NOT read the exit code as health: `ensure` returns 0 whether it revived
+# the host or found it already running. The discriminator is the word
+# "started" vs "already ready", and it is also the only thing that turns a
+# silent 8-hour outage into a line somebody can count.
+try {
+    $Ensure = (& $Traycer host ensure 2>&1 | Out-String).Trim()
+    if ($Ensure -notmatch 'already ready') {
+        "[$Stamp] TRAYCER HOST WAS DOWN - revived: $Ensure" | Out-File -FilePath $Log -Append
+    }
+} catch {
+    "[$Stamp] host ensure skipped: $_" | Out-File -FilePath $Log -Append
 }
 
 try {
