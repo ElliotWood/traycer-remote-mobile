@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and eighteen** entries in this
+everything came down, nothing went up. The **one hundred and nineteen** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and eighteen**. Three count sites remain in this header: this
+on this file → **one hundred and nineteen**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,38 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and eighteen entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and nineteen entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-23 12:15 — **the lease storm came back 61 minutes after the restart, so the 08:15 run's "a restart closed it" (`4eb8fb933`) is also wrong**; a restart pauses it for about an hour, then it resumes at full rate
+
+The host that the 08:15 run revived started at **08:17:56**. The first
+`EpicTokenRefresher … CredentialLeaseReleasedError` came at **09:19:01**, 61
+minutes later. That is roughly one lease lifetime after the check-in's own CLI
+calls at about 08:18, which were the last live request context. After that it
+ran at **64 lines/hour** in both 10:00 and 11:00, which is *above* the 54/hour
+seen before the crash (9 in ten minutes). The 08:15 run watched for 25 minutes
+and saw 0. That window cannot see an effect that starts at the one-hour mark.
+Derive the rate per hour with
+`grep 'CredentialLease' ~/.traycer/host/host.log | grep -o '^\[2026-..-.. ..' | uniq -c`.
+
+**What this changes.** Both proposed closers are refuted. An attended sign-in
+was never needed, and a restart only buys about an hour. The storm is the
+upstream host's refresher running with no live client context. It is noise the
+fork cannot patch, and future entries should stop offering a closer for it.
+
+**Fleet:** 115 agents, **0 active** (`agent list --all --json`, filter on
+`.active`). Nothing is blocked, errored or rate-limited, and no agent was
+messaged. **CI:** `4eb8fb933` is green on all six workflows. **Host:** alive,
+last line 12:16:05, 248 lines since the 08:17 start. **Toward the standing
+goal:** unchanged. What remains needs a human or a billed action: a real Teams
+install, T1b SSO, the attended upstream merge, and a deploy to the deallocated
+VM.
 
 ## 2026-09-23 08:15 — **the traycer host had been dead for eight hours and nothing was ever going to restart it**; the fix was a call that already existed and nobody was making, and it also cleared a 34,049-line storm
 
