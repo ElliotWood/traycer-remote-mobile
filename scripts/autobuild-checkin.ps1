@@ -406,12 +406,20 @@ try {
     # a connection error - this entry does, at length - must not be retried, and
     # matching the phrase anywhere in the body would retry it three times.
     # A genuine no-op dies on the first token, so its whole body IS the marker.
+    #
+    # The prompt goes on STDIN, never argv. The task runs powershell.exe 5.1,
+    # which passes a native argument without escaping its inner `"`: each one
+    # toggles quoting, and the eighth (`# "Testing and` in step 1) leaves the
+    # quoted run, so the next space ends argv[1]. Measured 2026-09-24: argv
+    # delivered 1126 of 12393 chars in 34 pieces, so a run got
+    # step 1's setup and nothing after it. UTF-8 because 5.1 pipes ASCII.
+    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $Attempt = 0
     do {
         $Attempt++
         $Mark = @(Get-Content $Log -ErrorAction SilentlyContinue).Count
 
-        & $Claude -p $Prompt --permission-mode bypassPermissions 2>&1 |
+        $Prompt | & $Claude -p --permission-mode bypassPermissions 2>&1 |
             Out-File -FilePath $Log -Append
         $Code = $LASTEXITCODE
 
