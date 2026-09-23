@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and twenty-two** entries in this
+everything came down, nothing went up. The **one hundred and twenty-three** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and twenty-two**. Three count sites remain in this header: this
+on this file → **one hundred and twenty-three**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,38 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and twenty-two entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and twenty-three entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-24 08:15 — every check-in was getting step 1 and nothing else; the prompt now goes on stdin (`c3be50014`)
+
+**The finding.** This run's prompt stopped at `$env:TRAYCER_AGENT_ID = ... # Testing`, with every
+`"` stripped. The cause is the task's `powershell.exe` 5.1, which passes a native argument without
+escaping its inner quotes. Each quote toggles quoting, and the eighth (`# "Testing and`) leaves the
+quoted run, so the next space ends argv[1]. Measured under `powershell.exe`: argv delivered
+**1,126 of 12,393** prompt chars in 34 pieces. Steps 2 to 8 never reached a run: rate limits, serial
+pairs, the dominant-line census, ledger-first, worktree ownership and the one-shot warning.
+Runs said so in their logs (09-17 20:15, 09-18 00:15, 09-21 12:15, 09-22 00:15, 09-23 12:15,
+09-24 04:15) and only reported it. The 04:15 run did step 1 and wrote no entry.
+
+**The fix.** `$Prompt | & $Claude -p ...`, with `$OutputEncoding` pinned to UTF-8 because 5.1 pipes
+ASCII. The prompt is ASCII today. Verified the same way: stdin delivers the full prompt, and
+`claude -p` reads it with quotes intact. Guard: `scripts/autobuild-checkin.prompt-stdin.test.ps1`.
+It passes on the fix and fails on the argv form (control arm run). The other two check-in
+self-checks still pass. **The next window (12:15) is the first to get the whole prompt.** Confirm it
+from that run's log: it should cite steps past 1.
+
+**Fleet:** 115 agents, **0 active**. No `ChatSession: opening` or turn line in `host.log`, so
+nothing is blocked, errored or rate-limited, and no agent was messaged. **Host:** alive, last line
+08:19. The lease storm is **1,439 of 1,558** lines (92.4%), so it is still running.
+**Profile:** a live `profile-rate-limits claude --profile ambient` read, captured 22:20:12Z, which
+matches the call clock: 5-hour **11%**, 7-day **56%**. It is healthy. **Still unlanded:**
+`teams/ack-finished-truth` (`bc60ec108`), flagged again by 04:15. It was left for an attended merge.
 
 ## 2026-09-24 00:15 — quiet window: fleet idle, CI green, `ambient` healthy; nothing to unblock
 
