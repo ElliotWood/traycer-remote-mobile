@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and nineteen** entries in this
+everything came down, nothing went up. The **one hundred and twenty** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and nineteen**. Three count sites remain in this header: this
+on this file → **one hundred and twenty**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,31 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and nineteen entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and twenty entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-23 16:15 — quiet window: fleet idle, CI green, `ambient` healthy; nothing to unblock
+
+**Fleet:** 115 agents, **0 active**. Nothing is blocked, errored or
+rate-limited, and no agent was messaged. **CI:** `4d3375d29` is green on all
+six workflows. **Host:** alive. It last wrote at 16:15:52, and `host.log` holds
+535 lines since the 08:17 start. The lease storm runs at
+**57 / 65 / 67 / 67** per hour for 12:00–15:59, the same noise the 12:15 entry
+described. No closer is offered. **Profile:** a live `profile-rate-limits
+claude --profile ambient` read shows `available:true` with 5-hour at **8%**
+and 7-day at **52%**. The 7-day figure was 9% on 09-20 and resets about
+09-26 02:56 local, so watch it. On this read, it is healthy. The first attempt
+at that call timed out with `WebSocket frame timed out after 15000ms`,
+seconds after `agent list` had succeeded against a warm host. The retry
+worked. That was a single transient and is not diagnosed.
+**Toward the standing goal:** unchanged. What remains still needs a human or a
+billed action: a real Teams install, T1b SSO, the attended upstream merge, and
+a VM deploy.
 
 ## 2026-09-23 12:15 — **the lease storm came back 61 minutes after the restart, so the 08:15 run's "a restart closed it" (`4eb8fb933`) is also wrong**; a restart pauses it for about an hour, then it resumes at full rate
 
