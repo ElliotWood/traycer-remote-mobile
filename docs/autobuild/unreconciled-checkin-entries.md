@@ -52,6 +52,50 @@ after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
 
+## 2026-09-25 04:15 — the artifact storm STOPPED at 00:22; one non-artifact room still fails once a minute
+
+**Host:** `host.log` is 11,823 lines (last line 04:15:32, so the host is alive). The whole-file
+census still reads 93% one story, but that is history. **The hourly counts collapsed: 00h 326,
+01h 120, 02h 118, 03h 116** (was ~780). Per-hour census for 00h-03h: the last
+`EpicTokenRefresher ... No live request context` is **00:15:16**, and the last `artifact-room-*
+stayed disconnected` is **00:22:14**, with `Could not read room metadata after reconnect` lines for
+three artifact rooms at 00:16, 00:19 and 00:22. What is left is **one room, `f347a4fb...`
+(not an artifact room), failing to rebuild on the same missing context once a minute**. It has done
+that since 09-24 12:59:56. Nothing else is logged after 01:00. The timing matches the 00:15
+check-in's CLI calls: `agent list` at 00:16:03, then the profile retry at 00:19:16 that refreshed
+the bearer, followed by `RPC WS ... "exp" claim timestamp check failed` at 00:19:17. **The mechanism is
+UNMEASURED.** The refresher's last failure (00:15:16) comes 47 s BEFORE the first CLI call. So
+"a CLI call restores the host's request context" is a guess, not a finding. Whatever `f347a4fb` is,
+it did not recover.
+
+**Fleet:** 115 agents. There are **zero** `starting provider turn`, `ChatSession: opening`,
+`EpicFileSync`, `active turn` or `status=running` lines in `host.log`, so nothing is blocked,
+errored or rate-limited. No agent was messaged. No artifact was touched: sync is not running, and
+there has been no `EpicFileSync` line since the log began on 09-22.
+
+**CI: `bcbc5cebb` Tests is RED.** It is a docs-only commit on top of green `3cc9a6121`: the diff is
+the ledger file alone. The one failure is `test (desktop darwin + packaging)`, in
+`host-controller.test.ts:3033`, `P3: removeTraycer aborts an in-flight download and waits for its
+child to settle before uninstalling` (`expected false to be true`, 1019 ms). No code changed, so
+this is a flake by construction. The ledger has no earlier mention of it, so this is its **first
+recorded sighting**. It was not rerun, because this entry's push re-runs the suite. If it goes red
+again on a docs-only commit, it is a real intermittent that needs a ticket. The other five
+workflows are green.
+
+**Profile:** `ambient`, 5-hour **1%**, 7-day **62%** (resets 09-26 02:59 local). It is healthy.
+Altra was not re-read because nothing needed a failover. The first read hit the known
+`WebSocket frame timed out after 15000ms` (fifth window in a row). The immediate retry answered,
+`captured 2026-09-24T18:15:56Z`.
+
+**CLI bearer:** `exp` was 04:19:17. Both calls ran at about 04:15-04:16, inside the token's life,
+and neither refreshed it. So **the stored `exp` is still 09-25 04:19:17**. The next run lands hours
+past it, and the CLI refreshes in-command.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main`.
+**Toward the standing goal:** unchanged. What remains needs a human or a billed action: a real
+Teams install, T1b SSO, the attended upstream merge, and a VM deploy. No generator/evaluator pair
+was started. Parent of this entry's commit: `bcbc5cebb`.
+
 ## 2026-09-25 00:15 — quiet window: the storm holds at ~780 lines an hour, nothing to unblock
 
 **Host:** `host.log` is 11,330 lines (last line 00:16:39, so the host is alive). Hourly counts stay
