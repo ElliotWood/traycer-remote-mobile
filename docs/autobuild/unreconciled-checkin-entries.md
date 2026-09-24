@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and twenty-three** entries in this
+everything came down, nothing went up. The **one hundred and twenty-four** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and twenty-three**. Three count sites remain in this header: this
+on this file → **one hundred and twenty-four**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,45 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and twenty-three entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and twenty-four entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-24 12:15 — the stdin fix held: this run got all eight steps; quiet window, nothing to unblock
+
+**The 08:15 fix, confirmed.** This is the first window since `c3be50014`, and its prompt arrived
+whole: steps 1 to 8, quotes intact, ending at "Decide, act, and document what you decided." This
+entry follows the steps that argv used to drop. It decoded the bearer before calling (step 1),
+read the profile live (step 2), took the dominant-line census (step 4), checked `EpicFileSync`
+before any artifact and landed here first (step 5), checked worktree ownership (step 6), and
+placed no delayed read (step 8).
+
+**Fleet:** 115 agents. `host.log` has no `ChatSession: opening`, `active turn` or `status=running`
+line in its whole span (since the 09-22 22:17 start), so nothing is blocked, errored or
+rate-limited, and no agent was messaged. **Host:** alive, last line 12:16:24. The census's top
+line is the `EpicTokenRefresher` / `CredentialLeaseReleasedError` lease storm, **1,623 of 1,753**
+lines (92.6%), and the other four are one stack trace (8 each). It is still running, at
+58 / 19 / 40 / 62 / 68 lines per hour for 07:00 to 11:59. **Artifacts:** `host.log` holds **zero**
+`EpicFileSync` lines, so sync is not running and no artifact was touched.
+**CI:** `a552904f7` is green on all six workflows.
+
+**Profile:** a live `profile-rate-limits claude --profile ambient` read, captured 02:17:36Z, which
+matches the call clock: 5-hour **2%**, 7-day **60%**, resetting 09-26 03:00 local. It is healthy.
+Altra was not re-read because nothing needed a failover.
+**CLI bearer:** `exp` 12:16:24. The first call at **+16 s** returned `401`, as predicted, and
+`credentials` was not rewritten. `agent list` at +46 s worked. The next call,
+`profile-rate-limits`, got `WebSocket frame timed out after 15000ms` again, and its retry worked.
+That makes **four** windows running. It is still undiagnosed and still costs one retry.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`), not an ancestor of `origin/main`,
+left for an attended merge. **Toward the standing goal:** unchanged. What remains still needs a
+human or a billed action: a real Teams install, T1b SSO, the attended upstream merge, and a VM
+deploy. No generator/evaluator pair was started. 7-day usage is 60% with ~39 h to its reset, and
+the queue has nothing an unattended pair can finish.
 
 ## 2026-09-24 08:15 — every check-in was getting step 1 and nothing else; the prompt now goes on stdin (`c3be50014`)
 
