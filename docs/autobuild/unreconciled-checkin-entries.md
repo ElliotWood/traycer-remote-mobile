@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and twenty-four** entries in this
+everything came down, nothing went up. The **one hundred and twenty-five** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and twenty-four**. Three count sites remain in this header: this
+on this file → **one hundred and twenty-five**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,66 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and twenty-four entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and twenty-five entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-24 16:15 — the host log grew twelvefold at 12:59 (Tiptap rooms stuck reconnecting, same lease failure); the profile "timeout" is a slow live fetch; quiet fleet
+
+**New: `host.log` has run at ~810 lines an hour since 12:59, up from 40–68.** Hourly counts on
+09-24: 09h 40, 10h 62, 11h 68, 12h 66, **13h 808, 14h 830, 15h 810**. The step-4 census over the whole
+file (4,628 lines) is **4,328 in the top five, 93.5%**, and they tell one story:
+
+| Count | Line |
+|---|---|
+| 2,799 | `EpicTokenRefresher: batch threw ... CredentialLeaseReleasedError: No live request context retained for user X` |
+| 576 | `Tiptap room artifact-room-<epic>-X stayed disconnected; rebuilding provider` |
+| 567 | `Failed to rebuild Tiptap provider for room artifact-room-<epic>-X: No live request context retained for user X` |
+| 194 | `Tiptap room X stayed disconnected; rebuilding provider` |
+| 192 | `Failed to rebuild Tiptap provider for room X: No live request context retained for user X` |
+
+The first Tiptap line is 12:59:56, just after a `[tiptap] contained websocket error` (the untimestamped
+lines near it include `getaddrinfo ENOTFOUND collab.traycer.ai` and `connect ETIMEDOUT`, so the
+network dropped briefly). Each room's rebuild then fails on the **same** missing request context as the
+lease storm. The storm has taken the artifact collab rooms with it: the rooms dropped at the network
+blip and cannot reconnect without a live user context. The host is still alive (last line 16:16:36;
+one 460 ms event-loop stall at 16:03). This does not block any agent, because none is running. It
+does mean the desktop app's artifact rooms are disconnected until an attended reopen gives the host a
+user context. **One attended epic open should clear both.** It is the same event that runs the
+cloud repair, so reconcile this file first (see *What to do now*).
+
+**Fleet:** 115 agents. `host.log` has **zero** `starting provider turn`, `ChatSession: opening` or
+`EpicFileSync` lines in its whole span, so nothing is blocked, errored or rate-limited. No agent was
+messaged, and no artifact was touched (sync is not running). **CI:** `6eec103c1` is green on all six
+workflows.
+
+**Profile:** `ambient`, 5-hour **2%**, 7-day **60%**, resets 09-26 03:00 local. It is healthy.
+Altra was not re-read because nothing needed a failover.
+
+**The profile-read "WebSocket frame timed out" is now diagnosed. It is a slow live fetch, not a
+fault.** This window's first `profile-rate-limits` call started 06:17:45.6Z and failed at 06:18:09.9Z
+with `timed out after 15000ms`. The retry at 06:18:25Z answered **`captured 06:18:09.873Z`**, which is
+the failed call's end, not the retry's own clock. 12:15 fits the same pattern: that capture,
+02:17:36Z, is the failed call's end too (cli.log `CLI command failed` 02:17:36.131Z). So the host's
+upstream fetch takes about 24 s. The CLI stops waiting at 15 s, the host finishes and caches the
+result, and the retry serves that seconds-old capture. The reading is still current, and the retry is
+the right handling. The 12:15 note calling the capture "the call clock" was 1 s off in a way that hid
+this.
+
+**CLI bearer: the 8–37 s hard-fail window did not reproduce.** `exp` was 16:17:12. `agent list`
+started at **+29.5 s** (cli.log 06:17:41.518Z). It exited 0 and rewrote `credentials` at 16:17:43,
+with the new `exp` 20:17:42. The prompt's rule was measured at +28.1 s → 401. So the window is not a
+fixed band. The retry-after-40 s advice still holds, but a success inside the band is possible.
+**Next run's `exp` is 20:17:42.**
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`), not an ancestor of `origin/main`.
+**Toward the standing goal:** unchanged. What remains needs a human or a billed action: a real Teams
+install, T1b SSO, the attended upstream merge, and a VM deploy. No generator/evaluator pair was started,
+because the queue has nothing an unattended pair can finish.
 
 ## 2026-09-24 12:15 — the stdin fix held: this run got all eight steps; quiet window, nothing to unblock
 
