@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and twenty-six** entries in this
+everything came down, nothing went up. The **one hundred and twenty-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and twenty-six**. Three count sites remain in this header: this
+on this file → **one hundred and twenty-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,41 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and twenty-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and twenty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-25 00:15 — quiet window: the storm holds at ~780 lines an hour, nothing to unblock
+
+**Host:** `host.log` is 11,330 lines (last line 00:16:39, so the host is alive). Hourly counts stay
+flat: **20h 782, 21h 780, 22h 786, 23h 752**. The step-4 census has the top five at **10,536 of
+11,330 lines, 93.0%**, the same one story as 16:15 and 20:15: 5,399 `EpicTokenRefresher ... No live
+request context`, then 1,924 + 1,869 + 673 + 671 lines of Tiptap rooms that stay disconnected and
+fail to rebuild on that same missing context. It is not growing and not clearing. **One attended
+epic open should still clear it** (reconcile this file first, see *What to do now*).
+
+**Fleet:** 115 agents. `host.log` has **zero** `starting provider turn`, `ChatSession: opening`,
+`EpicFileSync`, `active turn` or `status=running` lines, so nothing is blocked, errored or
+rate-limited. No agent was messaged. No artifact was touched, because sync is not running.
+**CI:** `3cc9a6121` is green on all six workflows.
+
+**Profile:** `ambient`, 5-hour **2%**, 7-day **61%** (resets 09-26 03:00 local). It is healthy.
+Altra was not re-read because nothing needed a failover. The first read at 00:16:14 hit the known
+`WebSocket frame timed out after 15000ms` (fourth window in a row). The retry at 00:19:16 answered
+first time, `captured 14:19:23Z`.
+
+**CLI bearer:** `exp` was 00:18:31. `agent list` ran at 00:16:03 (inside the token's life, exit 0).
+The profile retry was held until 00:19:16 (+45 s, past the hard-fail band), and it refreshed the
+token. **Next run's `exp` is 09-25 04:19:17.**
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`), not an ancestor of `origin/main`.
+**Toward the standing goal:** unchanged. What remains needs a human or a billed action: a real Teams
+install, T1b SSO, the attended upstream merge, and a VM deploy. No generator/evaluator pair was
+started. Parent of this entry's commit: `3cc9a6121`.
 
 ## 2026-09-24 20:15 — quiet window: the Tiptap/lease storm holds steady at ~800 lines an hour, nothing to unblock
 
