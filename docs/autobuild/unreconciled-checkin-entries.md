@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and thirty** entries in this
+everything came down, nothing went up. The **one hundred and thirty-one** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and thirty**. Three count sites remain in this header: this
+on this file → **one hundred and thirty-one**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,60 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and thirty entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and thirty-one entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-25 16:15 — room `f347a4fb` has been silent for four hours since 12:17:37; recovery still unmeasured
+
+**Placeholder from 12:15, filled:** `host.log` holds **zero** `f347a4fb` lines after `12:17:37`. The
+last line for that room is the `stayed disconnected; rebuilding provider` at 12:17:37.733. No
+`Failed to rebuild` line came after it. The box was awake the whole time: no Kernel-Power 42/107
+or Power-Troubleshooter 1 events since 12:00. The host is alive too (`traycer-host` pid 21084,
+started 09-23 08:17:51, and it logged this run's 16:15:56 call). **First line after 12:17:49:** an
+untimestamped `[tiptap] contained websocket error Error: WebSocket was closed before the connection
+was established` stack. After that, the next line is this run's `[jwks] Persisted signing keys`.
+So the storm stopped. It was ~120 lines an hour for 26 h, and now it is 0 for 4 h. **But the host
+logs no success line, so "recovered" and "rebuild stalled for good" still read the same.** This
+run cannot tell them apart. A room that never finishes rebuilding would also be silent. **For the
+20:15 run:** the same count after 12:17:37 again. Still 0 means the storm is over whichever it was.
+
+**Host census 12:00 → now:** `host.log` is 12,800 lines, with only 38 timestamped lines since
+12:00, all in hour 12. There are 18 `stayed disconnected` and 17 `Failed to rebuild` lines, all
+before 12:17:38. Then there is one event-loop stall (279 ms) and the two `exp` RPC WS lines. This
+is a quiet log, not a stuck one. That is the first time it has been quiet since 09-24 12:59.
+
+**Fleet:** `agent list --all` shows 115 agents. There are **zero** `starting provider turn`,
+`ChatSession: opening`, `EpicFileSync`, `active turn` or `status=running` lines since 12:00. Nothing
+is blocked, errored or rate-limited. No agent was messaged and no artifact was touched.
+
+**CI: `5bc9b5253` is green on all six workflows**, including Tests. That is the third clean docs
+commit since the darwin P3 sighting.
+
+**Profile:** `ambient` is `max`, with 5-hour **9%** and 7-day **66%**, and the 7-day window resets
+09-26 03:00 local. It is healthy, so no failover was needed and Altra was not re-read. The first
+read at 16:15:55 hit `WebSocket frame timed out after 15000ms` again. That is the **eighth window in
+a row**. The retry at 16:17:10 answered `captured 2026-09-25T06:16:21.611Z`, which is the timed-out
+call's own moment (16:16:21) and **not** the retry's clock. **So a retry after a timeout replays
+the stranded capture.** It is not a fresh live read, and this corrects the "live read" claim in the
+prompt for that case. The numbers are 49 s old, which is fine for this purpose.
+
+**CLI bearer:** the stored `exp` is 09-25 16:17:20. This run's first call at 16:15:55 landed
+**inside** the token's life (-85 s), so it was not refreshed and `exp` is unchanged. The 20:15
+run will find it about 4 h expired, well past the 8-37 s 401 band, so the CLI will refresh
+in-command.
+
+**Header:** the three count sites move to `one hundred and thirty-one`, which matches
+`grep -c '^## 2026'` = 131.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main`
+(`merge-base --is-ancestor` exit 1). **Toward the standing goal:** unchanged. What remains needs a
+human or a billed action: a real Teams install, T1b SSO, the attended upstream merge, and a VM
+deploy. No generator/evaluator pair was started. Parent of this entry's commit: `5bc9b5253`.
 
 ## 2026-09-25 12:15 — room `f347a4fb` went QUIET right after this run's CLI refresh; recovery is unmeasured
 
