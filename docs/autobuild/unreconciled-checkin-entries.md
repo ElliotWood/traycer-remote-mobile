@@ -91,9 +91,11 @@ failure is one job, `test (traycer-clients-gui-app shard 4)` (run `36211573331`,
 picker is open"*, `expected +0 to be 1` at line 117. That is the shard-4 member `ci-tests-flake.md`
 has had by name since 2026-09-01. The commit only changes docs, and its parent `361639452` was green on
 the same tree. So this is the flake, not a regression. **Rerun of the failed job issued 16:19:40.**
-Rerun result: **pending**. Attempt 2 was still `in_progress` at 16:20:08, when this entry landed. No row was added to `ci-tests-flake.md` this window. The next run should
-file `d30d871fc` there, along with this rerun's attempt 2 from
-`actions/runs/36211573331/attempts/2/jobs`.
+Rerun result: **CANCELLED, by this run.** Landing this entry pushed `6d0f0761c` to `main`, and Tests has
+`concurrency: cancel-in-progress` keyed on the ref, so the new run killed attempt 2 at 16:21. **Rule:** a
+rerun on `main` does not survive the same window's ledger push. Read the next push's Tests run instead. That
+run (`36223456651` on `6d0f0761c`, same code tree) went **green on every job at 16:27.** The flake is confirmed. No row was added to `ci-tests-flake.md` this window. The next run should
+file `d30d871fc` there: attempt 1 red, attempt 2 cancelled by the push, green on `6d0f0761c`.
 
 **Worktree note:** cwd is again the `traycer/chat-transfer` worktree (`electric-stork`), with the same
 uncommitted `scripts/autobuild-checkin.ps1` change and the untracked
