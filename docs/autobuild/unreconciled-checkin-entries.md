@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and thirty-seven** entries in this
+everything came down, nothing went up. The **one hundred and thirty-eight** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and thirty-seven**. Three count sites remain in this header: this
+on this file → **one hundred and thirty-eight**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,61 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and thirty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and thirty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-26 20:15 — main green on all six workflows; the 16:15 flake filed in `ci-tests-flake.md`; profile healthy (max, 5 % / 8 %); quiet fleet
+
+**Bearer:** stored `exp` was 20:18:05. Every CLI call ran 20:15:26 → 20:16:06, inside the token's life, so
+none refreshed (`credentials` mtime is still 16:18:07). The once-per-window `exp` fatal-close pair is
+expected in `host.log` at about 20:18; this run did not wait to see it.
+
+**Profile: MEASURED, two calls for the fourth window running.** The first `agent profile-rate-limits
+claude --profile ambient` started 20:15:26 and exited 1: `WebSocket frame timed out after 15000ms`. The
+retry started 20:15:59 and exited 0 with `captured 2026-09-26T10:15:53.170Z` = **20:15:53 local**. That is
+after the first call's start but BEFORE the retry's, so the retry returned the capture the timed-out call
+produced. It is still a live reading from this window, just not the retry's own. Verdict: `plan: max`,
+**5-hour 5 %** (resets 23:10 local), **7-day 8 %** (resets 10-03 03:00 local), Fable 0 %. **Healthy; no
+failover.** Altra re-read: `unavailable (rate_limits_not_available)`, and `host.log` logged two probes with
+`subscriptionType: null`. That matches its standing unauthenticated state. Box `LoadPercentage` was 17 at
+20:17, so load does not explain the slow first probe this window either.
+
+**Host:** `host.log` has 12,912 lines, up from 12,901. The only timestamped lines since 16:15 are 16:15's
+`exp` pair and this run's two Altra probe WARNs. The whole-file top five are unchanged: `EpicTokenRefresher:
+batch threw` 5,399, then the four Tiptap lines (1,927 / 1,869 / 1,390 / 1,386). Together that is 92.7 % of
+the file and one story (`No live request context retained for user`), but **none grew. It is a quiet log
+carrying an old stuck episode, not a stuck one now.** `EpicFileSync` has **0** lines. No sync window, so no
+artifact was edited; this ledger is the whole record.
+
+**Fleet:** `agent list --all --json` returned **115** agents, exit 0, the same count as 16:15 (not diffed
+by id this window). There are **zero** `starting provider turn`, `ChatSession: opening`, `active turn` or
+`status=running` lines in `host.log`. Nothing is blocked, errored or rate-limited. No agent was messaged.
+
+**CI:** `90f4d6fc5` (16:15's follow-up docs commit, `main` head) is **green on all six workflows**, Tests
+included (run `36223808668`). 16:15's carried ask is done: `d30d871fc` is filed in `ci-tests-flake.md`
+(attempt 1 red on shard 4, attempt 2 cancelled by the ledger push, green on `6d0f0761c` and `90f4d6fc5`).
+**Left unreconciled:** that file's summary sentence still reads "twenty-six red runs … shard 4 three
+times", but its table now has **31** rows (`grep -c '^| \`'`) and four shard-4 rows. That drift predates
+this run (30 rows before this one). A backfill window should re-derive the sentence from the table rather
+than bump it.
+
+**Worktree note:** cwd is again the `traycer/chat-transfer` worktree (`electric-stork`), with the same
+uncommitted `scripts/autobuild-checkin.ps1` change and the untracked
+`scripts/autobuild-checkin.missed-windows.test.ps1`. Neither is this run's; both left untouched. Landed
+via `C:/repo/wt-guiapp-main`, which holds only untracked `scratch/DRY-*.md` files and has no live agent.
+
+**Header:** the three count sites move to `one hundred and thirty-eight`, which matches
+`grep -c '^## 2026'` = 138.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main` (exit 1).
+**Toward the standing goal:** unchanged. Capacity is not the blocker. What remains needs a human or a
+billed action: a real Teams install, T1b SSO, the attended upstream merge, and a VM deploy. No
+generator/evaluator pair was started. Parent of this entry's commit: `90f4d6fc5`.
 
 ## 2026-09-26 16:15 — Tests red on 12:15's docs commit (shard 4, the named `workspace-folders-refresh` flake), rerun issued; profile healthy (max, 12 % / 7 %); quiet fleet
 
