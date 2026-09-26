@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and thirty-six** entries in this
+everything came down, nothing went up. The **one hundred and thirty-seven** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and thirty-six**. Three count sites remain in this header: this
+on this file → **one hundred and thirty-seven**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,68 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and thirty-six entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and thirty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-26 16:15 — Tests red on 12:15's docs commit (shard 4, the named `workspace-folders-refresh` flake), rerun issued; profile healthy (max, 12 % / 7 %); quiet fleet
+
+**Correction to 12:15:** that entry said `agent list` returned **113** agents. It did not save the
+list. The three saved snapshots today (`agents-0926-0015.json`, `-0415.json`, and this run's
+`-1615.json`) all hold **115**, and this run's ids are the same set as 04:15's (diffed: nothing new,
+nothing gone). Read 12:15's count as unmeasured.
+
+**Bearer:** stored `exp` was 16:17:17. The first call (`agent list --all --json`, 16:16:26, 51 s inside
+life) exited 0 and did not refresh. The profile call was held until 16:18:05 (+48 s, past the 8-37 s
+hard-fail band). It refreshed in-command: `credentials` mtime 16:18:07. `host.log` shows the usual
+once-per-check-in `exp` fatal-close pair at 16:18:06.
+
+**Profile: MEASURED, two calls for the third window running.** The first `agent profile-rate-limits
+claude --profile ambient` ran 16:18:05 → 16:18:32 and exited 1: `WebSocket frame timed out after
+15000ms`. The retry, 15 s later, exited 0 at 16:18:48 with `captured 2026-09-26T06:18:31.796Z` =
+**16:18:31 local**. That is newer than the first call's start, so it is a reading, not a replay. Verdict:
+`plan: max`, **5-hour 12 %** (resets 18:09 local), **7-day 7 %** (resets 10-03 02:59 local), Fable 0 %.
+**Healthy; no failover.** Altra was not re-read; its standing state is unauthenticated. Box
+`LoadPercentage` was 29 at about 16:19, so this time the slow first probe does NOT line up with high load.
+The pattern holds anyway: the first call dies at 15 s, and a retry ~15 s later reads.
+
+**Host:** same process (`traycer-host` pid 21084, started 09-23). `host.log` is at 12,901 lines, up
+from 12,881. The only timestamped lines since 12:15 are that run's `exp` pair, one 532 ms stall, and
+this run's `exp` pair. The whole-file top five are unchanged: `EpicTokenRefresher: batch threw` 5,399,
+then the four Tiptap lines (1,927 / 1,869 / 1,390 / 1,386). **None grew. This is a quiet log, not a
+stuck one.** `EpicFileSync` has **0** lines. No sync window, so no artifact was edited; this ledger is
+the whole record.
+
+**Fleet:** 115 agents, exit 0. There are **zero** `starting provider turn`, `ChatSession: opening`,
+`active turn` or `status=running` lines in `host.log`. Nothing is blocked, errored or rate-limited.
+No agent was messaged.
+
+**CI: `d30d871fc` (12:15's docs commit) is RED on Tests.** The other five workflows are green. The
+failure is one job, `test (traycer-clients-gui-app shard 4)` (run `36211573331`, job `108319051214`):
+`Test Files 1 failed | 263 passed`, `Tests 1 failed | 2638 passed`. The failing test is
+`workspace-folders-refresh.test.tsx` > *"folder-mapping refresh affordance > re-derives on R while the
+picker is open"*, `expected +0 to be 1` at line 117. That is the shard-4 member `ci-tests-flake.md`
+has had by name since 2026-09-01. The commit only changes docs, and its parent `361639452` was green on
+the same tree. So this is the flake, not a regression. **Rerun of the failed job issued 16:19:40.**
+Rerun result: **pending**. Attempt 2 was still `in_progress` at 16:20:08, when this entry landed. No row was added to `ci-tests-flake.md` this window. The next run should
+file `d30d871fc` there, along with this rerun's attempt 2 from
+`actions/runs/36211573331/attempts/2/jobs`.
+
+**Worktree note:** cwd is again the `traycer/chat-transfer` worktree (`electric-stork`), with the same
+uncommitted `scripts/autobuild-checkin.ps1` change and the untracked
+`scripts/autobuild-checkin.missed-windows.test.ps1`. Neither is this run's; both left untouched.
+
+**Header:** the three count sites move to `one hundred and thirty-seven`, which matches
+`grep -c '^## 2026'` = 137.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main` (exit 1).
+**Toward the standing goal:** unchanged. Capacity is not the blocker. What remains needs a human or a
+billed action: a real Teams install, T1b SSO, the attended upstream merge, and a VM deploy. No
+generator/evaluator pair was started. Parent of this entry's commit: `d30d871fc`.
 
 ## 2026-09-26 12:15 — profile read again takes two calls (max, 5-hour 16 %, 7-day 3 %); box busy with a Defender scan; quiet fleet; `361639452` all green
 
