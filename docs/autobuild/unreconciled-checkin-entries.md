@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and forty-four** entries in this
+everything came down, nothing went up. The **one hundred and forty-five** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and forty-four**. Three count sites remain in this header: this
+on this file → **one hundred and forty-five**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,7 +44,7 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and forty-four entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and forty-five entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
@@ -52,6 +52,51 @@ after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
 
+## 2026-09-28 00:15 — main green on all six (darwin red did not recur); profile healthy (max, 3 % / 13 %); quiet fleet
+
+**Bearer: one reading lost, then recovered — my fault, not the CLI's.** `exp` decoded to 00:15:39. I placed
+the first `agent list --all --json` at 00:15:47 (**+8 s**, inside the 401 band) because I misjudged the
+clock. It exited 1 and `credentials` was not rewritten (mtime stayed 20:15:40.554), exactly as the prompt
+predicts. The retry at 00:16:29 (+50 s) exited 0 and refreshed in-command: `credentials` rewritten 00:16:31.188,
+`host.log` `exp` fatal-close pair at 00:16:30.558/.559. The failed call left **no** `host.log` line.
+**Lesson: gate the first call on `(Get-Date) -ge exp+40s` in code, not by eye.**
+
+**Profile: MEASURED, frame-timeout path for the fifth window running.** The first `ambient` call (00:16:32)
+exited 1 with `WebSocket frame timed out after 15000ms`. The retry at 00:16:59 exited 0 with `captured`
+**00:16:59.560 local**, a live read. Verdict: plan `max`, **5-hour 3 %**, **7-day 13 %**, Fable 0 %.
+**Healthy; no failover.** Altra: `unavailable (rate_limits_not_available)`, captured 00:17:06.331, with
+its two `subscriptionType: null` probe WARNs. That is its standing unauthenticated state.
+
+**Host:** same process (`traycer-host` pid 21084, started 09-23 08:17). `host.log` was at 13,013 lines
+before my calls, 16 more than 20:15's 12,997. All 16 are two untimestamped
+`[tiptap] contained websocket error ... closed before the connection was established` blocks with their
+stack traces. That is background Tiptap reconnect noise with no timestamped line, so nothing ran. It is
+13,018 after my calls. The whole-file top five are unchanged: `EpicTokenRefresher: batch threw` 5,399, then
+the four Tiptap `No live request context` lines (1,927 / 1,869 / 1,390 / 1,386). Those five are 92 % of the
+file and tell one story. **None grew, so they are the old episode, not the current state.** `EpicFileSync`
+has **0** lines, so no artifact was edited. This ledger is the whole record.
+
+**Fleet:** `agent list --all --json` returned **115** agents (saved to
+`wt-guiapp-main/scratch/agents-0928-0015.json`). `host.log` has **zero** `starting provider turn` lines.
+Nothing is blocked, errored or rate-limited. No agent was messaged.
+
+**CI: 20:15's commit `4f728c123` is GREEN on all six workflows** (Tests run 36312111472). The darwin
+host-lifecycle red on `15a18bc19` did not recur on the next docs-only push. That fits the flake reading,
+and there is no fourth sighting. `ci-tests-flake.md` is untouched. **Next run: read Tests for this
+entry's commit.**
+
+**Worktree note:** unchanged. `electric-stork` still has the uncommitted `scripts/autobuild-checkin.ps1`
+change and the untracked missed-windows test. Neither is mine, and I left both untouched. Landed via
+`C:/repo/wt-guiapp-main`.
+
+**Header:** the three count sites move to `one hundred and forty-five`, which matches
+`grep -c '^## 2026'` = 145.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main` (exit 1).
+**Carried, still unreconciled:** the `ci-tests-flake.md` summary sentence vs its table. **Toward the
+standing goal:** unchanged. Capacity is not the blocker. What is left needs a human or a billed action: a
+real Teams install, T1b SSO, the attended upstream merge, and a VM deploy. No generator/evaluator pair was
+started. Parent of this entry's commit: `4f728c123`.
 ## 2026-09-27 20:15 — Tests red on 16:15's docs push (darwin host-lifecycle flake, third sighting); profile healthy (max, 4 % / 12 %); quiet fleet
 
 **Bearer: no reading lost.** I decoded `exp` before the first call: 16:17:32, so the token was about 4 h stale,
