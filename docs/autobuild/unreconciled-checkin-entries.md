@@ -115,7 +115,7 @@ read Tests for this entry's commit.**
 **Worktree note:** unchanged. `electric-stork` still has the uncommitted `scripts/autobuild-checkin.ps1` change and
 the untracked missed-windows test. Neither is mine, and I left both untouched. Landed via `C:/repo/wt-guiapp-main`.
 
-**Header:** the three count sites move to `one hundred and forty-nine`, which matches `grep -c '^## 2026'` = 148.
+**Header:** the three count sites move to `one hundred and forty-eight`, which matches `grep -c '^## 2026'` = 148.
 
 **Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main` (exit 1). **Toward the standing
 goal:** unchanged. What is left needs a human or a billed action: a real Teams install, T1b SSO, the attended
