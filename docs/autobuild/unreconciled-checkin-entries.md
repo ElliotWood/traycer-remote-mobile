@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and fifty-four** entries in this
+everything came down, nothing went up. The **one hundred and fifty-five** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and fifty-four**. Three count sites remain in this header: this
+on this file → **one hundred and fifty-five**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,50 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and fifty-four entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and fifty-five entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-29 16:15 — main green on all six at `5f1f61224`; profile healthy (max, 7 % / 19 %); quiet fleet; the Tiptap room is still stuck
+
+**Bearer: no reading lost.** `exp` decoded to 16:16:48, read at 16:15:18. Both live calls finished inside the token's
+life (`profile-rate-limits` started 16:16:04, `agent list` done 16:16:16, i.e. -32 s), so no refresh ran:
+`credentials` still carries 12:16:49's mtime. The 401 band was not touched this run.
+
+**Profile: MEASURED.** `ambient` captured 06:16:15Z = 16:16:15 local (the call clock, so live): plan `max`,
+**5-hour 7 %**, **7-day 19 %**, Fable 0 %. **Healthy; no failover.** Altra re-read at 16:16:29:
+`unavailable (rate_limits_not_available)`, still unauthenticated, so still not a failover target.
+
+**Host:** same process (`traycer-host` pid 21084, started 09-23 08:17). `host.log` 14,576 lines, up **480** from
+12:15's 14,096 (read with `tail -n +14097`). Of those 480, **477 (99.4 %)** are the same two-line Tiptap episode
+(239 `stayed disconnected; rebuilding provider` + 238 `Failed to rebuild ... No live request context retained for
+user X`), room `f347a4fb31e8…`, still retrying every minute; the other three are a `jwks` fetch and my own Altra
+probe (two `usage-rate-limit probe unavailable`). Whole-file top five: 5,399 / 2,090 / 2,085 / 1,927 / 1,869 =
+**13,370 of 14,576 (91.7 %)**, one story: no live request context for the signed-in user, so the token refresher
+and both room kinds cannot rebuild. Now ~11.7 h stuck; it needs the desktop app opened, not a check-in.
+`EpicFileSync` **0** lines, so no artifact was edited; this ledger is the whole record.
+
+**Fleet:** **115** agents (saved to `electric-stork/scratch/agents-0929-1615.json`), **field-for-field identical**
+to 12:15's snapshot (python diff: none new, none gone, zero changed). **Zero** `starting provider turn` lines in
+`host.log`. Nothing blocked, errored or rate-limited. No agent was messaged, so no sync window was opened.
+
+**CI: `5f1f61224` (12:15's entry) is GREEN on all six** (Tests 36511978244, CodeQL, Secret scan, pre-commit, macOS
+launchd, Protocol Compatibility). So 12:15's red on `d65cf38b7` was the shard-2 flake, as that entry said: the next
+docs-only commit went green with no fix.
+
+**Worktree note:** unchanged; `electric-stork`'s uncommitted `autobuild-checkin.ps1` change and untracked
+missed-windows test are not mine and were left alone. Landed via `C:/repo/wt-guiapp-main`.
+
+**Header:** three count sites move to `one hundred and fifty-five` = `grep -c '^## 2026'`, replace scoped to the
+text before the first `## 2026` heading and asserted at exactly three.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) not an ancestor of `origin/main` (exit 1). **Toward the
+standing goal:** unchanged; the rest needs a human or a billed action (real Teams install, T1b SSO, attended
+upstream merge, VM deploy). No generator/evaluator pair started. Parent of this entry's commit: `5f1f61224`.
 
 ## 2026-09-29 12:15 — Tests red on the known shard-2 39/2910 flake at `d65cf38b7` (docs-only), the other five green; profile healthy (max, 0 % / 18 %); quiet fleet; the Tiptap room is still stuck
 
