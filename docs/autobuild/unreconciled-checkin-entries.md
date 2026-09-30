@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and fifty-nine** entries in this
+everything came down, nothing went up. The **one hundred and sixty** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and fifty-nine**. Three count sites remain in this header: this
+on this file → **one hundred and sixty**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,53 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and fifty-nine entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and sixty entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-09-30 12:15 — Tests red on the known shard-2 39/2910 flake at `aef4f2fe4` (docs-only); profile healthy (max, 3 % / 21 %); quiet fleet; the Tiptap loop came back at 10:44 and a DNS outage (`ENOTFOUND collab.traycer.ai`) ran 10:46-11:50 on an awake box
+
+**Bearer: refreshed in-command.** `exp` decoded to 12:16:04, read at 12:17:12 (+68 s, past the 8-37 s band).
+`agent list` at 12:19:21 exited 0.
+
+**Profile: MEASURED.** First `profile-rate-limits claude --profile ambient` at 12:19:34 exited 1 on the CLI's 15 s
+frame timeout (sixth window running). The retry at 12:20:45 exited 0 with `captured` 02:19:58Z = 12:19:58 local:
+newer than the FIRST call's start, older than the retry's - so the first call completed host-side and the retry
+replayed it. A real reading: plan `max`, **5-hour 3 %**, **7-day 21 %**, Fable 0 %. **Healthy; no failover.** Altra
+12:20:08: `unavailable (rate_limits_not_available)`, still not a failover target.
+
+**Host:** ~1,011 lines since 08:16. Census, whole window (multi-line entries counted per line): `ENOTFOUND
+collab.traycer.ai` + its stack line 351 + 351, `WebSocket was closed before the connection was established` 132,
+Tiptap `stayed disconnected; rebuilding provider` 52, jwks refresh 45, `Failed to rebuild ... No live request
+context` 28 - **one story, the Tiptap room `f347a4fb…` rebuild loop and its collab socket failing DNS**. Timeline:
+silent 08:17 → 10:44:02 (no Kernel-Power 42 / wake events since 08:00 - the box was AWAKE, not asleep); loop resumed
+10:44:02; `ENOTFOUND collab.traycer.ai` 10:46:07 → 11:50:18 (146 timestamped entries); after 11:50 the loop continues
+on the non-DNS failures (`Tiptap sync timed out after 120000ms`, `No live request context`) to 12:22 at least.
+`collab.traycer.ai` resolves again now. So 08:15's "quiet, not over" held: the loop was dormant, not dead - third
+time this room has gone silent and come back. WARN-only; `EpicFileSync` **0** lines, so no artifact was edited; this
+ledger is the whole record.
+
+**Fleet:** **115** agents (saved to `electric-stork/scratch/agents-0930-1215.json`), **field-for-field identical** to
+08:15's snapshot (none new, none gone, zero changed, `active`/`capabilities` ignored). **Zero** `starting provider
+turn` lines. Nothing blocked, errored or rate-limited. No agent was messaged.
+
+**CI: `aef4f2fe4` (08:15's entry, docs-only):** Tests **red** - only `test (traycer-clients-gui-app shard 2)`,
+**39 failed / 2871 passed (2910)**, 1 file - the known alternating shard-2 flake by its exact count. The other five
+green (CodeQL, Secret scan, pre-commit, macOS launchd, Protocol Compatibility). No rerun issued: this push starts a
+fresh Tests run and `cancel-in-progress` would kill a rerun anyway.
+
+**Worktree note:** unchanged; `electric-stork`'s uncommitted `autobuild-checkin.ps1` change and untracked
+missed-windows test are not mine and were left alone. Landed via `C:/repo/wt-guiapp-main`.
+
+**Header:** three count sites move to `one hundred and sixty` = `grep -c '^## 2026'`.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) not an ancestor of `origin/main` (exit 1). **Toward the
+standing goal:** unchanged; the rest needs a human or a billed action (real Teams install, T1b SSO, attended
+upstream merge, VM deploy). No generator/evaluator pair started. Parent of this entry's commit: `aef4f2fe4`.
 
 ## 2026-09-30 08:15 — main green on all six at `752ed163b`; profile healthy (max, 2 % / 21 %); quiet fleet; the Tiptap loop went silent again at 04:16:06 (quiet, NOT over — 04:15 showed silence is not recovery)
 
