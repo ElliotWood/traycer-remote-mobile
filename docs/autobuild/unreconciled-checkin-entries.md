@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and sixty-seven** entries in this
+everything came down, nothing went up. The **one hundred and sixty-eight** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and sixty-seven**. Three count sites remain in this header: this
+on this file → **one hundred and sixty-eight**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,57 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and sixty-seven entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and sixty-eight entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-10-01 20:15 — 16:15's `b0476a7a0` went red on two known gui-app flake members (shard 2 = 39/74, shard 3 = about-details), green on attempt 2; profile healthy (max, 0 % / 26 %); quiet fleet; host.log silent 16:16-20:16 on an awake box (seventh window running)
+
+**Bearer: 14,183 s past `exp` at first read** (`exp` 16:19:49, read 20:16:05) - far outside the 8-37 s hard-fail band,
+so the first call refreshed in-command. `agent list` exit 0. host.log logged the usual once-per-window `RPC WS ... "exp"
+claim timestamp check failed` pair at 20:16:31, the same shape as 12:19:49.
+
+**Profile: first call frame-timed-out again, retry served it.** `profile-rate-limits claude --profile ambient` at
+20:16:32 exited 1 (`WebSocket frame timed out after 15000ms`); the retry at 20:17:07 exited 0 with `captured`
+10:16:52Z = 20:16:52 local - 15 s OLDER than the retry, so it is the first call's reading completing host-side, 15 s
+old. Plan `max`, **5-hour 0 %**, **7-day 26 %**, Fable 0 %. **Healthy; no failover.** Altra at 20:17:14: `captured`
+20:17:14 (live) `unavailable (rate_limits_not_available)` - still not a failover target.
+
+**Host:** 18,488 lines (+5 since 16:15's 18,483, all this run's: the `exp` pair at 20:16:31, an untimestamped
+`[jwks] Persisted signing keys ... (4 key(s))` line, and the two Altra probe lines); whole-file top five =
+**14,101 (76.3 %)**, unchanged - the same `No live request context retained for user 3e3d1309…` story
+(`EpicTokenRefresher` 5,399, Tiptap rebuild loop 2,484 / 2,422 / 1,927 / 1,869). Last timestamped line before this run
+is 16:16:16. Box **awake** (Kernel-Power 42/107 in the last 4 h: 0). `starting provider turn` on 10-01: **0**.
+`EpicFileSync` on 10-01: **0** lines, so no artifact was edited; this ledger is the whole record.
+
+**Fleet:** **115** agents (saved to `wt-guiapp-main/scratch/agents-1001-2015.json`); the `agents` array is
+byte-identical to 16:15's snapshot (`==` on the parsed arrays). No agent took a turn; nothing blocked, errored or
+rate-limited. No agent was messaged (nothing to hand them, and a send would trigger a cloud repair and spend their
+tokens).
+
+**CI: `b0476a7a0` (16:15's entry, docs-only, one file) - Tests RED on attempt 1, GREEN on attempt 2.** Run
+36824030366: `test (traycer-clients-gui-app shard 2)` = `providers-settings-panel.test.tsx` **74 tests | 39 failed**,
+first *"edits and switches the default account"* - the named shard-2 member, identified by the exact-39 invariant; and
+`test (traycer-clients-gui-app shard 3)` = `about-details-dialog.test.tsx` > *"gates the failed-snapshot report action
+on capability and never forwards the raw error"*, `Test Files 1 failed | 263 passed (264)` - the named seventh member.
+The second time both have been red in one run (first: `505243649`). The three preceding docs-only commits
+(`07dd483fa`, `0b55c0368`, `705756d5f`) were green on attempt 1. `gh run rerun --failed` at 20:18:09, waited out in
+the FOREGROUND before this push (a main push cancels an in-flight rerun): **attempt 2 completed success** at 20:22:53,
+both shards green. Other five workflows green on attempt 1. Row added to `ci-tests-flake.md`; its prose tally was NOT
+advanced (it already trails the three rows below `505243649`).
+
+**Worktree note:** `electric-stork`'s uncommitted `autobuild-checkin.ps1` change and untracked missed-windows test
+are still not mine and were left alone. Landed via `C:/repo/wt-guiapp-main`.
+
+**Header:** three count sites move to `one hundred and sixty-eight` = `grep -c '^## 2026'`.
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) not an ancestor of `origin/main` (exit 1). **Toward the
+standing goal:** unchanged; the rest needs a human or a billed action (real Teams install, T1b SSO, attended
+upstream merge, VM deploy). No generator/evaluator pair started. Parent of this entry's commit: `b0476a7a0`.
 
 ## 2026-10-01 16:15 — main green on all six at `705756d5f`; profile healthy (max, 2 % / 26 %); quiet fleet; host.log silent 12:20-16:16 on an awake box (sixth window running)
 
