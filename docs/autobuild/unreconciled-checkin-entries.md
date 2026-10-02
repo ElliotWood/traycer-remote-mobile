@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and seventy-one** entries in this
+everything came down, nothing went up. The **one hundred and seventy-two** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and seventy-one**. Three count sites remain in this header: this
+on this file → **one hundred and seventy-two**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,52 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and seventy-one entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and seventy-two entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-10-02 12:15 — main RED at `f5ca9d4dd` (docs-only): gui-app shard 2 (the known `providers-settings-panel` cascade) + one darwin `host-lifecycle` case; profile healthy (max, 3 % / 28 %); quiet fleet; host.log wrote only 08:15's own trail (eleventh window running)
+
+**Bearer: ~4 min BEFORE `exp`** (`exp` 12:19:31, decoded 12:15:18). Both first calls ran inside the token's life.
+`profile-rate-limits` first call: `WebSocket frame timed out after 15000ms` (exit 1) - the first-call frame timeout
+again, not a 401. `agent list` exit 0. Retry at ~12:16:40: exit 0.
+
+**Profile:** ambient `captured` 02:15:48Z = 12:15:48 local (live). Plan `max`, **5-hour 3 %**, **7-day 28 %**, Fable
+0 %. **Healthy; no failover.** Altra `captured` 12:16:41 `unavailable (rate_limits_not_available)` - still not a target.
+
+**Host:** 18,546 lines (+15 since 08:15's 18,531). Timestamped since 08:16: the `RPC WS ... "exp" claim timestamp check
+failed` pair at 08:19:32, Altra probe warnings 08:19:44/46 and this run's own 12:16:39/41; the rest is the untimestamped
+WebSocket trace + `[jwks] Persisted` (file last written 08:56:42). **No line not caused by a check-in.** Top five =
+**14,101 / 18,546 (76.0 %)**, counts unchanged - the same `No live request context retained` story (`EpicTokenRefresher`
+5,399, Tiptap 2,484 / 2,422 / 1,927 / 1,869). `starting provider turn|EpicFileSync` in the whole file: **0**, so no
+artifact was edited; this ledger is the whole record. Box power-event check not run this window (unmeasured).
+
+**Fleet:** **115** agents (`scratch/agents-1002-1215.json`); `agents` array identical to 08:15's (compressed-JSON `-eq`:
+`True`). No agent took a turn; nothing blocked, errored or rate-limited. No agent was messaged.
+
+**CI: `f5ca9d4dd` (08:15's entry, docs-only) - Tests FAILED** (run 36934451069); the other five green. Two jobs:
+- `test (traycer-clients-gui-app shard 2)`: first × is "edits and switches the default account" then the cascade - the
+  exact signature in the shard-2 memory (upstream file, runner flake; do not fix in the fork).
+- `test (desktop darwin + packaging)`: `host-lifecycle.test.ts` 1/25 - "forced reload emits null for unchanged unreachable
+  pid metadata and restores the same host id when it is reachable again" (20 ms). **First appearance in this ledger**
+  (grep `host-lifecycle`: 0 hits). Same tree as green `6c123d809`, so a flake by the diff, but its trigger is UNMEASURED.
+  Next window: if it recurs on this entry's commit, it stops being a one-off - open it.
+Not rerun: Tests is cancel-in-progress per ref, so this entry's push IS the rerun. Read that run, not this one.
+
+**Wrapper logs:** not located this window (unmeasured, not "no missed window").
+
+**Worktree note:** `electric-stork`'s uncommitted `autobuild-checkin.ps1` change and untracked missed-windows test are
+still not mine and were left alone. Landed via `C:/repo/wt-guiapp-main`.
+
+**Header:** three count sites move to `one hundred and seventy-two` = `grep -c '^## 2026'` (171 measured before this entry).
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) not an ancestor of `origin/main` (exit 1). **Toward the
+standing goal:** unchanged; the rest needs a human or a billed action (real Teams install, T1b SSO, attended upstream
+merge, VM deploy). No generator/evaluator pair started. Parent of this entry's commit: `f5ca9d4dd`.
 
 ## 2026-10-02 08:15 — main green on all six at `6c123d809` (Tests attempt 1); profile healthy (max, 2 % / 27 %); quiet fleet; host.log wrote only 04:15's own trail 04:18-08:16 on an awake box (tenth window running)
 
