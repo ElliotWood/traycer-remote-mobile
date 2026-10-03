@@ -24,7 +24,7 @@ together, so a single event can take all of them at once."*
 **That single event happened at 2026-08-26 04:23:26–29** — the first epic
 open since 08-11 ran `cloud repair complete liveArtifacts=210
 writeCandidates=210`, then `file sync stopped pendingArtifactWrites=0`:
-everything came down, nothing went up. The **one hundred and seventy-seven** entries in this
+everything came down, nothing went up. The **one hundred and seventy-eight** entries in this
 file survived because they are here; every artifact-only entry did not. The
 2026-08-24 04:15 entry counted the artifact pile at **nineteen** while this
 file held fourteen, so at least five entries (2026-08-19 → 2026-08-24) plus
@@ -33,7 +33,7 @@ before the repair — are gone, except where the 08:15 entry below recovers
 them.
 
 **The counts in this section are derived, not carried:** `grep -c "^## 2026"`
-on this file → **one hundred and seventy-seven**. Three count sites remain in this header: this
+on this file → **one hundred and seventy-eight**. Three count sites remain in this header: this
 derivation, the survivor count above, and the one under *What to do now*
 (the 08-24 artifact-pile *nineteen* is frozen history — never update it).
 Re-derive and update all three, or update none. (The old fifth site — "consecutive
@@ -44,13 +44,50 @@ that count stopped being derivable the day it was needed most.)
 ## What to do now (rewritten 2026-08-26 — the old "when sync comes back" branch happened, destructively)
 
 One attended minute, in the desktop app: open the epic, then either paste
-the one hundred and seventy-seven entries below back into `traycer-remote-teams/autobuild/index.md`
+the one hundred and seventy-eight entries below back into `traycer-remote-teams/autobuild/index.md`
 (newest-first; the artifact's top entry is currently 2026-08-11 16:15) and
 confirm every heading survives a subsequent reopen — or decide this file on
 `main` is the permanent record and leave a pointer in the artifact. Only
 after one of those, delete this file. A recovery copy that outlives its
 emergency is just a second source of truth that nothing keeps honest — but
 deleting this one before reconciliation deletes the only copy.
+
+## 2026-10-03 12:15 — main GREEN on all six at `d4c6926de`; profile healthy (max, 0 % / 2 %); quiet fleet (115, identical to 08:15); host.log wrote one Tiptap stack and nothing else since 08:15's trail (seventeenth window running); the 401 band bit and the retry read through it
+
+**Bearer: decoded BEFORE any call** - `exp` 12:16:28, read 12:16:23 (5 s before `exp`). The first `agent list` landed at
+12:16:40 (+12 s, inside the 8-37 s band): **exit 1, `credentials` NOT rewritten** (mtime still 08:16:28) - the band
+behaved exactly as the prompt describes. Waited to 12:17:15 (+47 s) and repeated: exit 0, `credentials` rewritten
+12:17:17, host logged its `UNAUTHORIZED reason="exp"` close pair at 12:17:16. The first `profile-rate-limits` exited 1 at
+12:17:40 with `WebSocket frame timed out after 15000ms`; the retry at 12:17:55 exit 0.
+
+**Profile:** ambient `captured` 02:17:42Z = 12:17:42 local - inside the FIRST call's life (12:17:25 -> 12:17:40 CLI
+timeout), so the host completed it after the CLI gave up; a real reading, not a replay (`usedPercent` present). Plan
+`max`, **5-hour 0 %**, **7-day 2 %**, Fable 0 %. **Healthy; no failover.** Altra `captured` 12:17:48
+`unavailable (rate_limits_not_available)` - still not a target.
+
+**Host:** 18,614 lines (+13 since 08:15's 18,601). Between the 08:15 run's last timestamped line (08:17:19) and this
+run's first (12:17:16) the host wrote one untimestamped `[tiptap] contained websocket error ... closed before the
+connection was established` stack (8 lines) and one `[jwks]` key persist that may be this run's own (the 12:16:40 failed
+call left no other host.log line). Top five unchanged - the `No live request context retained` story
+(`EpicTokenRefresher` 5,399, Tiptap 2,484 / 2,422 / 1,927 / 1,869) - historical, not growing. No `EpicFileSync`
+activity in host.log at all; no artifact was edited, and this ledger is the whole record. Host pid 21084 still running
+(started 09-23 08:17; no crash since).
+
+**Fleet:** **115** agents (`scratch/agents-1003-1215.json`); compared per id (ignoring the sender-relative `active` and
+`capabilities`) against `agents-1003-0815.json` - no added, removed or changed agent. No `active turn` /
+`status=running` line in host.log; nothing is blocked, errored or rate-limited. No agent was messaged.
+
+**CI: `d4c6926de` (08:15's entry, docs-only) - all six green.**
+
+**Worktree note:** `electric-stork`'s uncommitted `autobuild-checkin.ps1` change and untracked missed-windows test are
+still not mine and were left alone. Landed via `C:/repo/wt-guiapp-main`.
+
+**Header:** the three count sites move to `one hundred and seventy-eight` = `grep -c '^## 2026'` (177 measured before
+this entry).
+
+**Still unlanded:** `teams/ack-finished-truth` (`bc60ec108`) is not an ancestor of `origin/main` (exit 1). **Toward the
+standing goal:** unchanged. What remains needs a human or a billed action (real Teams install, T1b SSO, attended upstream
+merge, VM deploy). No generator/evaluator pair started. Parent of this entry's commit: `d4c6926de`.
 
 ## 2026-10-03 08:15 — main GREEN on all six at `e89550535`; profile healthy (max, 2 % / 0 %); quiet fleet (115, identical to 04:15); host.log wrote one Tiptap stack and nothing else since 04:15's trail (sixteenth window running)
 
