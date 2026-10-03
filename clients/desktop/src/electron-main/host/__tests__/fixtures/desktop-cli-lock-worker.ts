@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { stat, writeFile } from "node:fs/promises";
+import { rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { acquireDesktopCliLock } from "../../desktop-cli-lock";
 
@@ -97,10 +97,13 @@ async function main(): Promise<void> {
   });
   await outcome.handle.release();
   const exitCode = await cliExit;
+  // The test polls for cli-exit to exist and then parses it, so it must
+  // appear whole: writeFile creates the file empty before filling it.
   await writeFile(
-    join(barrierDir, "cli-exit"),
+    join(barrierDir, "cli-exit.tmp"),
     JSON.stringify({ exitCode, stdout: cliStdout, stderr: cliStderr }),
   );
+  await rename(join(barrierDir, "cli-exit.tmp"), join(barrierDir, "cli-exit"));
   if (exitCode !== 0) {
     throw new Error("desktop-cli-lock-worker: terminal host uninstall failed");
   }
